@@ -21,6 +21,9 @@
     reckon_db,
     reckon_evoq,
 
+    %% Mesh infrastructure (MUST start before domain apps with listeners)
+    hecate_mesh,
+
     %% Command services (CQRS write side)
     manage_capabilities,
     manage_reputation,
@@ -37,8 +40,7 @@
     query_identities,
     query_ucan,
 
-    %% Infrastructure
-    hecate_mesh,
+    %% API (starts last)
     hecate_api
    ]},
   {env, [

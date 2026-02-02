@@ -590,6 +590,66 @@ The code is now ready to attempt connection to `boot.macula.io:443`. However:
 
 ---
 
+## 2026-02-03 COMPLETE: Mesh Connection TESTED + Startup Issues Fixed
+
+**Task:** Test the mesh connection to `boot.macula.io:443`.
+
+### Test Result: SUCCESS
+
+```
+✅ Mesh client started
+Connected to Macula mesh: boot.macula.io:443
+[Connection] Successfully connected to https://boot.macula.io:443
+[hecate_mesh] Connected to mesh via https://boot.macula.io:443
+[Connection Facade] QUIC connection ready
+PONG received from bootstrap server
+```
+
+The `macula:connect/2` implementation is working correctly. QUIC connection established, handshake completed.
+
+### Startup Issues Fixed
+
+Several issues were discovered and fixed during testing:
+
+**1. Vertical slice modules not compiling (`undef` errors)**
+
+- Modules in slice subdirectories (e.g., `src/follow_agent/*.erl`) weren't being compiled
+- **Fix:** Added `{src_dirs, [...]}` to each app's rebar.config to include slice directories
+- **Apps updated:** `manage_social`, `manage_capabilities`, `manage_reputation`, `manage_subscriptions`, `manage_identities`, `manage_ucan`
+
+**2. Broken emitter modules (missing gen_server implementation)**
+
+Four emitter modules only had `publish/1` functions but supervisors expected gen_servers with `start_link/0`:
+
+| Module | Status |
+|--------|--------|
+| `agent_unfollowed_v1_to_mesh` | Fixed |
+| `capability_endorsed_v1_to_mesh` | Fixed |
+| `endorsement_revoked_v1_to_mesh` | Fixed |
+| `identity_updated_v1_to_mesh` | Fixed |
+
+All four converted to proper gen_server implementations that subscribe to events.
+
+### Files Modified
+
+**rebar.config files (6):**
+- Added `{src_dirs, ["src", "src/slice1", "src/slice2", ...]}` to each
+
+**Emitter modules (4):**
+- Full gen_server implementation with event subscription
+
+### Verification
+
+- `rebar3 compile` ✅
+- `rebar3 release` ✅
+- Mesh connection test: **PASS** (connects to boot.macula.io:443)
+
+### DHT Peer Connection Notes
+
+The logs show DHT connection errors to `370fc04fd1c9:4433` - this is expected. That's an internal Docker network address for the bootstrap server's internal endpoint, not reachable from outside.
+
+---
+
 ## 2026-02-02 COMPLETE: Pairing API (Daemon Side)
 
 **Task from QUEUE.md:** Implement daemon pairing API endpoints.
