@@ -23,7 +23,7 @@ publish_event(EventType, EventData) ->
 %% Callbacks
 
 init([]) ->
-    Realm = application:get_env(hecate_mesh, realm, <<"io.macula">>),
+    Realm = application:get_env(hecate, realm, <<"io.macula">>),
     io:format("[hecate_mesh_publisher] Initialized for realm: ~s~n", [Realm]),
     {ok, #state{realm = Realm}}.
 
