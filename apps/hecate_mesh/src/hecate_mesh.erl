@@ -19,9 +19,12 @@ publish(Topic, EventData) ->
 publish_event(EventType, EventData) ->
     publish(EventType, EventData).
 
-%% @doc Subscribe to all domain events (for query services).
-%% TODO: Implement proper mesh subscriber (currently a no-op).
-%% The mesh subscriber pattern needs refactoring - see CLAUDE.md.
+%% @doc DEPRECATED: This function is a no-op.
+%% Each domain owns its own listeners - there is NO central mesh subscriber.
+%% See CLAUDE.md → 'MESH INTEGRATION DOCTRINE' for the correct pattern:
+%% - query_capabilities → remote_capabilities_listener
+%% - manage_social → follower_events_listener, endorsement_events_listener
+%% - etc.
 -spec subscribe_to_events() -> ok.
 subscribe_to_events() ->
     ok.
