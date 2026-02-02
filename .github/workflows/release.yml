@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-release:
+    name: Build Release (${{ matrix.os }}-${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            runner: ubuntu-latest
+          - os: darwin
+            arch: arm64
+            runner: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Erlang/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: '28'
+          rebar3-version: '3.24'
+
+      - name: Get dependencies
+        run: rebar3 get-deps
+
+      - name: Compile
+        run: rebar3 compile
+
+      - name: Build release
+        run: rebar3 as prod tar
+
+      - name: Find and rename tarball
+        run: |
+          TARBALL=$(find _build/prod/rel/hecate -name 'hecate-*.tar.gz' | head -n 1)
+          NEW_NAME="hecate-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
+          mv "$TARBALL" "$NEW_NAME"
+          echo "Renamed to: $NEW_NAME"
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hecate-${{ matrix.os }}-${{ matrix.arch }}
+          path: hecate-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: ls -R artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: artifacts/**/*.tar.gz
+          body: |
+            ## Installation
+
+            **Linux (amd64):**
+            ```bash
+            curl -L https://github.com/macula-io/macula-hecate/releases/download/${{ github.ref_name }}/hecate-linux-amd64.tar.gz | tar xz
+            sudo mv bin/hecate /usr/local/bin/
+            ```
+
+            **macOS (arm64):**
+            ```bash
+            curl -L https://github.com/macula-io/macula-hecate/releases/download/${{ github.ref_name }}/hecate-darwin-arm64.tar.gz | tar xz
+            sudo mv bin/hecate /usr/local/bin/
+            ```
+
+            **Or use the installer:**
+            ```bash
+            curl -sSL https://macula.io/install/hecate | sh
+            ```
+
+            ## Documentation
+
+            - [README](https://github.com/macula-io/macula-hecate/blob/main/README.md)
+            - [API Documentation](https://github.com/macula-io/macula-hecate/blob/main/docs/API.md)
+            - [Architecture](https://github.com/macula-io/macula-hecate/blob/main/docs/ARCHITECTURE.md)
+            - [Operator Guide](https://github.com/macula-io/macula-hecate/blob/main/docs/OPERATOR_GUIDE.md)
+            - [Developer Guide](https://github.com/macula-io/macula-hecate/blob/main/docs/DEVELOPER_GUIDE.md)
+
+            See [CHANGELOG.md](https://github.com/macula-io/macula-hecate/blob/main/CHANGELOG.md) for changes.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

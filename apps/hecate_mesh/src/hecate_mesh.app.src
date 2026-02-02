@@ -1,0 +1,19 @@
+{application, hecate_mesh, [
+    {description, "Macula mesh client integration for hecate"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {hecate_mesh_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        macula
+    ]},
+    {env, [
+        {bootstrap_nodes, ["boot.macula.io:4433"]},
+        {realm, <<"io.macula">>},
+        {agent_identity, <<"mri:agent:io.macula/hecate">>}
+    ]},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

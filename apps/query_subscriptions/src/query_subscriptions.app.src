@@ -1,0 +1,11 @@
+{application, query_subscriptions, [
+    {description, "Query service for subscriptions using SQLite"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_subscriptions_app, []}},
+    {applications, [kernel, stdlib, esqlite, jsx]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

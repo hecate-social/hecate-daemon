@@ -1,0 +1,531 @@
+2026-01-31 09:43:24 =ERROR REPORT====
+Error in process <0.1063.0> with exit value:
+{{badmatch,{error,{load_failed,"Failed to load NIF library: '/home/rl/work/github.com/macula-io/macula-hecate/_build/default/lib/esqlite/priv/esqlite3_nif.so: cannot open shared object file: No such file or directory'"}}},[{esqlite3_nif,init,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/_build/default/lib/esqlite/src/esqlite3_nif.erl"},{line,89}]},{code_server,'-schedule_on_load/4-fun-0-',1,[{file,"code_server.erl"},{line,1388}]}]}
+2026-01-31 09:43:24 =CRASH REPORT====
+  crasher:
+    initial call: hecate_store:init/1
+    pid: <0.1062.0>
+    registered_name: []
+    process_label: undefined
+    exception error: {undef,[{esqlite3_nif,open,["/tmp/hecate_identity_test_4354/hecate.db"],[]},{esqlite3,open,1,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/_build/default/lib/esqlite/src/esqlite3.erl"},{line,126}]},{hecate_store,init,1,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_store.erl"},{line,76}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.982.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.982.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 376
+    stack_size: 29
+    reductions: 1342
+  neighbours:
+    neighbour: [{pid,<0.982.0>},{registered_name,[]},{process_label,undefined},{initial_call,{erlang,apply,2}},{current_function,{proc_lib,sync_start,2}},{ancestors,[]},{message_queue_len,0},{links,[<0.981.0>,<0.1062.0>]},{trap_exit,false},{status,waiting},{heap_size,2586},{stack_size,77},{reductions,21398},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{hecate_identity_tests,setup,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/test/hecate_identity_tests.erl"},{line,45}]},{eunit_test,enter_context,4,[{file,"eunit_test.erl"},{line,341}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,369}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]}]}]
+2026-01-31 09:43:50 =CRASH REPORT====
+  crasher:
+    initial call: hecate_store:init/1
+    pid: <0.815.0>
+    registered_name: []
+    process_label: undefined
+    exception error: {function_clause,[{esqlite3,exec,["CREATE TABLE IF NOT EXISTS kv (\n            bucket TEXT NOT NULL,\n            key TEXT NOT NULL,\n            value BLOB NOT NULL,\n            updated_at INTEGER NOT NULL,\n            PRIMARY KEY (bucket, key)\n        )",{esqlite3,#Ref<0.372245420.2749497409.144705>}],[{file,"/home/rl/work/github.com/macula-io/macula-hecate/_build/default/lib/esqlite/src/esqlite3.erl"},{line,263}]},{hecate_store,init_schema,1,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_store.erl"},{line,154}]},{hecate_store,init,1,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_store.erl"},{line,78}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.735.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.735.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 376
+    stack_size: 29
+    reductions: 1313
+  neighbours:
+    neighbour: [{pid,<0.735.0>},{registered_name,[]},{process_label,undefined},{initial_call,{erlang,apply,2}},{current_function,{proc_lib,sync_start,2}},{ancestors,[]},{message_queue_len,0},{links,[<0.734.0>,<0.815.0>]},{trap_exit,false},{status,waiting},{heap_size,2586},{stack_size,77},{reductions,21361},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{hecate_identity_tests,setup,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/test/hecate_identity_tests.erl"},{line,45}]},{eunit_test,enter_context,4,[{file,"eunit_test.erl"},{line,341}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,369}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]}]}]
+2026-01-31 09:44:33 =ERROR REPORT====
+** Generic server hecate_identity terminating 
+** Last message in was {initialize,#{}}
+** When Server state == {state,undefined,undefined,undefined,undefined}
+** Reason for termination ==
+** {{badmatch,{<<192,179,121,25,252,165,100,98,31,117,187,105,239,252,165,48,111,139,160,231,215,167,60,212,239,60,57,95,59,71,8,34>>,<<55,176,205,194,135,160,7,149,48,109,213,209,198,49,200,240,123,26,196,122,108,25,209,227,102,229,26,11,130,124,67,164>>}},[{hecate_identity,generate_keypair,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_identity.erl"},{line,176}]},{hecate_identity,handle_call,3,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_identity.erl"},{line,122}]},{gen_server,try_handle_call,4,[{file,"gen_server.erl"},{line,2470}]},{gen_server,handle_msg,3,[{file,"gen_server.erl"},{line,2499}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+** Client <0.844.0> stacktrace
+** [{gen,do_call,4,[{file,"gen.erl"},{line,262}]},{gen_server,call,2,[{file,"gen_server.erl"},{line,1217}]},{hecate_identity_tests,initialize_creates_identity,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/test/hecate_identity_tests.erl"},{line,76}]},{eunit_test,run_testfun,1,[{file,"eunit_test.erl"},{line,83}]},{eunit_proc,run_test,1,[{file,"eunit_proc.erl"},{line,554}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,379}]},{eunit_proc,handle_test,2,[{file,"eunit_proc.erl"},{line,537}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]}]
+2026-01-31 09:44:33 =CRASH REPORT====
+  crasher:
+    initial call: hecate_identity:init/1
+    pid: <0.842.0>
+    registered_name: hecate_identity
+    process_label: undefined
+    exception error: {{badmatch,{<<192,179,121,25,252,165,100,98,31,117,187,105,239,252,165,48,111,139,160,231,215,167,60,212,239,60,57,95,59,71,8,34>>,<<55,176,205,194,135,160,7,149,48,109,213,209,198,49,200,240,123,26,196,122,108,25,209,227,102,229,26,11,130,124,67,164>>}},[{hecate_identity,generate_keypair,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_identity.erl"},{line,176}]},{hecate_identity,handle_call,3,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_identity.erl"},{line,122}]},{gen_server,try_handle_call,4,[{file,"gen_server.erl"},{line,2470}]},{gen_server,handle_msg,3,[{file,"gen_server.erl"},{line,2499}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.735.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.735.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 987
+    stack_size: 29
+    reductions: 546
+  neighbours:
+    neighbour: [{pid,<0.841.0>},{registered_name,hecate_store},{process_label,undefined},{initial_call,{hecate_store,init,['Argument__1']}},{current_function,{gen_server,loop,5}},{ancestors,[<0.735.0>]},{message_queue_len,0},{links,[<0.735.0>]},{trap_exit,false},{status,waiting},{heap_size,987},{stack_size,9},{reductions,1076},{current_stacktrace,[{gen_server,loop,5,[{file,"gen_server.erl"},{line,2311}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}]
+    neighbour: [{pid,<0.735.0>},{registered_name,[]},{process_label,undefined},{initial_call,{erlang,apply,2}},{current_function,{eunit_proc,wait_for_tasks,2}},{ancestors,[]},{message_queue_len,0},{links,[<0.841.0>,<0.842.0>,<0.843.0>,<0.734.0>]},{trap_exit,false},{status,waiting},{heap_size,6772},{stack_size,81},{reductions,28729},{current_stacktrace,[{eunit_proc,wait_for_tasks,2,[{file,"eunit_proc.erl"},{line,438}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,369}]},{eunit_test,enter_context,4,[{file,"eunit_test.erl"},{line,358}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,369}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]}]}]
+2026-01-31 09:44:46 =ERROR REPORT====
+** Generic server hecate_store terminating 
+** Last message in was {get,<<"test">>,<<"key1">>}
+** When Server state == {state,{esqlite3,#Ref<0.2277904377.601227331.255317>}}
+** Reason for termination ==
+** {{case_clause,[[<<131,109,0,0,0,6,118,97,108,117,101,49>>]]},[{hecate_store,handle_call,3,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_store.erl"},{line,84}]},{gen_server,try_handle_call,4,[{file,"gen_server.erl"},{line,2470}]},{gen_server,handle_msg,3,[{file,"gen_server.erl"},{line,2499}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+** Client <0.1019.0> stacktrace
+** [{gen,do_call,4,[{file,"gen.erl"},{line,262}]},{gen_server,call,2,[{file,"gen_server.erl"},{line,1217}]},{hecate_store_tests,put_get_value,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/test/hecate_store_tests.erl"},{line,62}]},{eunit_test,run_testfun,1,[{file,"eunit_test.erl"},{line,83}]},{eunit_proc,run_test,1,[{file,"eunit_proc.erl"},{line,554}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,379}]},{eunit_proc,handle_test,2,[{file,"eunit_proc.erl"},{line,537}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]}]
+2026-01-31 09:44:46 =CRASH REPORT====
+  crasher:
+    initial call: hecate_store:init/1
+    pid: <0.1017.0>
+    registered_name: hecate_store
+    process_label: undefined
+    exception error: {{case_clause,[[<<131,109,0,0,0,6,118,97,108,117,101,49>>]]},[{hecate_store,handle_call,3,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_store.erl"},{line,84}]},{gen_server,try_handle_call,4,[{file,"gen_server.erl"},{line,2470}]},{gen_server,handle_msg,3,[{file,"gen_server.erl"},{line,2499}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.735.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.735.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 376
+    stack_size: 29
+    reductions: 1418
+  neighbours:
+    neighbour: [{pid,<0.735.0>},{registered_name,[]},{process_label,undefined},{initial_call,{erlang,apply,2}},{current_function,{eunit_proc,wait_for_tasks,2}},{ancestors,[]},{message_queue_len,0},{links,[<0.1017.0>,<0.1018.0>,<0.734.0>]},{trap_exit,false},{status,waiting},{heap_size,4185},{stack_size,81},{reductions,58650},{current_stacktrace,[{eunit_proc,wait_for_tasks,2,[{file,"eunit_proc.erl"},{line,438}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,369}]},{eunit_test,enter_context,4,[{file,"eunit_test.erl"},{line,358}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,369}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]}]}]
+2026-01-31 09:57:19 =CRASH REPORT====
+  crasher:
+    initial call: meck_proc:init/1
+    pid: <0.988.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{abstract_code_not_found,macula},[{meck_proc,backup_original,4,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/_build/test/lib/meck/src/meck_proc.erl"},{line,426}]},{meck_proc,init,1,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/_build/test/lib/meck/src/meck_proc.erl"},{line,224}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.814.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.814.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 666
+  neighbours:
+    neighbour: [{pid,<0.814.0>},{registered_name,[]},{process_label,undefined},{initial_call,{erlang,apply,2}},{current_function,{proc_lib,sync_start,2}},{ancestors,[]},{message_queue_len,0},{links,[<0.986.0>,<0.988.0>,<0.813.0>]},{trap_exit,false},{status,waiting},{heap_size,1598},{stack_size,80},{reductions,39596},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{meck_proc,start,2,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/_build/test/lib/meck/src/meck_proc.erl"},{line,90}]},{hecate_mesh_tests,setup_with_identity,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/test/hecate_mesh_tests.erl"},{line,95}]},{eunit_test,enter_context,4,[{file,"eunit_test.erl"},{line,341}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,369}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]}]}]
+2026-01-31 09:57:19 =ERROR REPORT====
+** Generic server hecate_identity_meck terminating 
+** Last message in was {'EXIT',<0.814.0>,{abstract_code_not_found,macula}}
+** When Server state == {state,hecate_identity,[{start_link,0},{get_mri,0},{get_realm,0},{get_public_key,0},{sign,1},{verify,2},{initialize,1},{init,1},{handle_call,3},{handle_cast,2},{handle_info,2},{terminate,2},{is_initialized,0}],{dict,13,16,16,8,80,48,{[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]},{{[[{initialize,1}|{{initialize,1},[{{args_matcher,['_'],#Ref<0.4078876747.872022026.17954>,false},meck_passthrough}]}]],[],[],[[{handle_info,2}|{{handle_info,2},[{{args_matcher,['_','_'],#Ref<0.4078876747.872022026.17958>,false},meck_passthrough}]}]],[],[],[[{is_initialized,0}|{{is_initialized,0},[{{args_matcher,[],#Ref<0.4078876747.872022025.17927>,false},{meck_exec,#Fun<hecate_mesh_tests.13.9316076>}}]}]],[],[[{handle_cast,2}|{{handle_cast,2},[{{args_matcher,['_','_'],#Ref<0.4078876747.872022026.17957>,false},meck_passthrough}]}]],[[{sign,1}|{{sign,1},[{{args_matcher,['_'],#Ref<0.4078876747.872022026.17952>,false},meck_passthrough}]}],[{handle_call,3}|{{handle_call,3},[{{args_matcher,['_','_','_'],#Ref<0.4078876747.872022026.17956>,false},meck_passthrough}]}],[{terminate,2}|{{terminate,2},[{{args_matcher,['_','_'],#Ref<0.4078876747.872022026.17959>,false},meck_passthrough}]}]],[],[[{get_mri,0}|{{get_mri,0},[{{args_matcher,[],#Ref<0.4078876747.872022026.17949>,false},meck_passthrough}]}],[{get_public_key,0}|{{get_public_key,0},[{{args_matcher,[],#Ref<0.4078876747.872022026.17951>,false},meck_passthrough}]}]],[],[[{start_link,0}|{{start_link,0},[{{args_matcher,[],#Ref<0.4078876747.872022026.17948>,false},meck_passthrough}]}],[{verify,2}|{{verify,2},[{{args_matcher,['_','_'],#Ref<0.4078876747.872022026.17953>,false},meck_passthrough}]}]],[],[[{get_realm,0}|{{get_realm,0},[{{args_matcher,[],#Ref<0.4078876747.872022025.17929>,false},{meck_exec,#Fun<hecate_mesh_tests.14.9316076>}}]}],[{init,1}|{{init,1},[{{args_matcher,['_'],#Ref<0.4078876747.872022026.17955>,false},meck_passthrough}]}]]}}},true,[],{false,no_passthrough_cover},false,false,true,undefined,[]}
+** Reason for termination ==
+** {abstract_code_not_found,macula}
+2026-01-31 09:57:19 =CRASH REPORT====
+  crasher:
+    initial call: meck_proc:init/1
+    pid: <0.986.0>
+    registered_name: hecate_identity_meck
+    process_label: undefined
+    exception exit: {{abstract_code_not_found,macula},[{gen_server,decode_msg,6,[{file,"gen_server.erl"},{line,2379}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.814.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: true
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 1608373
+  neighbours:
+2026-01-31 09:57:40 =CRASH REPORT====
+  crasher:
+    initial call: meck_proc:init/1
+    pid: <0.940.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{abstract_code_not_found,macula_peer},[{meck_proc,backup_original,4,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/_build/test/lib/meck/src/meck_proc.erl"},{line,426}]},{meck_proc,init,1,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/_build/test/lib/meck/src/meck_proc.erl"},{line,224}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.766.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.766.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 987
+    stack_size: 29
+    reductions: 605
+  neighbours:
+    neighbour: [{pid,<0.766.0>},{registered_name,[]},{process_label,undefined},{initial_call,{erlang,apply,2}},{current_function,{proc_lib,sync_start,2}},{ancestors,[]},{message_queue_len,0},{links,[<0.938.0>,<0.940.0>,<0.765.0>]},{trap_exit,false},{status,waiting},{heap_size,1598},{stack_size,80},{reductions,39660},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{meck_proc,start,2,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/_build/test/lib/meck/src/meck_proc.erl"},{line,90}]},{hecate_mesh_tests,setup_with_identity,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/test/hecate_mesh_tests.erl"},{line,96}]},{eunit_test,enter_context,4,[{file,"eunit_test.erl"},{line,341}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,369}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]}]}]
+2026-01-31 09:57:40 =ERROR REPORT====
+** Generic server hecate_identity_meck terminating 
+** Last message in was {'EXIT',<0.766.0>,{abstract_code_not_found,macula_peer}}
+** When Server state == {state,hecate_identity,[{start_link,0},{get_mri,0},{get_realm,0},{get_public_key,0},{sign,1},{verify,2},{initialize,1},{init,1},{handle_call,3},{handle_cast,2},{handle_info,2},{terminate,2},{is_initialized,0}],{dict,13,16,16,8,80,48,{[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]},{{[[{initialize,1}|{{initialize,1},[{{args_matcher,['_'],#Ref<0.3171441143.2214199297.33410>,false},meck_passthrough}]}]],[],[],[[{handle_info,2}|{{handle_info,2},[{{args_matcher,['_','_'],#Ref<0.3171441143.2214199297.33414>,false},meck_passthrough}]}]],[],[],[[{is_initialized,0}|{{is_initialized,0},[{{args_matcher,[],#Ref<0.3171441143.2214199308.32631>,false},{meck_exec,#Fun<hecate_mesh_tests.13.51190889>}}]}]],[],[[{handle_cast,2}|{{handle_cast,2},[{{args_matcher,['_','_'],#Ref<0.3171441143.2214199297.33413>,false},meck_passthrough}]}]],[[{sign,1}|{{sign,1},[{{args_matcher,['_'],#Ref<0.3171441143.2214199297.33408>,false},meck_passthrough}]}],[{handle_call,3}|{{handle_call,3},[{{args_matcher,['_','_','_'],#Ref<0.3171441143.2214199297.33412>,false},meck_passthrough}]}],[{terminate,2}|{{terminate,2},[{{args_matcher,['_','_'],#Ref<0.3171441143.2214199297.33415>,false},meck_passthrough}]}]],[],[[{get_mri,0}|{{get_mri,0},[{{args_matcher,[],#Ref<0.3171441143.2214199297.33405>,false},meck_passthrough}]}],[{get_public_key,0}|{{get_public_key,0},[{{args_matcher,[],#Ref<0.3171441143.2214199297.33407>,false},meck_passthrough}]}]],[],[[{start_link,0}|{{start_link,0},[{{args_matcher,[],#Ref<0.3171441143.2214199297.33404>,false},meck_passthrough}]}],[{verify,2}|{{verify,2},[{{args_matcher,['_','_'],#Ref<0.3171441143.2214199297.33409>,false},meck_passthrough}]}]],[],[[{get_realm,0}|{{get_realm,0},[{{args_matcher,[],#Ref<0.3171441143.2214199308.32633>,false},{meck_exec,#Fun<hecate_mesh_tests.14.51190889>}}]}],[{init,1}|{{init,1},[{{args_matcher,['_'],#Ref<0.3171441143.2214199297.33411>,false},meck_passthrough}]}]]}}},true,[],{false,no_passthrough_cover},false,false,true,undefined,[]}
+** Reason for termination ==
+** {abstract_code_not_found,macula_peer}
+2026-01-31 09:57:40 =CRASH REPORT====
+  crasher:
+    initial call: meck_proc:init/1
+    pid: <0.938.0>
+    registered_name: hecate_identity_meck
+    process_label: undefined
+    exception exit: {{abstract_code_not_found,macula_peer},[{gen_server,decode_msg,6,[{file,"gen_server.erl"},{line,2379}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.766.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: true
+    status: running
+    heap_size: 17731
+    stack_size: 29
+    reductions: 1608057
+  neighbours:
+2026-01-31 09:58:11 =CRASH REPORT====
+  crasher:
+    initial call: application_master:init/3
+    pid: <0.619.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{{mkdir_failed,eacces},{macula_app,start,[normal,[]]}},[{application_master,init,3,[{file,"application_master.erl"},{line,147}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [application_controller,<0.10.0>]
+    message_queue_len: 1
+    messages: [{'EXIT',<0.620.0>,normal}]
+    links: [<0.45.0>]
+    dictionary: []
+    trap_exit: true
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 100
+  neighbours:
+2026-01-31 09:59:14 =CRASH REPORT====
+  crasher:
+    initial call: macula_gateway_health:init/1
+    pid: <0.609.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{health_server_failed,eaddrinuse},[{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2257}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.608.0>,macula_root,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.608.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 376
+    stack_size: 29
+    reductions: 2711
+  neighbours:
+2026-01-31 09:59:14 =SUPERVISOR REPORT====
+     Supervisor: {<0.608.0>,macula_gateway_system}
+     Context:    start_error
+     Reason:     {health_server_failed,eaddrinuse}
+     Offender:   [{pid,undefined},{id,macula_gateway_health},{mfargs,{macula_gateway_health,start_link,[[{health_port,8080}]]}},{restart_type,permanent},{significant,false},{shutdown,5000},{child_type,worker}]
+
+2026-01-31 09:59:14 =SUPERVISOR REPORT====
+     Supervisor: {local,macula_root}
+     Context:    start_error
+     Reason:     {shutdown,{failed_to_start_child,macula_gateway_health,{health_server_failed,eaddrinuse}}}
+     Offender:   [{pid,undefined},{id,macula_gateway_system},{mfargs,{macula_gateway_system,start_link,[[{port,9443},{realm,<<"com.example.realm">>},{health_port,8080}]]}},{restart_type,permanent},{significant,false},{shutdown,infinity},{child_type,supervisor}]
+
+2026-01-31 09:59:14 =CRASH REPORT====
+  crasher:
+    initial call: application_master:init/3
+    pid: <0.587.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{{shutdown,{failed_to_start_child,macula_gateway_system,{shutdown,{failed_to_start_child,macula_gateway_health,{health_server_failed,eaddrinuse}}}}},{macula_app,start,[normal,[]]}},[{application_master,init,3,[{file,"application_master.erl"},{line,147}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [application_controller,<0.10.0>]
+    message_queue_len: 1
+    messages: [{'EXIT',<0.588.0>,normal}]
+    links: [<0.45.0>]
+    dictionary: []
+    trap_exit: true
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 92
+  neighbours:
+2026-01-31 10:00:53 =CRASH REPORT====
+  crasher:
+    initial call: macula_peer:init/1
+    pid: <0.596.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{timeout,{gen_server,call,[<0.602.0>,get_status,5000]}},[{gen_server,call,3,[{file,"gen_server.erl"},{line,1301}]},{macula_peer,wait_for_connection_status,3,[{file,"macula_peer.erl"},{line,415}]},{macula_peer,init,1,[{file,"macula_peer.erl"},{line,237}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [hecate_mesh,hecate_sup,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.593.0>,<0.601.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 1572
+  neighbours:
+    neighbour: [{pid,<0.593.0>},{registered_name,hecate_mesh},{process_label,undefined},{initial_call,{hecate_mesh,init,['Argument__1']}},{current_function,{proc_lib,sync_start,2}},{ancestors,[hecate_sup,<0.588.0>]},{message_queue_len,0},{links,[<0.589.0>,<0.596.0>]},{trap_exit,false},{status,waiting},{heap_size,233},{stack_size,26},{reductions,941},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{hecate_mesh,handle_info,2,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_mesh.erl"},{line,140}]},{gen_server,try_handle_info,3,[{file,"gen_server.erl"},{line,2434}]},{gen_server,handle_msg,3,[{file,"gen_server.erl"},{line,2420}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}]
+2026-01-31 10:00:53 =SUPERVISOR REPORT====
+     Supervisor: {local,hecate_sup}
+     Context:    child_terminated
+     Reason:     {timeout,{gen_server,call,[<0.602.0>,get_status,5000]}}
+     Offender:   [{pid,<0.593.0>},{id,hecate_mesh},{mfargs,{hecate_mesh,start_link,[]}},{restart_type,permanent},{significant,false},{shutdown,5000},{child_type,worker}]
+
+2026-01-31 10:00:53 =ERROR REPORT====
+** Generic server <0.601.0> terminating 
+** Last message in was {'EXIT',<0.596.0>,{timeout,{gen_server,call,[<0.602.0>,get_status,5000]}}}
+** When Server state == {state,{<0.601.0>,macula_peer_system},rest_for_one,{[advertisement_manager,rpc_handler,pubsub_handler,connection_manager],#{connection_manager => {child,<0.602.0>,connection_manager,{macula_connection,start_link,[<<"https://boot.macula.io:4433">>,#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.593.0>,node_id => <<88,222,238,147,94,251,135,179,254,166,205,180,150,115,28,205,127,167,55,245,195,92,108,4,114,217,52,253,89,6,88,158>>,peer_id => 1}]},permanent,false,5000,worker,[macula_connection]},pubsub_handler => {child,<0.603.0>,pubsub_handler,{macula_pubsub_handler,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.593.0>,node_id => <<88,222,238,147,94,251,135,179,254,166,205,180,150,115,28,205,127,167,55,245,195,92,108,4,114,217,52,253,89,6,88,158>>,peer_id => 1}]},permanent,false,5000,worker,[macula_pubsub_handler]},rpc_handler => {child,<0.605.0>,rpc_handler,{macula_rpc_handler,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.593.0>,node_id => <<88,222,238,147,94,251,135,179,254,166,205,180,150,115,28,205,127,167,55,245,195,92,108,4,114,217,52,253,89,6,88,158>>,peer_id => 1}]},permanent,false,5000,worker,[macula_rpc_handler]},advertisement_manager => {child,<0.607.0>,advertisement_manager,{macula_advertisement_manager,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.593.0>,node_id => <<88,222,238,147,94,251,135,179,254,166,205,180,150,115,28,205,127,167,55,245,195,92,108,4,114,217,52,253,89,6,88,158>>,peer_id => 1}]},permanent,false,5000,worker,[macula_advertisement_manager]}}},undefined,10,60,[],0,0,never,1000,#Ref<0.1076518738.1677459461.177924>,macula_peer_system,{<<"https://boot.macula.io:4433">>,#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.593.0>,node_id => <<88,222,238,147,94,251,135,179,254,166,205,180,150,115,28,205,127,167,55,245,195,92,108,4,114,217,52,253,89,6,88,158>>}}}
+** Reason for termination ==
+** {timeout,{gen_server,call,[<0.602.0>,get_status,5000]}}
+2026-01-31 10:00:53 =CRASH REPORT====
+  crasher:
+    initial call: supervisor:macula_peer_system/1
+    pid: <0.601.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{timeout,{gen_server,call,[<0.602.0>,get_status,5000]}},[{gen_server,decode_msg,6,[{file,"gen_server.erl"},{line,2379}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.596.0>,hecate_mesh,hecate_sup,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: true
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 2821
+  neighbours:
+2026-01-31 10:00:58 =CRASH REPORT====
+  crasher:
+    initial call: macula_peer:init/1
+    pid: <0.622.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{timeout,{gen_server,call,[<0.624.0>,get_status,5000]}},[{gen_server,call,3,[{file,"gen_server.erl"},{line,1301}]},{macula_peer,wait_for_connection_status,3,[{file,"macula_peer.erl"},{line,415}]},{macula_peer,init,1,[{file,"macula_peer.erl"},{line,237}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [hecate_mesh,hecate_sup,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.621.0>,<0.623.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 987
+    stack_size: 29
+    reductions: 437
+  neighbours:
+    neighbour: [{pid,<0.621.0>},{registered_name,hecate_mesh},{process_label,undefined},{initial_call,{hecate_mesh,init,['Argument__1']}},{current_function,{proc_lib,sync_start,2}},{ancestors,[hecate_sup,<0.588.0>]},{message_queue_len,0},{links,[<0.589.0>,<0.622.0>]},{trap_exit,false},{status,waiting},{heap_size,376},{stack_size,26},{reductions,791},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{hecate_mesh,handle_info,2,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_mesh.erl"},{line,140}]},{gen_server,try_handle_info,3,[{file,"gen_server.erl"},{line,2434}]},{gen_server,handle_msg,3,[{file,"gen_server.erl"},{line,2420}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}]
+2026-01-31 10:00:58 =SUPERVISOR REPORT====
+     Supervisor: {local,hecate_sup}
+     Context:    child_terminated
+     Reason:     {timeout,{gen_server,call,[<0.624.0>,get_status,5000]}}
+     Offender:   [{pid,<0.621.0>},{id,hecate_mesh},{mfargs,{hecate_mesh,start_link,[]}},{restart_type,permanent},{significant,false},{shutdown,5000},{child_type,worker}]
+
+2026-01-31 10:00:58 =ERROR REPORT====
+** Generic server <0.623.0> terminating 
+** Last message in was {'EXIT',<0.622.0>,{timeout,{gen_server,call,[<0.624.0>,get_status,5000]}}}
+** When Server state == {state,{<0.623.0>,macula_peer_system},rest_for_one,{[advertisement_manager,rpc_handler,pubsub_handler,connection_manager],#{connection_manager => {child,<0.624.0>,connection_manager,{macula_connection,start_link,[<<"https://boot.macula.io:4433">>,#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.621.0>,node_id => <<149,21,21,184,169,99,69,39,162,11,164,97,26,18,145,80,47,172,113,134,238,217,3,249,172,97,245,208,197,118,166,237>>,peer_id => 4}]},permanent,false,5000,worker,[macula_connection]},pubsub_handler => {child,<0.625.0>,pubsub_handler,{macula_pubsub_handler,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.621.0>,node_id => <<149,21,21,184,169,99,69,39,162,11,164,97,26,18,145,80,47,172,113,134,238,217,3,249,172,97,245,208,197,118,166,237>>,peer_id => 4}]},permanent,false,5000,worker,[macula_pubsub_handler]},rpc_handler => {child,<0.626.0>,rpc_handler,{macula_rpc_handler,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.621.0>,node_id => <<149,21,21,184,169,99,69,39,162,11,164,97,26,18,145,80,47,172,113,134,238,217,3,249,172,97,245,208,197,118,166,237>>,peer_id => 4}]},permanent,false,5000,worker,[macula_rpc_handler]},advertisement_manager => {child,<0.627.0>,advertisement_manager,{macula_advertisement_manager,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.621.0>,node_id => <<149,21,21,184,169,99,69,39,162,11,164,97,26,18,145,80,47,172,113,134,238,217,3,249,172,97,245,208,197,118,166,237>>,peer_id => 4}]},permanent,false,5000,worker,[macula_advertisement_manager]}}},undefined,10,60,[],0,0,never,1000,#Ref<0.1076518738.1677459461.178106>,macula_peer_system,{<<"https://boot.macula.io:4433">>,#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.621.0>,node_id => <<149,21,21,184,169,99,69,39,162,11,164,97,26,18,145,80,47,172,113,134,238,217,3,249,172,97,245,208,197,118,166,237>>}}}
+** Reason for termination ==
+** {timeout,{gen_server,call,[<0.624.0>,get_status,5000]}}
+2026-01-31 10:00:58 =CRASH REPORT====
+  crasher:
+    initial call: supervisor:macula_peer_system/1
+    pid: <0.623.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{timeout,{gen_server,call,[<0.624.0>,get_status,5000]}},[{gen_server,decode_msg,6,[{file,"gen_server.erl"},{line,2379}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.622.0>,hecate_mesh,hecate_sup,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: true
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 1469
+  neighbours:
+2026-01-31 10:01:03 =CRASH REPORT====
+  crasher:
+    initial call: macula_peer:init/1
+    pid: <0.630.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{timeout,{gen_server,call,[<0.632.0>,get_status,5000]}},[{gen_server,call,3,[{file,"gen_server.erl"},{line,1301}]},{macula_peer,wait_for_connection_status,3,[{file,"macula_peer.erl"},{line,415}]},{macula_peer,init,1,[{file,"macula_peer.erl"},{line,237}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [hecate_mesh,hecate_sup,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.629.0>,<0.631.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 987
+    stack_size: 29
+    reductions: 437
+  neighbours:
+    neighbour: [{pid,<0.629.0>},{registered_name,hecate_mesh},{process_label,undefined},{initial_call,{hecate_mesh,init,['Argument__1']}},{current_function,{proc_lib,sync_start,2}},{ancestors,[hecate_sup,<0.588.0>]},{message_queue_len,0},{links,[<0.589.0>,<0.630.0>]},{trap_exit,false},{status,waiting},{heap_size,376},{stack_size,26},{reductions,791},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{hecate_mesh,handle_info,2,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_mesh.erl"},{line,140}]},{gen_server,try_handle_info,3,[{file,"gen_server.erl"},{line,2434}]},{gen_server,handle_msg,3,[{file,"gen_server.erl"},{line,2420}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}]
+2026-01-31 10:01:03 =SUPERVISOR REPORT====
+     Supervisor: {local,hecate_sup}
+     Context:    child_terminated
+     Reason:     {timeout,{gen_server,call,[<0.632.0>,get_status,5000]}}
+     Offender:   [{pid,<0.629.0>},{id,hecate_mesh},{mfargs,{hecate_mesh,start_link,[]}},{restart_type,permanent},{significant,false},{shutdown,5000},{child_type,worker}]
+
+2026-01-31 10:01:03 =ERROR REPORT====
+** Generic server <0.631.0> terminating 
+** Last message in was {'EXIT',<0.630.0>,{timeout,{gen_server,call,[<0.632.0>,get_status,5000]}}}
+** When Server state == {state,{<0.631.0>,macula_peer_system},rest_for_one,{[advertisement_manager,rpc_handler,pubsub_handler,connection_manager],#{connection_manager => {child,<0.632.0>,connection_manager,{macula_connection,start_link,[<<"https://boot.macula.io:4433">>,#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.629.0>,node_id => <<237,254,103,238,164,187,239,68,213,207,198,116,158,97,182,106,148,137,207,73,53,254,208,221,80,58,218,137,55,128,99,216>>,peer_id => 7}]},permanent,false,5000,worker,[macula_connection]},pubsub_handler => {child,<0.633.0>,pubsub_handler,{macula_pubsub_handler,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.629.0>,node_id => <<237,254,103,238,164,187,239,68,213,207,198,116,158,97,182,106,148,137,207,73,53,254,208,221,80,58,218,137,55,128,99,216>>,peer_id => 7}]},permanent,false,5000,worker,[macula_pubsub_handler]},rpc_handler => {child,<0.634.0>,rpc_handler,{macula_rpc_handler,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.629.0>,node_id => <<237,254,103,238,164,187,239,68,213,207,198,116,158,97,182,106,148,137,207,73,53,254,208,221,80,58,218,137,55,128,99,216>>,peer_id => 7}]},permanent,false,5000,worker,[macula_rpc_handler]},advertisement_manager => {child,<0.635.0>,advertisement_manager,{macula_advertisement_manager,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.629.0>,node_id => <<237,254,103,238,164,187,239,68,213,207,198,116,158,97,182,106,148,137,207,73,53,254,208,221,80,58,218,137,55,128,99,216>>,peer_id => 7}]},permanent,false,5000,worker,[macula_advertisement_manager]}}},undefined,10,60,[],0,0,never,1000,#Ref<0.1076518738.1677459460.178692>,macula_peer_system,{<<"https://boot.macula.io:4433">>,#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.629.0>,node_id => <<237,254,103,238,164,187,239,68,213,207,198,116,158,97,182,106,148,137,207,73,53,254,208,221,80,58,218,137,55,128,99,216>>}}}
+** Reason for termination ==
+** {timeout,{gen_server,call,[<0.632.0>,get_status,5000]}}
+2026-01-31 10:01:03 =CRASH REPORT====
+  crasher:
+    initial call: supervisor:macula_peer_system/1
+    pid: <0.631.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{timeout,{gen_server,call,[<0.632.0>,get_status,5000]}},[{gen_server,decode_msg,6,[{file,"gen_server.erl"},{line,2379}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.630.0>,hecate_mesh,hecate_sup,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: true
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 1464
+  neighbours:
+2026-01-31 10:01:08 =CRASH REPORT====
+  crasher:
+    initial call: macula_peer:init/1
+    pid: <0.638.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{timeout,{gen_server,call,[<0.640.0>,get_status,5000]}},[{gen_server,call,3,[{file,"gen_server.erl"},{line,1301}]},{macula_peer,wait_for_connection_status,3,[{file,"macula_peer.erl"},{line,415}]},{macula_peer,init,1,[{file,"macula_peer.erl"},{line,237}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [hecate_mesh,hecate_sup,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.637.0>,<0.639.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 987
+    stack_size: 29
+    reductions: 437
+  neighbours:
+    neighbour: [{pid,<0.637.0>},{registered_name,hecate_mesh},{process_label,undefined},{initial_call,{hecate_mesh,init,['Argument__1']}},{current_function,{proc_lib,sync_start,2}},{ancestors,[hecate_sup,<0.588.0>]},{message_queue_len,0},{links,[<0.589.0>,<0.638.0>]},{trap_exit,false},{status,waiting},{heap_size,376},{stack_size,26},{reductions,790},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{hecate_mesh,handle_info,2,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_mesh.erl"},{line,140}]},{gen_server,try_handle_info,3,[{file,"gen_server.erl"},{line,2434}]},{gen_server,handle_msg,3,[{file,"gen_server.erl"},{line,2420}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}]
+2026-01-31 10:01:08 =SUPERVISOR REPORT====
+     Supervisor: {local,hecate_sup}
+     Context:    child_terminated
+     Reason:     {timeout,{gen_server,call,[<0.640.0>,get_status,5000]}}
+     Offender:   [{pid,<0.637.0>},{id,hecate_mesh},{mfargs,{hecate_mesh,start_link,[]}},{restart_type,permanent},{significant,false},{shutdown,5000},{child_type,worker}]
+
+2026-01-31 10:01:08 =ERROR REPORT====
+** Generic server <0.639.0> terminating 
+** Last message in was {'EXIT',<0.638.0>,{timeout,{gen_server,call,[<0.640.0>,get_status,5000]}}}
+** When Server state == {state,{<0.639.0>,macula_peer_system},rest_for_one,{[advertisement_manager,rpc_handler,pubsub_handler,connection_manager],#{connection_manager => {child,<0.640.0>,connection_manager,{macula_connection,start_link,[<<"https://boot.macula.io:4433">>,#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.637.0>,node_id => <<19,2,45,237,97,85,179,31,191,57,58,211,235,188,132,62,202,6,101,147,52,103,155,21,84,210,122,231,59,177,95,249>>,peer_id => 10}]},permanent,false,5000,worker,[macula_connection]},pubsub_handler => {child,<0.641.0>,pubsub_handler,{macula_pubsub_handler,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.637.0>,node_id => <<19,2,45,237,97,85,179,31,191,57,58,211,235,188,132,62,202,6,101,147,52,103,155,21,84,210,122,231,59,177,95,249>>,peer_id => 10}]},permanent,false,5000,worker,[macula_pubsub_handler]},rpc_handler => {child,<0.642.0>,rpc_handler,{macula_rpc_handler,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.637.0>,node_id => <<19,2,45,237,97,85,179,31,191,57,58,211,235,188,132,62,202,6,101,147,52,103,155,21,84,210,122,231,59,177,95,249>>,peer_id => 10}]},permanent,false,5000,worker,[macula_rpc_handler]},advertisement_manager => {child,<0.643.0>,advertisement_manager,{macula_advertisement_manager,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.637.0>,node_id => <<19,2,45,237,97,85,179,31,191,57,58,211,235,188,132,62,202,6,101,147,52,103,155,21,84,210,122,231,59,177,95,249>>,peer_id => 10}]},permanent,false,5000,worker,[macula_advertisement_manager]}}},undefined,10,60,[],0,0,never,1000,#Ref<0.1076518738.1677459461.178193>,macula_peer_system,{<<"https://boot.macula.io:4433">>,#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.637.0>,node_id => <<19,2,45,237,97,85,179,31,191,57,58,211,235,188,132,62,202,6,101,147,52,103,155,21,84,210,122,231,59,177,95,249>>}}}
+** Reason for termination ==
+** {timeout,{gen_server,call,[<0.640.0>,get_status,5000]}}
+2026-01-31 10:01:08 =CRASH REPORT====
+  crasher:
+    initial call: supervisor:macula_peer_system/1
+    pid: <0.639.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{timeout,{gen_server,call,[<0.640.0>,get_status,5000]}},[{gen_server,decode_msg,6,[{file,"gen_server.erl"},{line,2379}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.638.0>,hecate_mesh,hecate_sup,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: true
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 1464
+  neighbours:
+2026-01-31 10:01:13 =CRASH REPORT====
+  crasher:
+    initial call: macula_peer:init/1
+    pid: <0.646.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{timeout,{gen_server,call,[<0.648.0>,get_status,5000]}},[{gen_server,call,3,[{file,"gen_server.erl"},{line,1301}]},{macula_peer,wait_for_connection_status,3,[{file,"macula_peer.erl"},{line,415}]},{macula_peer,init,1,[{file,"macula_peer.erl"},{line,237}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [hecate_mesh,hecate_sup,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.645.0>,<0.647.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 987
+    stack_size: 29
+    reductions: 437
+  neighbours:
+    neighbour: [{pid,<0.645.0>},{registered_name,hecate_mesh},{process_label,undefined},{initial_call,{hecate_mesh,init,['Argument__1']}},{current_function,{proc_lib,sync_start,2}},{ancestors,[hecate_sup,<0.588.0>]},{message_queue_len,0},{links,[<0.589.0>,<0.646.0>]},{trap_exit,false},{status,waiting},{heap_size,376},{stack_size,26},{reductions,790},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{hecate_mesh,handle_info,2,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_mesh.erl"},{line,140}]},{gen_server,try_handle_info,3,[{file,"gen_server.erl"},{line,2434}]},{gen_server,handle_msg,3,[{file,"gen_server.erl"},{line,2420}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}]
+2026-01-31 10:01:13 =SUPERVISOR REPORT====
+     Supervisor: {local,hecate_sup}
+     Context:    child_terminated
+     Reason:     {timeout,{gen_server,call,[<0.648.0>,get_status,5000]}}
+     Offender:   [{pid,<0.645.0>},{id,hecate_mesh},{mfargs,{hecate_mesh,start_link,[]}},{restart_type,permanent},{significant,false},{shutdown,5000},{child_type,worker}]
+
+2026-01-31 10:01:13 =ERROR REPORT====
+** Generic server <0.647.0> terminating 
+** Last message in was {'EXIT',<0.646.0>,{timeout,{gen_server,call,[<0.648.0>,get_status,5000]}}}
+** When Server state == {state,{<0.647.0>,macula_peer_system},rest_for_one,{[advertisement_manager,rpc_handler,pubsub_handler,connection_manager],#{connection_manager => {child,<0.648.0>,connection_manager,{macula_connection,start_link,[<<"https://boot.macula.io:4433">>,#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.645.0>,node_id => <<135,211,215,130,190,104,204,125,118,147,184,33,14,40,205,209,67,34,121,108,144,214,49,74,127,231,195,97,88,20,31,246>>,peer_id => 13}]},permanent,false,5000,worker,[macula_connection]},pubsub_handler => {child,<0.649.0>,pubsub_handler,{macula_pubsub_handler,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.645.0>,node_id => <<135,211,215,130,190,104,204,125,118,147,184,33,14,40,205,209,67,34,121,108,144,214,49,74,127,231,195,97,88,20,31,246>>,peer_id => 13}]},permanent,false,5000,worker,[macula_pubsub_handler]},rpc_handler => {child,<0.650.0>,rpc_handler,{macula_rpc_handler,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.645.0>,node_id => <<135,211,215,130,190,104,204,125,118,147,184,33,14,40,205,209,67,34,121,108,144,214,49,74,127,231,195,97,88,20,31,246>>,peer_id => 13}]},permanent,false,5000,worker,[macula_rpc_handler]},advertisement_manager => {child,<0.651.0>,advertisement_manager,{macula_advertisement_manager,start_link,[#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.645.0>,node_id => <<135,211,215,130,190,104,204,125,118,147,184,33,14,40,205,209,67,34,121,108,144,214,49,74,127,231,195,97,88,20,31,246>>,peer_id => 13}]},permanent,false,5000,worker,[macula_advertisement_manager]}}},undefined,10,60,[],0,0,never,1000,#Ref<0.1076518738.1677459461.178226>,macula_peer_system,{<<"https://boot.macula.io:4433">>,#{port => 4433,host => "boot.macula.io",url => <<"https://boot.macula.io:4433">>,realm => <<"io.macula">>,event_handler => <0.645.0>,node_id => <<135,211,215,130,190,104,204,125,118,147,184,33,14,40,205,209,67,34,121,108,144,214,49,74,127,231,195,97,88,20,31,246>>}}}
+** Reason for termination ==
+** {timeout,{gen_server,call,[<0.648.0>,get_status,5000]}}
+2026-01-31 10:01:13 =CRASH REPORT====
+  crasher:
+    initial call: supervisor:macula_peer_system/1
+    pid: <0.647.0>
+    registered_name: []
+    process_label: undefined
+    exception exit: {{timeout,{gen_server,call,[<0.648.0>,get_status,5000]}},[{gen_server,decode_msg,6,[{file,"gen_server.erl"},{line,2379}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.646.0>,hecate_mesh,hecate_sup,<0.588.0>]
+    message_queue_len: 0
+    messages: []
+    links: []
+    dictionary: []
+    trap_exit: true
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 1469
+  neighbours:
+2026-02-01 11:20:26 =CRASH REPORT====
+  crasher:
+    initial call: hecate_store:init/1
+    pid: <0.6014.0>
+    registered_name: []
+    process_label: undefined
+    exception error: {undef,[{lager,info,["Opening store at ~s",["/tmp/hecate_identity_test_8/hecate.db"]],[]},{hecate_store,init,1,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_store.erl"},{line,75}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.5699.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.5699.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 411
+  neighbours:
+    neighbour: [{pid,<0.5699.0>},{registered_name,[]},{process_label,undefined},{initial_call,{erlang,apply,2}},{current_function,{proc_lib,sync_start,2}},{ancestors,[]},{message_queue_len,0},{links,[<0.5698.0>,<0.6014.0>]},{trap_exit,false},{status,waiting},{heap_size,6772},{stack_size,77},{reductions,247543},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{hecate_identity_tests,setup,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/test/hecate_identity_tests.erl"},{line,45}]},{eunit_test,enter_context,4,[{file,"eunit_test.erl"},{line,341}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,369}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]}]}]
+2026-02-01 11:36:28 =CRASH REPORT====
+  crasher:
+    initial call: hecate_store:init/1
+    pid: <0.6241.0>
+    registered_name: []
+    process_label: undefined
+    exception error: {undef,[{lager,info,["Opening store at ~s",["/tmp/hecate_identity_test_7/hecate.db"]],[]},{hecate_store,init,1,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/src/hecate_store.erl"},{line,75}]},{gen_server,init_it,2,[{file,"gen_server.erl"},{line,2276}]},{gen_server,init_it,6,[{file,"gen_server.erl"},{line,2236}]},{proc_lib,init_p_do_apply,3,[{file,"proc_lib.erl"},{line,333}]}]}
+    ancestors: [<0.5926.0>]
+    message_queue_len: 0
+    messages: []
+    links: [<0.5926.0>]
+    dictionary: []
+    trap_exit: false
+    status: running
+    heap_size: 610
+    stack_size: 29
+    reductions: 411
+  neighbours:
+    neighbour: [{pid,<0.5926.0>},{registered_name,[]},{process_label,undefined},{initial_call,{erlang,apply,2}},{current_function,{proc_lib,sync_start,2}},{ancestors,[]},{message_queue_len,0},{links,[<0.5925.0>,<0.6241.0>]},{trap_exit,false},{status,waiting},{heap_size,6772},{stack_size,77},{reductions,247535},{current_stacktrace,[{proc_lib,sync_start,2,[{file,"proc_lib.erl"},{line,438}]},{hecate_identity_tests,setup,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/test/hecate_identity_tests.erl"},{line,45}]},{eunit_test,enter_context,4,[{file,"eunit_test.erl"},{line,341}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]},{eunit_proc,with_timeout,3,[{file,"eunit_proc.erl"},{line,369}]},{eunit_proc,run_group,2,[{file,"eunit_proc.erl"},{line,593}]},{eunit_proc,tests_inorder,3,[{file,"eunit_proc.erl"},{line,479}]}]}]

@@ -1,0 +1,31 @@
+{application, hecate_api, [
+    {description, "HTTP API gateway for macula-hecate using Cowboy"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {hecate_api_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        cowboy,
+        jsx,
+        manage_capabilities,
+        query_capabilities,
+        manage_reputation,
+        query_reputation,
+        manage_social,
+        query_social,
+        manage_subscriptions,
+        query_subscriptions,
+        manage_identities,
+        query_identities,
+        manage_ucan,
+        query_ucan
+    ]},
+    {env, [
+        {http_port, 4444},
+        {http_host, "127.0.0.1"}
+    ]},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

@@ -1,0 +1,26 @@
+## Name of the node
+-sname hecate
+
+## Cookie for distributed erlang
+-setcookie hecate_cookie
+
+## Heartbeat management
+-heart
+
+## Enable SMP
+-smp auto
+
+## Increase async threads
++A 64
+
+## Increase process limit
++P 1048576
+
+## Increase port limit  
++Q 65536
+
+## Set scheduler bind type
++sbt db
+
+## Enable dirty schedulers
++SDio 32

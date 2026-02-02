@@ -1,0 +1,184 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700">
+  <defs>
+    <style>
+      .domain-box { fill: #1e293b; stroke: #3b82f6; stroke-width: 2; }
+      .service-box { fill: #1e1b2e; stroke: #8b5cf6; stroke-width: 2; }
+      .event-flow { stroke: #22d3ee; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .query-flow { stroke: #10b981; stroke-width: 2; fill: none; marker-end: url(#arrowhead-green); }
+      .text-title { fill: #60a5fa; font-family: 'SF Mono', Monaco, monospace; font-size: 14px; font-weight: bold; }
+      .text-service { fill: #a78bfa; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; font-weight: bold; }
+      .text-normal { fill: #e2e8f0; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; }
+      .text-small { fill: #94a3b8; font-family: 'SF Mono', Monaco, monospace; font-size: 9px; }
+      .separator { stroke: #475569; stroke-width: 1; stroke-dasharray: 5,5; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#22d3ee" />
+    </marker>
+    <marker id="arrowhead-green" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#10b981" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="700" fill="#0f172a"/>
+
+  <!-- Title -->
+  <text x="500" y="30" text-anchor="middle" fill="#60a5fa" font-size="22" font-weight="bold">Hecate CQRS Architecture</text>
+  <text x="500" y="55" text-anchor="middle" fill="#94a3b8" font-size="12">Umbrella App: 6 Domains × (Command Service + Query Service)</text>
+
+  <!-- Vertical separator: Write side | Read side -->
+  <line x1="500" y1="80" x2="500" y2="680" class="separator"/>
+  <text x="250" y="100" text-anchor="middle" fill="#22d3ee" font-size="16" font-weight="bold">WRITE SIDE (Commands)</text>
+  <text x="750" y="100" text-anchor="middle" fill="#10b981" font-size="16" font-weight="bold">READ SIDE (Queries)</text>
+
+  <!-- Domain 1: Capabilities -->
+  <rect x="20" y="120" width="960" height="80" rx="8" class="domain-box"/>
+  <text x="30" y="145" class="text-title">Domain 1: Capabilities</text>
+
+  <!-- Command service -->
+  <rect x="30" y="155" width="180" height="35" rx="4" class="service-box"/>
+  <text x="120" y="175" text-anchor="middle" class="text-service">manage_capabilities</text>
+  <text x="120" y="188" text-anchor="middle" class="text-small">ReckonDB + reckon_evoq</text>
+
+  <!-- Slices -->
+  <text x="220" y="165" class="text-small">announce_capability/</text>
+  <text x="220" y="177" class="text-small">update_capability/</text>
+  <text x="220" y="189" class="text-small">retract_capability/</text>
+
+  <!-- Events arrow -->
+  <path d="M 410 172 L 590 172" class="event-flow"/>
+  <text x="500" y="167" text-anchor="middle" class="text-small" fill="#22d3ee">events</text>
+
+  <!-- Query service -->
+  <rect x="600" y="155" width="180" height="35" rx="4" class="service-box"/>
+  <text x="690" y="175" text-anchor="middle" class="text-service">query_capabilities</text>
+  <text x="690" y="188" text-anchor="middle" class="text-small">SQLite + projections</text>
+
+  <!-- Projections -->
+  <text x="790" y="165" class="text-small">get_capability/</text>
+  <text x="790" y="177" class="text-small">list_capabilities/</text>
+
+  <!-- Domain 2: Reputation -->
+  <rect x="20" y="210" width="960" height="80" rx="8" class="domain-box"/>
+  <text x="30" y="235" class="text-title">Domain 2: Reputation</text>
+
+  <rect x="30" y="245" width="180" height="35" rx="4" class="service-box"/>
+  <text x="120" y="265" text-anchor="middle" class="text-service">track_rpc_calls</text>
+  <text x="120" y="278" text-anchor="middle" class="text-small">ReckonDB + reckon_evoq</text>
+
+  <text x="220" y="255" class="text-small">record_rpc_call/</text>
+  <text x="220" y="267" class="text-small">flag_dispute/</text>
+  <text x="220" y="279" class="text-small">resolve_dispute/</text>
+
+  <path d="M 410 262 L 590 262" class="event-flow"/>
+  <text x="500" y="257" text-anchor="middle" class="text-small" fill="#22d3ee">events</text>
+
+  <rect x="600" y="245" width="180" height="35" rx="4" class="service-box"/>
+  <text x="690" y="265" text-anchor="middle" class="text-service">query_reputation</text>
+  <text x="690" y="278" text-anchor="middle" class="text-small">SQLite + projections</text>
+
+  <text x="790" y="255" class="text-small">get_reputation/</text>
+  <text x="790" y="267" class="text-small">list_rpc_calls/</text>
+  <text x="790" y="279" class="text-small">list_disputes/</text>
+
+  <!-- Domain 3: Social Graph -->
+  <rect x="20" y="300" width="960" height="80" rx="8" class="domain-box"/>
+  <text x="30" y="325" class="text-title">Domain 3: Social Graph</text>
+
+  <rect x="30" y="335" width="180" height="35" rx="4" class="service-box"/>
+  <text x="120" y="355" text-anchor="middle" class="text-service">manage_social_graph</text>
+  <text x="120" y="368" text-anchor="middle" class="text-small">ReckonDB + reckon_evoq</text>
+
+  <text x="220" y="345" class="text-small">follow_agent/</text>
+  <text x="220" y="357" class="text-small">unfollow_agent/</text>
+  <text x="220" y="369" class="text-small">endorse_capability/</text>
+
+  <path d="M 410 352 L 590 352" class="event-flow"/>
+  <text x="500" y="347" text-anchor="middle" class="text-small" fill="#22d3ee">events</text>
+
+  <rect x="600" y="335" width="180" height="35" rx="4" class="service-box"/>
+  <text x="690" y="355" text-anchor="middle" class="text-service">query_social_graph</text>
+  <text x="690" y="368" text-anchor="middle" class="text-small">SQLite + projections</text>
+
+  <text x="790" y="345" class="text-small">get_followers/</text>
+  <text x="790" y="357" class="text-small">get_following/</text>
+  <text x="790" y="369" class="text-small">get_endorsements/</text>
+
+  <!-- Domain 4: PubSub -->
+  <rect x="20" y="390" width="960" height="80" rx="8" class="domain-box"/>
+  <text x="30" y="415" class="text-title">Domain 4: PubSub</text>
+
+  <rect x="30" y="425" width="180" height="35" rx="4" class="service-box"/>
+  <text x="120" y="445" text-anchor="middle" class="text-service">manage_subscriptions</text>
+  <text x="120" y="458" text-anchor="middle" class="text-small">ReckonDB + reckon_evoq</text>
+
+  <text x="220" y="435" class="text-small">subscribe_topic/</text>
+  <text x="220" y="447" class="text-small">unsubscribe_topic/</text>
+
+  <path d="M 410 442 L 590 442" class="event-flow"/>
+  <text x="500" y="437" text-anchor="middle" class="text-small" fill="#22d3ee">events</text>
+
+  <rect x="600" y="425" width="180" height="35" rx="4" class="service-box"/>
+  <text x="690" y="445" text-anchor="middle" class="text-service">query_subscriptions</text>
+  <text x="690" y="458" text-anchor="middle" class="text-small">SQLite + projections</text>
+
+  <text x="790" y="435" class="text-small">list_subscriptions/</text>
+  <text x="790" y="447" class="text-small">get_subscription_stats/</text>
+
+  <!-- Domain 5: Identities -->
+  <rect x="20" y="480" width="960" height="80" rx="8" class="domain-box"/>
+  <text x="30" y="505" class="text-title">Domain 5: Identities</text>
+
+  <rect x="30" y="515" width="180" height="35" rx="4" class="service-box"/>
+  <text x="120" y="535" text-anchor="middle" class="text-service">manage_identities</text>
+  <text x="120" y="548" text-anchor="middle" class="text-small">ReckonDB + reckon_evoq</text>
+
+  <text x="220" y="525" class="text-small">initialize_agent/</text>
+  <text x="220" y="537" class="text-small">update_agent_metadata/</text>
+
+  <path d="M 410 532 L 590 532" class="event-flow"/>
+  <text x="500" y="527" text-anchor="middle" class="text-small" fill="#22d3ee">events</text>
+
+  <rect x="600" y="515" width="180" height="35" rx="4" class="service-box"/>
+  <text x="690" y="535" text-anchor="middle" class="text-service">query_identities</text>
+  <text x="690" y="548" text-anchor="middle" class="text-small">SQLite + projections</text>
+
+  <text x="790" y="525" class="text-small">get_agent/</text>
+  <text x="790" y="537" class="text-small">list_agents/</text>
+
+  <!-- Domain 6: UCAN -->
+  <rect x="20" y="570" width="960" height="80" rx="8" class="domain-box"/>
+  <text x="30" y="595" class="text-title">Domain 6: UCAN (Authorization)</text>
+
+  <rect x="30" y="605" width="180" height="35" rx="4" class="service-box"/>
+  <text x="120" y="625" text-anchor="middle" class="text-service">manage_ucan</text>
+  <text x="120" y="638" text-anchor="middle" class="text-small">ReckonDB + reckon_evoq</text>
+
+  <text x="220" y="615" class="text-small">grant_ucan_capability/</text>
+  <text x="220" y="627" class="text-small">revoke_ucan_capability/</text>
+
+  <path d="M 410 622 L 590 622" class="event-flow"/>
+  <text x="500" y="617" text-anchor="middle" class="text-small" fill="#22d3ee">events</text>
+
+  <rect x="600" y="605" width="180" height="35" rx="4" class="service-box"/>
+  <text x="690" y="625" text-anchor="middle" class="text-service">query_ucan</text>
+  <text x="690" y="638" text-anchor="middle" class="text-small">SQLite + projections</text>
+
+  <text x="790" y="615" class="text-small">list_ucan_capabilities/</text>
+  <text x="790" y="627" class="text-small">verify_ucan_capability/</text>
+
+  <!-- Legend -->
+  <rect x="20" y="665" width="960" height="25" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1"/>
+  <text x="30" y="680" class="text-small">Legend:</text>
+
+  <line x1="100" y1="677" x2="140" y2="677" class="event-flow"/>
+  <text x="150" y="680" class="text-small">Events (ReckonDB → SQLite projections)</text>
+
+  <rect x="350" y="670" width="60" height="15" rx="2" class="service-box"/>
+  <text x="380" y="680" text-anchor="middle" class="text-small">Command</text>
+
+  <rect x="440" y="670" width="60" height="15" rx="2" class="service-box"/>
+  <text x="470" y="680" text-anchor="middle" class="text-small">Query</text>
+
+  <text x="530" y="680" class="text-small">Each service has dedicated DB instance</text>
+</svg>

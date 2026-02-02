@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#a855f7"/>
+    </marker>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="600" height="400" fill="#1a1a2e"/>
+  
+  <!-- Title -->
+  <text x="300" y="30" text-anchor="middle" font-family="system-ui, sans-serif" font-size="18" font-weight="bold" fill="#fff">Install &amp; First Run</text>
+  
+  <!-- Step 1: Install -->
+  <rect x="50" y="60" width="500" height="70" rx="6" fill="#16213e" stroke="#3b82f6" stroke-width="2"/>
+  <text x="70" y="85" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#60a5fa">1. INSTALL</text>
+  <text x="70" y="110" font-family="monospace" font-size="11" fill="#fff">curl -fsSL https://get.macula.io/hecate | sh</text>
+  
+  <!-- Arrow -->
+  <line x1="300" y1="130" x2="300" y2="150" stroke="#a855f7" stroke-width="2" marker-end="url(#arr)"/>
+  
+  <!-- Step 2: Initialize -->
+  <rect x="50" y="160" width="500" height="85" rx="6" fill="#16213e" stroke="#a855f7" stroke-width="2"/>
+  <text x="70" y="185" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#c4b5fd">2. INITIALIZE</text>
+  <text x="70" y="210" font-family="monospace" font-size="11" fill="#fff">hecate init</text>
+  <text x="70" y="232" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">→ Generates MRI identity + keypair</text>
+  <text x="70" y="247" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">→ Creates ~/.hecate/identity.json</text>
+  
+  <!-- Arrow -->
+  <line x1="300" y1="245" x2="300" y2="265" stroke="#a855f7" stroke-width="2" marker-end="url(#arr)"/>
+  
+  <!-- Step 3: Start -->
+  <rect x="50" y="275" width="240" height="100" rx="6" fill="#16213e" stroke="#10b981" stroke-width="2"/>
+  <text x="70" y="300" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#34d399">3. START</text>
+  <text x="70" y="325" font-family="monospace" font-size="11" fill="#fff">hecate start</text>
+  <text x="70" y="350" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">→ Daemon on :4444</text>
+  <text x="70" y="365" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">→ Health: /health</text>
+
+  <!-- Step 4: Pair -->
+  <rect x="310" y="275" width="240" height="100" rx="6" fill="#16213e" stroke="#f97316" stroke-width="2"/>
+  <text x="330" y="300" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#fb923c">4. PAIR</text>
+  <text x="330" y="325" font-family="monospace" font-size="11" fill="#fff">hecate pair</text>
+  <text x="330" y="350" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">→ QR code + 6-digit code</text>
+  <text x="330" y="365" font-family="system-ui, sans-serif" font-size="10" fill="#94a3b8">→ Connects to realm</text>
+</svg>

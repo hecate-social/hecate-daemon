@@ -1,0 +1,18 @@
+%%% Application descriptor for query_capabilities
+{application, query_capabilities, [
+    {description, "Capability query service (CQRS read side)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_capabilities_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        esqlite,
+        reckon_evoq,
+        manage_capabilities  % For event schemas
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

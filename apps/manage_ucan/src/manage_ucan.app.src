@@ -1,0 +1,11 @@
+{application, manage_ucan, [
+    {description, "Command service for UCAN capabilities"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {manage_ucan_app, []}},
+    {applications, [kernel, stdlib, reckon_db, reckon_evoq]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

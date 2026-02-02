@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600">
+  <defs>
+    <style>
+      .box { fill: #1e293b; stroke: #3b82f6; stroke-width: 2; }
+      .event-box { fill: #1e1b2e; stroke: #22d3ee; stroke-width: 2; }
+      .calc-box { fill: #1e1b2e; stroke: #10b981; stroke-width: 2; }
+      .arrow { stroke: #3b82f6; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .text-title { fill: #60a5fa; font-family: 'SF Mono', Monaco, monospace; font-size: 14px; font-weight: bold; }
+      .text-normal { fill: #e2e8f0; font-family: 'SF Mono', Monaco, monospace; font-size: 12px; }
+      .text-small { fill: #94a3b8; font-family: 'SF Mono', Monaco, monospace; font-size: 10px; }
+      .text-code { fill: #22d3ee; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#3b82f6" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="600" fill="#0f172a"/>
+
+  <!-- Title -->
+  <text x="450" y="30" text-anchor="middle" fill="#60a5fa" font-size="20" font-weight="bold">Reputation System Flow</text>
+  <text x="450" y="50" text-anchor="middle" fill="#94a3b8" font-size="12">Automatic reputation calculation from RPC call tracking</text>
+
+  <!-- Phase 1: RPC Call -->
+  <text x="150" y="85" text-anchor="middle" class="text-title">1. RPC CALL TRACKED</text>
+
+  <rect x="50" y="100" width="200" height="100" rx="8" class="box"/>
+  <text x="150" y="125" text-anchor="middle" class="text-normal">Agent B calls capability</text>
+  <text x="150" y="145" text-anchor="middle" class="text-code">weather-forecast</text>
+  <text x="150" y="165" text-anchor="middle" class="text-small">provided by Agent A</text>
+  <text x="150" y="182" text-anchor="middle" class="text-small">result: success (200 OK)</text>
+  <text x="150" y="195" text-anchor="middle" class="text-small">latency: 45ms</text>
+
+  <!-- Arrow -->
+  <path d="M 250 150 L 330 150" class="arrow"/>
+  <text x="290" y="145" text-anchor="middle" class="text-small" fill="#3b82f6">record event</text>
+
+  <!-- Phase 2: Event Recorded -->
+  <text x="450" y="85" text-anchor="middle" class="text-title">2. EVENT RECORDED</text>
+
+  <rect x="340" y="100" width="220" height="100" rx="8" class="event-box"/>
+  <text x="450" y="125" text-anchor="middle" class="text-normal" fill="#22d3ee">rpc_call_completed_v1</text>
+  <text x="450" y="145" text-anchor="middle" class="text-code">capability: weather-forecast</text>
+  <text x="450" y="162" text-anchor="middle" class="text-code">provider: Agent A</text>
+  <text x="450" y="179" text-anchor="middle" class="text-code">status: success</text>
+  <text x="450" y="196" text-anchor="middle" class="text-code">latency_ms: 45</text>
+
+  <!-- Arrow -->
+  <path d="M 450 200 L 450 240" class="arrow"/>
+  <text x="460" y="223" text-anchor="start" class="text-small" fill="#3b82f6">projection</text>
+
+  <!-- Phase 3: Projection Updates Stats -->
+  <text x="450" y="265" text-anchor="middle" class="text-title">3. STATS UPDATED</text>
+
+  <rect x="340" y="280" width="220" height="120" rx="8" class="box"/>
+  <text x="450" y="305" text-anchor="middle" class="text-normal">SQLite: rpc_call_stats</text>
+  <text x="450" y="330" text-anchor="middle" class="text-code">capability: weather-forecast</text>
+  <text x="450" y="347" text-anchor="middle" class="text-code">total_calls: 147</text>
+  <text x="450" y="364" text-anchor="middle" class="text-code">successful_calls: 144</text>
+  <text x="450" y="381" text-anchor="middle" class="text-code">avg_latency_ms: 52</text>
+  <text x="450" y="398" text-anchor="middle" class="text-code">last_called_at: 2026-01-31T...</text>
+
+  <!-- Arrow -->
+  <path d="M 560 340 L 640 340" class="arrow"/>
+  <text x="600" y="335" text-anchor="middle" class="text-small" fill="#3b82f6">calculate</text>
+
+  <!-- Phase 4: Reputation Calculated -->
+  <text x="750" y="265" text-anchor="middle" class="text-title">4. REPUTATION SCORE</text>
+
+  <rect x="650" y="280" width="200" height="180" rx="8" class="calc-box"/>
+  <text x="750" y="305" text-anchor="middle" class="text-normal" fill="#10b981">Reputation Formula</text>
+
+  <!-- Formula breakdown -->
+  <text x="660" y="330" class="text-small">Success Rate (70%):</text>
+  <text x="660" y="345" class="text-code">144/147 = 97.96% → 68.57</text>
+
+  <text x="660" y="365" class="text-small">Performance (20%):</text>
+  <text x="660" y="380" class="text-code">1 - (52/1000) = 94.8% → 18.96</text>
+
+  <text x="660" y="400" class="text-small">Volume (10%):</text>
+  <text x="660" y="415" class="text-code">min(147/100, 1) = 1.0 → 10.0</text>
+
+  <line x1="660" y1="428" x2="840" y2="428" stroke="#10b981" stroke-width="1"/>
+  <text x="660" y="443" class="text-title" fill="#10b981">Total: 97.53</text>
+  <text x="660" y="458" class="text-small" fill="#34d399">(Excellent tier)</text>
+
+  <!-- Bottom: Query API -->
+  <text x="450" y="495" text-anchor="middle" class="text-title">5. QUERY REPUTATION</text>
+
+  <rect x="250" y="510" width="400" height="70" rx="8" class="box"/>
+  <text x="450" y="535" text-anchor="middle" class="text-normal">GET /reputation?capability=weather-forecast</text>
+  <text x="450" y="555" text-anchor="middle" class="text-code">{"score": 97.53, "tier": "excellent",</text>
+  <text x="450" y="570" text-anchor="middle" class="text-code"> "calls": 147, "success_rate": 0.9796}</text>
+
+  <!-- Side note: Automatic -->
+  <rect x="30" y="420" width="200" height="80" rx="6" fill="#1e293b" stroke="#a5b4fc" stroke-width="1"/>
+  <text x="130" y="440" text-anchor="middle" class="text-small" fill="#a5b4fc">Fully Automatic</text>
+  <text x="130" y="458" text-anchor="middle" class="text-small">✓ No manual scoring</text>
+  <text x="130" y="473" text-anchor="middle" class="text-small">✓ Real-time updates</text>
+  <text x="130" y="488" text-anchor="middle" class="text-small">✓ Objective metrics</text>
+</svg>

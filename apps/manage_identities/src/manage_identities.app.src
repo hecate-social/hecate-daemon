@@ -1,0 +1,11 @@
+{application, manage_identities, [
+    {description, "Command service for agent identities"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {manage_identities_app, []}},
+    {applications, [kernel, stdlib, reckon_db, reckon_evoq]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

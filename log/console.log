@@ -1,0 +1,341 @@
+2026-01-31 09:43:24.931 [info] <0.1062.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4354/hecate.db
+2026-01-31 09:43:24.934 [error] emulator Error in process <0.1063.0> with exit value:
+{{badmatch,{error,{load_failed,"Failed to load NIF library: '/home/rl/work/github.com/macula-io/macula-hecate/_build/default/lib/esqlite/priv/esqlite3_nif.so: cannot open shared object file: No such file or directory'"}}},[{esqlite3_nif,init,0,[{file,"/home/rl/work/github.com/macula-io/macula-hecate/_build/default/lib/esqlite/src/esqlite3_nif.erl"},{line,89}]},{code_server,'-schedule_on_load/4-fun-0-',1,[{file,"code_server.erl"},{line,1388}]}]}
+2026-01-31 09:43:50.548 [info] <0.815.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4/hecate.db
+2026-01-31 09:43:50.554 [error] <0.815.0>@esqlite3:exec:263 CRASH REPORT Process <0.815.0> with 1 neighbours crashed with reason: no function clause matching esqlite3:exec("CREATE TABLE IF NOT EXISTS kv (\n            bucket TEXT NOT NULL,\n            key TEXT NOT NULL...", {esqlite3,#Ref<0.372245420.2749497409.144705>}) line 263
+2026-01-31 09:44:33.735 [info] <0.815.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_14/hecate.db
+2026-01-31 09:44:33.740 [info] <0.817.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:33.749 [info] <0.821.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_16/hecate.db
+2026-01-31 09:44:33.750 [info] <0.822.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:33.756 [info] <0.826.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_2/hecate.db
+2026-01-31 09:44:33.756 [info] <0.827.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:33.762 [info] <0.831.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_142/hecate.db
+2026-01-31 09:44:33.762 [info] <0.832.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:33.768 [info] <0.836.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_270/hecate.db
+2026-01-31 09:44:33.769 [info] <0.837.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:33.774 [info] <0.841.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_144/hecate.db
+2026-01-31 09:44:33.775 [info] <0.842.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:33.775 [error] <0.842.0>@hecate_identity:generate_keypair:176 gen_server hecate_identity terminated with reason: no match of right hand value {<<192,179,121,25,252,165,100,98,31,117,187,105,239,252,165,48,111,139,160,231,215,167,60,212,239,60,57,95,59,71,8,34>>,<<55,176,205,194,135,160,7,149,48,109,213,209,198,49,200,240,123,26,196,122,108,25,209,227,102,229,26,11,130,124,67,164>>} in hecate_identity:generate_keypair/0 line 176
+2026-01-31 09:44:45.758 [info] <0.815.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_2/hecate.db
+2026-01-31 09:44:45.763 [info] <0.817.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.774 [info] <0.821.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_16/hecate.db
+2026-01-31 09:44:45.774 [info] <0.822.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.779 [info] <0.826.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_3/hecate.db
+2026-01-31 09:44:45.780 [info] <0.827.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.785 [info] <0.831.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_131/hecate.db
+2026-01-31 09:44:45.786 [info] <0.832.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.791 [info] <0.836.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_144/hecate.db
+2026-01-31 09:44:45.792 [info] <0.837.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.797 [info] <0.841.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_272/hecate.db
+2026-01-31 09:44:45.798 [info] <0.842.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.798 [info] <0.842.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-d604
+2026-01-31 09:44:45.804 [info] <0.846.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_259/hecate.db
+2026-01-31 09:44:45.805 [info] <0.847.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.805 [info] <0.847.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:custom.realm/testowner/myagent
+2026-01-31 09:44:45.811 [info] <0.851.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_400/hecate.db
+2026-01-31 09:44:45.812 [info] <0.852.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.812 [info] <0.852.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-6dac
+2026-01-31 09:44:45.818 [info] <0.856.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_387/hecate.db
+2026-01-31 09:44:45.819 [info] <0.857.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.819 [info] <0.857.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-7449
+2026-01-31 09:44:45.832 [info] <0.861.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_18/hecate.db
+2026-01-31 09:44:45.833 [info] <0.862.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.833 [info] <0.862.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-16c4
+2026-01-31 09:44:45.839 [info] <0.866.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_515/hecate.db
+2026-01-31 09:44:45.840 [info] <0.867.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:45.840 [info] <0.867.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:test.realm/owner/agent
+2026-01-31 09:44:46.041 [info] <0.903.0>@hecate_mesh:handle_info:{102,13} Connecting to mesh...
+2026-01-31 09:44:46.506 [info] <0.961.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_12/hecate.db
+2026-01-31 09:44:46.541 [info] <0.968.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_13/hecate.db
+2026-01-31 09:44:46.564 [info] <0.971.0>@hecate_rpc:handle_call:{71,5} Registered procedure: echo -> http://localhost:8080/echo
+2026-01-31 09:44:46.575 [info] <0.975.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_11/hecate.db
+2026-01-31 09:44:46.598 [info] <0.978.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc1 -> http://localhost/proc1
+2026-01-31 09:44:46.598 [info] <0.978.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc2 -> http://localhost/proc2
+2026-01-31 09:44:46.598 [info] <0.978.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc3 -> http://localhost/proc3
+2026-01-31 09:44:46.609 [info] <0.982.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_528/hecate.db
+2026-01-31 09:44:46.630 [info] <0.985.0>@hecate_rpc:handle_call:{71,5} Registered procedure: to_remove -> http://localhost/remove
+2026-01-31 09:44:46.630 [info] <0.985.0>@hecate_rpc:handle_call:{77,5} Unregistered procedure: to_remove
+2026-01-31 09:44:46.641 [info] <0.989.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_656/hecate.db
+2026-01-31 09:44:46.662 [info] <0.992.0>@hecate_rpc:handle_call:{77,5} Unregistered procedure: nonexistent
+2026-01-31 09:44:46.673 [info] <0.996.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_141/hecate.db
+2026-01-31 09:44:46.694 [info] <0.999.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc -> http://old-endpoint
+2026-01-31 09:44:46.694 [info] <0.999.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc -> http://new-endpoint
+2026-01-31 09:44:46.705 [info] <0.1003.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_10/hecate.db
+2026-01-31 09:44:46.726 [info] <0.1006.0>@hecate_rpc:handle_call:{71,5} Registered procedure: test_proc -> http://localhost:9000/test
+2026-01-31 09:44:46.736 [info] <0.1010.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_4360/hecate.db
+2026-01-31 09:44:46.772 [info] <0.1017.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_store_test_9/hecate.db
+2026-01-31 09:44:46.773 [error] <0.1017.0>@hecate_store:handle_call:84 gen_server hecate_store terminated with reason: no case clause matching [[<<131,109,0,0,0,6,118,97,108,117,101,49>>]] in hecate_store:handle_call/3 line 84
+2026-01-31 09:44:59.248 [info] <0.815.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_5/hecate.db
+2026-01-31 09:44:59.252 [info] <0.817.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.261 [info] <0.821.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_133/hecate.db
+2026-01-31 09:44:59.262 [info] <0.822.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.267 [info] <0.826.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4/hecate.db
+2026-01-31 09:44:59.267 [info] <0.827.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.274 [info] <0.831.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_261/hecate.db
+2026-01-31 09:44:59.274 [info] <0.832.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.280 [info] <0.836.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_132/hecate.db
+2026-01-31 09:44:59.281 [info] <0.837.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.286 [info] <0.841.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_389/hecate.db
+2026-01-31 09:44:59.286 [info] <0.842.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.287 [info] <0.842.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-26b5
+2026-01-31 09:44:59.293 [info] <0.846.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_260/hecate.db
+2026-01-31 09:44:59.293 [info] <0.847.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.294 [info] <0.847.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:custom.realm/testowner/myagent
+2026-01-31 09:44:59.299 [info] <0.851.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_517/hecate.db
+2026-01-31 09:44:59.300 [info] <0.852.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.300 [info] <0.852.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-c83a
+2026-01-31 09:44:59.306 [info] <0.856.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_388/hecate.db
+2026-01-31 09:44:59.306 [info] <0.857.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.307 [info] <0.857.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-8d34
+2026-01-31 09:44:59.318 [info] <0.861.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_645/hecate.db
+2026-01-31 09:44:59.319 [info] <0.862.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.319 [info] <0.862.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-e9ed
+2026-01-31 09:44:59.325 [info] <0.866.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_516/hecate.db
+2026-01-31 09:44:59.325 [info] <0.867.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:44:59.326 [info] <0.867.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:test.realm/owner/agent
+2026-01-31 09:44:59.516 [info] <0.903.0>@hecate_mesh:handle_info:{102,13} Connecting to mesh...
+2026-01-31 09:44:59.975 [info] <0.961.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_16/hecate.db
+2026-01-31 09:45:00.005 [info] <0.968.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_14/hecate.db
+2026-01-31 09:45:00.027 [info] <0.971.0>@hecate_rpc:handle_call:{71,5} Registered procedure: echo -> http://localhost:8080/echo
+2026-01-31 09:45:00.038 [info] <0.975.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_773/hecate.db
+2026-01-31 09:45:00.059 [info] <0.978.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc1 -> http://localhost/proc1
+2026-01-31 09:45:00.060 [info] <0.978.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc2 -> http://localhost/proc2
+2026-01-31 09:45:00.060 [info] <0.978.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc3 -> http://localhost/proc3
+2026-01-31 09:45:00.071 [info] <0.982.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_142/hecate.db
+2026-01-31 09:45:00.093 [info] <0.985.0>@hecate_rpc:handle_call:{71,5} Registered procedure: to_remove -> http://localhost/remove
+2026-01-31 09:45:00.093 [info] <0.985.0>@hecate_rpc:handle_call:{77,5} Unregistered procedure: to_remove
+2026-01-31 09:45:00.104 [info] <0.989.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_144/hecate.db
+2026-01-31 09:45:00.125 [info] <0.992.0>@hecate_rpc:handle_call:{77,5} Unregistered procedure: nonexistent
+2026-01-31 09:45:00.135 [info] <0.996.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_272/hecate.db
+2026-01-31 09:45:00.156 [info] <0.999.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc -> http://old-endpoint
+2026-01-31 09:45:00.157 [info] <0.999.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc -> http://new-endpoint
+2026-01-31 09:45:00.167 [info] <0.1003.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_400/hecate.db
+2026-01-31 09:45:00.188 [info] <0.1006.0>@hecate_rpc:handle_call:{71,5} Registered procedure: test_proc -> http://localhost:9000/test
+2026-01-31 09:45:00.199 [info] <0.1010.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_1539/hecate.db
+2026-01-31 09:45:00.233 [info] <0.1017.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_store_test_270/hecate.db
+2026-01-31 09:45:00.240 [info] <0.1021.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_store_test_398/hecate.db
+2026-01-31 09:45:00.246 [info] <0.1025.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_store_test_15/hecate.db
+2026-01-31 09:45:18.055 [info] <0.815.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_6/hecate.db
+2026-01-31 09:45:18.060 [info] <0.817.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.069 [info] <0.821.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_3/hecate.db
+2026-01-31 09:45:18.069 [info] <0.822.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.076 [info] <0.826.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_131/hecate.db
+2026-01-31 09:45:18.076 [info] <0.827.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.081 [info] <0.831.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_259/hecate.db
+2026-01-31 09:45:18.082 [info] <0.832.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.087 [info] <0.836.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_387/hecate.db
+2026-01-31 09:45:18.088 [info] <0.837.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.093 [info] <0.841.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_515/hecate.db
+2026-01-31 09:45:18.094 [info] <0.842.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.094 [info] <0.842.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-11e7
+2026-01-31 09:45:18.100 [info] <0.846.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_643/hecate.db
+2026-01-31 09:45:18.101 [info] <0.847.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.101 [info] <0.847.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:custom.realm/testowner/myagent
+2026-01-31 09:45:18.106 [info] <0.851.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_771/hecate.db
+2026-01-31 09:45:18.107 [info] <0.852.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.107 [info] <0.852.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-e38e
+2026-01-31 09:45:18.112 [info] <0.856.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_899/hecate.db
+2026-01-31 09:45:18.113 [info] <0.857.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.113 [info] <0.857.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-14a0
+2026-01-31 09:45:18.128 [info] <0.861.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1027/hecate.db
+2026-01-31 09:45:18.128 [info] <0.862.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.128 [info] <0.862.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-0c67
+2026-01-31 09:45:18.135 [info] <0.866.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1155/hecate.db
+2026-01-31 09:45:18.135 [info] <0.867.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:45:18.136 [info] <0.867.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:test.realm/owner/agent
+2026-01-31 09:45:18.326 [info] <0.903.0>@hecate_mesh:handle_info:{102,13} Connecting to mesh...
+2026-01-31 09:45:18.782 [info] <0.961.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_13/hecate.db
+2026-01-31 09:45:18.817 [info] <0.968.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_12/hecate.db
+2026-01-31 09:45:18.838 [info] <0.971.0>@hecate_rpc:handle_call:{71,5} Registered procedure: echo -> http://localhost:8080/echo
+2026-01-31 09:45:18.848 [info] <0.975.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_11/hecate.db
+2026-01-31 09:45:18.869 [info] <0.978.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc1 -> http://localhost/proc1
+2026-01-31 09:45:18.870 [info] <0.978.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc2 -> http://localhost/proc2
+2026-01-31 09:45:18.870 [info] <0.978.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc3 -> http://localhost/proc3
+2026-01-31 09:45:18.881 [info] <0.982.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_15/hecate.db
+2026-01-31 09:45:18.903 [info] <0.985.0>@hecate_rpc:handle_call:{71,5} Registered procedure: to_remove -> http://localhost/remove
+2026-01-31 09:45:18.903 [info] <0.985.0>@hecate_rpc:handle_call:{77,5} Unregistered procedure: to_remove
+2026-01-31 09:45:18.914 [info] <0.989.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_140/hecate.db
+2026-01-31 09:45:18.934 [info] <0.992.0>@hecate_rpc:handle_call:{77,5} Unregistered procedure: nonexistent
+2026-01-31 09:45:18.944 [info] <0.996.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_268/hecate.db
+2026-01-31 09:45:18.967 [info] <0.999.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc -> http://old-endpoint
+2026-01-31 09:45:18.967 [info] <0.999.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc -> http://new-endpoint
+2026-01-31 09:45:18.978 [info] <0.1003.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_141/hecate.db
+2026-01-31 09:45:19.000 [info] <0.1006.0>@hecate_rpc:handle_call:{71,5} Registered procedure: test_proc -> http://localhost:9000/test
+2026-01-31 09:45:19.011 [info] <0.1010.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_269/hecate.db
+2026-01-31 09:45:19.046 [info] <0.1017.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_store_test_10/hecate.db
+2026-01-31 09:45:19.053 [info] <0.1021.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_store_test_4616/hecate.db
+2026-01-31 09:57:18.998 [info] <0.894.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1411/hecate.db
+2026-01-31 09:57:19.005 [info] <0.896.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.015 [info] <0.900.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1539/hecate.db
+2026-01-31 09:57:19.015 [info] <0.901.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.021 [info] <0.905.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1667/hecate.db
+2026-01-31 09:57:19.022 [info] <0.906.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.028 [info] <0.910.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1795/hecate.db
+2026-01-31 09:57:19.028 [info] <0.911.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.034 [info] <0.915.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4356/hecate.db
+2026-01-31 09:57:19.035 [info] <0.916.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.040 [info] <0.920.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4484/hecate.db
+2026-01-31 09:57:19.041 [info] <0.921.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.041 [info] <0.921.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-9a3a
+2026-01-31 09:57:19.047 [info] <0.925.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1923/hecate.db
+2026-01-31 09:57:19.047 [info] <0.926.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.048 [info] <0.926.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:custom.realm/testowner/myagent
+2026-01-31 09:57:19.053 [info] <0.930.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_2051/hecate.db
+2026-01-31 09:57:19.053 [info] <0.931.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.054 [info] <0.931.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-c9e7
+2026-01-31 09:57:19.059 [info] <0.935.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4612/hecate.db
+2026-01-31 09:57:19.060 [info] <0.936.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.060 [info] <0.936.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-e844
+2026-01-31 09:57:19.072 [info] <0.940.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4740/hecate.db
+2026-01-31 09:57:19.073 [info] <0.941.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.073 [info] <0.941.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-2ee6
+2026-01-31 09:57:19.079 [info] <0.945.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4868/hecate.db
+2026-01-31 09:57:19.079 [info] <0.946.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:19.080 [info] <0.946.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:test.realm/owner/agent
+2026-01-31 09:57:19.315 [error] <0.988.0> CRASH REPORT Process <0.988.0> with 1 neighbours exited with reason: {abstract_code_not_found,macula} in meck_proc:backup_original/4 line 426
+2026-01-31 09:57:19.328 [error] <0.986.0> gen_server hecate_identity_meck terminated with reason: {abstract_code_not_found,macula}
+2026-01-31 09:57:39.955 [info] <0.846.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_2/hecate.db
+2026-01-31 09:57:39.960 [info] <0.848.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:39.970 [info] <0.852.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4358/hecate.db
+2026-01-31 09:57:39.971 [info] <0.853.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:39.977 [info] <0.857.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4486/hecate.db
+2026-01-31 09:57:39.978 [info] <0.858.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:39.983 [info] <0.862.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_7/hecate.db
+2026-01-31 09:57:39.984 [info] <0.863.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:39.990 [info] <0.867.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1541/hecate.db
+2026-01-31 09:57:39.991 [info] <0.868.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:39.997 [info] <0.872.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_135/hecate.db
+2026-01-31 09:57:39.997 [info] <0.873.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:39.998 [info] <0.873.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-6022
+2026-01-31 09:57:40.004 [info] <0.877.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1669/hecate.db
+2026-01-31 09:57:40.004 [info] <0.878.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:40.005 [info] <0.878.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:custom.realm/testowner/myagent
+2026-01-31 09:57:40.011 [info] <0.882.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_263/hecate.db
+2026-01-31 09:57:40.011 [info] <0.883.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:40.012 [info] <0.883.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-be3f
+2026-01-31 09:57:40.017 [info] <0.887.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1797/hecate.db
+2026-01-31 09:57:40.018 [info] <0.888.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:40.018 [info] <0.888.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-c34d
+2026-01-31 09:57:40.031 [info] <0.892.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4614/hecate.db
+2026-01-31 09:57:40.032 [info] <0.893.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:40.032 [info] <0.893.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-3cd1
+2026-01-31 09:57:40.038 [info] <0.897.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_4742/hecate.db
+2026-01-31 09:57:40.038 [info] <0.898.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:40.039 [info] <0.898.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:test.realm/owner/agent
+2026-01-31 09:57:40.274 [error] <0.940.0> CRASH REPORT Process <0.940.0> with 1 neighbours exited with reason: {abstract_code_not_found,macula_peer} in meck_proc:backup_original/4 line 426
+2026-01-31 09:57:40.287 [error] <0.938.0> gen_server hecate_identity_meck terminated with reason: {abstract_code_not_found,macula_peer}
+2026-01-31 09:57:54.720 [info] <0.846.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_18/hecate.db
+2026-01-31 09:57:54.725 [info] <0.848.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.734 [info] <0.852.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_19/hecate.db
+2026-01-31 09:57:54.734 [info] <0.853.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.740 [info] <0.857.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_147/hecate.db
+2026-01-31 09:57:54.741 [info] <0.858.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.747 [info] <0.862.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_146/hecate.db
+2026-01-31 09:57:54.747 [info] <0.863.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.752 [info] <0.867.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_275/hecate.db
+2026-01-31 09:57:54.753 [info] <0.868.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.758 [info] <0.872.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_403/hecate.db
+2026-01-31 09:57:54.759 [info] <0.873.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.759 [info] <0.873.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-c2c4
+2026-01-31 09:57:54.765 [info] <0.877.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_531/hecate.db
+2026-01-31 09:57:54.766 [info] <0.878.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.766 [info] <0.878.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:custom.realm/testowner/myagent
+2026-01-31 09:57:54.772 [info] <0.882.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_16/hecate.db
+2026-01-31 09:57:54.773 [info] <0.883.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.773 [info] <0.883.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-b6af
+2026-01-31 09:57:54.779 [info] <0.887.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_144/hecate.db
+2026-01-31 09:57:54.780 [info] <0.888.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.780 [info] <0.888.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-315c
+2026-01-31 09:57:54.791 [info] <0.892.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_272/hecate.db
+2026-01-31 09:57:54.792 [info] <0.893.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.792 [info] <0.893.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-58b5
+2026-01-31 09:57:54.798 [info] <0.897.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_400/hecate.db
+2026-01-31 09:57:54.799 [info] <0.898.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 09:57:54.799 [info] <0.898.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:test.realm/owner/agent
+2026-01-31 09:57:55.514 [info] <0.992.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_13/hecate.db
+2026-01-31 09:57:55.563 [info] <0.999.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_12/hecate.db
+2026-01-31 09:57:55.603 [info] <0.1002.0>@hecate_rpc:handle_call:{71,5} Registered procedure: echo -> http://localhost:8080/echo
+2026-01-31 09:57:55.614 [info] <0.1006.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_528/hecate.db
+2026-01-31 09:57:55.653 [info] <0.1009.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc1 -> http://localhost/proc1
+2026-01-31 09:57:55.653 [info] <0.1009.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc2 -> http://localhost/proc2
+2026-01-31 09:57:55.654 [info] <0.1009.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc3 -> http://localhost/proc3
+2026-01-31 09:57:55.664 [info] <0.1013.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_10/hecate.db
+2026-01-31 09:57:55.705 [info] <0.1016.0>@hecate_rpc:handle_call:{71,5} Registered procedure: to_remove -> http://localhost/remove
+2026-01-31 09:57:55.705 [info] <0.1016.0>@hecate_rpc:handle_call:{77,5} Unregistered procedure: to_remove
+2026-01-31 09:57:55.716 [info] <0.1020.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_15/hecate.db
+2026-01-31 10:32:03.871 [info] <0.839.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_15/hecate.db
+2026-01-31 10:32:03.876 [info] <0.841.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.887 [info] <0.845.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_12/hecate.db
+2026-01-31 10:32:03.888 [info] <0.846.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.894 [info] <0.850.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_140/hecate.db
+2026-01-31 10:32:03.895 [info] <0.851.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.901 [info] <0.855.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_268/hecate.db
+2026-01-31 10:32:03.901 [info] <0.856.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.907 [info] <0.860.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_11/hecate.db
+2026-01-31 10:32:03.907 [info] <0.861.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.913 [info] <0.865.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_139/hecate.db
+2026-01-31 10:32:03.913 [info] <0.866.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.914 [info] <0.866.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-dc3c
+2026-01-31 10:32:03.919 [info] <0.870.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_267/hecate.db
+2026-01-31 10:32:03.920 [info] <0.871.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.920 [info] <0.871.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:custom.realm/testowner/myagent
+2026-01-31 10:32:03.925 [info] <0.875.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_1155/hecate.db
+2026-01-31 10:32:03.926 [info] <0.876.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.926 [info] <0.876.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-6715
+2026-01-31 10:32:03.932 [info] <0.880.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_395/hecate.db
+2026-01-31 10:32:03.932 [info] <0.881.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.933 [info] <0.881.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-fb80
+2026-01-31 10:32:03.944 [info] <0.885.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_396/hecate.db
+2026-01-31 10:32:03.945 [info] <0.886.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.945 [info] <0.886.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-0185
+2026-01-31 10:32:03.952 [info] <0.890.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_523/hecate.db
+2026-01-31 10:32:03.952 [info] <0.891.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:32:03.953 [info] <0.891.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:test.realm/owner/agent
+2026-01-31 10:32:04.675 [info] <0.985.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_9/hecate.db
+2026-01-31 10:32:04.726 [info] <0.992.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_137/hecate.db
+2026-01-31 10:32:04.767 [info] <0.995.0>@hecate_rpc:handle_call:{71,5} Registered procedure: echo -> http://localhost:8080/echo
+2026-01-31 10:32:04.778 [info] <0.999.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_8/hecate.db
+2026-01-31 10:32:04.818 [info] <0.1002.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc1 -> http://localhost/proc1
+2026-01-31 10:32:04.818 [info] <0.1002.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc2 -> http://localhost/proc2
+2026-01-31 10:32:04.818 [info] <0.1002.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc3 -> http://localhost/proc3
+2026-01-31 10:32:04.830 [info] <0.1006.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_7/hecate.db
+2026-01-31 10:32:04.871 [info] <0.1009.0>@hecate_rpc:handle_call:{71,5} Registered procedure: to_remove -> http://localhost/remove
+2026-01-31 10:32:04.872 [info] <0.1009.0>@hecate_rpc:handle_call:{77,5} Unregistered procedure: to_remove
+2026-01-31 13:05:55.474 [info] <0.834.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_19/hecate.db
+2026-01-31 13:05:55.479 [info] <0.836.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.489 [info] <0.840.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_16/hecate.db
+2026-01-31 13:05:55.490 [info] <0.841.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.496 [info] <0.845.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_144/hecate.db
+2026-01-31 13:05:55.497 [info] <0.846.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.503 [info] <0.850.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_147/hecate.db
+2026-01-31 13:05:55.504 [info] <0.851.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.510 [info] <0.855.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_275/hecate.db
+2026-01-31 13:05:55.510 [info] <0.856.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.517 [info] <0.860.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_272/hecate.db
+2026-01-31 13:05:55.517 [info] <0.861.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.518 [info] <0.861.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-94a6
+2026-01-31 13:05:55.524 [info] <0.865.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_403/hecate.db
+2026-01-31 13:05:55.525 [info] <0.866.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.525 [info] <0.866.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:custom.realm/testowner/myagent
+2026-01-31 13:05:55.531 [info] <0.870.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_400/hecate.db
+2026-01-31 13:05:55.531 [info] <0.871.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.532 [info] <0.871.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-e8ec
+2026-01-31 13:05:55.538 [info] <0.875.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_528/hecate.db
+2026-01-31 13:05:55.539 [info] <0.876.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.539 [info] <0.876.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-18ce
+2026-01-31 13:05:55.550 [info] <0.880.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_531/hecate.db
+2026-01-31 13:05:55.551 [info] <0.881.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.551 [info] <0.881.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-6e4d
+2026-01-31 13:05:55.558 [info] <0.885.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_identity_test_656/hecate.db
+2026-01-31 13:05:55.559 [info] <0.886.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 13:05:55.559 [info] <0.886.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:test.realm/owner/agent
+2026-01-31 13:05:56.298 [info] <0.980.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_8/hecate.db
+2026-01-31 13:05:56.349 [info] <0.987.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_11/hecate.db
+2026-01-31 13:05:56.391 [info] <0.990.0>@hecate_rpc:handle_call:{71,5} Registered procedure: echo -> http://localhost:8080/echo
+2026-01-31 13:05:56.403 [info] <0.994.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_136/hecate.db
+2026-01-31 13:05:56.443 [info] <0.997.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc1 -> http://localhost/proc1
+2026-01-31 13:05:56.443 [info] <0.997.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc2 -> http://localhost/proc2
+2026-01-31 13:05:56.444 [info] <0.997.0>@hecate_rpc:handle_call:{71,5} Registered procedure: proc3 -> http://localhost/proc3
+2026-01-31 13:05:56.455 [info] <0.1001.0>@hecate_store:init:{75,5} Opening store at /tmp/hecate_rpc_test_5898/hecate.db
+2026-02-01 11:20:26.016 [error] <0.6014.0>@lager:info CRASH REPORT Process <0.6014.0> with 1 neighbours crashed with reason: call to undefined function lager:info("Opening store at ~s", ["/tmp/hecate_identity_test_8/hecate.db"])
+2026-02-01 11:36:28.458 [error] <0.6241.0>@lager:info CRASH REPORT Process <0.6241.0> with 1 neighbours crashed with reason: call to undefined function lager:info("Opening store at ~s", ["/tmp/hecate_identity_test_7/hecate.db"])

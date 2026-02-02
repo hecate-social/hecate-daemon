@@ -1,0 +1,145 @@
+2026-01-31 09:58:11.190 [info] <0.45.0> Application lager started on node nonode@nohost
+2026-01-31 09:58:11.192 [info] <0.45.0> Application jsx started on node nonode@nohost
+2026-01-31 09:58:11.192 [info] <0.45.0> Application cowlib started on node nonode@nohost
+2026-01-31 09:58:11.192 [info] <0.45.0> Application ranch started on node nonode@nohost
+2026-01-31 09:58:11.196 [info] <0.45.0> Application cowboy started on node nonode@nohost
+2026-01-31 09:58:11.197 [info] <0.45.0> Application unicode_util_compat started on node nonode@nohost
+2026-01-31 09:58:11.197 [info] <0.45.0> Application idna started on node nonode@nohost
+2026-01-31 09:58:11.197 [info] <0.45.0> Application mimerl started on node nonode@nohost
+2026-01-31 09:58:11.197 [info] <0.45.0> Application certifi started on node nonode@nohost
+2026-01-31 09:58:11.197 [info] <0.45.0> Application parse_trans started on node nonode@nohost
+2026-01-31 09:58:11.197 [info] <0.45.0> Application ssl_verify_fun started on node nonode@nohost
+2026-01-31 09:58:11.197 [info] <0.45.0> Application metrics started on node nonode@nohost
+2026-01-31 09:58:11.210 [info] <0.45.0> Application hackney started on node nonode@nohost
+2026-01-31 09:58:11.210 [info] <0.45.0> Application esqlite started on node nonode@nohost
+2026-01-31 09:58:11.225 [info] <0.45.0> Application quicer started on node nonode@nohost
+2026-01-31 09:58:11.225 [info] <0.45.0> Application msgpack started on node nonode@nohost
+2026-01-31 09:58:11.242 [info] <0.45.0> Application gproc started on node nonode@nohost
+2026-01-31 09:58:11.246 [info] <0.45.0> Application macula exited with reason: {{mkdir_failed,eacces},{macula_app,start,[normal,[]]}}
+2026-01-31 09:58:11.246 [error] <0.619.0> CRASH REPORT Process <0.619.0> with 0 neighbours exited with reason: {{mkdir_failed,eacces},{macula_app,start,[normal,[]]}} in application_master:init/3 line 147
+2026-01-31 09:58:11.247 [info] <0.45.0> Application gproc exited with reason: stopped
+2026-01-31 09:58:11.247 [info] <0.45.0> Application msgpack exited with reason: stopped
+2026-01-31 09:58:11.248 [info] <0.45.0> Application quicer exited with reason: stopped
+2026-01-31 09:58:11.248 [info] <0.45.0> Application esqlite exited with reason: stopped
+2026-01-31 09:58:11.248 [info] <0.45.0> Application hackney exited with reason: stopped
+2026-01-31 09:58:11.248 [info] <0.45.0> Application metrics exited with reason: stopped
+2026-01-31 09:58:11.248 [info] <0.45.0> Application ssl_verify_fun exited with reason: stopped
+2026-01-31 09:58:11.248 [info] <0.45.0> Application parse_trans exited with reason: stopped
+2026-01-31 09:58:11.248 [info] <0.45.0> Application certifi exited with reason: stopped
+2026-01-31 09:58:11.248 [info] <0.45.0> Application mimerl exited with reason: stopped
+2026-01-31 09:58:11.248 [info] <0.45.0> Application idna exited with reason: stopped
+2026-01-31 09:58:11.248 [info] <0.45.0> Application unicode_util_compat exited with reason: stopped
+2026-01-31 09:58:11.249 [info] <0.45.0> Application cowboy exited with reason: stopped
+2026-01-31 09:58:11.250 [info] <0.45.0> Application ranch exited with reason: stopped
+2026-01-31 09:58:11.250 [info] <0.45.0> Application cowlib exited with reason: stopped
+2026-01-31 09:58:11.250 [info] <0.45.0> Application jsx exited with reason: stopped
+2026-01-31 09:59:13.974 [info] <0.45.0> Application lager started on node nonode@nohost
+2026-01-31 09:59:13.976 [info] <0.45.0> Application jsx started on node nonode@nohost
+2026-01-31 09:59:13.976 [info] <0.45.0> Application cowlib started on node nonode@nohost
+2026-01-31 09:59:13.976 [info] <0.45.0> Application ranch started on node nonode@nohost
+2026-01-31 09:59:13.978 [info] <0.45.0> Application cowboy started on node nonode@nohost
+2026-01-31 09:59:13.978 [info] <0.45.0> Application unicode_util_compat started on node nonode@nohost
+2026-01-31 09:59:13.978 [info] <0.45.0> Application idna started on node nonode@nohost
+2026-01-31 09:59:13.979 [info] <0.45.0> Application mimerl started on node nonode@nohost
+2026-01-31 09:59:13.979 [info] <0.45.0> Application certifi started on node nonode@nohost
+2026-01-31 09:59:13.979 [info] <0.45.0> Application parse_trans started on node nonode@nohost
+2026-01-31 09:59:13.979 [info] <0.45.0> Application ssl_verify_fun started on node nonode@nohost
+2026-01-31 09:59:13.979 [info] <0.45.0> Application metrics started on node nonode@nohost
+2026-01-31 09:59:13.989 [info] <0.45.0> Application hackney started on node nonode@nohost
+2026-01-31 09:59:13.989 [info] <0.45.0> Application esqlite started on node nonode@nohost
+2026-01-31 09:59:14.008 [info] <0.45.0> Application quicer started on node nonode@nohost
+2026-01-31 09:59:14.008 [info] <0.45.0> Application msgpack started on node nonode@nohost
+2026-01-31 09:59:14.024 [info] <0.45.0> Application gproc started on node nonode@nohost
+2026-01-31 09:59:14.203 [error] <0.609.0> CRASH REPORT Process <0.609.0> with 0 neighbours exited with reason: {health_server_failed,eaddrinuse} in gen_server:init_it/6 line 2257
+2026-01-31 09:59:14.203 [error] <0.608.0> Supervisor {<0.608.0>,macula_gateway_system} had child macula_gateway_health started with macula_gateway_health:start_link([{health_port,8080}]) at undefined exit with reason {health_server_failed,eaddrinuse} in context start_error
+2026-01-31 09:59:14.204 [error] <0.589.0> Supervisor macula_root had child macula_gateway_system started with macula_gateway_system:start_link([{port,9443},{realm,<<"com.example.realm">>},{health_port,8080}]) at undefined exit with reason {shutdown,{failed_to_start_child,macula_gateway_health,{health_server_failed,eaddrinuse}}} in context start_error
+2026-01-31 09:59:14.204 [error] <0.587.0> CRASH REPORT Process <0.587.0> with 0 neighbours exited with reason: {{shutdown,{failed_to_start_child,macula_gateway_system,{shutdown,{failed_to_start_child,macula_gateway_health,{health_server_failed,eaddrinuse}}}}},{macula_app,start,[normal,[]]}} in application_master:init/3 line 147
+2026-01-31 09:59:14.204 [info] <0.45.0> Application macula exited with reason: {{shutdown,{failed_to_start_child,macula_gateway_system,{shutdown,{failed_to_start_child,macula_gateway_health,{health_server_failed,eaddrinuse}}}}},{macula_app,start,[normal,[]]}}
+2026-01-31 09:59:14.204 [info] <0.45.0> Application gproc exited with reason: stopped
+2026-01-31 09:59:14.205 [info] <0.45.0> Application msgpack exited with reason: stopped
+2026-01-31 09:59:14.205 [info] <0.45.0> Application quicer exited with reason: stopped
+2026-01-31 09:59:14.205 [info] <0.45.0> Application esqlite exited with reason: stopped
+2026-01-31 09:59:14.206 [info] <0.45.0> Application hackney exited with reason: stopped
+2026-01-31 09:59:14.206 [info] <0.45.0> Application metrics exited with reason: stopped
+2026-01-31 09:59:14.206 [info] <0.45.0> Application ssl_verify_fun exited with reason: stopped
+2026-01-31 09:59:14.206 [info] <0.45.0> Application parse_trans exited with reason: stopped
+2026-01-31 09:59:14.206 [info] <0.45.0> Application certifi exited with reason: stopped
+2026-01-31 09:59:14.206 [info] <0.45.0> Application mimerl exited with reason: stopped
+2026-01-31 09:59:14.206 [info] <0.45.0> Application idna exited with reason: stopped
+2026-01-31 09:59:14.206 [info] <0.45.0> Application unicode_util_compat exited with reason: stopped
+2026-01-31 09:59:14.206 [info] <0.45.0> Application cowboy exited with reason: stopped
+2026-01-31 09:59:14.207 [info] <0.45.0> Application ranch exited with reason: stopped
+2026-01-31 09:59:14.207 [info] <0.45.0> Application cowlib exited with reason: stopped
+2026-01-31 09:59:14.207 [info] <0.45.0> Application jsx exited with reason: stopped
+2026-01-31 10:00:09.382 [info] <0.45.0> Application lager started on node nonode@nohost
+2026-01-31 10:00:09.384 [info] <0.45.0> Application jsx started on node nonode@nohost
+2026-01-31 10:00:09.384 [info] <0.45.0> Application cowlib started on node nonode@nohost
+2026-01-31 10:00:09.384 [info] <0.45.0> Application ranch started on node nonode@nohost
+2026-01-31 10:00:09.387 [info] <0.45.0> Application cowboy started on node nonode@nohost
+2026-01-31 10:00:09.387 [info] <0.45.0> Application unicode_util_compat started on node nonode@nohost
+2026-01-31 10:00:09.387 [info] <0.45.0> Application idna started on node nonode@nohost
+2026-01-31 10:00:09.387 [info] <0.45.0> Application mimerl started on node nonode@nohost
+2026-01-31 10:00:09.387 [info] <0.45.0> Application certifi started on node nonode@nohost
+2026-01-31 10:00:09.387 [info] <0.45.0> Application parse_trans started on node nonode@nohost
+2026-01-31 10:00:09.387 [info] <0.45.0> Application ssl_verify_fun started on node nonode@nohost
+2026-01-31 10:00:09.387 [info] <0.45.0> Application metrics started on node nonode@nohost
+2026-01-31 10:00:09.398 [info] <0.45.0> Application hackney started on node nonode@nohost
+2026-01-31 10:00:09.398 [info] <0.45.0> Application esqlite started on node nonode@nohost
+2026-01-31 10:00:09.413 [info] <0.45.0> Application quicer started on node nonode@nohost
+2026-01-31 10:00:09.427 [info] <0.45.0> Application gproc started on node nonode@nohost
+2026-01-31 10:00:09.427 [info] <0.45.0> Application msgpack started on node nonode@nohost
+2026-01-31 10:00:09.428 [info] <0.588.0>@hecate_app:start:{22,5} Starting Hecate 🗝️
+2026-01-31 10:00:09.429 [info] <0.590.0>@hecate_store:init:{75,5} Opening store at /home/rl/.hecate/hecate.db
+2026-01-31 10:00:09.518 [info] <0.592.0>@hecate_identity:init:{87,13} No identity found - run 'hecate init' to create one
+2026-01-31 10:00:09.547 [info] <0.598.0>@hecate_api:init:{67,5} API listening on {127,0,0,1}:4444
+2026-01-31 10:00:09.547 [info] <0.45.0> Application hecate started on node nonode@nohost
+2026-01-31 10:00:31.281 [info] <0.592.0>@hecate_identity:handle_call:{149,5} Created identity: mri:agent:io.macula/anonymous/hecate-test
+2026-01-31 10:00:34.524 [info] <0.593.0>@hecate_mesh:do_connect:{188,5} Connecting to https://boot.macula.io:4433 (realm: io.macula)
+2026-01-31 10:00:48.769 [info] <0.45.0> Application lager started on node nonode@nohost
+2026-01-31 10:00:48.771 [info] <0.45.0> Application jsx started on node nonode@nohost
+2026-01-31 10:00:48.771 [info] <0.45.0> Application cowlib started on node nonode@nohost
+2026-01-31 10:00:48.771 [info] <0.45.0> Application ranch started on node nonode@nohost
+2026-01-31 10:00:48.775 [info] <0.45.0> Application cowboy started on node nonode@nohost
+2026-01-31 10:00:48.775 [info] <0.45.0> Application unicode_util_compat started on node nonode@nohost
+2026-01-31 10:00:48.775 [info] <0.45.0> Application idna started on node nonode@nohost
+2026-01-31 10:00:48.775 [info] <0.45.0> Application mimerl started on node nonode@nohost
+2026-01-31 10:00:48.776 [info] <0.45.0> Application certifi started on node nonode@nohost
+2026-01-31 10:00:48.776 [info] <0.45.0> Application parse_trans started on node nonode@nohost
+2026-01-31 10:00:48.776 [info] <0.45.0> Application ssl_verify_fun started on node nonode@nohost
+2026-01-31 10:00:48.776 [info] <0.45.0> Application metrics started on node nonode@nohost
+2026-01-31 10:00:48.787 [info] <0.45.0> Application hackney started on node nonode@nohost
+2026-01-31 10:00:48.787 [info] <0.45.0> Application esqlite started on node nonode@nohost
+2026-01-31 10:00:48.803 [info] <0.45.0> Application quicer started on node nonode@nohost
+2026-01-31 10:00:48.818 [info] <0.45.0> Application gproc started on node nonode@nohost
+2026-01-31 10:00:48.818 [info] <0.45.0> Application msgpack started on node nonode@nohost
+2026-01-31 10:00:48.819 [info] <0.588.0>@hecate_app:start:{22,5} Starting Hecate 🗝️
+2026-01-31 10:00:48.820 [info] <0.590.0>@hecate_store:init:{75,5} Opening store at /home/rl/.hecate/hecate.db
+2026-01-31 10:00:48.824 [info] <0.592.0>@hecate_identity:init:{79,13} Loaded identity: mri:agent:io.macula/anonymous/hecate-test
+2026-01-31 10:00:48.825 [info] <0.593.0>@hecate_mesh:do_connect:{188,5} Connecting to https://boot.macula.io:4433 (realm: io.macula)
+2026-01-31 10:00:48.871 [info] <0.600.0>@hecate_api:init:{67,5} API listening on {127,0,0,1}:4444
+2026-01-31 10:00:48.871 [info] <0.45.0> Application hecate started on node nonode@nohost
+2026-01-31 10:00:53.863 [error] <0.596.0> CRASH REPORT Process <0.596.0> with 1 neighbours exited with reason: {timeout,{gen_server,call,[<0.602.0>,get_status,5000]}} in gen_server:call/3 line 1301
+2026-01-31 10:00:53.863 [error] <0.589.0> Supervisor hecate_sup had child hecate_mesh started with hecate_mesh:start_link() at <0.593.0> exit with reason {timeout,{gen_server,call,[<0.602.0>,get_status,5000]}} in context child_terminated
+2026-01-31 10:00:53.863 [info] <0.621.0>@hecate_mesh:do_connect:{188,5} Connecting to https://boot.macula.io:4433 (realm: io.macula)
+2026-01-31 10:00:53.868 [error] <0.601.0> gen_server <0.601.0> terminated with reason: {timeout,{gen_server,call,[<0.602.0>,get_status,5000]}}
+2026-01-31 10:00:53.868 [error] <0.601.0> CRASH REPORT Process <0.601.0> with 0 neighbours exited with reason: {timeout,{gen_server,call,[<0.602.0>,get_status,5000]}} in gen_server:decode_msg/6 line 2379
+2026-01-31 10:00:58.868 [error] <0.622.0> CRASH REPORT Process <0.622.0> with 1 neighbours exited with reason: {timeout,{gen_server,call,[<0.624.0>,get_status,5000]}} in gen_server:call/3 line 1301
+2026-01-31 10:00:58.868 [error] <0.589.0> Supervisor hecate_sup had child hecate_mesh started with hecate_mesh:start_link() at <0.621.0> exit with reason {timeout,{gen_server,call,[<0.624.0>,get_status,5000]}} in context child_terminated
+2026-01-31 10:00:58.868 [info] <0.629.0>@hecate_mesh:do_connect:{188,5} Connecting to https://boot.macula.io:4433 (realm: io.macula)
+2026-01-31 10:00:58.868 [error] <0.623.0> gen_server <0.623.0> terminated with reason: {timeout,{gen_server,call,[<0.624.0>,get_status,5000]}}
+2026-01-31 10:00:58.868 [error] <0.623.0> CRASH REPORT Process <0.623.0> with 0 neighbours exited with reason: {timeout,{gen_server,call,[<0.624.0>,get_status,5000]}} in gen_server:decode_msg/6 line 2379
+2026-01-31 10:01:03.873 [error] <0.630.0> CRASH REPORT Process <0.630.0> with 1 neighbours exited with reason: {timeout,{gen_server,call,[<0.632.0>,get_status,5000]}} in gen_server:call/3 line 1301
+2026-01-31 10:01:03.873 [error] <0.589.0> Supervisor hecate_sup had child hecate_mesh started with hecate_mesh:start_link() at <0.629.0> exit with reason {timeout,{gen_server,call,[<0.632.0>,get_status,5000]}} in context child_terminated
+2026-01-31 10:01:03.873 [info] <0.637.0>@hecate_mesh:do_connect:{188,5} Connecting to https://boot.macula.io:4433 (realm: io.macula)
+2026-01-31 10:01:03.873 [error] <0.631.0> gen_server <0.631.0> terminated with reason: {timeout,{gen_server,call,[<0.632.0>,get_status,5000]}}
+2026-01-31 10:01:03.873 [error] <0.631.0> CRASH REPORT Process <0.631.0> with 0 neighbours exited with reason: {timeout,{gen_server,call,[<0.632.0>,get_status,5000]}} in gen_server:decode_msg/6 line 2379
+2026-01-31 10:01:08.878 [error] <0.638.0> CRASH REPORT Process <0.638.0> with 1 neighbours exited with reason: {timeout,{gen_server,call,[<0.640.0>,get_status,5000]}} in gen_server:call/3 line 1301
+2026-01-31 10:01:08.878 [error] <0.589.0> Supervisor hecate_sup had child hecate_mesh started with hecate_mesh:start_link() at <0.637.0> exit with reason {timeout,{gen_server,call,[<0.640.0>,get_status,5000]}} in context child_terminated
+2026-01-31 10:01:08.878 [info] <0.645.0>@hecate_mesh:do_connect:{188,5} Connecting to https://boot.macula.io:4433 (realm: io.macula)
+2026-01-31 10:01:08.878 [error] <0.639.0> gen_server <0.639.0> terminated with reason: {timeout,{gen_server,call,[<0.640.0>,get_status,5000]}}
+2026-01-31 10:01:08.878 [error] <0.639.0> CRASH REPORT Process <0.639.0> with 0 neighbours exited with reason: {timeout,{gen_server,call,[<0.640.0>,get_status,5000]}} in gen_server:decode_msg/6 line 2379
+2026-01-31 10:01:13.883 [error] <0.646.0> CRASH REPORT Process <0.646.0> with 1 neighbours exited with reason: {timeout,{gen_server,call,[<0.648.0>,get_status,5000]}} in gen_server:call/3 line 1301
+2026-01-31 10:01:13.883 [error] <0.589.0> Supervisor hecate_sup had child hecate_mesh started with hecate_mesh:start_link() at <0.645.0> exit with reason {timeout,{gen_server,call,[<0.648.0>,get_status,5000]}} in context child_terminated
+2026-01-31 10:01:13.883 [info] <0.653.0>@hecate_mesh:do_connect:{188,5} Connecting to https://boot.macula.io:4433 (realm: io.macula)
+2026-01-31 10:01:13.883 [error] <0.647.0> gen_server <0.647.0> terminated with reason: {timeout,{gen_server,call,[<0.648.0>,get_status,5000]}}
+2026-01-31 10:01:13.883 [error] <0.647.0> CRASH REPORT Process <0.647.0> with 0 neighbours exited with reason: {timeout,{gen_server,call,[<0.648.0>,get_status,5000]}} in gen_server:decode_msg/6 line 2379
