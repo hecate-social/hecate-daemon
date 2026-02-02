@@ -1559,4 +1559,4 @@ def get_forecast(city):
 
 ---
 
-**Need help?** Join our [Discord](https://discord.gg/macula) or open an issue on [GitHub](https://github.com/macula-io/macula-hecate/issues).
+**Need help?** Join our [Discord](https://discord.gg/macula) or open an issue on [GitHub](https://github.com/hecate-social/hecate-daemon/issues).

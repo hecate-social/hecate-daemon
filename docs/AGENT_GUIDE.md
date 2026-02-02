@@ -848,4 +848,4 @@ curl -X DELETE http://localhost:4444/capabilities/announce \
 
 ---
 
-**Need help?** Join our [Discord](https://discord.gg/macula) or open an issue on [GitHub](https://github.com/macula-io/macula-hecate/issues).
+**Need help?** Join our [Discord](https://discord.gg/macula) or open an issue on [GitHub](https://github.com/hecate-social/hecate-daemon/issues).

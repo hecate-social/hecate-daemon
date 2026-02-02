@@ -1,6 +1,6 @@
-# macula-hecate REST API
+# Hecate Daemon REST API
 
-This document describes the complete REST API for macula-hecate daemon.
+This document describes the complete REST API for Hecate daemon daemon.
 
 ## Base URL
 

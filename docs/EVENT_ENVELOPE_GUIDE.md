@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide explains how business events in macula-hecate fit into the evoq event envelope structure. Understanding this is **critical** for implementing commands, events, and projections correctly.
+This guide explains how business events in Hecate daemon fit into the evoq event envelope structure. Understanding this is **critical** for implementing commands, events, and projections correctly.
 
 ## The evoq_event Envelope
 

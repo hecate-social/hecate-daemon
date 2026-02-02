@@ -1,6 +1,6 @@
-# macula-hecate Operator Guide
+# Hecate daemon Operator Guide
 
-This guide is for operators deploying and running macula-hecate in production.
+This guide is for operators deploying and running Hecate daemon in production.
 
 ## Table of Contents
 
@@ -51,7 +51,7 @@ VERSION="0.1.0"
 OS="linux"  # or "darwin"
 ARCH="amd64"  # or "arm64"
 
-curl -LO "https://github.com/macula-io/macula-hecate/releases/download/v${VERSION}/hecate-${OS}-${ARCH}.tar.gz"
+curl -LO "https://github.com/hecate-social/hecate-daemon/releases/download/v${VERSION}/hecate-${OS}-${ARCH}.tar.gz"
 ```
 
 **2. Extract**
@@ -80,8 +80,8 @@ hecate version
 
 ```bash
 # Clone repository
-git clone https://github.com/macula-io/macula-hecate.git
-cd macula-hecate
+git clone https://github.com/hecate-social/hecate-daemon.git
+cd hecate-daemon
 
 # Install dependencies
 rebar3 get-deps
@@ -202,7 +202,7 @@ sudo chmod +x /usr/local/bin/hecate
 # /etc/systemd/system/hecate.service
 [Unit]
 Description=Macula Hecate Daemon
-Documentation=https://github.com/macula-io/macula-hecate
+Documentation=https://github.com/hecate-social/hecate-daemon
 After=network-online.target
 Wants=network-online.target
 
@@ -675,7 +675,7 @@ If only ReckonDB is backed up:
 
 ```bash
 VERSION="0.2.0"
-curl -LO "https://github.com/macula-io/macula-hecate/releases/download/v${VERSION}/hecate-linux-amd64.tar.gz"
+curl -LO "https://github.com/hecate-social/hecate-daemon/releases/download/v${VERSION}/hecate-linux-amd64.tar.gz"
 ```
 
 **3. Stop Hecate**
@@ -938,8 +938,8 @@ grep "rpc.*status.*failure" /var/lib/hecate/logs/hecate.log
 ## Support
 
 **Documentation:**
-- GitHub: https://github.com/macula-io/macula-hecate
-- Guides: https://macula-io.github.io/macula-hecate/
+- GitHub: https://github.com/hecate-social/hecate-daemon
+- Guides: https://hecate-social.github.io/hecate-daemon/
 
 **Community:**
 - Discord: https://discord.gg/macula

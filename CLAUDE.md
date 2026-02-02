@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Development guidelines for macula-hecate.
+Development guidelines for hecate-daemon.
 
 ---
 
@@ -458,7 +458,7 @@ rebar3 as prod tar
 ## Directory Structure
 
 ```
-macula-hecate/
+hecate-daemon/
 ├── src/
 │   ├── hecate_app.erl          # Application behaviour
 │   ├── hecate_sup.erl          # Top supervisor

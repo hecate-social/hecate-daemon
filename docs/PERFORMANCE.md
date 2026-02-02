@@ -1,6 +1,6 @@
 # Performance Characteristics
 
-This document describes the performance characteristics, known bottlenecks, and optimization strategies for macula-hecate's CQRS architecture.
+This document describes the performance characteristics, known bottlenecks, and optimization strategies for Hecate daemon's CQRS architecture.
 
 ## Architecture Overview
 

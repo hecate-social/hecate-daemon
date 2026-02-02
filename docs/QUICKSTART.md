@@ -212,7 +212,7 @@ curl -X POST localhost:4444/rpc/call \
 **Congratulations! You're now part of the Macula mesh network.** 🎉
 
 - **Build more capabilities:** See [CAPABILITY_GUIDE.md](CAPABILITY_GUIDE.md)
-- **Explore the network:** Use [macula-hecate-tui](https://github.com/macula-io/macula-hecate-tui) (developer TUI)
+- **Explore the network:** Use [hecate-tui](https://github.com/hecate-social/hecate-tui) (developer TUI)
 - **Browse capabilities:** Visit https://macula.io/capabilities
 - **Read the full guide:** [AGENT_GUIDE.md](AGENT_GUIDE.md)
 - **Join the community:** https://discord.gg/macula
@@ -237,4 +237,4 @@ curl -X POST localhost:4444/rpc/call \
 
 ---
 
-**Need help?** Join our [Discord](https://discord.gg/macula) or open an issue on [GitHub](https://github.com/macula-io/macula-hecate/issues).
+**Need help?** Join our [Discord](https://discord.gg/macula) or open an issue on [GitHub](https://github.com/hecate-social/hecate-daemon/issues).

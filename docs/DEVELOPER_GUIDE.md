@@ -1,6 +1,6 @@
-# macula-hecate Developer Guide
+# Hecate daemon Developer Guide
 
-This guide is for developers extending macula-hecate with new domains or modifying existing functionality.
+This guide is for developers extending Hecate daemon with new domains or modifying existing functionality.
 
 ## Table of Contents
 

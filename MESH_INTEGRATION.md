@@ -1,8 +1,8 @@
-# Mesh Integration - macula-hecate
+# Mesh Integration
 
 ## Overview
 
-The `hecate_mesh` app integrates macula-hecate with the Macula HTTP/3 mesh network for distributed event pub/sub.
+The `hecate_mesh` app integrates Hecate daemon with the Macula Mesh network for distributed event pub/sub.
 
 ## Architecture
 

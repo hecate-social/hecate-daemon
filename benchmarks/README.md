@@ -1,6 +1,6 @@
 # Performance Testing Suite
 
-This directory contains performance tests for the macula-hecate CQRS stack.
+This directory contains performance tests for the Hecate daemon CQRS stack.
 
 ## Quick Start
 

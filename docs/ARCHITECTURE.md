@@ -1,6 +1,6 @@
-# macula-hecate Architecture
+# Hecate daemon Architecture
 
-This document describes the complete architecture of macula-hecate, a lightweight Erlang daemon for connecting AI agents to the Macula mesh network.
+This document describes the complete architecture of Hecate daemon, a lightweight Erlang daemon for connecting AI agents to the Macula mesh network.
 
 ## Table of Contents
 
@@ -22,7 +22,7 @@ This document describes the complete architecture of macula-hecate, a lightweigh
 
 ### Purpose
 
-**macula-hecate** is a sidecar daemon that:
+**Hecate daemon** is a sidecar daemon that:
 - Exposes REST API for mesh operations
 - Manages agent identity and capabilities
 - Handles RPC and pub/sub communication
