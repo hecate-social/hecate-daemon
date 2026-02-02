@@ -16,6 +16,11 @@ start(_StartType, _StartArgs) ->
             %% Identity
             {"/identity", hecate_api_identity, []},
 
+            %% Pairing
+            {"/api/pairing/start", hecate_api_pairing, [start]},
+            {"/api/pairing/status", hecate_api_pairing, [status]},
+            {"/api/pairing/cancel", hecate_api_pairing, [cancel]},
+
             %% Capabilities
             {"/capabilities/announce", hecate_api_capabilities, [announce]},
             {"/capabilities/discover", hecate_api_capabilities, [discover]},
