@@ -26,7 +26,7 @@ jobs:
       - name: Set up Erlang/OTP
         uses: erlef/setup-beam@v1
         with:
-          otp-version: '28'
+          otp-version: '27'
           rebar3-version: '3.24'
 
       - name: Get dependencies
@@ -78,31 +78,27 @@ jobs:
           body: |
             ## Installation
 
-            **Linux (amd64):**
+            **Recommended: Use the installer**
             ```bash
-            curl -L https://github.com/macula-io/macula-hecate/releases/download/${{ github.ref_name }}/hecate-linux-amd64.tar.gz | tar xz
-            sudo mv bin/hecate /usr/local/bin/
+            curl -fsSL https://raw.githubusercontent.com/hecate-social/hecate-node/main/install.sh | bash
             ```
 
-            **macOS (arm64):**
+            **Manual - Linux (amd64):**
             ```bash
-            curl -L https://github.com/macula-io/macula-hecate/releases/download/${{ github.ref_name }}/hecate-darwin-arm64.tar.gz | tar xz
-            sudo mv bin/hecate /usr/local/bin/
+            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-linux-amd64.tar.gz | tar xz -C ~/.local/bin
             ```
 
-            **Or use the installer:**
+            **Manual - macOS (arm64):**
             ```bash
-            curl -sSL https://macula.io/install/hecate | sh
+            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-darwin-arm64.tar.gz | tar xz -C ~/.local/bin
             ```
 
             ## Documentation
 
-            - [README](https://github.com/macula-io/macula-hecate/blob/main/README.md)
-            - [API Documentation](https://github.com/macula-io/macula-hecate/blob/main/docs/API.md)
-            - [Architecture](https://github.com/macula-io/macula-hecate/blob/main/docs/ARCHITECTURE.md)
-            - [Operator Guide](https://github.com/macula-io/macula-hecate/blob/main/docs/OPERATOR_GUIDE.md)
-            - [Developer Guide](https://github.com/macula-io/macula-hecate/blob/main/docs/DEVELOPER_GUIDE.md)
+            - [README](https://github.com/hecate-social/hecate-daemon/blob/main/README.md)
+            - [API Documentation](https://github.com/hecate-social/hecate-daemon/blob/main/docs/API.md)
+            - [Architecture](https://github.com/hecate-social/hecate-daemon/blob/main/docs/ARCHITECTURE.md)
 
-            See [CHANGELOG.md](https://github.com/macula-io/macula-hecate/blob/main/CHANGELOG.md) for changes.
+            See [CHANGELOG.md](https://github.com/hecate-social/hecate-daemon/blob/main/CHANGELOG.md) for changes.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
