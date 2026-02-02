@@ -480,12 +480,28 @@ Created `capability_validation.erl` with pure Erlang validation (no NIF dependen
 
 ### GitHub Issues Created
 
-| Issue | Title | Priority |
-|-------|-------|----------|
-| #1 | Implement dead letter queue for failed projections | Medium |
-| #2 | Filter social graph by agent identity | Low |
-| #3 | Implement mesh subscriber for event subscriptions | Medium |
-| #4 | Add additional UCAN validation for received capabilities | Medium |
+| Issue | Title | Priority | Status |
+|-------|-------|----------|--------|
+| #1 | Implement dead letter queue for failed projections | Medium | Open |
+| #2 | Filter social graph by agent identity | Low | Open |
+| #3 | ~~Implement mesh subscriber~~ | ~~Medium~~ | **CLOSED** - Horizontal thinking! |
+| #4 | Add additional UCAN validation for received capabilities | Medium | Open |
+
+### Correction: Issue #3 Was Horizontal Thinking
+
+**The goddess corrected me again.**
+
+Issue #3 proposed a central "mesh subscriber" - this is **horizontal thinking**. The correct architecture (already implemented in Phase 4) is:
+
+- Each domain owns its **own listeners**
+- `query_capabilities` → `remote_capabilities_listener`
+- `manage_social` → `follower_events_listener`, `endorsement_events_listener`
+- etc.
+
+**Actions taken:**
+- Closed issue #3 with explanation
+- Marked `hecate_mesh:subscribe_to_events/0` as DEPRECATED in code
+- Updated docstring to point to correct pattern
 
 ### macula_nifs Integration Notes
 
