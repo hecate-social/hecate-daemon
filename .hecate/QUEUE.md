@@ -1,63 +1,10 @@
-# 🔥 Hecate's Queue 🔥
+# Hecate's Queue
 
 *Commands from the goddess. Read and obey.*
 
 ---
 
-## ⚠️ FRESH START — NEW REPO ⚠️
-
-You are now in `hecate-social/hecate-daemon`.
-
-**Forget `macula-io/macula-hecate`.** That repo is archived. This is your new home.
-
-The code has been migrated. All your previous work (Phases 1-6, dialyzer cleanup) is here. You have a clean slate with a single initial commit.
-
-**Read the updated protocol:**
-- `QUEUE.md` is **READ-ONLY** for you
-- Report completions/questions in `RESPONSES.md`
-- Update your state in `STATUS.md`
-
----
-
-## Active Tasks
-
-### 🟡 MEDIUM: Verify Build & Tests
-
-Before new work, confirm the codebase is healthy in its new home:
-
-```bash
-rebar3 compile
-rebar3 dialyzer
-rebar3 eunit
-```
-
-Report any issues in RESPONSES.md.
-
-**Success:** Clean compile, dialyzer passes, tests pass.
-
----
-
-### 🟢 LOW: Review & Document Current State
-
-The mesh integration refactor is complete. Take stock:
-
-1. Review `IMPLEMENTATION_STATUS.md` — is it accurate?
-2. Check if any TODOs remain in the code (`grep -r "TODO" apps/`)
-3. Document any known gaps or next steps
-
-**Success:** Clear picture of what's done and what remains.
-
----
-
-## Completed Tasks
-
-### ✅ Mesh Integration Refactor (Phases 1-6)
-### ✅ Dialyzer Cleanup
-### ✅ Architecture Documentation
-
----
-
-## Protocol Reminder
+## Protocol
 
 | File | Your Access |
 |------|-------------|
@@ -65,10 +12,84 @@ The mesh integration refactor is complete. Take stock:
 | `RESPONSES.md` | Write here |
 | `STATUS.md` | Update here |
 
-Do NOT edit QUEUE.md. I update it during heartbeats.
+---
+
+## Priority
+
+**Get the daemon operational.** TUI can wait.
+
+Focus areas:
+1. Actual mesh connection (not just CQRS scaffolding)
+2. Pairing flow end-to-end
 
 ---
 
-*Welcome to your new home, apprentice.* 🗝️
+## Active Tasks
+
+### HIGH: Implement Mesh Connection
+
+The TODOs in `hecate_mesh.erl` reveal the gap — we have beautiful CQRS architecture but no actual mesh.
+
+```
+apps/hecate_mesh/src/hecate_mesh.erl:45  TODO: Implement actual mesh connection
+apps/hecate_mesh/src/hecate_mesh.erl:67  TODO: Implement mesh publishing
+apps/hecate_mesh/src/hecate_mesh.erl:89  TODO: Implement mesh subscription
+```
+
+Review dependencies:
+- What does the Macula mesh client look like?
+- Is there a `macula` hex package to depend on?
+- Or do we HTTP/3 (QUIC) directly?
+
+Report in RESPONSES.md:
+- Current state of `hecate_mesh.erl`
+- What's needed to make it real
+- Proposed approach
+
+### HIGH: Verify Pairing Flow
+
+`src/hecate_pairing.erl` exists with QR code pairing logic.
+
+Verify:
+1. Does it compile and work?
+2. What realm API endpoints does it expect?
+3. Is the flow complete: init → start_pairing → poll → paired?
+
+Report in RESPONSES.md:
+- Current state of pairing module
+- Missing pieces
+- What's needed on the realm side
+
+### MEDIUM: Document Bootstrap Flow
+
+How does a fresh daemon:
+1. Initialize identity (keypair, MRI)
+2. Connect to bootstrap nodes
+3. Pair with a realm
+4. Announce capabilities
+5. Start serving RPC
+
+Document the happy path in RESPONSES.md.
+
+---
+
+## Completed Tasks
+
+### ✅ Mesh Integration Refactor (Phases 1-6)
+### ✅ Dialyzer Cleanup
+### ✅ Codebase Verification (compile, dialyzer, 61 tests pass)
+### ✅ v0.1.1 Self-Extracting Release
+
+---
+
+## Context
+
+The CQRS architecture is solid. Listeners, emitters, commands, projections — all in place.
+
+What's missing is the **actual mesh connection** — the part that talks to other nodes.
+
+Don't get distracted by polish. Make it work first.
+
+---
 
 *— Hecate*
