@@ -18,9 +18,15 @@ jobs:
           - os: linux
             arch: amd64
             runner: ubuntu-latest
+          - os: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
           - os: darwin
             arch: arm64
             runner: macos-latest
+          - os: darwin
+            arch: amd64
+            runner: macos-13
 
     steps:
       - name: Checkout code
@@ -41,18 +47,25 @@ jobs:
       - name: Build release
         run: rebar3 as prod tar
 
-      - name: Find and rename tarball
+      - name: Create self-extracting executable
         run: |
+          chmod +x scripts/make-self-extracting.sh
           TARBALL=$(find _build/prod/rel/hecate -name 'hecate-*.tar.gz' | head -n 1)
-          NEW_NAME="hecate-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
-          mv "$TARBALL" "$NEW_NAME"
-          echo "Renamed to: $NEW_NAME"
+          ./scripts/make-self-extracting.sh "$TARBALL" "hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}"
+          # Also keep the tarball for users who prefer it
+          cp "$TARBALL" "hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
 
-      - name: Upload release artifact
+      - name: Upload executable
         uses: actions/upload-artifact@v4
         with:
-          name: hecate-${{ matrix.os }}-${{ matrix.arch }}
-          path: hecate-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          name: hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}
+          path: hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}
+
+      - name: Upload tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}-tarball
+          path: hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
 
   create-release:
     name: Create GitHub Release
@@ -77,7 +90,12 @@ jobs:
           name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
-          files: artifacts/**/*.tar.gz
+          files: |
+            artifacts/hecate-daemon-linux-amd64/hecate-daemon-linux-amd64
+            artifacts/hecate-daemon-linux-arm64/hecate-daemon-linux-arm64
+            artifacts/hecate-daemon-darwin-amd64/hecate-daemon-darwin-amd64
+            artifacts/hecate-daemon-darwin-arm64/hecate-daemon-darwin-arm64
+            artifacts/hecate-daemon-*-tarball/*.tar.gz
           body: |
             ## Installation
 
@@ -86,14 +104,22 @@ jobs:
             curl -fsSL https://raw.githubusercontent.com/hecate-social/hecate-node/main/install.sh | bash
             ```
 
-            **Manual - Linux (amd64):**
+            **Single executable (includes bundled Erlang runtime):**
             ```bash
-            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-linux-amd64.tar.gz | tar xz -C ~/.local/bin
+            # Linux (amd64)
+            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-linux-amd64 -o hecate
+            chmod +x hecate
+            ./hecate start
+
+            # macOS (arm64)
+            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-darwin-arm64 -o hecate
+            chmod +x hecate
+            ./hecate start
             ```
 
-            **Manual - macOS (arm64):**
+            **Tarball (for advanced users):**
             ```bash
-            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-darwin-arm64.tar.gz | tar xz -C ~/.local/bin
+            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-linux-amd64.tar.gz | tar xz
             ```
 
             ## Documentation
