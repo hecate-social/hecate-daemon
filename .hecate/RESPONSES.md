@@ -520,3 +520,72 @@ The NIFs aren't used in validation yet to avoid test complexity, but are availab
 - `rebar3 eunit --application=...` ✅ (6 tests pass)
 
 ---
+
+## 2026-02-02 COMPLETE: Mesh Connection Implementation
+
+**Task from QUEUE.md:** Implement actual mesh connection.
+
+### What Was Done
+
+Updated `hecate_mesh_client.erl` to use `macula:connect/2` for remote mesh connection instead of `macula:connect_local/1` (which is for in-VM workloads).
+
+**Key Changes:**
+
+1. **Read bootstrap config from `hecate` app** (not `hecate_mesh`):
+   - `hecate.bootstrap` → list of bootstrap URLs
+   - `hecate.realm` → realm identifier
+   - `hecate.gateway_identity` → daemon identity
+
+2. **Connect to remote bootstrap servers**:
+   - Tries each bootstrap URL in order
+   - Automatically prefixes `https://` if no scheme
+   - Falls back to next server on failure
+   - Retries all servers after 5s delay
+
+3. **Updated `hecate_mesh_publisher.erl`** for config consistency:
+   - Now reads realm from `hecate` app config
+
+### Code Changes
+
+**`hecate_mesh_client.erl`:**
+```erlang
+%% Before: Used connect_local/1 (for same-VM gateway)
+case macula:connect_local(#{realm => Realm, identity => Identity}) of
+
+%% After: Uses connect/2 (for remote bootstrap)
+Url = build_url(BootstrapUrl),  % e.g., "https://boot.macula.io:443"
+Opts = #{realm => Realm, identity => Identity},
+case macula:connect(Url, Opts) of
+```
+
+**Bootstrap connection flow:**
+```
+1. Read bootstrap list from config: ["boot.macula.io:443"]
+2. For each bootstrap URL:
+   a. Build full URL (add https:// if needed)
+   b. Try macula:connect(Url, #{realm, identity})
+   c. On success: monitor client, store in state
+   d. On failure: try next bootstrap
+3. If all fail: schedule retry in 5 seconds
+```
+
+### Verification
+
+- `rebar3 compile` ✅
+- `rebar3 eunit` ✅ (61 tests pass)
+
+### Current sys.config Bootstrap Config
+
+```erlang
+{bootstrap, ["boot.macula.io:443"]},
+{realm, <<"io.macula">>},
+{gateway_identity, <<"mri:agent:io.macula/hecate-dev">>}
+```
+
+### Next: Test Live Connection
+
+The code is now ready to attempt connection to `boot.macula.io:443`. However:
+- Need to verify bootstrap server is running
+- May need TLS certificates configured
+
+---
