@@ -14,19 +14,21 @@
 
 ---
 
-## Priority
+## ⚡ PRIORITY: MOVE FASTER
 
-**Get daemon operational + pairing flow working.**
+You've been idle since verification. The refactor was good work, but we're not done.
 
-Pairing is split across daemon, TUI, and realm. Coordinate accordingly.
+**The daemon is a skeleton.** Pretty bones, correct structure — but no flesh. The mesh connection is stubbed. The pairing flow doesn't work end-to-end. We have 61 tests for infrastructure that can't actually *do* anything yet.
+
+**Expectation:** When you start your next session, pick up these tasks IMMEDIATELY. No planning documents. No architectural discussions. CODE.
 
 ---
 
 ## Active Tasks
 
-### HIGH: Implement Mesh Connection
+### 🔴 CRITICAL: Implement Mesh Connection
 
-The TODOs in `hecate_mesh.erl` reveal the gap:
+**This is blocking everything else.** Without mesh, we're just a local daemon talking to itself.
 
 ```
 apps/hecate_mesh/src/hecate_mesh.erl:45  TODO: Implement actual mesh connection
@@ -34,14 +36,17 @@ apps/hecate_mesh/src/hecate_mesh.erl:67  TODO: Implement mesh publishing
 apps/hecate_mesh/src/hecate_mesh.erl:89  TODO: Implement mesh subscription
 ```
 
-Report in RESPONSES.md:
-- Current state of `hecate_mesh.erl`
-- What Macula client library exists (hex package? HTTP/3 direct?)
-- Proposed approach
+**Do this:**
+1. Read `hecate_mesh.erl` — understand current stub
+2. Check what Macula client exists (hex package? HTTP/3 direct?)
+3. **IMPLEMENT IT** — even HTTP/2 initially, or mock for local testing
+4. Report **COMPLETION**, not proposals
 
-### HIGH: Pairing API (Daemon Side)
+I don't need plans. I need working code.
 
-The TUI will handle the UX. Daemon provides the API:
+### 🔴 CRITICAL: Pairing API (Daemon Side)
+
+The TUI handles UX. Daemon provides the API:
 
 | Endpoint | Purpose |
 |----------|---------|
@@ -50,19 +55,15 @@ The TUI will handle the UX. Daemon provides the API:
 | `POST /api/pairing/cancel` | Cancel active pairing |
 | `GET /api/identity` | Return current identity and pairing status |
 
-Verify `src/hecate_pairing.erl`:
-1. Does it expose these endpoints via `hecate_api`?
-2. Does it call the realm API correctly?
-3. Does it store cert on success?
+**Do this:**
+1. Check `src/hecate_pairing.erl` and `apps/hecate_api/`
+2. **IMPLEMENT** missing endpoints
+3. Test with curl
+4. Report **COMPLETION** with working curl examples
 
-Report in RESPONSES.md:
-- Current API endpoints available
-- What's missing
-- Realm API endpoints it expects
+### 🟡 MEDIUM: Bootstrap Flow (After Above)
 
-### MEDIUM: Document Bootstrap Flow
-
-How does a fresh daemon go from zero to operational?
+Document the WORKING flow once mesh and pairing exist:
 
 1. `hecate init` → Generate keypair, create MRI
 2. `hecate start` → Start daemon on :4444
@@ -70,15 +71,23 @@ How does a fresh daemon go from zero to operational?
 4. Announce capabilities
 5. Start serving RPC
 
-Document in RESPONSES.md.
+This is documentation of working code, not aspirational design.
 
 ---
 
-## Dependency Note
+## ⚠️ No More Planning Phase
 
-**Pairing requires TUI.** The daemon provides the API, but the user experience (QR display, status) lives in the TUI.
+The refactor is done. The architecture is correct. You learned the patterns.
 
-Coordinate with `hecate-tui/.hecate/QUEUE.md` for the TUI side.
+Now **ship features**. The next message I want to see in RESPONSES.md:
+
+> "COMPLETE: Mesh connection working. Here's how to test it..."
+
+Not:
+
+> "QUESTION: Should I use HTTP/2 or HTTP/3?"
+
+Figure it out. Make a decision. Build it. If it's wrong, we fix it. But a working wrong thing beats a perfect plan.
 
 ---
 
@@ -91,4 +100,4 @@ Coordinate with `hecate-tui/.hecate/QUEUE.md` for the TUI side.
 
 ---
 
-*— Hecate*
+*The goddess is watching. Move.* 🔥🗝️🔥
