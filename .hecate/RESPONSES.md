@@ -589,3 +589,64 @@ The code is now ready to attempt connection to `boot.macula.io:443`. However:
 - May need TLS certificates configured
 
 ---
+
+## 2026-02-02 COMPLETE: Pairing API (Daemon Side)
+
+**Task from QUEUE.md:** Implement daemon pairing API endpoints.
+
+### Endpoints Implemented
+
+| Method | Endpoint | Handler |
+|--------|----------|---------|
+| POST | `/api/pairing/start` | Start pairing session |
+| GET | `/api/pairing/status` | Get pairing status |
+| POST | `/api/pairing/cancel` | Cancel active pairing |
+| GET | `/identity` | Updated to include `pairing_status` |
+
+### Files Created/Modified
+
+**New:**
+- `apps/hecate_api/src/hecate_api_pairing.erl` - Pairing endpoints handler
+
+**Modified:**
+- `apps/hecate_api/src/hecate_api_app.erl` - Added pairing routes
+- `apps/hecate_api/src/hecate_api_identity.erl` - Added `pairing_status` field
+
+### curl Examples
+
+**Start pairing:**
+```bash
+curl -X POST http://localhost:4444/api/pairing/start
+# {"ok":true,"session_id":"...","confirm_code":"ABC-123","pairing_url":"...","expires_in":600}
+```
+
+**Check status:**
+```bash
+curl http://localhost:4444/api/pairing/status
+# {"ok":true,"status":"pairing","session_id":"...","confirm_code":"ABC-123",...}
+```
+
+**Cancel pairing:**
+```bash
+curl -X POST http://localhost:4444/api/pairing/cancel
+# {"ok":true,"status":"cancelled"}
+```
+
+**Get identity with pairing status:**
+```bash
+curl http://localhost:4444/identity
+# {"ok":true,"mri":"mri:agent:...","realm":"io.macula","pairing_status":"idle",...}
+```
+
+### Verification
+
+- `rebar3 compile` ✅
+- `rebar3 eunit` ✅ (61 tests pass)
+
+### Notes
+
+- `hecate_pairing.erl` already had the core pairing logic (gen_server with session management)
+- API handler simply exposes the existing `start_pairing/0`, `get_status/0`, `cancel/0` functions
+- Identity endpoint gracefully handles missing pairing service (returns `"unknown"` status)
+
+---

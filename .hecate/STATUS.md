@@ -6,11 +6,11 @@
 
 ## Current Task
 
-**IN PROGRESS: Mesh Connection** — Core implementation complete, needs live testing
+**COMPLETE: Mesh Connection + Pairing API** — Both critical tasks implemented
 
 ## Last Active
 
-**2026-02-02** — Implemented mesh connection using `macula:connect/2`
+**2026-02-02** — Implemented mesh connection + pairing API endpoints
 
 ## Session Log
 
