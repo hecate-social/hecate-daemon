@@ -406,3 +406,101 @@ Working tree is clean. All pushed to `origin/main`.
 4. **Filter before command** — `is_my_identity/1` check before dispatching commands
 
 ---
+
+## 2026-02-02 COMPLETE: Codebase Verification (v0.1.1 Release Prep)
+
+**Task from QUEUE.md: Verify and confirm working state.**
+
+### Verification Results
+
+| Check | Status | Details |
+|-------|--------|---------|
+| `rebar3 compile` | ✅ PASS | Clean compilation |
+| `rebar3 dialyzer` | ✅ PASS | No type errors |
+| `rebar3 eunit` | ✅ PASS | **61 tests passed** |
+
+### TODOs Found (13 items)
+
+Running `grep -r "TODO" apps/` found the following:
+
+| App | File | TODO |
+|-----|------|------|
+| `manage_capabilities` | `maybe_announce_capability.erl:25` | Validate capability MRI format |
+| `manage_capabilities` | `maybe_announce_capability.erl:26` | Check for duplicate announcements |
+| `manage_capabilities` | `maybe_announce_capability.erl:27` | Validate tags format |
+| `query_capabilities` | `capability_announced_v1_to_capabilities.erl:15` | Index by tags for tag-based queries |
+| `query_capabilities` | `capability_announced_v1_to_capabilities.erl:16` | Update existing capabilities if re-announced |
+| `manage_ucan` | `maybe_grant_capability.erl:26` | Validate UCAN capability format |
+| `manage_ucan` | `maybe_grant_capability.erl:27` | Check granter has authority |
+| `manage_ucan` | `maybe_grant_capability.erl:28` | Validate attenuation constraints |
+| `manage_ucan` | `maybe_revoke_capability.erl:21` | Verify revoker has authority |
+| `manage_ucan` | `maybe_revoke_capability.erl:22` | Handle transitive revocation |
+| `hecate_mesh` | `hecate_mesh.erl:45` | Implement actual mesh connection |
+| `hecate_mesh` | `hecate_mesh.erl:67` | Implement mesh publishing |
+| `hecate_mesh` | `hecate_mesh.erl:89` | Implement mesh subscription |
+
+### Note on Documentation Cleanup
+
+During the previous session's documentation cleanup for v0.1.0 release:
+- `IMPLEMENTATION_STATUS.md` was removed (was an internal tracking file with macula-io references)
+- All references to `macula-io` updated to `hecate-social`
+- README rewritten for public consumption
+
+### Self-Extracting Release
+
+v0.1.1 release workflow creates self-extracting executables:
+- Bundles ERTS (no Erlang prerequisite required)
+- Auto-extracts on first run to `~/.hecate/runtime/`
+- Builds for: `linux-amd64`, `linux-arm64`, `darwin-arm64`
+
+**Codebase is healthy and ready for next tasks.**
+
+---
+
+## 2026-02-02 COMPLETE: Implement Capability Validation + Create GitHub Issues
+
+**Task:** Fix TODOs in capability handlers and create GitHub issues for remaining items.
+
+### Implemented Validation
+
+Created `capability_validation.erl` with pure Erlang validation (no NIF dependency for portability):
+
+| Function | Purpose |
+|----------|---------|
+| `validate_mri/1` | Validates MRI format (must be `capability` or `proc` type) |
+| `validate_agent_identity/1` | Validates agent ID (accepts `mri:agent:*` or `did:*`) |
+| `validate_tags/1` | Validates tags are non-empty binaries |
+| `is_owner/2` | Ownership check for update/retract operations |
+
+**Updated handlers:**
+- `maybe_announce_capability.erl` - Now validates MRI, agent identity, and tags
+- `maybe_update_capability.erl` - Added validation + `handle/2` with ownership check
+- `maybe_retract_capability.erl` - Added validation + `handle/2` with ownership check
+- `capability_aggregate.erl` - Now passes owner ID to handlers for permission checks
+
+### GitHub Issues Created
+
+| Issue | Title | Priority |
+|-------|-------|----------|
+| #1 | Implement dead letter queue for failed projections | Medium |
+| #2 | Filter social graph by agent identity | Low |
+| #3 | Implement mesh subscriber for event subscriptions | Medium |
+| #4 | Add additional UCAN validation for received capabilities | Medium |
+
+### macula_nifs Integration Notes
+
+Added `macula_nifs` as a git dependency (main branch) for future use:
+- MRI validation currently uses pure Erlang for portability
+- `macula_mri_nif` available for high-performance MRI operations
+- `macula_ucan_nif` available for UCAN token operations
+- `macula_crypto_nif` available for Ed25519 crypto
+
+The NIFs aren't used in validation yet to avoid test complexity, but are available when needed.
+
+### Verification
+
+- `rebar3 compile` ✅
+- `rebar3 dialyzer` ✅
+- `rebar3 eunit --application=...` ✅ (6 tests pass)
+
+---

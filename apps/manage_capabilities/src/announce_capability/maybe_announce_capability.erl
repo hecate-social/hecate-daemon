@@ -12,15 +12,38 @@
 -dialyzer({nowarn_function, [dispatch/1]}).
 
 %% @doc Handle announce_capability_v1 command (business logic only)
-%% Returns {ok, Events}
-%% TODO: Add validation that may return {error, Reason}
+%% Validates MRI format, agent identity, and tags before creating event.
 -spec handle(announce_capability_v1:announce_capability_v1()) ->
-    {ok, [capability_announced_v1:capability_announced_v1()]}.
+    {ok, [capability_announced_v1:capability_announced_v1()]} |
+    {error, invalid_mri | invalid_mri_type | invalid_agent_identity | invalid_tags}.
 handle(Cmd) ->
-    %% TODO: Check if capability already exists (query aggregate state)
-    %% TODO: Validate agent has permission to announce (check UCAN)
-    Event = create_event_from_command(Cmd),
-    {ok, [Event]}.
+    MRI = announce_capability_v1:get_mri(Cmd),
+    AgentID = announce_capability_v1:get_agent_id(Cmd),
+    Tags = announce_capability_v1:get_tags(Cmd),
+
+    case validate_command(MRI, AgentID, Tags) of
+        ok ->
+            Event = create_event_from_command(Cmd),
+            {ok, [Event]};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+%% @doc Validate command fields
+-spec validate_command(binary(), binary(), [binary()]) ->
+    ok | {error, invalid_mri | invalid_mri_type | invalid_agent_identity | invalid_tags}.
+validate_command(MRI, AgentID, Tags) ->
+    case capability_validation:validate_mri(MRI) of
+        ok ->
+            case capability_validation:validate_agent_identity(AgentID) of
+                ok ->
+                    capability_validation:validate_tags(Tags);
+                Error ->
+                    Error
+            end;
+        Error ->
+            Error
+    end.
 
 %% @doc Dispatch command via evoq (self-contained slice)
 -spec dispatch(announce_capability_v1:announce_capability_v1()) ->

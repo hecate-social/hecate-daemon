@@ -57,7 +57,8 @@ execute_update(Payload, State) ->
             {error, capability_not_found};
         _ ->
             {ok, Cmd} = update_capability_v1:from_map(Payload),
-            convert_events(maybe_update_capability:handle(Cmd), fun capability_updated_v1:to_map/1)
+            OwnerID = State#capability_state.agent_id,
+            convert_events(maybe_update_capability:handle(Cmd, OwnerID), fun capability_updated_v1:to_map/1)
     end.
 
 execute_retract(Payload, State) ->
@@ -68,7 +69,8 @@ execute_retract(Payload, State) ->
             case State#capability_state.retracted_at of
                 undefined ->
                     {ok, Cmd} = retract_capability_v1:from_map(Payload),
-                    convert_events(maybe_retract_capability:handle(Cmd), fun capability_retracted_v1:to_map/1);
+                    OwnerID = State#capability_state.agent_id,
+                    convert_events(maybe_retract_capability:handle(Cmd, OwnerID), fun capability_retracted_v1:to_map/1);
                 _ ->
                     {error, capability_already_retracted}
             end
@@ -76,7 +78,9 @@ execute_retract(Payload, State) ->
 
 convert_events({ok, Events}, ToMapFun) ->
     EventMaps = [ToMapFun(E) || E <- Events],
-    {ok, EventMaps}.
+    {ok, EventMaps};
+convert_events({error, Reason}, _ToMapFun) ->
+    {error, Reason}.
 
 %% @doc Apply event to state (event sourcing)
 %% NOTE: evoq passes event as map
