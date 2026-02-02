@@ -24,9 +24,6 @@ jobs:
           - os: darwin
             arch: arm64
             runner: macos-latest
-          - os: darwin
-            arch: amd64
-            runner: macos-13
 
     steps:
       - name: Checkout code
@@ -93,7 +90,6 @@ jobs:
           files: |
             artifacts/hecate-daemon-linux-amd64/hecate-daemon-linux-amd64
             artifacts/hecate-daemon-linux-arm64/hecate-daemon-linux-arm64
-            artifacts/hecate-daemon-darwin-amd64/hecate-daemon-darwin-amd64
             artifacts/hecate-daemon-darwin-arm64/hecate-daemon-darwin-arm64
             artifacts/hecate-daemon-*-tarball/*.tar.gz
           body: |
