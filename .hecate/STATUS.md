@@ -6,15 +6,35 @@
 
 ## Current Task
 
-**COMPLETE: Mesh Connection TESTED** — Connection to boot.macula.io:443 verified working
+**COMPLETE: Release Starts Cleanly** — All apps start, API listening, mesh connected
 
 ## Last Active
 
-**2026-02-03** — Fixed startup issues + Tested mesh connection successfully
+**2026-02-03** — Fixed query_capabilities API bug, verified clean startup
 
 ## Session Log
 
 *(Append entries when starting/ending sessions)*
+
+### 2026-02-03 Session (Continued)
+
+**Status:** Complete
+
+**Completed:**
+- Fixed `query_capabilities_app.erl` - removed call to non-existent `reckon_evoq:subscribe/3`
+- Deleted redundant `query_capabilities_projections.erl` - subscriber handles projections
+- Verified release starts cleanly:
+  - All 6 manage services ✅
+  - All 6 query services ✅
+  - hecate_api listening on :4444 ✅
+  - Mesh connection to boot.macula.io:443 ✅
+  - Clean shutdown on SIGTERM ✅
+
+**Non-blocking issues (known):**
+- `reckon_db_subscriptions:create_filter` function_clause errors (gateway workers crash/restart)
+- These are API compatibility issues with reckon_db, not blocking app startup
+
+---
 
 ### 2026-02-02 Session
 
