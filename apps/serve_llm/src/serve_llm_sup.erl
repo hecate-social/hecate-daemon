@@ -66,7 +66,12 @@ init([]) ->
         %% Status heartbeat: sends periodic status updates
         {llm_status_heartbeat,
             {llm_status_heartbeat, start_link, []},
-            permanent, 5000, worker, [llm_status_heartbeat]}
+            permanent, 5000, worker, [llm_status_heartbeat]},
+
+        %% RPC listener: handles incoming mesh RPC requests
+        {llm_rpc_listener,
+            {llm_rpc_listener, start_link, []},
+            permanent, 5000, worker, [llm_rpc_listener]}
     ],
 
     logger:info("[serve_llm] Supervisor started with ~p children", [length(Children)]),
