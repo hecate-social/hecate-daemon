@@ -8,6 +8,9 @@
         stdlib,
         cowboy,
         jsx,
+        %% hecate core (must start first for hecate_identity)
+        hecate,
+        %% Domain apps
         manage_capabilities,
         query_capabilities,
         manage_reputation,

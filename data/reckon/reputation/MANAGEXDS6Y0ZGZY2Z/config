@@ -1,0 +1,11 @@
+#{id => {manage_reputation_store,nonode@nohost},
+  machine =>
+      {module,khepri_machine,
+              #{member => {manage_reputation_store,nonode@nohost},
+                store_id => manage_reputation_store}},
+  friendly_name => "Khepri store \"manage_reputation_store\"",
+  uid => <<"MANAGEXDS6Y0ZGZY2Z">>,cluster_name => manage_reputation_store,
+  initial_members => [],
+  log_init_args => #{uid => <<"MANAGEXDS6Y0ZGZY2Z">>},
+  broadcast_time => 100,tick_timeout => 1000,
+  install_snap_rpc_timeout => 120000,await_condition_timeout => 30000}.

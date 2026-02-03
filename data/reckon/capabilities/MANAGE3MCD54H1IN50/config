@@ -1,0 +1,11 @@
+#{id => {manage_capabilities_store,nonode@nohost},
+  machine =>
+      {module,khepri_machine,
+              #{member => {manage_capabilities_store,nonode@nohost},
+                store_id => manage_capabilities_store}},
+  friendly_name => "Khepri store \"manage_capabilities_store\"",
+  uid => <<"MANAGE3MCD54H1IN50">>,cluster_name => manage_capabilities_store,
+  initial_members => [],
+  log_init_args => #{uid => <<"MANAGE3MCD54H1IN50">>},
+  broadcast_time => 100,tick_timeout => 1000,
+  install_snap_rpc_timeout => 120000,await_condition_timeout => 30000}.

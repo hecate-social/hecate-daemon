@@ -38,10 +38,8 @@
     query_social,
     query_subscriptions,
     query_identities,
-    query_ucan,
-
-    %% API (starts last)
-    hecate_api
+    query_ucan
+    %% Note: hecate_api depends on hecate, not the other way around
    ]},
   {env, [
     {api_port, 4444},

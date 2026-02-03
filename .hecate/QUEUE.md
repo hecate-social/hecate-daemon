@@ -61,6 +61,50 @@ The TUI handles UX. Daemon provides the API:
 3. Test with curl
 4. Report **COMPLETION** with working curl examples
 
+### 🟡 MEDIUM: LLM Capability Service (NEW)
+
+**The daemon becomes a gateway to intelligence.**
+
+Read `plans/PLAN_LLM_CAPABILITY.md` for the full design.
+
+**Phase 1: Local Backend + API**
+
+Create `apps/serve_llm/` with vertical slices:
+
+```
+apps/serve_llm/src/
+├── serve_llm_app.erl
+├── serve_llm_sup.erl
+├── llm_backend/
+│   └── llm_backend.erl       # Ollama HTTP client
+└── (slices come in Phase 2)
+```
+
+**Implement:**
+1. `llm_backend.erl` — talk to Ollama at `localhost:11434`
+   - `chat/3` — sync completion
+   - `chat_stream/4` — streaming to caller pid
+   - `list_models/1` — GET /api/tags
+   - `health/1` — health check
+
+2. `hecate_api_llm.erl` — REST endpoints
+   - `GET /api/llm/models` — list available models
+   - `POST /api/llm/chat` — chat completion (SSE streaming)
+   - `GET /api/llm/health` — backend status
+
+**Test with:**
+```bash
+# Start Ollama with a model first
+curl http://localhost:4444/api/llm/models
+curl -X POST http://localhost:4444/api/llm/chat \
+  -H "Content-Type: application/json" \
+  -d '{"model":"llama3.2","messages":[{"role":"user","content":"Hello!"}]}'
+```
+
+**Phase 2 (later):** Mesh capability announcement, RPC handler for remote requests.
+
+---
+
 ### 🟡 MEDIUM: Bootstrap Flow (After Above)
 
 Document the WORKING flow once mesh and pairing exist:
