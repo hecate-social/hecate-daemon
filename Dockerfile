@@ -6,8 +6,12 @@ FROM erlang:27-alpine AS builder
 
 WORKDIR /build
 
-# Install build dependencies (including Rust for NIFs)
-RUN apk add --no-cache git curl bash build-base cmake rust cargo
+# Install build dependencies (Rust for NIFs, Perl for OpenSSL, etc.)
+RUN apk add --no-cache \
+    git curl bash \
+    build-base cmake \
+    rust cargo \
+    perl linux-headers
 
 # Install rebar3
 RUN curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 && \
