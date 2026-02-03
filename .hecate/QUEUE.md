@@ -4,13 +4,22 @@
 
 ---
 
-## 📍 CHANNEL TAGGING
+## 📍 CHANNEL TAGGING (NEW RULE — READ THIS)
 
-This is the **[daemon]** channel. When referencing other repos, use:
+**Effective immediately:** All RESPONSES.md entries MUST include channel tags.
+
+This is the **[daemon]** channel. When writing to RESPONSES.md:
+- Prefix your title: `## 2026-02-03 COMPLETE [daemon]: Task Name`
+- Cross-references: `Related: Fixed bug in [macula-realm]`
+
+**All channels:**
+- `[daemon]` — hecate-daemon (this repo)
 - `[tui]` — hecate-tui
 - `[node]` — hecate-node
 - `[realm]` — hecate-realm
 - `[macula-realm]` — macula-io/macula-realm
+
+**Why:** I monitor multiple repos. Without tags, context is lost. Be explicit.
 
 ---
 
