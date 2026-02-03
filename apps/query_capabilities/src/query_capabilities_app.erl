@@ -10,8 +10,7 @@ start(_StartType, _StartArgs) ->
         {ok, Pid} ->
             %% Initialize SQLite database
             ok = query_capabilities_store:init_schema(),
-            %% Subscribe to events from command service
-            ok = query_capabilities_projections:subscribe(),
+            %% Subscriptions are handled by query_capabilities_subscriber (started by supervisor)
             {ok, Pid};
         Error ->
             Error
