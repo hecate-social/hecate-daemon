@@ -6,17 +6,46 @@
 
 ## Current Task
 
-**COMPLETE: LLM Capability Service Phase 1** — Ollama backend + REST API + Install Script
+**COMPLETE: LLM Capability Service Phase 2** — Event-driven mesh capability announcement
 
 ## Last Active
 
-**2026-02-03** — LLM Phase 1 complete, install script updated, ready for testing on beam03.lab
+**2026-02-03** — LLM Phase 2 complete: announce/retract slices, model poller, mesh integration
 
 ## Session Log
 
 *(Append entries when starting/ending sessions)*
 
-### 2026-02-03 Session (LLM Service)
+### 2026-02-03 Session (LLM Service - Phase 2)
+
+**Status:** Complete
+
+**Completed:**
+- Created 3 vertical slices for LLM capability events:
+  - `announce_llm_capability/` — command, event, handler, emitter (4 files)
+  - `retract_llm_capability/` — command, event, handler, emitter (4 files)
+  - `poll_llm_models/` — model poller (1 file)
+- Updated `serve_llm_sup.erl` to start:
+  - `serve_llm_store` (ReckonDB instance for this domain)
+  - `llm_capability_announced_v1_to_mesh` (emitter)
+  - `llm_capability_retracted_v1_to_mesh` (emitter)
+  - `llm_model_poller` (polls Ollama every 5 min)
+- Updated `hecate_mesh_publisher.erl` with LLM event type mappings
+- Updated `serve_llm/rebar.config` with src_dirs for slices
+- All tests pass, dialyzer clean
+
+**Commit:** `6e40a5b` - feat(serve_llm): Implement Phase 2 - mesh capability announcement
+
+**Flow:**
+1. `llm_model_poller` polls Ollama on startup + every 5 min
+2. New models → dispatch `announce_llm_capability_v1` command
+3. Removed models → dispatch `retract_llm_capability_v1` command
+4. Events stored in `serve_llm_store` via evoq
+5. Emitters subscribe to events, publish FACTs to mesh
+
+---
+
+### 2026-02-03 Session (LLM Service - Phase 1)
 
 **Status:** Complete (Phase 1)
 

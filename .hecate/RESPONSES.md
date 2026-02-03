@@ -947,6 +947,98 @@ The pairing flow required fixes in `macula-io/macula-realm`:
 
 ---
 
+## 2026-02-03 COMPLETE: LLM Capability Service Phase 2
+
+**Task from QUEUE.md:** Implement event-driven mesh capability announcement.
+
+### Summary
+
+Phase 2 is complete. LLM capabilities are now announced to the mesh using proper event sourcing.
+
+### Vertical Slices Created
+
+```
+apps/serve_llm/src/
+├── announce_llm_capability/
+│   ├── announce_llm_capability_v1.erl        # Command
+│   ├── llm_capability_announced_v1.erl       # Domain event
+│   ├── maybe_announce_llm_capability.erl     # Handler (dispatch via evoq)
+│   └── llm_capability_announced_v1_to_mesh.erl  # Emitter → mesh FACT
+│
+├── retract_llm_capability/
+│   ├── retract_llm_capability_v1.erl         # Command
+│   ├── llm_capability_retracted_v1.erl       # Domain event
+│   ├── maybe_retract_llm_capability.erl      # Handler
+│   └── llm_capability_retracted_v1_to_mesh.erl  # Emitter → mesh FACT
+│
+├── poll_llm_models/
+│   └── llm_model_poller.erl                  # Polls Ollama every 5 min
+```
+
+### Infrastructure
+
+- **serve_llm_store** (ReckonDB) — stores domain events for this domain
+- **Emitters** — subscribe to domain events, publish to mesh as integration facts
+- **Model Poller** — polls Ollama, detects model changes, dispatches commands
+
+### Flow
+
+```
+Ollama online
+    ↓
+llm_model_poller polls list_models()
+    ↓
+For new models → dispatch announce_llm_capability_v1 command
+    ↓
+maybe_announce_llm_capability:handle/1 → creates event
+    ↓
+evoq_dispatcher stores event in serve_llm_store
+    ↓
+llm_capability_announced_v1_to_mesh subscribes to events
+    ↓
+Publishes FACT to hecate.llm.announced mesh topic
+```
+
+### MRI Format
+
+```
+mri:capability:io.macula/{agent-id}/llm/{model-name}
+
+Example:
+mri:capability:io.macula/hecate-dev/llm/llama3.2
+```
+
+### Verification
+
+- `rebar3 compile` ✅
+- `rebar3 dialyzer` ✅ (clean)
+- `rebar3 release` ✅
+
+### Commit
+
+`6e40a5b` - feat(serve_llm): Implement Phase 2 - mesh capability announcement
+
+### Files Created (12)
+
+| Directory | Files |
+|-----------|-------|
+| `announce_llm_capability/` | 4 files (command, event, handler, emitter) |
+| `retract_llm_capability/` | 4 files (command, event, handler, emitter) |
+| `poll_llm_models/` | 1 file (model poller) |
+
+### Files Modified (3)
+
+- `serve_llm_sup.erl` — starts store, emitters, poller
+- `serve_llm/rebar.config` — added src_dirs for slices
+- `hecate_mesh_publisher.erl` — added LLM event type mappings
+
+### Next Steps (Phase 3)
+
+- `handle_llm_rpc/` slice — handle incoming RPC calls from mesh
+- End-to-end test: Daemon A announces → Daemon B discovers → Daemon B sends chat RPC
+
+---
+
 ## 2026-02-02 COMPLETE: Pairing API (Daemon Side)
 
 **Task from QUEUE.md:** Implement daemon pairing API endpoints.
