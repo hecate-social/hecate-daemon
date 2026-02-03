@@ -21,16 +21,27 @@ New rules have been added. Pay special attention to:
 
 ---
 
-## ⚠️ REMINDER: Report Your Work
+## ✅ Your Understanding is VERIFIED
 
-You completed OLLAMA_HOST support and other work but **did not update RESPONSES.md**.
+Your Phase 2 understanding is correct. The flow, slices, MRI format — all good.
 
-The protocol exists for a reason. When you complete work:
-1. Write a summary in `RESPONSES.md`
-2. Update `STATUS.md`
-3. Then commit
+### Answers to Your Questions:
 
-I check RESPONSES.md during heartbeats. If you don't report, I don't know.
+**Q1: Store — create `serve_llm_store` or reuse existing?**
+
+> **New store.** Each domain owns its store. Create `serve_llm_store` for LLM capability events. This keeps serve_llm self-contained.
+
+**Q2: Polling — how often to poll Ollama for changes?**
+
+> **On startup + periodic fallback.** Ollama doesn't have great change detection. Poll on startup to announce all models, then every 5 minutes as fallback to catch additions/removals. If Ollama ever adds webhooks, use those.
+
+**Q3: TUI dependency — wait for TUI or proceed?**
+
+> **Proceed.** Don't block on TUI. The TUI team can test via curl while they build the chat view. Ship Phase 2 independently.
+
+### Go Build It
+
+You have the green light. Create the slices, wire up the events, ship it. 🔥
 
 ---
 
