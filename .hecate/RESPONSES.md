@@ -650,6 +650,88 @@ The logs show DHT connection errors to `370fc04fd1c9:4433` - this is expected. T
 
 ---
 
+## 2026-02-03 COMPLETE: LLM Capability Service Phase 1
+
+### Summary
+
+**serve_llm** app implemented with Ollama backend and REST API.
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/serve_llm/src/serve_llm.app.src` | OTP application spec |
+| `apps/serve_llm/src/serve_llm_app.erl` | Application behaviour (can disable via config) |
+| `apps/serve_llm/src/serve_llm_sup.erl` | Supervisor |
+| `apps/serve_llm/src/llm_backend/llm_backend.erl` | Ollama HTTP client |
+| `apps/serve_llm/rebar.config` | App config with src_dirs |
+| `apps/hecate_api/src/hecate_api_llm.erl` | REST endpoints |
+
+### API Endpoints
+
+```
+GET  /api/llm/models  → List available models
+POST /api/llm/chat    → Chat completion (SSE streaming supported)
+GET  /api/llm/health  → Backend health check
+```
+
+### Backend Functions
+
+```erlang
+llm_backend:chat(Messages, #{model => Model})           → {ok, Response}
+llm_backend:chat_stream(Url, Messages, Opts)            → {ok, Ref}
+llm_backend:list_models()                               → {ok, [Model]}
+llm_backend:health()                                    → ok | {error, _}
+```
+
+### Test Commands
+
+```bash
+# List models (requires Ollama running)
+curl http://localhost:4444/api/llm/models
+
+# Chat completion
+curl -X POST http://localhost:4444/api/llm/chat \
+  -H "Content-Type: application/json" \
+  -d '{"model":"llama3.2","messages":[{"role":"user","content":"Hello!"}]}'
+
+# Streaming (SSE)
+curl -X POST http://localhost:4444/api/llm/chat \
+  -H "Content-Type: application/json" \
+  -d '{"model":"llama3.2","messages":[{"role":"user","content":"Hello!"}],"stream":true}'
+
+# Health check
+curl http://localhost:4444/api/llm/health
+```
+
+### Configuration
+
+```erlang
+{serve_llm, [
+    {enabled, true},
+    {backend, ollama},
+    {ollama_url, "http://localhost:11434"}
+]}
+```
+
+### Verification
+
+- `rebar3 compile` ✅
+- `rebar3 dialyzer` ✅
+- `rebar3 eunit` ✅ (61 tests pass)
+
+### Commit
+
+`d604efb` - feat: Add serve_llm app with Ollama backend (Phase 1)
+
+### Next: Phase 2
+
+- Announce models as mesh capabilities
+- RPC handler for remote chat requests
+- Coordinate with TUI team (hecate-tui)
+
+---
+
 ## 2026-02-03 COMPLETE: End-to-End Pairing Flow VERIFIED
 
 ### Summary

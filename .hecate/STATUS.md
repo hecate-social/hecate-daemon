@@ -6,17 +6,43 @@
 
 ## Current Task
 
-**COMPLETE: Release Starts Cleanly** — All apps start, API listening, mesh connected
+**COMPLETE: LLM Capability Service Phase 1** — Ollama backend + REST API
 
 ## Last Active
 
-**2026-02-03** — Fixed query_capabilities API bug, verified clean startup
+**2026-02-03** — Implemented serve_llm app with Ollama backend and API endpoints
 
 ## Session Log
 
 *(Append entries when starting/ending sessions)*
 
-### 2026-02-03 Session (Continued)
+### 2026-02-03 Session (LLM Service)
+
+**Status:** Complete (Phase 1)
+
+**Completed:**
+- Created `apps/serve_llm/` OTP application:
+  - `serve_llm_app.erl`: Application behaviour (can be disabled via config)
+  - `serve_llm_sup.erl`: Supervisor
+  - `llm_backend/llm_backend.erl`: Ollama HTTP client
+    - `chat/2,3`: Synchronous completion
+    - `chat_stream/3`: Streaming via message passing
+    - `list_models/0,1`: List available models
+    - `health/0,1`: Backend health check
+- Created REST endpoints in `hecate_api_llm.erl`:
+  - `GET /api/llm/models`: List models
+  - `POST /api/llm/chat`: Chat completion (SSE streaming supported)
+  - `GET /api/llm/health`: Backend status
+- Updated `sys.config` with serve_llm configuration
+- Updated `rebar.config` release apps
+- All tests pass (61)
+- Dialyzer clean
+
+**Commit:** `d604efb` - feat: Add serve_llm app with Ollama backend (Phase 1)
+
+---
+
+### 2026-02-03 Session (Earlier)
 
 **Status:** Complete
 
