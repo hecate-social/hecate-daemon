@@ -28,8 +28,8 @@ RUN rebar3 get-deps && rebar3 compile
 # Build release
 RUN rebar3 as prod release
 
-# Runtime stage
-FROM alpine:3.19
+# Runtime stage - must match Alpine version from erlang:27-alpine (3.22)
+FROM alpine:3.22
 
 # Install runtime dependencies
 RUN apk add --no-cache \
