@@ -20,6 +20,7 @@ RUN curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 &
 # Copy source
 COPY rebar.config rebar.lock ./
 COPY config/ config/
+COPY src/ src/
 COPY apps/ apps/
 
 # Fetch dependencies and compile
