@@ -15,6 +15,7 @@ start(_StartType, _StartArgs) ->
 
             %% Identity
             {"/identity", hecate_api_identity, []},
+            {"/identity/init", hecate_api_identity, [do_init]},
 
             %% Pairing
             {"/api/pairing/start", hecate_api_pairing, [start]},
