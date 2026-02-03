@@ -151,9 +151,16 @@ health(BaseUrl) ->
 %%% ===================================================================
 
 get_base_url() ->
-    case application:get_env(serve_llm, ollama_url) of
-        {ok, Url} -> to_binary(Url);
-        undefined -> <<"http://localhost:11434">>
+    %% Priority: OLLAMA_HOST env var > app config > default
+    %% OLLAMA_HOST is set by Docker to reach host's Ollama
+    case os:getenv("OLLAMA_HOST") of
+        false ->
+            case application:get_env(serve_llm, ollama_url) of
+                {ok, Url} -> to_binary(Url);
+                undefined -> <<"http://localhost:11434">>
+            end;
+        EnvUrl ->
+            to_binary(EnvUrl)
     end.
 
 to_binary(B) when is_binary(B) -> B;
