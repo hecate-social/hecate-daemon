@@ -4,6 +4,23 @@
 
 ---
 
+## ⚠️ MANDATORY: Re-read CLAUDE.md NOW
+
+**Before doing anything else this session:**
+
+```bash
+cat ~/work/github.com/CLAUDE.md
+```
+
+New rules have been added. Pay special attention to:
+- **"NEVER DELETE FEATURES"** section
+- Read the whole file before editing
+- Extend, don't replace
+
+**Acknowledge in RESPONSES.md that you've read it.**
+
+---
+
 ## Protocol
 
 | File | Your Access |
