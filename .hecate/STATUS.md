@@ -6,15 +6,36 @@
 
 ## Current Task
 
-**COMPLETE: LLM Phase 2 Enhanced** — Rich metadata, projections, status heartbeat
+**COMPLETE: LLM Phase 3** — Mesh RPC listener for incoming requests
 
 ## Last Active
 
-**2026-02-03** — Phase 2 enhanced with model/hardware metadata, SQLite projections, status heartbeat
+**2026-02-03** — Phase 3 complete: RPC handler for chat/list_models/health via mesh
 
 ## Session Log
 
 *(Append entries when starting/ending sessions)*
+
+### 2026-02-03 Session (LLM Service - Phase 3)
+
+**Status:** Complete
+
+**Completed:**
+- Created `handle_llm_rpc/` vertical slice:
+  - `llm_rpc_listener.erl` — Subscribes to `hecate.llm.rpc.{agent-path}` topic
+  - `handle_llm_rpc.erl` — Routes chat/list_models/health actions to llm_backend
+- Updated `serve_llm_sup.erl` to start the RPC listener
+- Sends responses back to requester via mesh reply_to topic
+
+**Commit:** `3a8278f` - feat(serve_llm): Add RPC listener for incoming mesh requests (Phase 3)
+
+**Flow:**
+1. Other agent sends HOPE to `hecate.llm.rpc.{this-agent}` topic
+2. `llm_rpc_listener` receives request, spawns handler
+3. `handle_llm_rpc` routes to `llm_backend` based on action
+4. Response published to `reply_to` topic from request
+
+---
 
 ### 2026-02-03 Session (LLM Service - Phase 2)
 
