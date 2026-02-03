@@ -4,49 +4,16 @@ The `serve_llm` application provides local LLM inference capabilities and mesh-b
 
 ## Architecture
 
-```
-                                    ┌─────────────────────────────────────┐
-                                    │           Macula Mesh               │
-                                    │  ┌─────────────────────────────┐    │
-                                    │  │  hecate.llm.announced       │    │
-                                    │  │  hecate.llm.retracted       │    │
-                                    │  │  hecate.llm.status          │    │
-                                    │  │  hecate.llm.rpc.{agent}     │    │
-                                    │  └─────────────────────────────┘    │
-                                    └──────────────┬──────────────────────┘
-                                                   │
-                    ┌──────────────────────────────┼──────────────────────────────┐
-                    │                              │                              │
-                    ▼                              ▼                              ▼
-          ┌─────────────────┐            ┌─────────────────┐            ┌─────────────────┐
-          │    Emitters     │            │   RPC Listener  │            │    Emitters     │
-          │  (announce)     │            │  (incoming)     │            │   (retract)     │
-          └────────┬────────┘            └────────┬────────┘            └────────┬────────┘
-                   │                              │                              │
-                   ▼                              ▼                              ▼
-          ┌─────────────────────────────────────────────────────────────────────────────┐
-          │                           serve_llm_sup                                     │
-          │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐   │
-          │  │ llm_model_poller │  │llm_status_heartbt│  │   llm_rpc_listener       │   │
-          │  │  (polls Ollama)  │  │  (30s updates)   │  │   (handles requests)     │   │
-          │  └────────┬─────────┘  └────────┬─────────┘  └──────────┬───────────────┘   │
-          │           │                     │                       │                   │
-          │           ▼                     ▼                       ▼                   │
-          │  ┌────────────────────────────────────────────────────────────────────────┐ │
-          │  │                         llm_backend                                    │ │
-          │  │                    (Ollama HTTP client)                                │ │
-          │  └────────────────────────────────────────────────────────────────────────┘ │
-          └─────────────────────────────────────────────────────────────────────────────┘
-                                                   │
-                                                   ▼
-                                    ┌─────────────────────────────┐
-                                    │     Ollama (localhost:11434) │
-                                    │  ┌───────────────────────┐   │
-                                    │  │  llama3.2, qwen2.5,   │   │
-                                    │  │  deepseek-r1, etc.    │   │
-                                    │  └───────────────────────┘   │
-                                    └─────────────────────────────┘
-```
+![LLM Service Architecture](../assets/llm-service-flow.svg)
+
+### Mesh Topics
+
+| Topic | Purpose |
+|-------|---------|
+| `hecate.llm.announced` | Capability announcements |
+| `hecate.llm.retracted` | Capability removals |
+| `hecate.llm.status` | Status heartbeats |
+| `hecate.llm.rpc.{agent}` | RPC requests |
 
 ## Components
 
@@ -158,6 +125,8 @@ Check Ollama backend status.
 ```
 
 ## Mesh Integration
+
+![Mesh Capability Flow](../assets/mesh-capability-flow.svg)
 
 ### Capability Announcement
 

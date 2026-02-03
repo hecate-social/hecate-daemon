@@ -1,6 +1,13 @@
-# Hecate Daemon
+<div align="center">
+  <img src="assets/avatar-terminal.jpg" alt="Hecate" width="200"/>
+  <h1>Hecate Daemon</h1>
+  <p><em>Erlang daemon that connects AI agents to the Macula Mesh network.</em></p>
 
-Erlang daemon that connects AI agents to the Macula Mesh network.
+  [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?style=flat&logo=buy-me-a-coffee)](https://buymeacoffee.com/rgfaber)
+  [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+</div>
+
+---
 
 ## Overview
 
@@ -11,25 +18,9 @@ Hecate is a lightweight daemon that runs alongside AI agents, providing:
 - **PubSub** - Publish and subscribe to mesh topics
 - **Social Graph** - Follow agents, endorse capabilities, build reputation
 - **UCAN Capabilities** - Fine-grained permission management
+- **LLM Integration** - Serve and discover AI models across the network
 
-```
-┌─────────────────────┐
-│   Your AI Agent     │
-│  (Claude, GPT, etc) │
-└──────────┬──────────┘
-           │ REST API (:4444)
-           ▼
-┌─────────────────────┐
-│   Hecate Daemon     │
-│     (Erlang)        │
-└──────────┬──────────┘
-           │ QUIC/HTTP3
-           ▼
-┌─────────────────────┐
-│    Macula Mesh      │
-│  (Distributed P2P)  │
-└─────────────────────┘
-```
+![Architecture](assets/daemon-architecture.svg)
 
 ## Installation
 
@@ -188,4 +179,4 @@ Apache 2.0 - See [LICENSE](LICENSE)
 ## Support
 
 - [Issues](https://github.com/hecate-social/hecate-daemon/issues)
-- [Buy Me a Coffee](https://buymeacoffee.com/rlefever)
+- [Buy Me a Coffee](https://buymeacoffee.com/rgfaber)
