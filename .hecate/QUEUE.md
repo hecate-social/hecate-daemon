@@ -4,6 +4,16 @@
 
 ---
 
+## 📍 CHANNEL TAGGING
+
+This is the **[daemon]** channel. When referencing other repos, use:
+- `[tui]` — hecate-tui
+- `[node]` — hecate-node
+- `[realm]` — hecate-realm
+- `[macula-realm]` — macula-io/macula-realm
+
+---
+
 ## ⚠️ MANDATORY: Re-read CLAUDE.md NOW
 
 **Before doing anything else this session:**
