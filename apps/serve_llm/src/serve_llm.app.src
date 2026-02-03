@@ -1,0 +1,19 @@
+{application, serve_llm, [
+    {description, "LLM capability service - local inference gateway"},
+    {vsn, "0.1.0"},
+    {registered, [serve_llm_sup]},
+    {mod, {serve_llm_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        hackney
+    ]},
+    {env, [
+        {enabled, true},
+        {backend, ollama},
+        {ollama_url, "http://localhost:11434"}
+    ]},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

@@ -64,7 +64,12 @@ start(_StartType, _StartArgs) ->
             {"/ucan/revoke/:capability_id", hecate_api_ucan, [revoke]},
             {"/ucan/capabilities", hecate_api_ucan, [list]},
             {"/ucan/verify/:capability_id", hecate_api_ucan, [verify]},
-            {"/ucan/verify", hecate_api_ucan, [verify_action]}
+            {"/ucan/verify", hecate_api_ucan, [verify_action]},
+
+            %% LLM
+            {"/api/llm/models", hecate_api_llm, [models]},
+            {"/api/llm/chat", hecate_api_llm, [chat]},
+            {"/api/llm/health", hecate_api_llm, [health]}
         ]}
     ]),
 
