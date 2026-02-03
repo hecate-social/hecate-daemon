@@ -6,11 +6,11 @@
 
 ## Current Task
 
-**COMPLETE: LLM Capability Service Phase 2** — Event-driven mesh capability announcement
+**COMPLETE: LLM Phase 2 Enhanced** — Rich metadata, projections, status heartbeat
 
 ## Last Active
 
-**2026-02-03** — LLM Phase 2 complete: announce/retract slices, model poller, mesh integration
+**2026-02-03** — Phase 2 enhanced with model/hardware metadata, SQLite projections, status heartbeat
 
 ## Session Log
 

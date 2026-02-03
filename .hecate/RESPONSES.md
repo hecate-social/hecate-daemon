@@ -947,13 +947,81 @@ The pairing flow required fixes in `macula-io/macula-realm`:
 
 ---
 
-## 2026-02-03 COMPLETE: LLM Capability Service Phase 2
+## 2026-02-03 COMPLETE: LLM Phase 2 - Enhanced with Rich Metadata & Projections
 
-**Task from QUEUE.md:** Implement event-driven mesh capability announcement.
+**Task from QUEUE.md:** Implement event-driven mesh capability announcement with rich metadata.
 
 ### Summary
 
-Phase 2 is complete. LLM capabilities are now announced to the mesh using proper event sourcing.
+Phase 2 enhanced per Hecate's expanded requirements. Now includes:
+- Rich metadata (model info + hardware info)
+- Status heartbeat slice
+- Projections to query_capabilities SQLite
+
+### New Components
+
+**1. Rich Metadata in Events/FACTs:**
+```erlang
+#{
+    mri => <<"mri:capability:io.macula/hecate-dev/llm/llama3.2">>,
+    type => <<"llm">>,
+    model => #{name, context_length, quantization, parameter_count, family},
+    hardware => #{ram_gb, cpu_cores, gpu, storage_path},
+    status => #{queue_depth, avg_tokens_per_sec, available}
+}
+```
+
+**2. Status Heartbeat Slice (update_llm_status/):**
+- `update_llm_status_v1.erl` - Command
+- `llm_status_updated_v1.erl` - Event
+- `maybe_update_llm_status.erl` - Handler
+- `llm_status_updated_v1_to_mesh.erl` - Emitter
+- `llm_status_heartbeat.erl` - Sends status every 30s
+
+**3. Projections (query_capabilities/):**
+- `llm_capability_subscriber.erl` - Subscribes to serve_llm_store
+- `llm_capability_announced_v1_to_capabilities.erl` - Inserts with type=llm
+- `llm_capability_retracted_v1_to_capabilities.erl` - Deletes capability
+- `llm_status_updated_v1_to_capabilities.erl` - Updates status metadata
+
+**4. Hardware Config in sys.config:**
+```erlang
+{hardware, [
+    {ram_gb, 16}, {cpu_cores, 4}, {gpu, <<"none">>}, {storage_path, <<"/bulk0">>}
+]}
+```
+
+### Architecture (Per Hecate's Clarification)
+
+```
+Command → serve_llm_store (ReckonDB) → Event
+    ↓
+    ├── Emitter → Mesh FACT (hecate.llm.*)
+    └── Projection → query_capabilities_store (SQLite)
+```
+
+Both stores are needed:
+- **ReckonDB** = immutable event log (command side)
+- **SQLite** = query-optimized read model (query side)
+
+### Commit
+
+`89457ea` - feat(serve_llm): Enrich Phase 2 with metadata, projections, status heartbeat
+
+### Files Created (9)
+
+- 5 files in `apps/serve_llm/src/update_llm_status/`
+- 4 files in `apps/query_capabilities/src/` (projections + subscriber)
+
+### Next: Phase 3 (handle_llm_rpc/)
+
+The `handle_llm_rpc/` slice for handling incoming mesh RPC calls.
+
+---
+
+## 2026-02-03 COMPLETE: LLM Capability Service Phase 2
+
+**Task from QUEUE.md:** Implement event-driven mesh capability announcement.
 
 ### Vertical Slices Created
 
