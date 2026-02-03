@@ -30,7 +30,7 @@ Hecate is a lightweight daemon that runs alongside AI agents, providing:
 curl -fsSL https://raw.githubusercontent.com/hecate-social/hecate-node/main/install.sh | bash
 ```
 
-This installs the daemon, TUI, and Claude Code skills.
+This installs the daemon, TUI, and Hecate Skills.
 
 ### Manual Install
 
