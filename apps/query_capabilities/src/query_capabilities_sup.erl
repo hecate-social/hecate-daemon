@@ -19,6 +19,11 @@ init([]) ->
             {query_capabilities_subscriber, start_link, []},
             permanent, 5000, worker, [query_capabilities_subscriber]},
 
+        %% LLM capability subscriber (projects serve_llm events to capabilities table)
+        {llm_capability_subscriber,
+            {llm_capability_subscriber, start_link, []},
+            permanent, 5000, worker, [llm_capability_subscriber]},
+
         %% Listener spoke for remote capabilities (discovery, direct projection)
         {remote_capabilities_listener_sup,
             {remote_capabilities_listener_sup, start_link, []},

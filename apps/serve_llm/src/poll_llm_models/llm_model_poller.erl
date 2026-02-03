@@ -10,12 +10,13 @@
 %% Suppress dialyzer warnings for calls to llm_backend (pattern matching on returns)
 -dialyzer({nowarn_function, [do_poll/1, announce_model/3, retract_model/2]}).
 
--define(POLL_INTERVAL_MS, 300000). %% 5 minutes
+-define(DEFAULT_POLL_INTERVAL_MS, 300000). %% 5 minutes
 
 -record(state, {
     known_models :: #{binary() => map()},  %% model_name => model_info
     agent_identity :: binary(),
-    timer_ref :: reference() | undefined
+    timer_ref :: reference() | undefined,
+    poll_interval :: non_neg_integer()
 }).
 
 %% API
@@ -32,13 +33,16 @@ poll_now() ->
 
 init([]) ->
     AgentIdentity = get_agent_identity(),
-    logger:info("[llm_model_poller] Starting with identity: ~s", [AgentIdentity]),
+    PollInterval = get_poll_interval(),
+    logger:info("[llm_model_poller] Starting with identity: ~s, poll interval: ~pms",
+                [AgentIdentity, PollInterval]),
     %% Poll immediately on startup
     self() ! poll,
     {ok, #state{
         known_models = #{},
         agent_identity = AgentIdentity,
-        timer_ref = undefined
+        timer_ref = undefined,
+        poll_interval = PollInterval
     }}.
 
 handle_call(_Request, _From, State) ->
@@ -50,10 +54,10 @@ handle_cast(poll_now, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(poll, State) ->
+handle_info(poll, #state{poll_interval = Interval} = State) ->
     NewState = do_poll(State),
     %% Schedule next poll
-    TimerRef = erlang:send_after(?POLL_INTERVAL_MS, self(), poll),
+    TimerRef = erlang:send_after(Interval, self(), poll),
     {noreply, NewState#state{timer_ref = TimerRef}};
 
 handle_info(_Info, State) ->
@@ -105,23 +109,15 @@ models_to_map(Models) ->
         Acc#{Name => Model}
     end, #{}, Models).
 
-announce_model(ModelName, ModelInfo, AgentID) ->
-    %% Extract model metadata
-    Size = maps:get(<<"size">>, ModelInfo, 0),
-    Details = maps:get(<<"details">>, ModelInfo, #{}),
-    Quantization = maps:get(<<"quantization_level">>, Details, <<"unknown">>),
-    ContextLength = maps:get(<<"context_length">>, Details, 4096),
+announce_model(ModelName, OllamaModelInfo, AgentID) ->
+    %% Build structured model_info from Ollama response
+    ModelInfo = build_model_info(ModelName, OllamaModelInfo),
 
     case announce_llm_capability_v1:new(#{
         model_name => ModelName,
         agent_identity => AgentID,
-        model_size => Size,
-        quantization => ensure_binary(Quantization),
-        context_length => ContextLength,
-        metadata => #{
-            family => maps:get(<<"family">>, Details, <<"unknown">>),
-            parameter_size => maps:get(<<"parameter_size">>, Details, <<"unknown">>)
-        }
+        model_info => ModelInfo
+        %% hardware_info will be read from config by the command
     }) of
         {ok, Cmd} ->
             case maybe_announce_llm_capability:dispatch(Cmd) of
@@ -133,6 +129,34 @@ announce_model(ModelName, ModelInfo, AgentID) ->
         {error, Reason} ->
             logger:warning("[llm_model_poller] Invalid command for ~s: ~p", [ModelName, Reason])
     end.
+
+%% @doc Build structured model info from Ollama API response
+build_model_info(ModelName, OllamaInfo) ->
+    Details = maps:get(<<"details">>, OllamaInfo, #{}),
+    #{
+        name => ModelName,
+        context_length => get_context_length(Details),
+        quantization => ensure_binary(maps:get(<<"quantization_level">>, Details, <<"unknown">>)),
+        parameter_count => ensure_binary(maps:get(<<"parameter_size">>, Details, <<"unknown">>)),
+        family => ensure_binary(maps:get(<<"family">>, Details, <<"unknown">>)),
+        size_bytes => maps:get(<<"size">>, OllamaInfo, 0)
+    }.
+
+%% @doc Get context length, with fallback based on model family
+get_context_length(Details) ->
+    case maps:get(<<"context_length">>, Details, undefined) of
+        undefined ->
+            %% Estimate based on family
+            Family = maps:get(<<"family">>, Details, <<>>),
+            estimate_context_length(Family);
+        Length ->
+            Length
+    end.
+
+estimate_context_length(<<"llama">>) -> 131072;  %% Llama 3.x default
+estimate_context_length(<<"qwen">>) -> 32768;
+estimate_context_length(<<"deepseek">>) -> 65536;
+estimate_context_length(_) -> 4096.
 
 retract_model(ModelName, AgentID) ->
     case retract_llm_capability_v1:new(#{
@@ -160,6 +184,12 @@ get_agent_identity() ->
     case application:get_env(hecate, gateway_identity) of
         {ok, Identity} -> ensure_binary(Identity);
         undefined -> <<"mri:agent:io.macula/hecate">>
+    end.
+
+get_poll_interval() ->
+    case application:get_env(serve_llm, poll_interval_ms) of
+        {ok, Interval} -> Interval;
+        undefined -> ?DEFAULT_POLL_INTERVAL_MS
     end.
 
 ensure_binary(V) when is_binary(V) -> V;

@@ -1,6 +1,6 @@
 %%% @doc serve_llm top-level supervisor
 %%%
-%%% Starts this domain's ReckonDB store and supervises emitters/poller.
+%%% Starts this domain's ReckonDB store and supervises emitters/pollers.
 %%% VERTICAL SLICING: This domain owns its own event store.
 -module(serve_llm_sup).
 -behaviour(supervisor).
@@ -54,11 +54,19 @@ init([]) ->
         {llm_capability_retracted_v1_to_mesh,
             {llm_capability_retracted_v1_to_mesh, start_link, []},
             permanent, 5000, worker, [llm_capability_retracted_v1_to_mesh]},
+        {llm_status_updated_v1_to_mesh,
+            {llm_status_updated_v1_to_mesh, start_link, []},
+            permanent, 5000, worker, [llm_status_updated_v1_to_mesh]},
 
         %% Model poller: polls Ollama and dispatches announce/retract commands
         {llm_model_poller,
             {llm_model_poller, start_link, []},
-            permanent, 5000, worker, [llm_model_poller]}
+            permanent, 5000, worker, [llm_model_poller]},
+
+        %% Status heartbeat: sends periodic status updates
+        {llm_status_heartbeat,
+            {llm_status_heartbeat, start_link, []},
+            permanent, 5000, worker, [llm_status_heartbeat]}
     ],
 
     logger:info("[serve_llm] Supervisor started with ~p children", [length(Children)]),

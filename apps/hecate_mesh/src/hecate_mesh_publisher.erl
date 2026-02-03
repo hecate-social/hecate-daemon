@@ -69,4 +69,5 @@ event_type_to_topic(<<"capability_revoked_v1">>) -> <<"hecate.ucan.revoked">>;
 %% LLM capability events
 event_type_to_topic(<<"llm_capability_announced_v1">>) -> <<"hecate.llm.announced">>;
 event_type_to_topic(<<"llm_capability_retracted_v1">>) -> <<"hecate.llm.retracted">>;
+event_type_to_topic(<<"llm_status_updated_v1">>) -> <<"hecate.llm.status">>;
 event_type_to_topic(EventType) -> <<"hecate.events.", EventType/binary>>.

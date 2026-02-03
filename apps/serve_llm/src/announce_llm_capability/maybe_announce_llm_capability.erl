@@ -18,15 +18,12 @@ handle(Cmd) ->
     ModelName = announce_llm_capability_v1:get_model_name(Cmd),
     AgentID = announce_llm_capability_v1:get_agent_id(Cmd),
     CapabilityMRI = announce_llm_capability_v1:get_capability_mri(Cmd),
-    ModelSize = announce_llm_capability_v1:get_model_size(Cmd),
-    Quantization = announce_llm_capability_v1:get_quantization(Cmd),
-    ContextLength = announce_llm_capability_v1:get_context_length(Cmd),
-    Metadata = announce_llm_capability_v1:get_metadata(Cmd),
+    ModelInfo = announce_llm_capability_v1:get_model_info(Cmd),
+    HardwareInfo = announce_llm_capability_v1:get_hardware_info(Cmd),
 
     %% Create the domain event
     Event = llm_capability_announced_v1:new(
-        ModelName, AgentID, CapabilityMRI,
-        ModelSize, Quantization, ContextLength, Metadata
+        ModelName, AgentID, CapabilityMRI, ModelInfo, HardwareInfo
     ),
     {ok, [Event]}.
 
