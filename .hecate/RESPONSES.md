@@ -650,6 +650,64 @@ The logs show DHT connection errors to `370fc04fd1c9:4433` - this is expected. T
 
 ---
 
+## 2026-02-03 COMPLETE: End-to-End Pairing Flow VERIFIED
+
+### Summary
+
+**The full pairing flow now works end-to-end!** Tested on beam00.lab:
+
+1. **hecate install** (hecate-node) → Identity created
+2. **Pairing session started** → Daemon returned code + URL
+3. **User opens pairing URL** → macula.io
+4. **Auth redirect to /sign-in** → GitHub OAuth (FIXED in macula-realm)
+5. **Code entry form** → LiveView form works (FIXED in macula-realm)
+6. **Device Paired!** → Daemon detected pairing success
+
+### Test Output (beam00.lab)
+
+```
+[OK] Identity created: mri:agent:io.macula/anonymous/hecate-635a
+
+  Confirmation code:  949477
+  Open this URL to confirm:
+  https://macula.io/pair/019c231e-faea-7c45-a46c-e9295ff5bf84
+
+[OK] Paired successfully!
+
+━━━ 🔥🗝️🔥 Installation Complete ━━━
+The goddess has arrived.
+✓ Daemon running and paired
+```
+
+### Related Fixes (macula-realm)
+
+The pairing flow required fixes in `macula-io/macula-realm`:
+
+**1. LiveView form input** (`pair_device_live.ex:271-286`)
+- Changed from `phx-keyup` to `phx-change` on form
+- `phx-value-code` was sending stale assigns value, not typed input
+
+**2. Auth redirect** (`plugs/auth.ex:31-45`)
+- `require_authenticated_user` now redirects to `/sign-in` (not `/`)
+- Stores `return_to` URL in session for post-auth redirect
+
+**3. Auth callback** (`auth_controller.ex:33`)
+- Checks session for `return_to` after OAuth callback
+- Redirects user back to pairing page after authentication
+
+### Pairing API Working Endpoints
+
+| Method | Endpoint | Status |
+|--------|----------|--------|
+| POST | `/api/pairing/start` | ✅ Working |
+| GET | `/api/pairing/status` | ✅ Working |
+| POST | `/api/pairing/cancel` | ✅ Working |
+| GET | `/identity` | ✅ Includes `pairing_status` |
+
+**The 🔴 CRITICAL: Pairing API task from QUEUE.md is COMPLETE.**
+
+---
+
 ## 2026-02-02 COMPLETE: Pairing API (Daemon Side)
 
 **Task from QUEUE.md:** Implement daemon pairing API endpoints.
