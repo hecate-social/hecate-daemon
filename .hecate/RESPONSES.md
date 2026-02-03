@@ -650,6 +650,72 @@ The logs show DHT connection errors to `370fc04fd1c9:4433` - this is expected. T
 
 ---
 
+## 2026-02-03 COMPLETE: Install Script LLM Integration
+
+### Summary
+
+Updated `hecate-node/install.sh` to fully support the LLM capability service.
+
+### Changes
+
+**1. Storage Detection**
+- Detects free space on `/bulk0`, `/fast`, or `$HOME`
+- Shows model capacity hints (70B+, 30B, 7B based on space)
+- Useful for beam cluster nodes with specific storage layout
+
+**2. Docker Host Mapping**
+- Added `OLLAMA_HOST=http://host.docker.internal:11434` env var
+- Added `extra_hosts: host-gateway` mapping
+- Container can now reach Ollama running on host
+
+**3. LLM CLI Commands**
+```bash
+hecate llm models    # List available models
+hecate llm health    # Check backend status
+hecate llm chat [model] [message]  # Chat with model
+```
+
+**4. Multi-Select Model Menu**
+```
+General Purpose:
+   1) Llama 3.2 (3B)             2GB  Fast, efficient
+   2) Llama 3.1 (8B)             5GB  Balanced quality
+
+Code Generation:
+   6) Qwen 2.5 Coder (7B)        4GB  Code optimized
+
+Reasoning:
+   8) DeepSeek R1 (8B)           5GB  Chain-of-thought
+```
+
+Features:
+- Multi-select (e.g., "1 4 6")
+- Filtered by detected RAM
+- Auto-suggestions based on hardware
+- Category grouping
+
+**5. Daemon OLLAMA_HOST Support**
+- `llm_backend:get_base_url/0` checks env var first
+- Priority: `OLLAMA_HOST` > app config > default
+
+### Commits
+
+| Repo | Commit | Description |
+|------|--------|-------------|
+| hecate-daemon | `fc90eb2` | OLLAMA_HOST env var support |
+| hecate-node | `d02f451` | Storage detection, CLI commands, Docker mapping |
+| hecate-node | `27eb51a` | Multi-select model menu |
+
+### Docker Build
+
+✅ `ghcr.io/hecate-social/hecate-daemon:main` ready
+
+### Testing
+
+User testing on beam03.lab now.
+
+---
+
 ## 2026-02-03 COMPLETE: LLM Capability Service Phase 1
 
 ### Summary

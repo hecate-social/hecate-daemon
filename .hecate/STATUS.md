@@ -6,11 +6,11 @@
 
 ## Current Task
 
-**COMPLETE: LLM Capability Service Phase 1** — Ollama backend + REST API
+**COMPLETE: LLM Capability Service Phase 1** — Ollama backend + REST API + Install Script
 
 ## Last Active
 
-**2026-02-03** — Implemented serve_llm app with Ollama backend and API endpoints
+**2026-02-03** — LLM Phase 1 complete, install script updated, ready for testing on beam03.lab
 
 ## Session Log
 
