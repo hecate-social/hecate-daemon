@@ -66,4 +66,7 @@ event_type_to_topic(<<"identity_registered_v1">>) -> <<"hecate.identity.register
 event_type_to_topic(<<"identity_updated_v1">>) -> <<"hecate.identity.updated">>;
 event_type_to_topic(<<"capability_granted_v1">>) -> <<"hecate.ucan.granted">>;
 event_type_to_topic(<<"capability_revoked_v1">>) -> <<"hecate.ucan.revoked">>;
+%% LLM capability events
+event_type_to_topic(<<"llm_capability_announced_v1">>) -> <<"hecate.llm.announced">>;
+event_type_to_topic(<<"llm_capability_retracted_v1">>) -> <<"hecate.llm.retracted">>;
 event_type_to_topic(EventType) -> <<"hecate.events.", EventType/binary>>.
