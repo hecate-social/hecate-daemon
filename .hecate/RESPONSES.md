@@ -650,6 +650,97 @@ The logs show DHT connection errors to `370fc04fd1c9:4433` - this is expected. T
 
 ---
 
+## 2026-02-03 UNDERSTANDING: LLM Phase 2 Architecture
+
+**I have read QUEUE.md and the reference pattern.**
+
+### Key Insight: Event-Driven, Not Direct Mesh Calls
+
+Hecate is correct. The temptation is to directly call `hecate_mesh:publish()` when Ollama comes online. This bypasses the command layer and loses:
+- Event history (what was announced when)
+- Replay capability
+- Testability
+- Symmetric retraction
+
+### The Correct Flow
+
+```
+Ollama online
+    ↓
+announce_llm_capability_v1 (COMMAND)
+    ↓
+maybe_announce_llm_capability:handle/1 → validates
+    ↓
+llm_capability_announced_v1 (DOMAIN EVENT) → ReckonDB
+    ↓
+llm_capability_announced_v1_to_mesh (EMITTER) → subscribes to event
+    ↓
+FACT published to mesh
+```
+
+### Vertical Slices to Create
+
+```
+apps/serve_llm/src/
+├── announce_llm_capability/
+│   ├── announce_llm_capability_v1.erl        # Command: model, agent_id, metadata
+│   ├── llm_capability_announced_v1.erl       # Event: same fields + timestamp
+│   ├── maybe_announce_llm_capability.erl     # Handler: validate, dispatch via evoq
+│   └── llm_capability_announced_v1_to_mesh.erl  # Emitter: subscribe → publish FACT
+│
+├── retract_llm_capability/
+│   ├── retract_llm_capability_v1.erl         # Command
+│   ├── llm_capability_retracted_v1.erl       # Event
+│   ├── maybe_retract_llm_capability.erl      # Handler
+│   └── llm_capability_retracted_v1_to_mesh.erl  # Emitter
+│
+├── handle_llm_rpc/
+│   ├── llm_rpc_listener.erl                  # Listens for mesh RPC requests
+│   └── handle_llm_rpc.erl                    # Routes to llm_backend:chat_stream/3
+```
+
+### Reference Pattern
+
+Studied `apps/manage_capabilities/src/announce_capability/`:
+- `announce_capability_v1.erl` - Command record with `new/N`, `to_map/1`, `from_map/1`, getters
+- `capability_announced_v1.erl` - Event record (similar structure)
+- `maybe_announce_capability.erl` - Handler with `handle/1` (validates) and `dispatch/1` (evoq)
+- `capability_announced_v1_to_mesh.erl` - Emitter (gen_server subscribing to events)
+
+### MRI Format
+
+```
+mri:capability:io.macula/{agent-id}/llm/{model-name}
+
+Example:
+mri:capability:io.macula/hecate-dev/llm/llama3.2
+mri:capability:io.macula/hecate-dev/llm/qwen2.5-coder
+```
+
+### Trigger Flow
+
+1. `serve_llm_sup` starts → polls Ollama for models
+2. For each model: dispatch `announce_llm_capability_v1` command
+3. Events stored in ReckonDB via `serve_llm_store` (new store needed)
+4. Emitters publish FACTs to mesh
+5. On model removed → `retract_llm_capability_v1` command
+
+### RPC Flow (Incoming)
+
+1. `llm_rpc_listener` subscribes to mesh topic `llm.chat.{my-identity}`
+2. Receives HOPE (RPC request) with model + messages
+3. Validates model is announced
+4. Calls `llm_backend:chat_stream/3`
+5. Sends FEEDBACK chunks back to requester
+
+### Questions for Hecate
+
+1. **Store**: Should I create `serve_llm_store` (new ReckonDB instance) or reuse existing?
+2. **Polling**: How often should we poll Ollama for model changes? Or use a watcher?
+3. **TUI dependency**: QUEUE says "after TUI has chat view" — should I wait or proceed?
+
+---
+
 ## 2026-02-03 COMPLETE: Install Script LLM Integration
 
 ### Summary
