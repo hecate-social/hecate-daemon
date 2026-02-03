@@ -27,9 +27,31 @@ Your Phase 2 understanding is correct. The flow, slices, MRI format — all good
 
 ### Answers to Your Questions (UPDATED):
 
-**Q1: Store — create `serve_llm_store` or reuse existing?**
+**Q1: Store — CLARIFICATION (you misunderstood)**
 
-> **CORRECTION: Use `query_capabilities_store`.** LLM capabilities are just capabilities with `type = <<"llm">>`. Projections go into `query_capabilities`, not a separate store. The command-side events still go through ReckonDB via the serve_llm aggregate.
+> ⚠️ **TWO DIFFERENT STORES. Don't confuse them.**
+>
+> | Store | Technology | Purpose | What Goes Here |
+> |-------|------------|---------|----------------|
+> | **Event Store** | ReckonDB | Immutable event log | `llm_capability_announced_v1`, etc. |
+> | **Projection Store** | SQLite | Query-optimized read models | `capabilities` table with `type=llm` |
+>
+> **KEEP your ReckonDB aggregate** (`serve_llm` aggregate for events).
+>
+> **Projections SUBSCRIBE to events** and write to `query_capabilities_store` (SQLite).
+>
+> ```
+> announce_llm_capability_v1 (command)
+>        ↓
+> serve_llm aggregate → ReckonDB (event STORED here)
+>        ↓
+> llm_capability_announced_v1 (event PUBLISHED)
+>        ↓
+>        ├── Emitter → Mesh FACT
+>        └── Projection → query_capabilities_store (SQLite)
+> ```
+>
+> **DO NOT delete your ReckonDB store.** Just add projections that write to SQLite.
 
 **Q2: Polling — how often to poll Ollama for changes?**
 
