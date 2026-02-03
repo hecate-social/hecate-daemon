@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="meshGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4a1c6b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7b2d96;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="daemonGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="ollamaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f3460;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="#0a0a0f"/>
+
+  <!-- Title -->
+  <text x="400" y="35" text-anchor="middle" fill="#e94560" font-family="monospace" font-size="20" font-weight="bold">LLM Service Architecture</text>
+
+  <!-- Macula Mesh (top) -->
+  <rect x="50" y="55" width="700" height="80" rx="8" fill="url(#meshGrad)" stroke="#9b59b6" stroke-width="2"/>
+  <text x="400" y="80" text-anchor="middle" fill="#fff" font-family="monospace" font-size="14" font-weight="bold">Macula Mesh</text>
+  <text x="150" y="105" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">hecate.llm.announced</text>
+  <text x="320" y="105" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">hecate.llm.status</text>
+  <text x="480" y="105" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">hecate.llm.retracted</text>
+  <text x="650" y="105" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">hecate.llm.rpc.*</text>
+
+  <!-- Arrows from mesh -->
+  <path d="M 150 135 L 150 170" stroke="#9b59b6" stroke-width="2" fill="none" marker-end="url(#arrowPurple)"/>
+  <path d="M 320 135 L 320 170" stroke="#9b59b6" stroke-width="2" fill="none" marker-end="url(#arrowPurple)"/>
+  <path d="M 480 135 L 480 170" stroke="#9b59b6" stroke-width="2" fill="none" marker-end="url(#arrowPurple)"/>
+  <path d="M 650 135 L 650 170" stroke="#9b59b6" stroke-width="2" fill="none" marker-end="url(#arrowPurple)"/>
+
+  <!-- serve_llm_sup box -->
+  <rect x="50" y="170" width="700" height="280" rx="8" fill="url(#daemonGrad)" stroke="#e94560" stroke-width="2"/>
+  <text x="400" y="195" text-anchor="middle" fill="#e94560" font-family="monospace" font-size="14" font-weight="bold">serve_llm_sup</text>
+
+  <!-- Emitters row -->
+  <rect x="70" y="210" width="150" height="55" rx="5" fill="#1e3a5f" stroke="#3498db" stroke-width="1"/>
+  <text x="145" y="235" text-anchor="middle" fill="#3498db" font-family="monospace" font-size="11">Announce Emitter</text>
+  <text x="145" y="252" text-anchor="middle" fill="#7fb3d5" font-family="monospace" font-size="9">capability_announced</text>
+
+  <rect x="240" y="210" width="150" height="55" rx="5" fill="#1e3a5f" stroke="#3498db" stroke-width="1"/>
+  <text x="315" y="235" text-anchor="middle" fill="#3498db" font-family="monospace" font-size="11">Status Emitter</text>
+  <text x="315" y="252" text-anchor="middle" fill="#7fb3d5" font-family="monospace" font-size="9">status_updated</text>
+
+  <rect x="410" y="210" width="150" height="55" rx="5" fill="#1e3a5f" stroke="#3498db" stroke-width="1"/>
+  <text x="485" y="235" text-anchor="middle" fill="#3498db" font-family="monospace" font-size="11">Retract Emitter</text>
+  <text x="485" y="252" text-anchor="middle" fill="#7fb3d5" font-family="monospace" font-size="9">capability_retracted</text>
+
+  <rect x="580" y="210" width="150" height="55" rx="5" fill="#1e3a5f" stroke="#e74c3c" stroke-width="1"/>
+  <text x="655" y="235" text-anchor="middle" fill="#e74c3c" font-family="monospace" font-size="11">RPC Listener</text>
+  <text x="655" y="252" text-anchor="middle" fill="#f1948a" font-family="monospace" font-size="9">llm_rpc_listener</text>
+
+  <!-- Workers row -->
+  <rect x="70" y="285" width="200" height="55" rx="5" fill="#1e3a5f" stroke="#2ecc71" stroke-width="1"/>
+  <text x="170" y="310" text-anchor="middle" fill="#2ecc71" font-family="monospace" font-size="11">Model Poller</text>
+  <text x="170" y="327" text-anchor="middle" fill="#82e0aa" font-family="monospace" font-size="9">polls every 5 min</text>
+
+  <rect x="300" y="285" width="200" height="55" rx="5" fill="#1e3a5f" stroke="#f39c12" stroke-width="1"/>
+  <text x="400" y="310" text-anchor="middle" fill="#f39c12" font-family="monospace" font-size="11">Status Heartbeat</text>
+  <text x="400" y="327" text-anchor="middle" fill="#f9e79f" font-family="monospace" font-size="9">updates every 30s</text>
+
+  <rect x="530" y="285" width="200" height="55" rx="5" fill="#1e3a5f" stroke="#e74c3c" stroke-width="1"/>
+  <text x="630" y="310" text-anchor="middle" fill="#e74c3c" font-family="monospace" font-size="11">RPC Handler</text>
+  <text x="630" y="327" text-anchor="middle" fill="#f1948a" font-family="monospace" font-size="9">handle_llm_rpc</text>
+
+  <!-- llm_backend box -->
+  <rect x="150" y="360" width="500" height="70" rx="5" fill="#0f3460" stroke="#1abc9c" stroke-width="2"/>
+  <text x="400" y="390" text-anchor="middle" fill="#1abc9c" font-family="monospace" font-size="14" font-weight="bold">llm_backend</text>
+  <text x="400" y="415" text-anchor="middle" fill="#76d7c4" font-family="monospace" font-size="10">chat/2 | chat_stream/3 | list_models/0 | health/0</text>
+
+  <!-- Arrows to backend -->
+  <path d="M 170 340 L 250 360" stroke="#2ecc71" stroke-width="1.5" fill="none"/>
+  <path d="M 400 340 L 400 360" stroke="#f39c12" stroke-width="1.5" fill="none"/>
+  <path d="M 630 340 L 550 360" stroke="#e74c3c" stroke-width="1.5" fill="none"/>
+
+  <!-- Ollama box -->
+  <rect x="200" y="480" width="400" height="90" rx="8" fill="url(#ollamaGrad)" stroke="#1abc9c" stroke-width="2"/>
+  <text x="400" y="510" text-anchor="middle" fill="#1abc9c" font-family="monospace" font-size="14" font-weight="bold">Ollama</text>
+  <text x="400" y="530" text-anchor="middle" fill="#76d7c4" font-family="monospace" font-size="11">localhost:11434</text>
+  <text x="280" y="555" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="9">llama3.2</text>
+  <text x="360" y="555" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="9">qwen2.5</text>
+  <text x="440" y="555" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="9">deepseek</text>
+  <text x="520" y="555" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="9">mistral</text>
+
+  <!-- Arrow from backend to Ollama -->
+  <path d="M 400 430 L 400 480" stroke="#1abc9c" stroke-width="2" fill="none" marker-end="url(#arrowTeal)"/>
+  <text x="420" y="460" fill="#1abc9c" font-family="monospace" font-size="9">HTTP</text>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#9b59b6"/>
+    </marker>
+    <marker id="arrowTeal" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1abc9c"/>
+    </marker>
+  </defs>
+</svg>

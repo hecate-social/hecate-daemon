@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500">
+  <defs>
+    <linearGradient id="agentGradA" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2c3e50;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a252f;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="agentGradB" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a5f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f2940;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="meshGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4a1c6b;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#7b2d96;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4a1c6b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="500" fill="#0a0a0f"/>
+
+  <!-- Title -->
+  <text x="450" y="35" text-anchor="middle" fill="#e94560" font-family="monospace" font-size="18" font-weight="bold">Mesh Capability Discovery Flow</text>
+
+  <!-- Agent A (Provider) -->
+  <rect x="30" y="70" width="250" height="380" rx="10" fill="url(#agentGradA)" stroke="#e94560" stroke-width="2"/>
+  <text x="155" y="100" text-anchor="middle" fill="#e94560" font-family="monospace" font-size="14" font-weight="bold">Agent A (Provider)</text>
+  <text x="155" y="120" text-anchor="middle" fill="#888" font-family="monospace" font-size="10">beam00 - 48GB RAM</text>
+
+  <!-- A: Ollama -->
+  <rect x="50" y="140" width="210" height="50" rx="5" fill="#0f3460" stroke="#1abc9c" stroke-width="1"/>
+  <text x="155" y="165" text-anchor="middle" fill="#1abc9c" font-family="monospace" font-size="11">Ollama</text>
+  <text x="155" y="180" text-anchor="middle" fill="#76d7c4" font-family="monospace" font-size="9">llama3.1:70b loaded</text>
+
+  <!-- A: Poller -->
+  <rect x="50" y="205" width="210" height="40" rx="5" fill="#1e3a5f" stroke="#2ecc71" stroke-width="1"/>
+  <text x="155" y="230" text-anchor="middle" fill="#2ecc71" font-family="monospace" font-size="10">Model Poller detects model</text>
+
+  <!-- A: Command -->
+  <rect x="50" y="260" width="210" height="40" rx="5" fill="#1e3a5f" stroke="#f39c12" stroke-width="1"/>
+  <text x="155" y="285" text-anchor="middle" fill="#f39c12" font-family="monospace" font-size="10">announce_llm_capability_v1</text>
+
+  <!-- A: Event Store -->
+  <rect x="50" y="315" width="210" height="40" rx="5" fill="#1e3a5f" stroke="#9b59b6" stroke-width="1"/>
+  <text x="155" y="340" text-anchor="middle" fill="#9b59b6" font-family="monospace" font-size="10">ReckonDB: event stored</text>
+
+  <!-- A: Emitter -->
+  <rect x="50" y="370" width="210" height="40" rx="5" fill="#1e3a5f" stroke="#3498db" stroke-width="1"/>
+  <text x="155" y="395" text-anchor="middle" fill="#3498db" font-family="monospace" font-size="10">Emitter publishes FACT</text>
+
+  <!-- Arrows within A -->
+  <path d="M 155 190 L 155 205" stroke="#1abc9c" stroke-width="1.5" fill="none" marker-end="url(#arrowDown)"/>
+  <path d="M 155 245 L 155 260" stroke="#2ecc71" stroke-width="1.5" fill="none" marker-end="url(#arrowDown)"/>
+  <path d="M 155 300 L 155 315" stroke="#f39c12" stroke-width="1.5" fill="none" marker-end="url(#arrowDown)"/>
+  <path d="M 155 355 L 155 370" stroke="#9b59b6" stroke-width="1.5" fill="none" marker-end="url(#arrowDown)"/>
+
+  <!-- Mesh (center) -->
+  <rect x="320" y="180" width="260" height="180" rx="10" fill="url(#meshGradient)" stroke="#9b59b6" stroke-width="2"/>
+  <text x="450" y="215" text-anchor="middle" fill="#fff" font-family="monospace" font-size="14" font-weight="bold">Macula Mesh</text>
+
+  <!-- Mesh topics -->
+  <rect x="340" y="240" width="220" height="30" rx="4" fill="#4a1c6b" stroke="#d4a5ff" stroke-width="1"/>
+  <text x="450" y="260" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">hecate.llm.announced</text>
+
+  <rect x="340" y="280" width="220" height="30" rx="4" fill="#4a1c6b" stroke="#d4a5ff" stroke-width="1"/>
+  <text x="450" y="300" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">hecate.llm.rpc.beam00</text>
+
+  <rect x="340" y="320" width="220" height="30" rx="4" fill="#4a1c6b" stroke="#d4a5ff" stroke-width="1"/>
+  <text x="450" y="340" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">hecate.llm.status</text>
+
+  <!-- Agent B (Consumer) -->
+  <rect x="620" y="70" width="250" height="380" rx="10" fill="url(#agentGradB)" stroke="#3498db" stroke-width="2"/>
+  <text x="745" y="100" text-anchor="middle" fill="#3498db" font-family="monospace" font-size="14" font-weight="bold">Agent B (Consumer)</text>
+  <text x="745" y="120" text-anchor="middle" fill="#888" font-family="monospace" font-size="10">beam01 - 16GB RAM</text>
+
+  <!-- B: Listener -->
+  <rect x="640" y="140" width="210" height="40" rx="5" fill="#1e3a5f" stroke="#e74c3c" stroke-width="1"/>
+  <text x="745" y="165" text-anchor="middle" fill="#e74c3c" font-family="monospace" font-size="10">Capability Listener</text>
+
+  <!-- B: Command -->
+  <rect x="640" y="195" width="210" height="40" rx="5" fill="#1e3a5f" stroke="#f39c12" stroke-width="1"/>
+  <text x="745" y="220" text-anchor="middle" fill="#f39c12" font-family="monospace" font-size="10">receive_capability_v1</text>
+
+  <!-- B: Event Store -->
+  <rect x="640" y="250" width="210" height="40" rx="5" fill="#1e3a5f" stroke="#9b59b6" stroke-width="1"/>
+  <text x="745" y="275" text-anchor="middle" fill="#9b59b6" font-family="monospace" font-size="10">ReckonDB: event stored</text>
+
+  <!-- B: Projection -->
+  <rect x="640" y="305" width="210" height="40" rx="5" fill="#1e3a5f" stroke="#1abc9c" stroke-width="1"/>
+  <text x="745" y="330" text-anchor="middle" fill="#1abc9c" font-family="monospace" font-size="10">Projection: SQLite updated</text>
+
+  <!-- B: Query -->
+  <rect x="640" y="360" width="210" height="50" rx="5" fill="#0f3460" stroke="#5dade2" stroke-width="1"/>
+  <text x="745" y="385" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="11">query_capabilities</text>
+  <text x="745" y="400" text-anchor="middle" fill="#85c1e9" font-family="monospace" font-size="9">finds beam00's 70b model</text>
+
+  <!-- Arrows within B -->
+  <path d="M 745 180 L 745 195" stroke="#e74c3c" stroke-width="1.5" fill="none" marker-end="url(#arrowDown)"/>
+  <path d="M 745 235 L 745 250" stroke="#f39c12" stroke-width="1.5" fill="none" marker-end="url(#arrowDown)"/>
+  <path d="M 745 290 L 745 305" stroke="#9b59b6" stroke-width="1.5" fill="none" marker-end="url(#arrowDown)"/>
+  <path d="M 745 345 L 745 360" stroke="#1abc9c" stroke-width="1.5" fill="none" marker-end="url(#arrowDown)"/>
+
+  <!-- Cross-mesh arrows -->
+  <path d="M 260 390 L 320 270" stroke="#3498db" stroke-width="2" fill="none" marker-end="url(#arrowBlue)"/>
+  <text x="290" y="320" fill="#3498db" font-family="monospace" font-size="9" transform="rotate(-35 290,320)">FACT</text>
+
+  <path d="M 580 255 L 640 160" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arrowRed)"/>
+  <text x="610" y="195" fill="#e74c3c" font-family="monospace" font-size="9" transform="rotate(-35 610,195)">subscribe</text>
+
+  <!-- RPC flow indicators -->
+  <rect x="350" y="420" width="200" height="60" rx="5" fill="#1a1a2e" stroke="#e94560" stroke-width="1" stroke-dasharray="4"/>
+  <text x="450" y="445" text-anchor="middle" fill="#e94560" font-family="monospace" font-size="10">RPC Call (HOPE)</text>
+  <text x="450" y="465" text-anchor="middle" fill="#f1948a" font-family="monospace" font-size="9">B calls A's llama3.1:70b</text>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowDown" markerWidth="10" markerHeight="10" refX="5" refY="10" orient="auto">
+      <path d="M0,0 L10,0 L5,10 z" fill="#888"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#3498db"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#e74c3c"/>
+    </marker>
+  </defs>
+</svg>
