@@ -25,23 +25,23 @@ New rules have been added. Pay special attention to:
 
 Your Phase 2 understanding is correct. The flow, slices, MRI format — all good.
 
-### Answers to Your Questions:
+### Answers to Your Questions (UPDATED):
 
 **Q1: Store — create `serve_llm_store` or reuse existing?**
 
-> **New store.** Each domain owns its store. Create `serve_llm_store` for LLM capability events. This keeps serve_llm self-contained.
+> **CORRECTION: Use `query_capabilities_store`.** LLM capabilities are just capabilities with `type = <<"llm">>`. Projections go into `query_capabilities`, not a separate store. The command-side events still go through ReckonDB via the serve_llm aggregate.
 
 **Q2: Polling — how often to poll Ollama for changes?**
 
-> **On startup + periodic fallback.** Ollama doesn't have great change detection. Poll on startup to announce all models, then every 5 minutes as fallback to catch additions/removals. If Ollama ever adds webhooks, use those.
+> **On startup + periodic fallback.** Poll on startup to announce all models, then every 5 minutes to catch additions/removals. Also emit `update_llm_status` periodically (every 30s?) to update queue depth and availability.
 
 **Q3: TUI dependency — wait for TUI or proceed?**
 
-> **Proceed.** Don't block on TUI. The TUI team can test via curl while they build the chat view. Ship Phase 2 independently.
+> **Proceed.** Don't block on TUI. Ship Phase 2 independently.
 
 ### Go Build It
 
-You have the green light. Create the slices, wire up the events, ship it. 🔥
+Expanded scope in the Phase 2 section below. Read it carefully — rich metadata, hardware info, our/their distinction. 🔥
 
 ---
 
@@ -111,71 +111,201 @@ curl -X POST http://localhost:4444/api/llm/chat \
 
 ## Active Tasks
 
-### 🔴 HIGH: LLM Phase 2 - Mesh Capability (EVENT-DRIVEN)
+### 🔴 HIGH: LLM Phase 2 - Mesh Capability (EVENT-DRIVEN + RICH METADATA)
 
-**⚠️ ARCHITECTURAL CORRECTION FROM THE GODDESS**
+**⚠️ EXPANDED SCOPE FROM THE GODDESS**
 
-Phase 2 MUST be event-driven with proper CQRS. Do NOT bypass the command layer.
+Phase 2 is about **intelligent model discovery**, not just "announce model exists."
 
-**WRONG (what you might be tempted to do):**
+---
+
+#### Architecture Clarification: Our vs Their
+
+**Use existing `query_capabilities` — do NOT create `query_llm`.**
+
+| Table | Purpose |
+|-------|---------|
+| `capabilities` | MY announcements (what I serve) |
+| `remote_capabilities` | THEIR announcements (what I discover from mesh) |
+
+LLM capabilities are just capabilities with `type = <<"llm">>` and rich metadata.
+
+---
+
+#### Rich Metadata in Capability FACTS
+
+The MRI is the **identifier**. The FACT payload carries the **metadata**.
+
 ```erlang
-%% NO NO NO - bypasses command layer
-ollama_up() ->
-    Models = llm_backend:list_models(),
-    hecate_mesh:publish(#{type => <<"llm_available">>, models => Models}).
+%% The FACT published to mesh (llm_capability_announced_v1_to_mesh.erl)
+#{
+    mri => <<"mri:capability:io.macula/hecate-beam00/llm/llama3.1:70b">>,
+    type => <<"llm">>,
+    
+    %% Model info (from Ollama API)
+    model => #{
+        name => <<"llama3.1:70b">>,
+        context_length => 131072,
+        quantization => <<"q4_K_M">>,
+        parameter_count => <<"70B">>,
+        family => <<"llama">>
+    },
+    
+    %% Hardware info (from hecate-node install detection!)
+    hardware => #{
+        ram_gb => 48,
+        cpu_cores => 8,
+        gpu => <<"none">>,           % or <<"nvidia_rtx4090">>
+        gpu_vram_gb => 0,            % GPU memory if applicable
+        storage_path => <<"/bulk0">>
+    },
+    
+    %% Dynamic status (updated periodically via heartbeat FACTs)
+    status => #{
+        queue_depth => 0,            % requests waiting
+        avg_tokens_per_sec => 45.2,  % measured inference speed
+        available => true            % model loaded and ready
+    },
+    
+    announced_at => 1738590000
+}
 ```
 
-**CORRECT (event sourcing with vertical slices):**
+---
 
-```
-COMMAND → DOMAIN EVENT → EMITTER → MESH FACT
+#### Hardware Info: Where Does It Come From?
+
+**The install script already detects hardware!** (`hecate-node/install.sh`)
+
+Store detected hardware in daemon config or identity:
+```erlang
+%% sys.config or identity store
+{hardware, #{
+    ram_gb => 48,
+    cpu_cores => 8,
+    gpu => <<"none">>,
+    storage_path => <<"/bulk0">>
+}}
 ```
 
-**Create these vertical slices in `apps/serve_llm/src/`:**
+Read this when announcing capabilities. The `announce_llm_capability` command should include hardware context.
+
+---
+
+#### Network Latency: Measured by Observer
+
+**Latency is NOT announced by the provider.** Each agent measures it themselves.
+
+```sql
+-- In query_capabilities remote_capabilities table
+ALTER TABLE remote_capabilities ADD COLUMN latency_ms INTEGER;
+ALTER TABLE remote_capabilities ADD COLUMN last_latency_check INTEGER;
+```
+
+Periodically ping discovered agents, update latency. This enables routing decisions.
+
+---
+
+#### Vertical Slices (Command Side)
 
 ```
 apps/serve_llm/src/
 ├── announce_llm_capability/
-│   ├── announce_llm_capability_v1.erl        # Command record
+│   ├── announce_llm_capability_v1.erl        # Command: model, hardware, metadata
 │   ├── llm_capability_announced_v1.erl       # Domain event
 │   ├── maybe_announce_llm_capability.erl     # Handler (validates, dispatches)
-│   └── llm_capability_announced_v1_to_mesh.erl  # Emitter → FACT
+│   └── llm_capability_announced_v1_to_mesh.erl  # Emitter → rich FACT
 ├── retract_llm_capability/
-│   ├── retract_llm_capability_v1.erl         # Command record
-│   ├── llm_capability_retracted_v1.erl       # Domain event  
-│   ├── maybe_retract_llm_capability.erl      # Handler
-│   └── llm_capability_retracted_v1_to_mesh.erl  # Emitter → FACT
+│   └── ...
+├── update_llm_status/                        # For periodic status updates
+│   ├── update_llm_status_v1.erl
+│   ├── llm_status_updated_v1.erl
+│   ├── maybe_update_llm_status.erl
+│   └── llm_status_updated_v1_to_mesh.erl     # Heartbeat FACTs
 ├── handle_llm_rpc/
-│   ├── handle_llm_rpc.erl                    # RPC request handler
-│   └── llm_rpc_listener.erl                  # Listens for incoming mesh RPC
+│   ├── llm_rpc_listener.erl                  # Listens for mesh RPC
+│   └── handle_llm_rpc.erl                    # Routes to llm_backend
 ```
 
-**Why this matters:**
-- ReckonDB stores the events — history of what was announced when
-- Projections — local query: "what have I announced?"
-- Retraction is symmetric — model offline → command → event → mesh fact
-- Testable — unit test command handlers, not mesh calls
-- Replay — rebuild mesh state from event log
+---
 
-**The pattern already exists.** Look at `apps/manage_capabilities/src/announce_capability/` for reference.
+#### Projections (Query Side) — in `query_capabilities`
 
-**Flow:**
-1. Ollama comes online → trigger `announce_llm_capability` command for each model
-2. Handler validates, dispatches event to ReckonDB
-3. Emitter subscribes to event, publishes FACT to mesh
-4. Remote agents discover via mesh queries
-5. Incoming RPC → `llm_rpc_listener` → route to `llm_backend:chat_stream/3`
+**Extend `query_capabilities`, don't create new app.**
 
-**MRI format for capabilities:**
 ```
-mri:capability:io.macula/{agent-id}/llm/{model-name}
+apps/query_capabilities/src/
+├── llm_capability_announced_v1_to_capabilities.erl  # NEW projection
+├── llm_capability_retracted_v1_to_capabilities.erl  # NEW projection
+├── llm_status_updated_v1_to_capabilities.erl        # NEW projection
 ```
 
-**Test end-to-end:**
-- Daemon A announces llama3.2
-- Daemon B discovers it via mesh
-- Daemon B sends RPC chat request
-- Daemon A handles, returns response via mesh
+These subscribe to serve_llm events and update the capabilities/remote_capabilities tables.
+
+---
+
+#### Model Selection Query Example
+
+```erlang
+%% "Find me a code model with <100ms latency and no queue"
+query_capabilities:find(#{
+    type => <<"llm">>,
+    model_family => <<"qwen">>,      % or tags
+    max_latency_ms => 100,
+    max_queue_depth => 0
+})
+
+%% Returns: beam02's qwen2.5-coder capability with full metadata
+```
+
+---
+
+#### What This Enables
+
+```
+beam00 (48GB) → llama3.1:70b   [queue:0, 45 tok/s, latency:12ms]
+beam01 (16GB) → llama3.2:3b    [queue:2, 120 tok/s, latency:8ms]
+beam02 (16GB) → qwen2.5-coder  [queue:0, 80 tok/s, latency:15ms]
+beam03 (16GB) → deepseek-r1    [queue:1, 60 tok/s, latency:10ms]
+
+Request: "I need code help, fast"
+→ Routes to beam02 (coder model, no queue, good speed)
+
+Request: "Analyze this 50k token document"  
+→ Routes to beam00 (only one with 128k context)
+```
+
+---
+
+#### Flow Summary
+
+1. Daemon starts → reads hardware config
+2. Polls Ollama → gets model list with metadata
+3. For each model: `announce_llm_capability` command with model + hardware
+4. Event stored in ReckonDB
+5. Emitter publishes rich FACT to mesh
+6. Other agents discover, store in `remote_capabilities`, measure latency
+7. Periodic `update_llm_status` commands for queue depth, availability
+8. Incoming RPC → `llm_rpc_listener` → `llm_backend` → response
+
+---
+
+#### Test Scenario
+
+```
+# Daemon A (beam00, 48GB)
+- Announces llama3.1:70b with hardware metadata
+
+# Daemon B (beam01, 16GB)  
+- Discovers beam00's capability via mesh
+- Measures latency: 12ms
+- Stores in remote_capabilities
+
+# User on B wants to use 70b model
+- Query: find llm capability with 70B params
+- Result: beam00's llama3.1:70b
+- RPC to beam00 → response streams back
+```
 
 ### 🟢 LOW: Bootstrap Flow Documentation
 
