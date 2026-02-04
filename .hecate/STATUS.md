@@ -6,13 +6,45 @@
 
 ## Current Task
 
-**COMPLETE: serve_llm Refactor + Process Managers**
+**COMPLETE: All 8 Next Steps from Phase 2 Follow-Up**
 
 ## Last Active
 
-**2026-02-04** — Completed serve_llm refactor with Cartwheel architecture and Process Managers
+**2026-02-04** — Completed all 8 tasks: Rich Metadata, LLM Heartbeat, Latency Measurement, Test Coverage, RPC Wiring, Mesh Facade, UCAN Validation, Bootstrap Documentation
 
 ## Session Log
+
+### 2026-02-04 Session (8 Next Steps)
+
+**Status:** Complete
+
+**Completed:**
+- Task #73: Rich metadata in capability announcements (hardware + model info)
+- Task #74: LLM status heartbeat (report_llm_status gen_server)
+- Task #75: Latency measurement for remote capabilities (measure_remote_latency)
+- Task #76: Test coverage for new modules (61 → 72 tests)
+- Task #77: Wire mesh RPC responders (already wired — verified)
+- Task #78: Implement hecate_mesh facade TODOs (subscribe/2, unsubscribe/1)
+- Task #79: UCAN validation (MRI validation, authority checks, 13 new tests → 85 total)
+- Task #80: Bootstrap flow documentation (guide + SVG diagram)
+
+**Verification:**
+- `rebar3 eunit` 85 tests passed
+- `rebar3 dialyzer` Clean (fixed 2 warnings in UCAN modules)
+
+**Files Created:**
+- `apps/serve_llm/src/report_llm_status/report_llm_status.erl`
+- `apps/serve_llm/src/report_llm_status/llm_status_reported_v1.erl`
+- `apps/manage_capabilities/src/on_llm_status_reported_update_capability/on_llm_status_reported_update_capability.erl`
+- `apps/query_capabilities/src/measure_remote_latency/measure_remote_latency.erl`
+- `apps/serve_llm/test/llm_events_test.erl`
+- `apps/serve_llm/test/chat_to_llm_test.erl`
+- `apps/manage_capabilities/test/process_manager_test.erl`
+- `apps/manage_ucan/test/ucan_validation_test.erl`
+- `guides/BOOTSTRAP_FLOW.md`
+- `assets/bootstrap-flow.svg`
+
+---
 
 ### 2026-02-04 Session (serve_llm Refactor)
 

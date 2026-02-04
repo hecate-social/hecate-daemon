@@ -51,8 +51,16 @@ execute(#{command_type := revoke_capability} = Payload, State) ->
         {_, true} ->
             {error, capability_already_revoked};
         {_, false} ->
-            {ok, Cmd} = revoke_capability_v1:from_map(Payload),
-            execute_handler(maybe_revoke_capability:handle(Cmd))
+            %% Verify revoker has authority (must be the original issuer)
+            Revoker = maps:get(revoker, Payload),
+            Issuer = State#ucan_state.issuer,
+            case Revoker =:= Issuer of
+                true ->
+                    {ok, Cmd} = revoke_capability_v1:from_map(Payload),
+                    execute_handler(maybe_revoke_capability:handle(Cmd));
+                false ->
+                    {error, not_authorized_to_revoke}
+            end
     end;
 execute(_UnknownCommand, _State) ->
     {error, unknown_command}.

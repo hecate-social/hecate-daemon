@@ -32,13 +32,18 @@ handle(Command) ->
 
 %% Internal functions
 
--spec validate_revoke(binary(), binary()) -> ok | {error, capability_id_required | revoker_required}.
+-spec validate_revoke(binary(), binary()) ->
+    ok | {error, capability_id_required | revoker_required | invalid_revoker_mri}.
 validate_revoke(CapId, Revoker) ->
     case {byte_size(CapId), byte_size(Revoker)} of
         {0, _} -> {error, capability_id_required};
         {_, 0} -> {error, revoker_required};
-        _ -> ok
+        _ -> validate_revoker_mri(Revoker)
     end.
+
+validate_revoker_mri(<<"mri:agent:", _/binary>>) -> ok;
+validate_revoker_mri(<<"did:", _/binary>>) -> ok;
+validate_revoker_mri(_) -> {error, invalid_revoker_mri}.
 
 -include_lib("evoq/include/evoq.hrl").
 

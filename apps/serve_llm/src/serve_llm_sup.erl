@@ -65,7 +65,12 @@ init([]) ->
         %% check_llm_health_responder: handles health requests from mesh
         {check_llm_health_responder,
             {check_llm_health_responder, start_link, []},
-            permanent, 5000, worker, [check_llm_health_responder]}
+            permanent, 5000, worker, [check_llm_health_responder]},
+
+        %% report_llm_status: periodically checks model availability
+        {report_llm_status,
+            {report_llm_status, start_link, []},
+            permanent, 5000, worker, [report_llm_status]}
     ],
 
     logger:info("[serve_llm] Supervisor started with ~p children", [length(Children)]),

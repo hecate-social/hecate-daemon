@@ -63,16 +63,38 @@ handle_event(<<"llm_detected_v1">>, EventData, AgentIdentity) ->
     %% Build capability MRI from model name
     CapabilityMRI = build_capability_mri(ModelName),
 
-    %% Build capability announcement command
+    %% Read hardware info from hecate app config
+    Hardware = get_hardware_info(),
+
+    %% Build model metadata per QUEUE spec
+    Model = #{
+        name => ModelName,
+        context_length => maps:get(context_length, ModelInfo, maps:get(<<"context_length">>, ModelInfo, 4096)),
+        quantization => maps:get(quantization, ModelInfo, maps:get(<<"quantization">>, ModelInfo, <<"unknown">>)),
+        parameter_count => maps:get(parameter_count, ModelInfo, maps:get(<<"parameter_count">>, ModelInfo, <<"unknown">>)),
+        family => maps:get(family, ModelInfo, maps:get(<<"family">>, ModelInfo, <<"unknown">>)),
+        size_bytes => maps:get(size_bytes, ModelInfo, maps:get(<<"size_bytes">>, ModelInfo, 0))
+    },
+
+    %% Build tags from model family
+    Family = maps:get(family, Model),
+    Tags = build_tags(Family),
+
+    %% Build capability announcement command with rich metadata
     CmdParams = #{
         capability_mri => CapabilityMRI,
         agent_identity => AgentIdentity,
-        tags => [<<"llm">>, <<"chat">>, <<"ai">>],
+        tags => Tags,
         description => build_description(ModelName, ModelInfo),
         metadata => #{
             type => <<"llm">>,
-            model_name => ModelName,
-            model_info => ModelInfo
+            model => Model,
+            hardware => Hardware,
+            status => #{
+                queue_depth => 0,
+                avg_tokens_per_sec => 0.0,
+                available => true
+            }
         }
     },
 
@@ -114,3 +136,28 @@ dispatch_announce_capability(CmdParams) ->
 
 get_agent_identity() ->
     application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>).
+
+get_hardware_info() ->
+    Default = #{
+        ram_gb => 0,
+        cpu_cores => 0,
+        gpu => <<"none">>,
+        gpu_vram_gb => 0,
+        storage_path => <<"unknown">>
+    },
+    application:get_env(hecate, hardware, Default).
+
+build_tags(Family) when is_binary(Family) ->
+    BaseTags = [<<"llm">>, <<"chat">>, <<"ai">>],
+    FamilyTag = string:lowercase(Family),
+    case is_code_model(FamilyTag) of
+        true -> [<<"code">> | BaseTags];
+        false -> BaseTags
+    end;
+build_tags(_) ->
+    [<<"llm">>, <<"chat">>, <<"ai">>].
+
+is_code_model(Family) ->
+    CodeFamilies = [<<"qwen2.5-coder">>, <<"codellama">>, <<"codegemma">>,
+                    <<"starcoder">>, <<"deepseek-coder">>],
+    lists:any(fun(CF) -> binary:match(Family, CF) =/= nomatch end, CodeFamilies).

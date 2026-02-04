@@ -1,0 +1,174 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1100">
+  <defs>
+    <style>
+      text { font-family: 'Consolas', 'Monaco', monospace; }
+      .title { font-size: 18px; font-weight: bold; fill: #1a1a2e; }
+      .phase-label { font-size: 14px; font-weight: bold; fill: #e94560; }
+      .component { font-size: 11px; fill: #1a1a2e; }
+      .detail { font-size: 10px; fill: #555; }
+      .arrow { stroke: #333; stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }
+      .phase-box { fill: #f8f9fa; stroke: #ddd; stroke-width: 1; rx: 6; }
+      .infra-box { fill: #e8f4f8; stroke: #0f3460; stroke-width: 1.5; rx: 4; }
+      .core-box { fill: #fff3e0; stroke: #e94560; stroke-width: 1.5; rx: 4; }
+      .domain-box { fill: #e8f5e9; stroke: #2e7d32; stroke-width: 1.5; rx: 4; }
+      .api-box { fill: #f3e5f5; stroke: #7b1fa2; stroke-width: 1.5; rx: 4; }
+      .mesh-box { fill: #fce4ec; stroke: #c62828; stroke-width: 1.5; rx: 4; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+    </marker>
+  </defs>
+
+  <text x="400" y="30" text-anchor="middle" class="title">Hecate Daemon Bootstrap Flow</text>
+
+  <!-- Phase 1: Infrastructure -->
+  <rect x="30" y="50" width="740" height="130" class="phase-box" />
+  <text x="50" y="72" class="phase-label">Phase 1: Infrastructure</text>
+
+  <rect x="50" y="85" width="200" height="40" class="infra-box" />
+  <text x="150" y="102" text-anchor="middle" class="component">ReckonDB</text>
+  <text x="150" y="117" text-anchor="middle" class="detail">Event store supervisor</text>
+
+  <line x1="250" y1="105" x2="300" y2="105" class="arrow" />
+
+  <rect x="300" y="85" width="200" height="40" class="infra-box" />
+  <text x="400" y="102" text-anchor="middle" class="component">Evoq</text>
+  <text x="400" y="117" text-anchor="middle" class="detail">CQRS framework</text>
+
+  <line x1="500" y1="105" x2="550" y2="105" class="arrow" />
+
+  <rect x="550" y="85" width="200" height="40" class="infra-box" />
+  <text x="650" y="102" text-anchor="middle" class="component">reckon_evoq</text>
+  <text x="650" y="117" text-anchor="middle" class="detail">Adapter layer</text>
+
+  <text x="50" y="168" class="detail">No stores created yet. Each domain starts its own store in its supervisor init/1.</text>
+
+  <!-- Phase 2: Core -->
+  <rect x="30" y="190" width="740" height="150" class="phase-box" />
+  <text x="50" y="212" class="phase-label">Phase 2: Core (hecate_sup)</text>
+
+  <rect x="50" y="225" width="160" height="50" class="core-box" />
+  <text x="130" y="245" text-anchor="middle" class="component">hecate_store</text>
+  <text x="130" y="260" text-anchor="middle" class="detail">SQLite ~/.hecate/hecate.db</text>
+
+  <line x1="210" y1="250" x2="240" y2="250" class="arrow" />
+
+  <rect x="240" y="225" width="160" height="50" class="core-box" />
+  <text x="320" y="245" text-anchor="middle" class="component">hecate_identity</text>
+  <text x="320" y="260" text-anchor="middle" class="detail">MRI + Ed25519 keypair</text>
+
+  <line x1="400" y1="250" x2="430" y2="250" class="arrow" />
+
+  <rect x="430" y="225" width="160" height="50" class="core-box" />
+  <text x="510" y="245" text-anchor="middle" class="component">hecate_pairing</text>
+  <text x="510" y="260" text-anchor="middle" class="detail">Device pairing state</text>
+
+  <line x1="590" y1="250" x2="620" y2="250" class="arrow" />
+
+  <rect x="620" y="225" width="130" height="50" class="core-box" />
+  <text x="685" y="245" text-anchor="middle" class="component">hecate_ucan</text>
+  <text x="685" y="260" text-anchor="middle" class="detail">Capability wallet</text>
+
+  <text x="50" y="310" class="detail">Identity loaded from SQLite (or stays uninitialized until POST /identity/init).</text>
+  <text x="50" y="325" class="detail">All workers permanent, one_for_one strategy.</text>
+
+  <!-- Phase 3: Mesh -->
+  <rect x="30" y="350" width="740" height="120" class="phase-box" />
+  <text x="50" y="372" class="phase-label">Phase 3: Mesh Connection</text>
+
+  <rect x="50" y="385" width="240" height="50" class="mesh-box" />
+  <text x="170" y="405" text-anchor="middle" class="component">hecate_mesh_client</text>
+  <text x="170" y="420" text-anchor="middle" class="detail">Connects to boot.macula.io:443</text>
+
+  <line x1="290" y1="410" x2="330" y2="410" class="arrow" />
+
+  <rect x="330" y="385" width="200" height="50" class="mesh-box" />
+  <text x="430" y="405" text-anchor="middle" class="component">macula:connect/2</text>
+  <text x="430" y="420" text-anchor="middle" class="detail">QUIC/HTTP3 to bootstrap</text>
+
+  <text x="560" y="405" class="detail">Retry on failure:</text>
+  <text x="560" y="420" class="detail">5s between attempts</text>
+  <text x="560" y="435" class="detail">Monitor client PID</text>
+  <text x="50" y="458" class="detail">Connection is non-blocking. Services continue starting while mesh connects.</text>
+
+  <!-- Phase 4: Domains -->
+  <rect x="30" y="480" width="740" height="200" class="phase-box" />
+  <text x="50" y="502" class="phase-label">Phase 4: Domain Services</text>
+
+  <!-- Command services -->
+  <text x="50" y="520" class="component" font-weight="bold">Command Services (each starts own ReckonDB store):</text>
+
+  <rect x="50" y="530" width="140" height="35" class="domain-box" />
+  <text x="120" y="552" text-anchor="middle" class="detail">manage_capabilities</text>
+
+  <rect x="200" y="530" width="140" height="35" class="domain-box" />
+  <text x="270" y="552" text-anchor="middle" class="detail">manage_reputation</text>
+
+  <rect x="350" y="530" width="110" height="35" class="domain-box" />
+  <text x="405" y="552" text-anchor="middle" class="detail">manage_social</text>
+
+  <rect x="470" y="530" width="120" height="35" class="domain-box" />
+  <text x="530" y="552" text-anchor="middle" class="detail">manage_ucan</text>
+
+  <rect x="600" y="530" width="150" height="35" class="domain-box" />
+  <text x="675" y="552" text-anchor="middle" class="detail">manage_identities</text>
+
+  <!-- Query services -->
+  <text x="50" y="590" class="component" font-weight="bold">Query Services (SQLite read models + mesh listeners):</text>
+
+  <rect x="50" y="600" width="140" height="35" class="domain-box" />
+  <text x="120" y="622" text-anchor="middle" class="detail">query_capabilities</text>
+
+  <rect x="200" y="600" width="140" height="35" class="domain-box" />
+  <text x="270" y="622" text-anchor="middle" class="detail">query_reputation</text>
+
+  <rect x="350" y="600" width="110" height="35" class="domain-box" />
+  <text x="405" y="622" text-anchor="middle" class="detail">query_social</text>
+
+  <rect x="470" y="600" width="120" height="35" class="domain-box" />
+  <text x="530" y="622" text-anchor="middle" class="detail">query_ucan</text>
+
+  <rect x="600" y="600" width="150" height="35" class="domain-box" />
+  <text x="675" y="622" text-anchor="middle" class="detail">query_identities</text>
+
+  <text x="50" y="665" class="detail">Each command service starts ReckonDB store + emitters + process managers.</text>
+  <text x="50" y="680" class="detail">Each query service starts SQLite pool + event subscribers + mesh listeners.</text>
+
+  <!-- Phase 5: API + LLM -->
+  <rect x="30" y="695" width="740" height="120" class="phase-box" />
+  <text x="50" y="717" class="phase-label">Phase 5: Services + API</text>
+
+  <rect x="50" y="730" width="180" height="50" class="api-box" />
+  <text x="140" y="750" text-anchor="middle" class="component">serve_llm</text>
+  <text x="140" y="765" text-anchor="middle" class="detail">Ollama polling + RPC</text>
+
+  <line x1="230" y1="755" x2="270" y2="755" class="arrow" />
+
+  <rect x="270" y="730" width="180" height="50" class="api-box" />
+  <text x="360" y="750" text-anchor="middle" class="component">hecate_api</text>
+  <text x="360" y="765" text-anchor="middle" class="detail">Cowboy on :4444</text>
+
+  <text x="480" y="750" class="detail">REST API endpoints:</text>
+  <text x="480" y="765" class="detail">/identity /pairing /llm /health</text>
+
+  <text x="50" y="805" class="detail">API starts last. All dependencies are running. System is ready.</text>
+
+  <!-- Phase 6: Ready state -->
+  <rect x="30" y="825" width="740" height="250" class="phase-box" />
+  <text x="50" y="847" class="phase-label">Ready State: User-Initiated Flows</text>
+
+  <text x="50" y="870" class="component" font-weight="bold">1. Identity Init (if not already initialized):</text>
+  <text x="70" y="888" class="detail">POST /identity/init -> Generate Ed25519 keypair -> Build MRI -> Store in SQLite</text>
+
+  <text x="50" y="912" class="component" font-weight="bold">2. Device Pairing (pairs with realm via TUI):</text>
+  <text x="70" y="930" class="detail">POST /pairing/start -> Create session on realm -> Display QR/code -> Poll for confirm</text>
+  <text x="70" y="945" class="detail">On confirm: Store refresh_token + org_identity + cert_pem</text>
+
+  <text x="50" y="970" class="component" font-weight="bold">3. Capability Announcement (automatic on LLM detection):</text>
+  <text x="70" y="988" class="detail">serve_llm polls Ollama -> detect_llm_models emits llm_detected_v1</text>
+  <text x="70" y="1003" class="detail">Process Manager dispatches announce_capability_v1 with model + hardware metadata</text>
+  <text x="70" y="1018" class="detail">Emitter publishes integration FACT to mesh -> Other agents discover</text>
+
+  <text x="50" y="1045" class="component" font-weight="bold">4. Serving RPC (automatic once connected):</text>
+  <text x="70" y="1063" class="detail">Responders subscribe to mesh RPC topics -> Handle incoming requests -> Route to local backends</text>
+</svg>

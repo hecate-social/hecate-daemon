@@ -64,7 +64,10 @@ init([]) ->
             permanent, 5000, worker, [on_llm_detected_announce_capability]},
         {on_llm_removed_retract_capability,
             {on_llm_removed_retract_capability, start_link, []},
-            permanent, 5000, worker, [on_llm_removed_retract_capability]}
+            permanent, 5000, worker, [on_llm_removed_retract_capability]},
+        {on_llm_status_reported_update_capability,
+            {on_llm_status_reported_update_capability, start_link, []},
+            permanent, 5000, worker, [on_llm_status_reported_update_capability]}
     ],
 
     {ok, {SupFlags, Children}}.

@@ -1350,6 +1350,49 @@ Central dispatchers are **horizontal thinking**. Each domain/slice should:
 
 ---
 
+## 2026-02-04 COMPLETE [daemon]: All 8 Phase 2 Follow-Up Tasks
+
+### Summary
+
+Completed all 8 next steps in order. Test count went from 61 → 85.
+
+### Tasks Completed
+
+| # | Task | Key Deliverable |
+|---|------|----------------|
+| 73 | Rich Metadata | Hardware config under `{hecate, [{hardware, #{...}}]}`, model/hardware/status sub-maps in announcements |
+| 74 | LLM Heartbeat | `report_llm_status` gen_server polls Ollama `/api/ps` every 30s |
+| 75 | Latency Measurement | `measure_remote_latency` gen_server pings discovered agents, updates SQLite |
+| 76 | Test Coverage | 11 new tests for events, exports, PMs (61 → 72) |
+| 77 | RPC Wiring | Already fully wired — verified and confirmed |
+| 78 | Mesh Facade | Added `subscribe/2` and `unsubscribe/1` to `hecate_mesh.erl` |
+| 79 | UCAN Validation | MRI format validation, resource URI validation, actions allowlist, revoker authority check (72 → 85 tests) |
+| 80 | Bootstrap Docs | `guides/BOOTSTRAP_FLOW.md` + `assets/bootstrap-flow.svg` |
+
+### UCAN Validation Details (GitHub Issue #4)
+
+Enhanced `maybe_grant_capability.erl`:
+- Issuer/audience must be `mri:agent:*` or `did:*`
+- Resource must be `mri:*`, `urn:*`, `https://*`, or `http://*`
+- Actions validated against allowlist: `read`, `write`, `execute`, `admin`, `delegate`, `invoke`, `subscribe`
+
+Added revoker authority check in `ucan_aggregate.erl`:
+- Only original issuer can revoke a capability
+- Returns `{error, not_authorized_to_revoke}` otherwise
+
+### Dialyzer Fixes
+
+Fixed 2 dialyzer warnings:
+1. `maybe_grant_capability.erl:97` — removed unreachable `validate_actions(_)` catch-all clause
+2. `ucan_aggregate.erl:56` — extracted revoker from Payload map instead of calling through opaque type
+
+### Verification
+
+- `rebar3 eunit` ✅ **85 tests passed**
+- `rebar3 dialyzer` ✅ **Clean**
+
+---
+
 ## 2026-02-04 COMPLETE [daemon]: serve_llm Refactor + Process Managers
 
 ### Summary

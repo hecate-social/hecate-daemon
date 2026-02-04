@@ -23,6 +23,11 @@ init([]) ->
         %% Listener spoke for remote capabilities (discovery, direct projection)
         {remote_capabilities_listener_sup,
             {remote_capabilities_listener_sup, start_link, []},
-            permanent, infinity, supervisor, [remote_capabilities_listener_sup]}
+            permanent, infinity, supervisor, [remote_capabilities_listener_sup]},
+
+        %% Latency measurement for discovered remote agents
+        {measure_remote_latency,
+            {measure_remote_latency, start_link, []},
+            permanent, 5000, worker, [measure_remote_latency]}
     ],
     {ok, {{one_for_one, 10, 10}, Children}}.

@@ -100,6 +100,12 @@ handle_call(init_schema, _From, #state{db = Db} = State) ->
 
     ok = esqlite3:exec(Db, LocalSchema),
     ok = esqlite3:exec(Db, RemoteSchema),
+
+    %% Schema migrations: add columns that may not exist yet
+    %% SQLite ALTER TABLE ADD COLUMN is idempotent-safe via error handling
+    migrate_add_column(Db, "remote_capabilities", "latency_ms", "INTEGER"),
+    migrate_add_column(Db, "remote_capabilities", "last_latency_check", "INTEGER"),
+
     {reply, ok, State};
 
 handle_call({execute, Sql, Params}, _From, #state{db = Db} = State) ->
@@ -128,3 +134,12 @@ handle_info(_Info, State) ->
 terminate(_Reason, #state{db = Db}) ->
     esqlite3:close(Db),
     ok.
+
+%% @private Add a column if it doesn't exist. Silently ignores "duplicate column" errors.
+migrate_add_column(Db, Table, Column, Type) ->
+    Sql = lists:flatten(io_lib:format(
+        "ALTER TABLE ~s ADD COLUMN ~s ~s", [Table, Column, Type])),
+    case esqlite3:exec(Db, Sql) of
+        ok -> ok;
+        {error, _} -> ok  %% Column already exists
+    end.
