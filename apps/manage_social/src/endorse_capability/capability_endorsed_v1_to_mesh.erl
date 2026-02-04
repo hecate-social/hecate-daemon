@@ -28,8 +28,8 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({event, #evoq_event{event_type = EventType, data = EventData}}, State) ->
-    hecate_mesh_publisher:publish_event(EventType, EventData),
+handle_info({event, #evoq_event{data = EventData}}, State) ->
+    hecate_mesh_client:publish(<<"hecate.social.endorsed">>, EventData),
     {noreply, State};
 
 handle_info(_Info, State) ->

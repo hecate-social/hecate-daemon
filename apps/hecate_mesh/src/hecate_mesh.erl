@@ -9,15 +9,16 @@
     is_connected/0
 ]).
 
-%% @doc Publish a domain event to the mesh.
+%% @doc Publish a message to the mesh.
+%% Each domain's emitter should call hecate_mesh_client:publish directly with its topic.
 -spec publish(binary(), map()) -> ok | {error, term()}.
-publish(Topic, EventData) ->
-    hecate_mesh_publisher:publish_event(Topic, EventData).
+publish(Topic, Payload) ->
+    hecate_mesh_client:publish(Topic, Payload).
 
-%% @doc Publish a domain event to the mesh (alias for publish/2).
+%% @doc Publish a message to the mesh (alias for publish/2).
 -spec publish_event(binary(), map()) -> ok | {error, term()}.
-publish_event(EventType, EventData) ->
-    publish(EventType, EventData).
+publish_event(Topic, Payload) ->
+    publish(Topic, Payload).
 
 %% @doc DEPRECATED: This function is a no-op.
 %% Each domain owns its own listeners - there is NO central mesh subscriber.

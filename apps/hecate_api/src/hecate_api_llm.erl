@@ -45,7 +45,7 @@ init(Req0, _State) ->
 %%% ===================================================================
 
 handle_list_models(Req0) ->
-    case llm_backend:list_models() of
+    case list_available_llms:list() of
         {ok, Models} ->
             Response = #{
                 ok => true,
@@ -89,7 +89,7 @@ handle_sync_chat(Req0, Model, Messages, Params) ->
     Opts = build_chat_opts(Model, Params),
     FormattedMessages = format_messages(Messages),
 
-    case llm_backend:chat(FormattedMessages, Opts) of
+    case chat_to_llm:chat(Model, FormattedMessages, Opts) of
         {ok, Response} ->
             json_response(200, #{
                 ok => true,
@@ -113,7 +113,7 @@ handle_streaming_chat(Req0, Model, Messages, Params) ->
     FormattedMessages = format_messages(Messages),
 
     %% chat_stream always returns {ok, Ref}, errors come via messages
-    {ok, Ref} = llm_backend:chat_stream(BaseUrl, FormattedMessages, Opts),
+    {ok, Ref} = chat_to_llm:chat_stream(BaseUrl, FormattedMessages, Opts),
     %% Set up SSE response
     Req1 = cowboy_req:stream_reply(200, #{
         <<"content-type">> => <<"text/event-stream">>,
@@ -161,7 +161,7 @@ stream_chunks(Req, Ref) ->
     end.
 
 handle_health(Req0) ->
-    case llm_backend:health() of
+    case check_llm_health:check() of
         ok ->
             json_response(200, #{
                 ok => true,

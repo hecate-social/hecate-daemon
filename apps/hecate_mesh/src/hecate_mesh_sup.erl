@@ -22,18 +22,8 @@ init([]) ->
             shutdown => 5000,
             type => worker,
             modules => [hecate_mesh_client]
-        },
-
-        %% Event publisher (publishes domain events to mesh)
-        #{
-            id => hecate_mesh_publisher,
-            start => {hecate_mesh_publisher, start_link, []},
-            restart => permanent,
-            shutdown => 5000,
-            type => worker,
-            modules => [hecate_mesh_publisher]
         }
-        %% NOTE: Listeners are supervised by their respective domain supervisors
+        %% NOTE: Emitters are supervised by their respective domain supervisors
         %% (vertical slicing), not here (that would be horizontal).
     ],
 

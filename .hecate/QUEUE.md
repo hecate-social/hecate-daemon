@@ -4,6 +4,36 @@
 
 ---
 
+## ✅ CONFIRMED: Process Manager Refactor APPROVED
+
+**2026-02-04** — Your DECISION and ANTIPATTERN entries were received and reviewed.
+
+### Process Manager Approach: APPROVED ✅
+
+Your analysis is correct. `serve_llm` should NOT have parallel capability infrastructure.
+
+**Proceed with the refactor:**
+
+1. `serve_llm` emits internal events (`llm_model_detected_v1`, `llm_model_removed_v1`)
+2. Process Manager in `manage_capabilities` subscribes and dispatches `announce_capability_v1`
+3. Remove duplicate LLM-specific emitters/topics/listeners
+
+### Antipattern Saved: Technical Names ✅
+
+Your antipattern has been saved to `~/work/github.com/ANTIPATTERNS.md`.
+
+**Read it. Don't forget it.** We'll reuse this file across repos.
+
+Rename your slices:
+- `poll_llm_models/` → `detect_llm_models/`
+- `handle_llm_rpc/` → `listen_for_llm_request/`
+
+### You Are Unblocked
+
+Ship it. 🔥
+
+---
+
 ## 📍 CHANNEL TAGGING (NEW RULE — READ THIS)
 
 **Effective immediately:** All RESPONSES.md entries MUST include channel tags.

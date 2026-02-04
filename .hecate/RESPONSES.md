@@ -1107,6 +1107,129 @@ mri:capability:io.macula/hecate-dev/llm/llama3.2
 
 ---
 
+## 2026-02-04 ANTIPATTERN [daemon]: Technical Names Don't Scream
+
+### The Antipattern
+
+I created slices with **technical names** instead of **business intent names**:
+
+| Technical Name (BAD) | What It Actually Does |
+|---------------------|----------------------|
+| `llm_model_poller` | Detects what models Ollama has |
+| `llm_rpc_listener` | Listens for incoming LLM requests from mesh |
+| `*_listener` | Technical concern, not business intent |
+| `*_poller` | Technical concern, not business intent |
+
+These names describe HOW (polling, listening) not WHAT (detecting models, handling requests).
+
+### The Solution
+
+Use **verb phrases that scream business intent**:
+
+| Technical Name (BAD) | Screaming Name (GOOD) |
+|---------------------|----------------------|
+| `poll_llm_models/llm_model_poller.erl` | `detect_llm_models/detect_llm_models.erl` |
+| `handle_llm_rpc/llm_rpc_listener.erl` | `listen_for_llm_request/listen_for_llm_request.erl` |
+
+### The Rule
+
+> **Slice names must be VERB PHRASES that scream WHAT the slice does, not HOW it does it.**
+>
+> - ❌ `*_poller` — HOW (technical)
+> - ❌ `*_listener` — HOW (technical)
+> - ❌ `*_handler` — HOW (technical)
+> - ❌ `*_worker` — HOW (technical)
+> - ✅ `detect_llm_models` — WHAT (business)
+> - ✅ `listen_for_llm_request` — WHAT (business)
+> - ✅ `announce_capability` — WHAT (business)
+
+### Request to Hecate
+
+**Please save this antipattern and its solution in a place where I will never forget it.**
+
+Perhaps in:
+- `~/work/github.com/CLAUDE.md` under vertical slicing rules
+- A dedicated `ANTIPATTERNS.md` file
+- The daemon's `CLAUDE.md`
+
+I keep making this mistake. Technical names slip through because my training is full of them. I need a permanent reminder.
+
+---
+
+## 2026-02-04 DECISION [daemon]: Cross-Domain Integration via Process Managers
+
+**Context:** Phase 4 (Discovery) revealed an architectural problem.
+
+### The Problem
+
+`serve_llm` created its own parallel capability infrastructure:
+- Separate event types (`llm_capability_announced_v1` vs `capability_announced_v1`)
+- Separate mesh topics (`hecate.llm.*` vs `hecate.capability.*`)
+- Separate emitters and listeners
+
+This duplicates `manage_capabilities` functionality. LLM capabilities ARE just capabilities with `type = <<"llm">>`.
+
+### The Question
+
+How should `serve_llm` announce capabilities using `manage_capabilities`?
+
+**Option 1: Direct Dispatch** — `llm_model_poller` calls `maybe_announce_capability:dispatch/1` directly.
+
+**Option 2: Process Manager** — `serve_llm` emits `llm_model_detected_v1`, a PM listens and dispatches to `manage_capabilities`.
+
+### The Decision
+
+**Process Managers. Loose coupling is ALWAYS better.**
+
+```
+serve_llm
+    ↓ emits llm_model_detected_v1 (internal event)
+
+Process Manager (on_llm_model_detected_announce_capability)
+    ↓ subscribes to serve_llm events
+    ↓ dispatches announce_capability_v1 to manage_capabilities
+
+manage_capabilities
+    ↓ stores capability_announced_v1 event
+    ↓ existing emitter publishes to hecate.capability.announced
+```
+
+### Refactoring Required
+
+1. **Remove from `serve_llm`:**
+   - `announce_llm_capability/` slice
+   - `retract_llm_capability/` slice
+   - `update_llm_status/` slice (merge into capability metadata updates)
+   - LLM-specific emitters
+
+2. **Add to `serve_llm`:**
+   - `detect_llm_model/` slice — emits `llm_model_detected_v1`
+   - `detect_llm_model_removed/` slice — emits `llm_model_removed_v1`
+
+3. **Add to `manage_capabilities`:**
+   - `on_llm_model_detected_announce_capability/` PM slice
+   - `on_llm_model_removed_retract_capability/` PM slice
+
+4. **Extend `announce_capability_v1`:**
+   - Rich metadata support for LLM model/hardware/status info
+
+5. **Remove from `hecate_mesh_publisher`:**
+   - LLM-specific topic mappings (use existing `hecate.capability.*`)
+
+6. **Remove from `query_capabilities`:**
+   - LLM-specific projections (generic projections handle all types)
+   - No need for `remote_llm_capabilities_listener` (use existing `remote_capabilities_listener`)
+
+### Documented
+
+Added to `~/work/github.com/CLAUDE.md` under "CROSS-DOMAIN INTEGRATION: PROCESS MANAGERS" section.
+
+### Status
+
+Awaiting confirmation before implementing refactor.
+
+---
+
 ## 2026-02-02 COMPLETE: Pairing API (Daemon Side)
 
 **Task from QUEUE.md:** Implement daemon pairing API endpoints.
@@ -1165,5 +1288,139 @@ curl http://localhost:4444/identity
 - `hecate_pairing.erl` already had the core pairing logic (gen_server with session management)
 - API handler simply exposes the existing `start_pairing/0`, `get_status/0`, `cancel/0` functions
 - Identity endpoint gracefully handles missing pairing service (returns `"unknown"` status)
+
+---
+
+## 2026-02-04 COMPLETE [daemon]: Remove hecate_mesh_publisher (Horizontal God Module)
+
+### The Violation
+
+`hecate_mesh_publisher` was a **central dispatcher** — horizontal thinking. Each domain already has its own emitters (e.g., `capability_announced_v1_to_mesh.erl`), but they were delegating to this central module which:
+
+1. Mapped event types to topics (centralized routing table)
+2. Called `hecate_mesh_client:publish/2`
+
+This violates vertical slicing: each emitter should own its topic and publish directly.
+
+### The Fix
+
+**1. Refactored all 11 emitters** to call `hecate_mesh_client:publish/2` directly with their own topics:
+
+| Emitter | Topic |
+|---------|-------|
+| `capability_announced_v1_to_mesh` | `hecate.capability.announced` |
+| `capability_updated_v1_to_mesh` | `hecate.capability.revised` |
+| `capability_retracted_v1_to_mesh` | `hecate.capability.retracted` |
+| `identity_registered_v1_to_mesh` | `hecate.identity.registered` |
+| `identity_updated_v1_to_mesh` | `hecate.identity.updated` |
+| `agent_followed_v1_to_mesh` | `hecate.social.followed` |
+| `agent_unfollowed_v1_to_mesh` | `hecate.social.unfollowed` |
+| `capability_endorsed_v1_to_mesh` | `hecate.social.endorsed` |
+| `endorsement_revoked_v1_to_mesh` | `hecate.social.endorsement_revoked` |
+| `subscribed_v1_to_mesh` | `hecate.subscription.subscribed` |
+| `unsubscribed_v1_to_mesh` | `hecate.subscription.unsubscribed` |
+| `capability_granted_v1_to_mesh` | `hecate.ucan.granted` |
+| `capability_revoked_v1_to_mesh` | `hecate.ucan.revoked` |
+
+**2. Deleted:**
+- `apps/hecate_mesh/src/hecate_mesh_publisher.erl`
+
+**3. Updated:**
+- `hecate_mesh_sup.erl` — removed hecate_mesh_publisher child
+- `hecate_mesh.app.src` — removed from registered list
+- `hecate_mesh.erl` — updated facade to delegate to `hecate_mesh_client` directly
+
+**4. Also cleaned up LLM-specific projections (no longer needed):**
+- Deleted `llm_capability_subscriber.erl`
+- Deleted `llm_capability_announced_v1_to_capabilities.erl`
+- Deleted `llm_capability_retracted_v1_to_capabilities.erl`
+- Deleted `llm_status_updated_v1_to_capabilities.erl`
+- Updated `query_capabilities_sup.erl` to remove llm_capability_subscriber
+
+### Verification
+
+- `rebar3 compile` ✅
+
+### Lesson Learned
+
+Central dispatchers are **horizontal thinking**. Each domain/slice should:
+- Own its mesh topic
+- Publish directly via `hecate_mesh_client`
+- NOT delegate to a "publisher" or "dispatcher" module
+
+---
+
+## 2026-02-04 COMPLETE [daemon]: serve_llm Refactor + Process Managers
+
+### Summary
+
+Completed the full refactoring of `serve_llm` to proper Cartwheel architecture with Process Managers for cross-domain integration.
+
+### serve_llm Structure (Final)
+
+```
+apps/serve_llm/src/
+├── detect_llms/                    # Polls Ollama, emits detection events
+│   ├── detect_llms.erl
+│   ├── llm_detected_v1.erl
+│   └── llm_removed_v1.erl
+├── chat_to_llm/                    # Handles chat requests
+│   ├── chat_to_llm.erl             # Ollama HTTP client (sync + stream)
+│   └── chat_to_llm_responder.erl   # Mesh responder
+├── list_available_llms/            # Handles list requests
+│   ├── list_available_llms.erl
+│   └── list_available_llms_responder.erl
+├── check_llm_health/               # Handles health requests
+│   ├── check_llm_health.erl
+│   └── check_llm_health_responder.erl
+├── serve_llm_app.erl
+└── serve_llm_sup.erl
+```
+
+### manage_capabilities Process Managers (New)
+
+```
+apps/manage_capabilities/src/
+├── on_llm_detected_announce_capability/
+│   └── on_llm_detected_announce_capability.erl
+└── on_llm_removed_retract_capability/
+    └── on_llm_removed_retract_capability.erl
+```
+
+**Flow:**
+1. `detect_llms` polls Ollama → emits `llm_detected_v1` to `serve_llm_store`
+2. Process Manager subscribes → dispatches `announce_capability_v1` to `manage_capabilities`
+3. Existing `capability_announced_v1_to_mesh` emitter publishes to mesh
+
+### Deleted (Horizontal/Duplicate)
+
+| File | Reason |
+|------|--------|
+| `hecate_mesh_publisher.erl` | Central dispatcher (horizontal) |
+| `llm_capability_subscriber.erl` | LLM-specific projection (use generic) |
+| `llm_capability_announced_v1_to_capabilities.erl` | LLM-specific projection |
+| `llm_capability_retracted_v1_to_capabilities.erl` | LLM-specific projection |
+| `llm_status_updated_v1_to_capabilities.erl` | LLM-specific projection |
+| `handle_llm_rpc_tests.erl` | Tests for deleted modules |
+| `llm_backend_tests.erl` | Tests for deleted modules |
+
+### Updated (API Changes)
+
+| File | Change |
+|------|--------|
+| `hecate_api_llm.erl` | Uses `chat_to_llm`, `list_available_llms`, `check_llm_health` |
+| All 11 emitters | Call `hecate_mesh_client:publish/2` directly (not via publisher) |
+
+### Verification
+
+- `rebar3 eunit` ✅ **61 tests passed**
+- `rebar3 dialyzer` ✅ **Clean**
+
+### Architecture Lessons Reinforced
+
+1. **No central dispatchers** — each emitter owns its topic
+2. **Process Managers for cross-domain** — loose coupling via event subscription
+3. **LLM capabilities ARE capabilities** — use existing infrastructure with `type = <<"llm">>`
+4. **Each responder in its slice** — Cartwheel architecture
 
 ---

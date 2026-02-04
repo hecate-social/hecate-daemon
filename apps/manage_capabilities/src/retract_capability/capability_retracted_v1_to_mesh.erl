@@ -32,9 +32,9 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({event, #evoq_event{event_type = EventType, data = EventData}}, State) ->
-    %% Project to mesh (publish integration fact)
-    hecate_mesh_publisher:publish_event(EventType, EventData),
+handle_info({event, #evoq_event{data = EventData}}, State) ->
+    %% Publish integration fact to mesh (this emitter owns its topic)
+    hecate_mesh_client:publish(<<"hecate.capability.retracted">>, EventData),
     {noreply, State};
 
 handle_info(_Info, State) ->

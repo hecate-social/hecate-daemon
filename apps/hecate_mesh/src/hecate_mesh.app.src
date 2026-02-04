@@ -1,7 +1,7 @@
 {application, hecate_mesh, [
     {description, "Macula mesh client integration for hecate"},
     {vsn, "0.1.0"},
-    {registered, [hecate_mesh_client, hecate_mesh_publisher]},
+    {registered, [hecate_mesh_client]},
     {mod, {hecate_mesh_app, []}},
     {applications, [
         kernel,

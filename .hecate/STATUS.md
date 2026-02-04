@@ -6,13 +6,51 @@
 
 ## Current Task
 
-**COMPLETE: LLM Phase 3** — Mesh RPC listener for incoming requests
+**COMPLETE: serve_llm Refactor + Process Managers**
 
 ## Last Active
 
-**2026-02-03** — Phase 3 complete: RPC handler for chat/list_models/health via mesh
+**2026-02-04** — Completed serve_llm refactor with Cartwheel architecture and Process Managers
 
 ## Session Log
+
+### 2026-02-04 Session (serve_llm Refactor)
+
+**Status:** Complete
+
+**Completed:**
+- Refactored `serve_llm` to proper Cartwheel architecture:
+  - `detect_llms/` — polls Ollama, emits detection events
+  - `chat_to_llm/` — handles chat requests with responder
+  - `list_available_llms/` — handles list requests with responder
+  - `check_llm_health/` — handles health requests with responder
+- Created Process Managers in `manage_capabilities`:
+  - `on_llm_detected_announce_capability/` — subscribes to llm_detected_v1, dispatches announce_capability_v1
+  - `on_llm_removed_retract_capability/` — subscribes to llm_removed_v1, dispatches retract_capability_v1
+- Eliminated `hecate_mesh_publisher` (horizontal god module):
+  - Refactored all 11 emitters to call `hecate_mesh_client:publish/2` directly
+- Removed LLM-specific projections from `query_capabilities` (use generic capability projections)
+- Updated `hecate_api_llm.erl` to use new module names
+- Fixed obsolete tests and dialyzer warnings
+
+**Verification:**
+- `rebar3 eunit` ✅ **61 tests passed**
+- `rebar3 dialyzer` ✅ **Clean**
+
+**Files Created:**
+- `apps/serve_llm/src/detect_llms/{detect_llms,llm_detected_v1,llm_removed_v1}.erl`
+- `apps/serve_llm/src/chat_to_llm/{chat_to_llm,chat_to_llm_responder}.erl`
+- `apps/serve_llm/src/list_available_llms/{list_available_llms,list_available_llms_responder}.erl`
+- `apps/serve_llm/src/check_llm_health/{check_llm_health,check_llm_health_responder}.erl`
+- `apps/manage_capabilities/src/on_llm_detected_announce_capability/on_llm_detected_announce_capability.erl`
+- `apps/manage_capabilities/src/on_llm_removed_retract_capability/on_llm_removed_retract_capability.erl`
+
+**Files Deleted:**
+- `apps/hecate_mesh/src/hecate_mesh_publisher.erl` (horizontal dispatcher)
+- `apps/query_capabilities/src/llm_capability_*.erl` (LLM-specific projections)
+- `apps/serve_llm/test/{handle_llm_rpc_tests,llm_backend_tests}.erl` (obsolete)
+
+---
 
 *(Append entries when starting/ending sessions)*
 

@@ -56,7 +56,15 @@ init([]) ->
             permanent, 5000, worker, [capability_updated_v1_to_mesh]},
         {capability_retracted_v1_to_mesh,
             {capability_retracted_v1_to_mesh, start_link, []},
-            permanent, 5000, worker, [capability_retracted_v1_to_mesh]}
+            permanent, 5000, worker, [capability_retracted_v1_to_mesh]},
+
+        %% Process Managers: react to cross-domain events
+        {on_llm_detected_announce_capability,
+            {on_llm_detected_announce_capability, start_link, []},
+            permanent, 5000, worker, [on_llm_detected_announce_capability]},
+        {on_llm_removed_retract_capability,
+            {on_llm_removed_retract_capability, start_link, []},
+            permanent, 5000, worker, [on_llm_removed_retract_capability]}
     ],
 
     {ok, {SupFlags, Children}}.

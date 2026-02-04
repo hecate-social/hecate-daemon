@@ -47,31 +47,25 @@ init([]) ->
     },
 
     Children = [
-        %% Emitters: subscribe to domain events and publish to mesh
-        {llm_capability_announced_v1_to_mesh,
-            {llm_capability_announced_v1_to_mesh, start_link, []},
-            permanent, 5000, worker, [llm_capability_announced_v1_to_mesh]},
-        {llm_capability_retracted_v1_to_mesh,
-            {llm_capability_retracted_v1_to_mesh, start_link, []},
-            permanent, 5000, worker, [llm_capability_retracted_v1_to_mesh]},
-        {llm_status_updated_v1_to_mesh,
-            {llm_status_updated_v1_to_mesh, start_link, []},
-            permanent, 5000, worker, [llm_status_updated_v1_to_mesh]},
+        %% detect_llms: polls Ollama, emits llm_detected/removed events
+        {detect_llms,
+            {detect_llms, start_link, []},
+            permanent, 5000, worker, [detect_llms]},
 
-        %% Model poller: polls Ollama and dispatches announce/retract commands
-        {llm_model_poller,
-            {llm_model_poller, start_link, []},
-            permanent, 5000, worker, [llm_model_poller]},
+        %% chat_to_llm_responder: handles chat requests from mesh
+        {chat_to_llm_responder,
+            {chat_to_llm_responder, start_link, []},
+            permanent, 5000, worker, [chat_to_llm_responder]},
 
-        %% Status heartbeat: sends periodic status updates
-        {llm_status_heartbeat,
-            {llm_status_heartbeat, start_link, []},
-            permanent, 5000, worker, [llm_status_heartbeat]},
+        %% list_available_llms_responder: handles list requests from mesh
+        {list_available_llms_responder,
+            {list_available_llms_responder, start_link, []},
+            permanent, 5000, worker, [list_available_llms_responder]},
 
-        %% RPC listener: handles incoming mesh RPC requests
-        {llm_rpc_listener,
-            {llm_rpc_listener, start_link, []},
-            permanent, 5000, worker, [llm_rpc_listener]}
+        %% check_llm_health_responder: handles health requests from mesh
+        {check_llm_health_responder,
+            {check_llm_health_responder, start_link, []},
+            permanent, 5000, worker, [check_llm_health_responder]}
     ],
 
     logger:info("[serve_llm] Supervisor started with ~p children", [length(Children)]),
