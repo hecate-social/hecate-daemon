@@ -13,6 +13,7 @@
     get_mri/0,
     get_realm/0,
     get_public_key/0,
+    agent_id/0,
     sign/1,
     verify/2,
     is_initialized/0,
@@ -54,6 +55,13 @@ get_realm() ->
 -spec get_public_key() -> {ok, binary()} | not_initialized.
 get_public_key() ->
     gen_server:call(?SERVER, get_public_key).
+
+-spec agent_id() -> binary().
+agent_id() ->
+    case get_mri() of
+        {ok, MRI} -> MRI;
+        not_initialized -> <<"mri:agent:io.macula/hecate">>
+    end.
 
 -spec sign(Data :: binary()) -> {ok, binary()} | not_initialized.
 sign(Data) ->

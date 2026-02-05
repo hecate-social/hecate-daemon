@@ -13,6 +13,7 @@
     cowboy,
     hackney,
     esqlite,
+    qrcode,
     quicer,
     gproc,
     msgpack,
