@@ -1,27 +1,25 @@
 %%% @doc List Available LLMs
-%%% Lists models available from Ollama.
+%%% Aggregates models from all configured providers.
 -module(list_available_llms).
 
 -export([list/0]).
 
--define(OLLAMA_URL, "http://localhost:11434").
-
 -spec list() -> {ok, list()} | {error, term()}.
 list() ->
-    BaseUrl = get_ollama_url(),
-    Url = BaseUrl ++ "/api/tags",
-    case hackney:get(Url, [], <<>>, [with_body]) of
-        {ok, 200, _Headers, Body} ->
-            #{<<"models">> := Models} = json:decode(Body),
-            {ok, Models};
-        {ok, Status, _Headers, _Body} ->
-            {error, {http_status, Status}};
-        {error, Reason} ->
-            {error, Reason}
-    end.
-
-get_ollama_url() ->
-    case os:getenv("OLLAMA_HOST") of
-        false -> application:get_env(serve_llm, ollama_url, ?OLLAMA_URL);
-        Url -> Url
-    end.
+    Providers = manage_providers:list(),
+    AllModels = maps:fold(fun(Name, #{type := Type} = Config, Acc) ->
+        case maps:get(enabled, Config, true) of
+            true ->
+                Mod = llm_provider:provider_module(Type),
+                case Mod:list_models(Config) of
+                    {ok, Models} ->
+                        Tagged = [M#{provider => Name} || M <- Models],
+                        Acc ++ Tagged;
+                    {error, _} ->
+                        Acc
+                end;
+            false ->
+                Acc
+        end
+    end, [], Providers),
+    {ok, AllModels}.

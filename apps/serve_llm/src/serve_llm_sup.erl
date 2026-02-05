@@ -47,7 +47,12 @@ init([]) ->
     },
 
     Children = [
-        %% detect_llms: polls Ollama, emits llm_detected/removed events
+        %% manage_providers: provider registry (must start before detect_llms)
+        {manage_providers,
+            {manage_providers, start_link, []},
+            permanent, 5000, worker, [manage_providers]},
+
+        %% detect_llms: polls local providers, emits llm_detected/removed events
         {detect_llms,
             {detect_llms, start_link, []},
             permanent, 5000, worker, [detect_llms]},

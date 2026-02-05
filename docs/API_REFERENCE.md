@@ -15,6 +15,7 @@ Base URL: `http://localhost:4444`
 - [Social API](#social-api)
 - [Identity API](#identity-api)
 - [Pairing API](#pairing-api)
+- [LLM API](#llm-api)
 - [Health API](#health-api)
 - [Error Handling](#error-handling)
 
@@ -892,6 +893,179 @@ Check if pairing has been confirmed.
   "ok": false,
   "error": "session_expired",
   "message": "Pairing session expired. Please start a new session."
+}
+```
+
+---
+
+## LLM API
+
+### List Models
+
+List available LLM models from all configured providers.
+
+**Endpoint:** `GET /api/llm/models`
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "models": [
+    {
+      "name": "llama3.2:latest",
+      "family": "llama",
+      "parameter_size": "3B",
+      "context_length": 4096,
+      "provider": "ollama"
+    },
+    {
+      "name": "claude-sonnet-4-5-20250929",
+      "family": "claude",
+      "context_length": 200000,
+      "provider": "anthropic"
+    }
+  ]
+}
+```
+
+### Chat Completion
+
+Run chat completion against any configured provider. The model name determines which provider handles the request.
+
+**Endpoint:** `POST /api/llm/chat`
+
+**Request:**
+
+```json
+{
+  "model": "claude-sonnet-4-5-20250929",
+  "messages": [
+    {"role": "system", "content": "You are helpful."},
+    {"role": "user", "content": "Hello!"}
+  ],
+  "stream": false,
+  "max_tokens": 1024,
+  "temperature": 0.7
+}
+```
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "response": {
+    "content": "Hello! How can I help you today?",
+    "model": "claude-sonnet-4-5-20250929",
+    "done": true,
+    "eval_count": 15,
+    "prompt_eval_count": 8,
+    "message": {"role": "assistant", "content": "Hello! How can I help you today?"}
+  }
+}
+```
+
+**Streaming:** Set `"stream": true` for SSE responses. Each chunk is a `data:` line with JSON.
+
+**Response (404):**
+
+```json
+{
+  "ok": false,
+  "error": "Model not found in any provider"
+}
+```
+
+### LLM Health
+
+Check health of all configured providers.
+
+**Endpoint:** `GET /api/llm/health`
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "status": "healthy",
+  "providers": {
+    "ollama": "healthy",
+    "anthropic": "healthy"
+  }
+}
+```
+
+### List Providers
+
+List configured LLM providers.
+
+**Endpoint:** `GET /api/llm/providers`
+
+**Response (200):**
+
+```json
+{
+  "ok": true,
+  "providers": {
+    "ollama": {"type": "ollama", "enabled": true, "url": "http://localhost:11434"},
+    "anthropic": {"type": "anthropic", "enabled": true, "url": "https://api.anthropic.com"}
+  }
+}
+```
+
+### Add Provider
+
+Add a new LLM provider configuration.
+
+**Endpoint:** `POST /api/llm/providers/add`
+
+**Request:**
+
+```json
+{
+  "name": "anthropic",
+  "type": "anthropic",
+  "api_key": "sk-ant-api03-...",
+  "url": "https://api.anthropic.com"
+}
+```
+
+Supported types: `ollama`, `openai`, `anthropic`, `google`
+
+**Response (200):**
+
+```json
+{"ok": true}
+```
+
+**Response (400):**
+
+```json
+{
+  "ok": false,
+  "error": "type must be one of: ollama, openai, anthropic, google"
+}
+```
+
+### Remove Provider
+
+Remove a configured provider. The default Ollama provider cannot be removed.
+
+**Endpoint:** `POST /api/llm/providers/:name/remove`
+
+**Response (200):**
+
+```json
+{"ok": true}
+```
+
+**Response (400):**
+
+```json
+{
+  "ok": false,
+  "error": "Cannot remove default Ollama provider"
 }
 ```
 

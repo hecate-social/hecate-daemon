@@ -1,26 +1,33 @@
 %%% @doc Check LLM Health
-%%% Checks if Ollama backend is healthy.
+%%% Checks health of all configured providers.
 -module(check_llm_health).
 
--export([check/0]).
+-export([check/0, check_all/0]).
 
--define(OLLAMA_URL, "http://localhost:11434").
-
+%% @doc Check health of all providers. Returns ok if any provider is healthy.
 -spec check() -> ok | {error, term()}.
 check() ->
-    BaseUrl = get_ollama_url(),
-    Url = BaseUrl ++ "/api/tags",
-    case hackney:get(Url, [], <<>>, [with_body, {recv_timeout, 5000}]) of
-        {ok, 200, _Headers, _Body} ->
-            ok;
-        {ok, Status, _Headers, _Body} ->
-            {error, {http_status, Status}};
-        {error, Reason} ->
-            {error, Reason}
+    case check_all() of
+        #{} = Results ->
+            HasHealthy = maps:fold(fun(_Name, Status, Acc) ->
+                Acc orelse (Status =:= ok)
+            end, false, Results),
+            case HasHealthy of
+                true -> ok;
+                false -> {error, all_providers_unhealthy}
+            end
     end.
 
-get_ollama_url() ->
-    case os:getenv("OLLAMA_HOST") of
-        false -> application:get_env(serve_llm, ollama_url, ?OLLAMA_URL);
-        Url -> Url
-    end.
+%% @doc Check health of each provider, returns per-provider status map.
+-spec check_all() -> #{binary() => ok | {error, term()}}.
+check_all() ->
+    Providers = manage_providers:list(),
+    maps:fold(fun(Name, #{type := Type} = Config, Acc) ->
+        case maps:get(enabled, Config, true) of
+            true ->
+                Mod = llm_provider:provider_module(Type),
+                Acc#{Name => Mod:health(Config)};
+            false ->
+                Acc#{Name => {error, disabled}}
+        end
+    end, #{}, Providers).

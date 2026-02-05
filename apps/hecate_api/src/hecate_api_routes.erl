@@ -113,7 +113,10 @@ llm_routes() ->
     [
         {"/api/llm/models", hecate_api_llm, [models]},
         {"/api/llm/chat", hecate_api_llm, [chat]},
-        {"/api/llm/health", hecate_api_llm, [health]}
+        {"/api/llm/health", hecate_api_llm, [health]},
+        {"/api/llm/providers", hecate_api_llm, [providers]},
+        {"/api/llm/providers/add", hecate_api_llm, [add_provider]},
+        {"/api/llm/providers/:name/remove", hecate_api_llm, [remove_provider]}
     ].
 
 %% Connectors

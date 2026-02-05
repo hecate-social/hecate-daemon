@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700">
+  <defs>
+    <linearGradient id="meshGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4a1c6b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7b2d96;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="daemonGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="providerGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f3460;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:1" />
+    </linearGradient>
+    <marker id="arrowTeal" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1abc9c"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#3498db"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#f39c12"/>
+    </marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#9b59b6"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="700" fill="#0a0a0f"/>
+
+  <!-- Title -->
+  <text x="450" y="35" text-anchor="middle" fill="#e94560" font-family="monospace" font-size="20" font-weight="bold">Multi-Provider LLM Architecture</text>
+
+  <!-- TUI / API Layer -->
+  <rect x="50" y="55" width="800" height="55" rx="8" fill="url(#meshGrad)" stroke="#9b59b6" stroke-width="2"/>
+  <text x="450" y="80" text-anchor="middle" fill="#fff" font-family="monospace" font-size="14" font-weight="bold">TUI / REST API</text>
+  <text x="200" y="98" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">/api/llm/chat</text>
+  <text x="380" y="98" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">/api/llm/models</text>
+  <text x="560" y="98" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">/api/llm/providers</text>
+  <text x="730" y="98" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="10">/api/llm/health</text>
+
+  <!-- Arrow from API to daemon -->
+  <path d="M 450 110 L 450 140" stroke="#9b59b6" stroke-width="2" fill="none" marker-end="url(#arrowPurple)"/>
+
+  <!-- serve_llm domain box -->
+  <rect x="50" y="140" width="800" height="340" rx="8" fill="url(#daemonGrad)" stroke="#e94560" stroke-width="2"/>
+  <text x="450" y="165" text-anchor="middle" fill="#e94560" font-family="monospace" font-size="14" font-weight="bold">serve_llm</text>
+
+  <!-- Dispatch modules row -->
+  <rect x="80" y="180" width="160" height="50" rx="5" fill="#1e3a5f" stroke="#3498db" stroke-width="1"/>
+  <text x="160" y="200" text-anchor="middle" fill="#3498db" font-family="monospace" font-size="11">chat_to_llm</text>
+  <text x="160" y="218" text-anchor="middle" fill="#7fb3d5" font-family="monospace" font-size="9">dispatch via provider</text>
+
+  <rect x="260" y="180" width="180" height="50" rx="5" fill="#1e3a5f" stroke="#3498db" stroke-width="1"/>
+  <text x="350" y="200" text-anchor="middle" fill="#3498db" font-family="monospace" font-size="11">list_available_llms</text>
+  <text x="350" y="218" text-anchor="middle" fill="#7fb3d5" font-family="monospace" font-size="9">aggregate all providers</text>
+
+  <rect x="460" y="180" width="170" height="50" rx="5" fill="#1e3a5f" stroke="#3498db" stroke-width="1"/>
+  <text x="545" y="200" text-anchor="middle" fill="#3498db" font-family="monospace" font-size="11">check_llm_health</text>
+  <text x="545" y="218" text-anchor="middle" fill="#7fb3d5" font-family="monospace" font-size="9">per-provider status</text>
+
+  <rect x="650" y="180" width="170" height="50" rx="5" fill="#1e3a5f" stroke="#2ecc71" stroke-width="1"/>
+  <text x="735" y="200" text-anchor="middle" fill="#2ecc71" font-family="monospace" font-size="11">manage_providers</text>
+  <text x="735" y="218" text-anchor="middle" fill="#82e0aa" font-family="monospace" font-size="9">registry + cache</text>
+
+  <!-- Arrows to llm_provider behaviour -->
+  <path d="M 160 230 L 160 265" stroke="#3498db" stroke-width="1.5" fill="none" marker-end="url(#arrowBlue)"/>
+  <path d="M 350 230 L 350 265" stroke="#3498db" stroke-width="1.5" fill="none" marker-end="url(#arrowBlue)"/>
+  <path d="M 545 230 L 450 265" stroke="#3498db" stroke-width="1.5" fill="none" marker-end="url(#arrowBlue)"/>
+  <path d="M 735 230 L 550 265" stroke="#2ecc71" stroke-width="1.5" fill="none"/>
+
+  <!-- llm_provider behaviour box -->
+  <rect x="150" y="265" width="500" height="45" rx="5" fill="#0f3460" stroke="#1abc9c" stroke-width="2"/>
+  <text x="400" y="285" text-anchor="middle" fill="#1abc9c" font-family="monospace" font-size="13" font-weight="bold">llm_provider behaviour</text>
+  <text x="400" y="302" text-anchor="middle" fill="#76d7c4" font-family="monospace" font-size="9">list_models | chat | chat_stream | health</text>
+
+  <!-- Arrows from behaviour to providers -->
+  <path d="M 225 310 L 135 340" stroke="#1abc9c" stroke-width="1.5" fill="none" marker-end="url(#arrowTeal)"/>
+  <path d="M 325 310 L 325 340" stroke="#1abc9c" stroke-width="1.5" fill="none" marker-end="url(#arrowTeal)"/>
+  <path d="M 475 310 L 520 340" stroke="#1abc9c" stroke-width="1.5" fill="none" marker-end="url(#arrowTeal)"/>
+  <path d="M 575 310 L 710 340" stroke="#1abc9c" stroke-width="1.5" fill="none" marker-end="url(#arrowTeal)"/>
+
+  <!-- Provider implementations -->
+  <rect x="70" y="340" width="160" height="55" rx="5" fill="#1e3a5f" stroke="#f39c12" stroke-width="1.5"/>
+  <text x="150" y="363" text-anchor="middle" fill="#f39c12" font-family="monospace" font-size="11" font-weight="bold">ollama_provider</text>
+  <text x="150" y="383" text-anchor="middle" fill="#f9e79f" font-family="monospace" font-size="9">local, no auth</text>
+
+  <rect x="250" y="340" width="160" height="55" rx="5" fill="#1e3a5f" stroke="#2ecc71" stroke-width="1.5"/>
+  <text x="330" y="363" text-anchor="middle" fill="#2ecc71" font-family="monospace" font-size="11" font-weight="bold">openai_provider</text>
+  <text x="330" y="383" text-anchor="middle" fill="#82e0aa" font-family="monospace" font-size="9">OpenAI, Groq, Together</text>
+
+  <rect x="440" y="340" width="175" height="55" rx="5" fill="#1e3a5f" stroke="#e74c3c" stroke-width="1.5"/>
+  <text x="528" y="363" text-anchor="middle" fill="#e74c3c" font-family="monospace" font-size="11" font-weight="bold">anthropic_provider</text>
+  <text x="528" y="383" text-anchor="middle" fill="#f1948a" font-family="monospace" font-size="9">Claude models</text>
+
+  <rect x="635" y="340" width="175" height="55" rx="5" fill="#1e3a5f" stroke="#5dade2" stroke-width="1.5"/>
+  <text x="723" y="363" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="11" font-weight="bold">google_provider</text>
+  <text x="723" y="383" text-anchor="middle" fill="#85c1e9" font-family="monospace" font-size="9">Gemini models</text>
+
+  <!-- Persistence indicator -->
+  <rect x="660" y="405" width="160" height="35" rx="5" fill="#1a1a2e" stroke="#7f8c8d" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="740" y="427" text-anchor="middle" fill="#7f8c8d" font-family="monospace" font-size="9">data/providers.json</text>
+  <path d="M 740 395 L 740 405" stroke="#7f8c8d" stroke-width="1" stroke-dasharray="3,2" fill="none"/>
+
+  <!-- Detect LLMs box -->
+  <rect x="80" y="410" width="160" height="40" rx="5" fill="#1e3a5f" stroke="#f39c12" stroke-width="1"/>
+  <text x="160" y="435" text-anchor="middle" fill="#f39c12" font-family="monospace" font-size="10">detect_llms (poller)</text>
+  <path d="M 160 395 L 160 410" stroke="#f39c12" stroke-width="1" fill="none" marker-end="url(#arrowOrange)"/>
+
+  <!-- Arrows from providers to backends -->
+  <path d="M 150 395 L 150 510" stroke="#f39c12" stroke-width="2" fill="none" marker-end="url(#arrowOrange)"/>
+  <path d="M 330 395 L 330 510" stroke="#2ecc71" stroke-width="2" fill="none" marker-end="url(#arrowTeal)"/>
+  <path d="M 528 395 L 528 510" stroke="#e74c3c" stroke-width="2" fill="none" marker-end="url(#arrowTeal)"/>
+  <path d="M 723 395 L 723 510" stroke="#5dade2" stroke-width="2" fill="none" marker-end="url(#arrowBlue)"/>
+
+  <!-- Labels on arrows -->
+  <text x="160" y="470" text-anchor="middle" fill="#f39c12" font-family="monospace" font-size="8">HTTP</text>
+  <text x="340" y="470" text-anchor="middle" fill="#2ecc71" font-family="monospace" font-size="8">HTTPS</text>
+  <text x="538" y="470" text-anchor="middle" fill="#e74c3c" font-family="monospace" font-size="8">HTTPS</text>
+  <text x="733" y="470" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="8">HTTPS</text>
+
+  <!-- Backend boxes -->
+  <rect x="70" y="510" width="160" height="70" rx="8" fill="url(#providerGrad)" stroke="#f39c12" stroke-width="2"/>
+  <text x="150" y="537" text-anchor="middle" fill="#f39c12" font-family="monospace" font-size="13" font-weight="bold">Ollama</text>
+  <text x="150" y="555" text-anchor="middle" fill="#f9e79f" font-family="monospace" font-size="9">localhost:11434</text>
+  <text x="120" y="572" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="8">llama3.2</text>
+  <text x="180" y="572" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="8">qwen2.5</text>
+
+  <rect x="250" y="510" width="160" height="70" rx="8" fill="url(#providerGrad)" stroke="#2ecc71" stroke-width="2"/>
+  <text x="330" y="537" text-anchor="middle" fill="#2ecc71" font-family="monospace" font-size="13" font-weight="bold">OpenAI</text>
+  <text x="330" y="555" text-anchor="middle" fill="#82e0aa" font-family="monospace" font-size="9">api.openai.com</text>
+  <text x="310" y="572" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="8">gpt-4o</text>
+  <text x="360" y="572" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="8">o1</text>
+
+  <rect x="440" y="510" width="175" height="70" rx="8" fill="url(#providerGrad)" stroke="#e74c3c" stroke-width="2"/>
+  <text x="528" y="537" text-anchor="middle" fill="#e74c3c" font-family="monospace" font-size="13" font-weight="bold">Anthropic</text>
+  <text x="528" y="555" text-anchor="middle" fill="#f1948a" font-family="monospace" font-size="9">api.anthropic.com</text>
+  <text x="490" y="572" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="8">opus</text>
+  <text x="530" y="572" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="8">sonnet</text>
+  <text x="570" y="572" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="8">haiku</text>
+
+  <rect x="635" y="510" width="175" height="70" rx="8" fill="url(#providerGrad)" stroke="#5dade2" stroke-width="2"/>
+  <text x="723" y="537" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="13" font-weight="bold">Google</text>
+  <text x="723" y="555" text-anchor="middle" fill="#85c1e9" font-family="monospace" font-size="9">googleapis.com</text>
+  <text x="693" y="572" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="8">gemini-2</text>
+  <text x="753" y="572" text-anchor="middle" fill="#5dade2" font-family="monospace" font-size="8">gemini-1.5</text>
+
+  <!-- Legend -->
+  <rect x="50" y="610" width="800" height="70" rx="5" fill="#0f0f14" stroke="#333" stroke-width="1"/>
+  <text x="100" y="635" fill="#888" font-family="monospace" font-size="10">Legend:</text>
+  <rect x="170" y="625" width="12" height="12" fill="#f39c12" rx="2"/>
+  <text x="190" y="635" fill="#f39c12" font-family="monospace" font-size="10">Local (Ollama)</text>
+  <rect x="320" y="625" width="12" height="12" fill="#2ecc71" rx="2"/>
+  <text x="340" y="635" fill="#2ecc71" font-family="monospace" font-size="10">OpenAI-compatible</text>
+  <rect x="500" y="625" width="12" height="12" fill="#e74c3c" rx="2"/>
+  <text x="520" y="635" fill="#e74c3c" font-family="monospace" font-size="10">Anthropic</text>
+  <rect x="630" y="625" width="12" height="12" fill="#5dade2" rx="2"/>
+  <text x="650" y="635" fill="#5dade2" font-family="monospace" font-size="10">Google</text>
+
+  <text x="170" y="660" fill="#888" font-family="monospace" font-size="9">All providers implement llm_provider behaviour: list_models | chat | chat_stream | health</text>
+  <text x="170" y="673" fill="#888" font-family="monospace" font-size="9">manage_providers resolves model names to the correct provider module + config</text>
+</svg>

@@ -1,6 +1,8 @@
 %%% @doc Detect LLMs
-%%% Polls Ollama for available models on startup and periodically.
+%%% Polls local (Ollama) providers for available models on startup and periodically.
 %%% Emits llm_detected_v1 and llm_removed_v1 events.
+%%% API-based providers (OpenAI, Anthropic, Google) are not polled — their
+%%% models are listed on demand via list_models/1.
 -module(detect_llms).
 -behaviour(gen_server).
 
@@ -11,13 +13,11 @@
 -dialyzer({nowarn_function, [store_event/2]}).
 
 -define(DEFAULT_POLL_INTERVAL_MS, 300000). %% 5 minutes
--define(OLLAMA_URL, "http://localhost:11434").
 
 -record(state, {
     known_models :: #{binary() => map()},
     timer_ref :: reference() | undefined,
-    poll_interval :: non_neg_integer(),
-    ollama_url :: string()
+    poll_interval :: non_neg_integer()
 }).
 
 start_link() ->
@@ -28,13 +28,11 @@ poll_now() ->
 
 init([]) ->
     PollInterval = application:get_env(serve_llm, poll_interval_ms, ?DEFAULT_POLL_INTERVAL_MS),
-    OllamaUrl = application:get_env(serve_llm, ollama_url, ?OLLAMA_URL),
     self() ! poll,
     {ok, #state{
         known_models = #{},
         timer_ref = undefined,
-        poll_interval = PollInterval,
-        ollama_url = OllamaUrl
+        poll_interval = PollInterval
     }}.
 
 handle_call(_Request, _From, State) ->
@@ -59,8 +57,8 @@ terminate(_Reason, #state{timer_ref = TimerRef}) ->
 
 %% Internal
 
-do_poll(#state{known_models = KnownModels, ollama_url = Url} = State) ->
-    case fetch_models(Url) of
+do_poll(#state{known_models = KnownModels} = State) ->
+    case poll_local_providers() of
         {ok, CurrentModels} ->
             CurrentMap = models_to_map(CurrentModels),
             NewModels = maps:without(maps:keys(KnownModels), CurrentMap),
@@ -79,26 +77,32 @@ do_poll(#state{known_models = KnownModels, ollama_url = Url} = State) ->
             State
     end.
 
-fetch_models(BaseUrl) ->
-    Url = BaseUrl ++ "/api/tags",
-    case hackney:get(Url, [], <<>>, [with_body]) of
-        {ok, 200, _Headers, Body} ->
-            #{<<"models">> := Models} = json:decode(Body),
-            {ok, Models};
-        {ok, Status, _Headers, _Body} ->
-            {error, {http_status, Status}};
-        {error, Reason} ->
-            {error, Reason}
-    end.
+%% @doc Only poll providers with type=ollama (local inference).
+poll_local_providers() ->
+    Providers = manage_providers:list(),
+    LocalModels = maps:fold(fun(_Name, #{type := ollama} = Config, Acc) ->
+        case maps:get(enabled, Config, true) of
+            true ->
+                case ollama_provider:list_models(Config) of
+                    {ok, Models} -> Acc ++ Models;
+                    {error, _} -> Acc
+                end;
+            false ->
+                Acc
+        end;
+    (_Name, _Config, Acc) ->
+        Acc
+    end, [], Providers),
+    {ok, LocalModels}.
 
 models_to_map(Models) ->
     lists:foldl(fun(Model, Acc) ->
-        Name = maps:get(<<"name">>, Model, <<"unknown">>),
+        Name = maps:get(name, Model, maps:get(<<"name">>, Model, <<"unknown">>)),
         Acc#{Name => Model}
     end, #{}, Models).
 
-emit_detected(ModelName, OllamaInfo) ->
-    {ok, Event} = llm_detected_v1:new(ModelName, build_model_info(ModelName, OllamaInfo)),
+emit_detected(ModelName, ModelInfo) ->
+    {ok, Event} = llm_detected_v1:new(ModelName, build_model_info(ModelName, ModelInfo)),
     store_event(<<"llm_detected_v1">>, llm_detected_v1:to_map(Event)).
 
 emit_removed(ModelName) ->
@@ -108,13 +112,12 @@ emit_removed(ModelName) ->
 store_event(EventType, EventData) ->
     reckon_evoq_adapter:append(serve_llm_store, <<"llms">>, EventType, EventData, #{}).
 
-build_model_info(ModelName, OllamaInfo) ->
-    Details = maps:get(<<"details">>, OllamaInfo, #{}),
+build_model_info(ModelName, ModelInfo) ->
     #{
         name => ModelName,
-        context_length => maps:get(<<"context_length">>, Details, 4096),
-        quantization => maps:get(<<"quantization_level">>, Details, <<"unknown">>),
-        parameter_count => maps:get(<<"parameter_size">>, Details, <<"unknown">>),
-        family => maps:get(<<"family">>, Details, <<"unknown">>),
-        size_bytes => maps:get(<<"size">>, OllamaInfo, 0)
+        context_length => maps:get(context_length, ModelInfo, 4096),
+        quantization => maps:get(quantization, ModelInfo, <<"unknown">>),
+        parameter_count => maps:get(parameter_size, ModelInfo, <<"unknown">>),
+        family => maps:get(family, ModelInfo, <<"unknown">>),
+        size_bytes => maps:get(size_bytes, ModelInfo, 0)
     }.
