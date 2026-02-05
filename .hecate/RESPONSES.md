@@ -1350,6 +1350,62 @@ Central dispatchers are **horizontal thinking**. Each domain/slice should:
 
 ---
 
+## 2026-02-05 COMPLETE [daemon]: Connector Architecture — Phases 1-3
+
+### Summary
+
+Implemented the full connector architecture from the plan "Hecate Connector Architecture — Daemon as Local Mesh Sidecar". The daemon now supports Unix domain sockets for local service connections.
+
+### Architecture
+
+```
+Developer's Machine
+┌──────────────────────────────────────────────────────┐
+│  hecate-tui ────── tui.sock ──────┐                 │
+│  CI pipeline ───── ci.sock ───────┤  hecate-daemon  │
+│  editor plugin ─── editor.sock ───┤  (mesh bridge)  │════► mesh
+│  custom tool ───── tool.sock ─────┘                 │
+└──────────────────────────────────────────────────────┘
+```
+
+Socket path: `~/.config/hecate/connectors/{name}.sock`
+
+### What Was Built
+
+**Phase 1: Route Extraction + manage_connectors Domain**
+- `hecate_api_routes.erl` — single source of truth for all Cowboy routes
+- `apps/manage_connectors/` — full Cartwheel domain with 4 spokes
+- `connector_aggregate.erl` — bit flag status (REGISTERED=1, ACTIVE=2, SUSPENDED=4, REVOKED=8)
+- ReckonDB store for connector events
+
+**Phase 2: Socket Listener Process Manager**
+- `on_connector_registered_start_listener.erl` — subscribes to connector events, manages Cowboy listeners on Unix sockets
+- Uses Ranch's native `{ifaddr, {local, SocketPath}}` — no custom transport
+- `connector_scope_middleware.erl` — per-connector route filtering (403 for disallowed paths)
+
+**Phase 3: Connector API + Default TUI**
+- `hecate_api_connectors.erl` — REST handler for connector CRUD
+- Auto-register "tui" connector on first boot (scope: `all`)
+- TCP listener now opt-in via `{tcp_listener, true}` config
+- Stale socket cleanup on daemon startup
+
+### Key Design Decisions
+
+1. **All connectors share same compiled dispatch table** — scoping via middleware, not separate route compilation
+2. **TCP remains enabled during transition** — backward compat while TUI migrates
+3. **Socket permissions 0600** — only owner can connect
+4. **Process manager handles lifecycle** — register→start, revoke→stop+delete, suspend→stop, activate→restart
+
+### Verification
+
+- `rebar3 compile` ✅ (all 18 apps clean)
+
+### Related
+
+Companion changes in [tui] — Phase 4 (Unix socket transport) and Phase 5 (config consolidation).
+
+---
+
 ## 2026-02-04 COMPLETE [daemon]: All 8 Phase 2 Follow-Up Tasks
 
 ### Summary

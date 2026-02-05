@@ -11,23 +11,46 @@
 -dialyzer({nowarn_function, [init/1, terminate/2]}).
 
 -record(state, {
-    subscription_id :: binary() | undefined,
+    subscription_ids :: [binary()],
     event_count :: non_neg_integer(),
     error_count :: non_neg_integer()
 }).
+
+-define(EVENT_TYPES, [
+    <<"learning_submitted_v1">>,
+    <<"learning_validated_v1">>,
+    <<"learning_rejected_v1">>,
+    <<"learning_endorsed_v1">>,
+    <<"learning_disputed_v1">>,
+    <<"learning_dispute_resolved_v1">>,
+    <<"mentor_subscribed_v1">>,
+    <<"mentor_unsubscribed_v1">>,
+    <<"expertise_declared_v1">>,
+    <<"expertise_withdrawn_v1">>
+]).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    {ok, SubId} = reckon_evoq_adapter:subscribe(
-        mentor_agents_store,
-        all,
-        <<"*">>,
-        <<"query_mentors_subscriber">>,
-        #{start_from => 0, subscriber_pid => self()}
-    ),
-    {ok, #state{subscription_id = SubId, event_count = 0, error_count = 0}}.
+    SubIds = lists:filtermap(fun(EventType) ->
+        case reckon_evoq_adapter:subscribe(
+            mentor_agents_store,
+            event_type,
+            EventType,
+            <<"query_mentors_subscriber_", EventType/binary>>,
+            #{start_from => 0, subscriber_pid => self()}
+        ) of
+            {ok, SubId} ->
+                io:format("[query_mentors_subscriber] Subscribed to ~s~n", [EventType]),
+                {true, SubId};
+            {error, Reason} ->
+                logger:warning("Failed to subscribe to ~s: ~p", [EventType, Reason]),
+                false
+        end
+    end, ?EVENT_TYPES),
+    io:format("~n[query_mentors_subscriber] Subscribed to mentor events~n"),
+    {ok, #state{subscription_ids = SubIds, event_count = 0, error_count = 0}}.
 
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.
@@ -41,11 +64,10 @@ handle_info({event, #evoq_event{data = EventData} = _Event}, State) ->
 handle_info(_Info, State) ->
     {noreply, State}.
 
-terminate(_Reason, #state{subscription_id = SubId}) ->
-    case SubId of
-        undefined -> ok;
-        _ -> reckon_evoq_adapter:unsubscribe(mentor_agents_store, SubId)
-    end.
+terminate(_Reason, #state{subscription_ids = SubIds}) ->
+    lists:foreach(fun(SubId) ->
+        reckon_evoq_adapter:unsubscribe(mentor_agents_store, SubId)
+    end, SubIds).
 
 %% Internal
 

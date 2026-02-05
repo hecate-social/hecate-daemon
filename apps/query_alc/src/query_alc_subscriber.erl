@@ -11,23 +11,57 @@
 -dialyzer({nowarn_function, [init/1, terminate/2]}).
 
 -record(state, {
-    subscription_id :: binary() | undefined,
+    subscription_ids :: [binary()],
     event_count :: non_neg_integer(),
     error_count :: non_neg_integer()
 }).
+
+-define(EVENT_TYPES, [
+    <<"project_initiated_v1">>,
+    <<"discovery_started_v1">>,
+    <<"finding_recorded_v1">>,
+    <<"term_defined_v1">>,
+    <<"discovery_completed_v1">>,
+    <<"phase_transitioned_v1">>,
+    <<"architecture_started_v1">>,
+    <<"dossier_defined_v1">>,
+    <<"spoke_inventoried_v1">>,
+    <<"plan_drafted_v1">>,
+    <<"plan_approved_v1">>,
+    <<"architecture_completed_v1">>,
+    <<"testing_started_v1">>,
+    <<"skeleton_created_v1">>,
+    <<"spoke_implemented_v1">>,
+    <<"build_verified_v1">>,
+    <<"testing_completed_v1">>,
+    <<"deployment_started_v1">>,
+    <<"deployment_recorded_v1">>,
+    <<"incident_reported_v1">>,
+    <<"incident_resolved_v1">>,
+    <<"deployment_completed_v1">>
+]).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    {ok, SubId} = reckon_evoq_adapter:subscribe(
-        manage_alc_store,
-        all,
-        <<"*">>,
-        <<"query_alc_subscriber">>,
-        #{start_from => 0, subscriber_pid => self()}
-    ),
-    {ok, #state{subscription_id = SubId, event_count = 0, error_count = 0}}.
+    SubIds = lists:filtermap(fun(EventType) ->
+        case reckon_evoq_adapter:subscribe(
+            manage_alc_store,
+            event_type,
+            EventType,
+            <<"query_alc_subscriber_", EventType/binary>>,
+            #{start_from => 0, subscriber_pid => self()}
+        ) of
+            {ok, SubId} ->
+                {true, SubId};
+            {error, Reason} ->
+                logger:warning("Failed to subscribe to ~s: ~p", [EventType, Reason]),
+                false
+        end
+    end, ?EVENT_TYPES),
+    io:format("~n[query_alc_subscriber] Subscribed to ALC events (~p types)~n", [length(SubIds)]),
+    {ok, #state{subscription_ids = SubIds, event_count = 0, error_count = 0}}.
 
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.
@@ -41,11 +75,10 @@ handle_info({event, #evoq_event{data = EventData} = _Event}, State) ->
 handle_info(_Info, State) ->
     {noreply, State}.
 
-terminate(_Reason, #state{subscription_id = SubId}) ->
-    case SubId of
-        undefined -> ok;
-        _ -> reckon_evoq_adapter:unsubscribe(manage_alc_store, SubId)
-    end.
+terminate(_Reason, #state{subscription_ids = SubIds}) ->
+    lists:foreach(fun(SubId) ->
+        reckon_evoq_adapter:unsubscribe(manage_alc_store, SubId)
+    end, SubIds).
 
 %% Internal
 

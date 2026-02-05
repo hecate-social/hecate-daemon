@@ -6,13 +6,59 @@
 
 ## Current Task
 
-**COMPLETE: All 8 Next Steps from Phase 2 Follow-Up**
+**COMPLETE: Connector Architecture — manage_connectors Domain + Socket Listeners**
 
 ## Last Active
 
-**2026-02-04** — Completed all 8 tasks: Rich Metadata, LLM Heartbeat, Latency Measurement, Test Coverage, RPC Wiring, Mesh Facade, UCAN Validation, Bootstrap Documentation
+**2026-02-05** — Implemented full connector architecture (Phases 1-3): manage_connectors domain, socket listener process manager, connector API, default TUI connector auto-registration
 
 ## Session Log
+
+### 2026-02-05 Session (Connector Architecture — Phases 1-3)
+
+**Status:** Complete
+
+**Completed:**
+- **Phase 1: Route Extraction + manage_connectors Domain**
+  - Extracted 60+ route dispatch table from `hecate_api_app.erl` into `hecate_api_routes.erl`
+  - Created full `apps/manage_connectors/` domain with 4 spokes:
+    - `register_connector/` — command, event, handler (computes socket path)
+    - `revoke_connector/` — command, event, handler
+    - `activate_connector/` — command, event, handler
+    - `suspend_connector/` — command, event, handler
+  - `connector_aggregate.erl` with bit flags (REGISTERED=1, ACTIVE=2, SUSPENDED=4, REVOKED=8)
+  - `manage_connectors_sup.erl` — ReckonDB store init + stale socket cleanup on startup
+
+- **Phase 2: Socket Listener Process Manager**
+  - `on_connector_registered_start_listener.erl` — gen_server subscribing to connector events
+  - Starts Cowboy listeners on Unix sockets via `{ifaddr, {local, SocketPath}}`
+  - Handles all 4 event types (register→start, revoke→stop+delete, suspend→stop, activate→restart)
+  - Socket permissions set to 0600
+  - `connector_scope_middleware.erl` — Cowboy middleware for route prefix checking
+
+- **Phase 3: Connector API + Default TUI Connector**
+  - `hecate_api_connectors.erl` — REST handler for connector management endpoints
+  - Routes: POST /connectors/register, GET /connectors, GET /connectors/:id, POST /connectors/:id/revoke
+  - Auto-register default "tui" connector on daemon startup
+  - TCP listener now opt-in via config `{tcp_listener, true}`
+  - Updated sys.config with manage_connectors section
+  - Updated root rebar.config with manage_connectors in release
+
+**Verification:**
+- `rebar3 compile` ✅ (all 18 apps)
+
+**Files Created:**
+- `apps/hecate_api/src/hecate_api_routes.erl`
+- `apps/hecate_api/src/hecate_api_connectors.erl`
+- `apps/manage_connectors/` — entire directory (17 files)
+
+**Files Modified:**
+- `apps/hecate_api/src/hecate_api_app.erl` — uses routes module, TCP opt-in, auto-register
+- `apps/hecate_api/rebar.config` — depends on manage_connectors
+- `config/sys.config` — manage_connectors config
+- `rebar.config` — manage_connectors in release
+
+---
 
 ### 2026-02-04 Session (8 Next Steps)
 
