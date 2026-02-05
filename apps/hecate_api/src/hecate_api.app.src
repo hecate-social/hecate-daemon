@@ -22,7 +22,9 @@
         manage_identities,
         query_identities,
         manage_ucan,
-        query_ucan
+        query_ucan,
+        mentor_agents,
+        query_mentors
     ]},
     {env, [
         {http_port, 4444},

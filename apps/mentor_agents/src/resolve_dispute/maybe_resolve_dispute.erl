@@ -1,0 +1,49 @@
+%%% @doc maybe_resolve_dispute handler
+%%% Business logic for resolving disputes.
+-module(maybe_resolve_dispute).
+
+-include_lib("evoq/include/evoq.hrl").
+
+-export([handle/1, dispatch/1]).
+
+-dialyzer({nowarn_function, [dispatch/1]}).
+
+-spec handle(resolve_dispute_v1:resolve_dispute_v1()) ->
+    {ok, [dispute_resolved_v1:dispute_resolved_v1()]} | {error, term()}.
+handle(Cmd) ->
+    LearningId = resolve_dispute_v1:get_learning_id(Cmd),
+    ResolverId = resolve_dispute_v1:get_resolver_id(Cmd),
+    Resolution = resolve_dispute_v1:get_resolution(Cmd),
+    Event = dispute_resolved_v1:new(LearningId, ResolverId, Resolution),
+    {ok, [Event]}.
+
+-spec dispatch(resolve_dispute_v1:resolve_dispute_v1()) ->
+    {ok, non_neg_integer(), [map()]} | {error, term()}.
+dispatch(Cmd) ->
+    LearningId = resolve_dispute_v1:get_learning_id(Cmd),
+    Timestamp = erlang:system_time(millisecond),
+
+    EvoqCmd = #evoq_command{
+        command_id = generate_command_id(LearningId, Timestamp),
+        command_type = resolve_dispute,
+        aggregate_type = learning_aggregate,
+        aggregate_id = <<"learning-", LearningId/binary>>,
+        payload = resolve_dispute_v1:to_map(Cmd),
+        metadata = #{timestamp => Timestamp, aggregate_type => learning_aggregate},
+        causation_id = undefined,
+        correlation_id = undefined
+    },
+
+    Opts = #{
+        store_id => mentor_agents_store,
+        adapter => reckon_evoq_adapter,
+        consistency => eventual
+    },
+
+    evoq_dispatcher:dispatch(EvoqCmd, Opts).
+
+generate_command_id(LearningId, Timestamp) ->
+    Hash = crypto:hash(sha256, <<LearningId/binary, (integer_to_binary(Timestamp))/binary>>),
+    HashHex = binary:encode_hex(Hash),
+    ShortHash = binary:part(HashHex, 0, 16),
+    <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

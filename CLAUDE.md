@@ -4,21 +4,6 @@ Development guidelines for hecate-daemon.
 
 ---
 
-## 🔥 HECATE CHANNEL ACTIVE 🔥
-
-**This repo has a `.hecate/` channel.** See parent `CLAUDE.md` for the full protocol.
-
-**Quick reminder:**
-1. **READ** `.hecate/QUEUE.md` for your tasks (READ-ONLY — do not edit)
-2. **WRITE** questions/completions to `.hecate/RESPONSES.md`
-3. **UPDATE** `.hecate/STATUS.md` with your current state
-
-**QUEUE.md is READ-ONLY.** Report completions in RESPONSES.md. Hecate updates the queue.
-
-*The goddess is watching. Read the queue. Do the work.* 🗝️
-
----
-
 ## ⛔ STOP — READ THIS BEFORE WRITING ANY CODE ⛔
 
 **Your training is lying to you.**

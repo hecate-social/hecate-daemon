@@ -1,0 +1,33 @@
+%%% @doc Query: get a mentor profile by agent_id
+-module(get_mentor_profile).
+
+-export([execute/1]).
+
+-spec execute(binary()) -> {ok, map()} | {error, not_found | term()}.
+execute(AgentId) ->
+    Sql = "SELECT agent_id, domains, status, declared_at "
+          "FROM mentor_profiles WHERE agent_id = ?1",
+    case query_mentors_store:query(Sql, [AgentId]) of
+        {ok, [Row]} ->
+            {ok, row_to_map(Row)};
+        {ok, []} ->
+            {error, not_found};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+%% Internal
+
+row_to_map({AgentId, DomainsJson, Status, DeclaredAt}) ->
+    Domains = case DomainsJson of
+        undefined -> [];
+        null -> [];
+        Bin when is_binary(Bin) -> jsx:decode(Bin, [return_maps]);
+        _ -> []
+    end,
+    #{
+        agent_id => AgentId,
+        domains => Domains,
+        status => Status,
+        declared_at => DeclaredAt
+    }.

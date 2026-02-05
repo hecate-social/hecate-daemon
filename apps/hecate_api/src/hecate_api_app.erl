@@ -3,86 +3,64 @@
 
 -export([start/2, stop/1]).
 
+-dialyzer({nowarn_function, [start/2, auto_register_default_connector/0]}).
+
 start(_StartType, _StartArgs) ->
     %% Get HTTP configuration
     Port = application:get_env(hecate_api, http_port, 4444),
+    TcpEnabled = application:get_env(manage_connectors, tcp_listener, true),
 
-    %% Define Cowboy routes
-    Dispatch = cowboy_router:compile([
-        {'_', [
-            %% Health check
-            {"/health", hecate_api_health, []},
+    %% Compile shared routes
+    Dispatch = hecate_api_routes:compile(),
 
-            %% Identity
-            {"/identity", hecate_api_identity, []},
-            {"/identity/init", hecate_api_identity, [do_init]},
+    %% Start TCP listener (opt-in, enabled by default during transition)
+    case TcpEnabled of
+        true ->
+            {ok, _} = cowboy:start_clear(hecate_http_listener,
+                [{port, Port}],
+                #{env => #{dispatch => Dispatch}}
+            ),
+            logger:info("Hecate API listening on http://127.0.0.1:~p", [Port]);
+        false ->
+            logger:info("Hecate TCP listener disabled (Unix sockets only)")
+    end,
 
-            %% Pairing
-            {"/api/pairing/start", hecate_api_pairing, [start]},
-            {"/api/pairing/status", hecate_api_pairing, [status]},
-            {"/api/pairing/cancel", hecate_api_pairing, [cancel]},
+    Result = hecate_api_sup:start_link(),
 
-            %% Capabilities
-            {"/capabilities/announce", hecate_api_capabilities, [announce]},
-            {"/capabilities/discover", hecate_api_capabilities, [discover]},
-            {"/capabilities/:mri", hecate_api_capabilities, [get]},
-            {"/capabilities/:mri/update", hecate_api_capabilities, [update]},
-            {"/capabilities/:mri/retract", hecate_api_capabilities, [retract]},
+    %% Auto-register default TUI connector after sup is up
+    auto_register_default_connector(),
 
-            %% Reputation
-            {"/reputation/:agent_identity", hecate_api_reputation, [get]},
-            {"/rpc-calls", hecate_api_reputation, [list_calls]},
-            {"/disputes", hecate_api_reputation, [list_disputes]},
-
-            %% RPC (tracking for reputation)
-            {"/rpc/track", hecate_api_rpc, [track]},
-
-            %% Social
-            {"/social/follow", hecate_api_social, [follow]},
-            {"/social/unfollow", hecate_api_social, [unfollow]},
-            {"/social/endorse", hecate_api_social, [endorse]},
-            {"/social/endorsement/revoke", hecate_api_social, [revoke_endorsement]},
-            {"/social/followers/:agent_identity", hecate_api_social, [get_followers]},
-            {"/social/following/:agent_identity", hecate_api_social, [get_following]},
-            {"/social/endorsements/:agent_identity", hecate_api_social, [get_endorsements]},
-            {"/social/graph/:agent_identity", hecate_api_social, [get_social_graph]},
-
-            %% Subscriptions
-            {"/subscriptions", hecate_api_subscriptions, [list]},
-            {"/subscriptions/subscribe", hecate_api_subscriptions, [subscribe]},
-            {"/subscriptions/unsubscribe", hecate_api_subscriptions, [unsubscribe]},
-            {"/subscriptions/stats", hecate_api_subscriptions, [stats]},
-
-            %% Identities
-            {"/agents", hecate_api_identities, [list]},
-            {"/agents/register", hecate_api_identities, [register]},
-            {"/agents/:agent_identity", hecate_api_identities, [get]},
-            {"/agents/:agent_identity/update", hecate_api_identities, [update]},
-
-            %% UCAN
-            {"/ucan/grant", hecate_api_ucan, [grant]},
-            {"/ucan/revoke/:capability_id", hecate_api_ucan, [revoke]},
-            {"/ucan/capabilities", hecate_api_ucan, [list]},
-            {"/ucan/verify/:capability_id", hecate_api_ucan, [verify]},
-            {"/ucan/verify", hecate_api_ucan, [verify_action]},
-
-            %% LLM
-            {"/api/llm/models", hecate_api_llm, [models]},
-            {"/api/llm/chat", hecate_api_llm, [chat]},
-            {"/api/llm/health", hecate_api_llm, [health]}
-        ]}
-    ]),
-
-    %% Start Cowboy HTTP listener
-    {ok, _} = cowboy:start_clear(hecate_http_listener,
-        [{port, Port}],
-        #{env => #{dispatch => Dispatch}}
-    ),
-
-    io:format("~n🗝️  Hecate API listening on http://127.0.0.1:~p~n~n", [Port]),
-
-    hecate_api_sup:start_link().
+    Result.
 
 stop(_State) ->
-    ok = cowboy:stop_listener(hecate_http_listener),
+    cowboy:stop_listener(hecate_http_listener),
     ok.
+
+%% @private Auto-register the default TUI connector on first boot.
+%% Dispatches a register_connector command if configured.
+auto_register_default_connector() ->
+    case application:get_env(manage_connectors, default_connector) of
+        {ok, #{id := ConnId, name := Name, allowed_routes := AllowedRoutes}} ->
+            CmdParams = #{
+                connector_id => ConnId,
+                name => Name,
+                allowed_routes => AllowedRoutes,
+                metadata => #{auto_registered => true}
+            },
+            case register_connector_v1:new(CmdParams) of
+                {ok, Cmd} ->
+                    case maybe_register_connector:dispatch(Cmd) of
+                        {ok, _Version, _Events} ->
+                            logger:info("Auto-registered default connector: ~s", [ConnId]);
+                        {error, connector_already_registered} ->
+                            logger:info("Default connector ~s already registered", [ConnId]);
+                        {error, Reason} ->
+                            logger:warning("Failed to auto-register connector ~s: ~p",
+                                           [ConnId, Reason])
+                    end;
+                {error, Reason} ->
+                    logger:warning("Invalid default connector config: ~p", [Reason])
+            end;
+        _ ->
+            ok
+    end.
