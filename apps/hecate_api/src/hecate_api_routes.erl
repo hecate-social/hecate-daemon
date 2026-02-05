@@ -64,7 +64,8 @@ reputation_routes() ->
         {"/reputation/:agent_identity", hecate_api_reputation, [get]},
         {"/rpc-calls", hecate_api_reputation, [list_calls]},
         {"/disputes", hecate_api_reputation, [list_disputes]},
-        {"/rpc/track", hecate_api_rpc, [track]}
+        {"/rpc/track", hecate_api_rpc, [track]},
+        {"/api/rpc/call", hecate_api_rpc, [call]}
     ].
 
 %% Social

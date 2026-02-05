@@ -137,14 +137,41 @@ handle_streaming_chat(Req0, Model, Messages, Params) ->
     end.
 
 stream_chunks(Req, Ref) ->
+    stream_chunks(Req, Ref, #{}).
+
+stream_chunks(Req, Ref, State) ->
     receive
         {llm_chunk, Ref, Chunk} ->
             Content = maps:get(content, Chunk, maps:get(<<"content">>, Chunk, <<>>)),
             Done = maps:get(done, Chunk, maps:get(<<"done">>, Chunk, false)),
+            StopReason = maps:get(stop_reason, Chunk, maps:get(<<"stop_reason">>, Chunk, undefined)),
             Event = #{content => Content, done => Done},
+
+            %% Handle tool calls in chunk (OpenAI streaming format)
+            Event1 = case maps:get(tool_calls, Chunk, undefined) of
+                undefined -> Event;
+                ToolCalls when is_list(ToolCalls) ->
+                    %% Full tool calls (non-streaming or final)
+                    Message = #{
+                        role => <<"assistant">>,
+                        content => Content,
+                        tool_calls => [format_tool_call(TC) || TC <- ToolCalls]
+                    },
+                    Event#{message => Message}
+            end,
+
+            %% Add stop_reason if tool_use
+            Event2 = case StopReason of
+                <<"tool_use">> -> Event1#{stop_reason => <<"tool_use">>};
+                <<"end_turn">> -> Event1#{stop_reason => <<"end_turn">>};
+                undefined -> Event1;
+                null -> Event1;
+                _ -> Event1#{stop_reason => StopReason}
+            end,
+
             EventWithUsage = case Done of
                 true ->
-                    Event#{
+                    Event2#{
                         model => maps:get(model, Chunk, maps:get(<<"model">>, Chunk, <<>>)),
                         usage => #{
                             prompt_tokens => maps:get(prompt_eval_count, Chunk, maps:get(<<"prompt_eval_count">>, Chunk, 0)),
@@ -152,11 +179,55 @@ stream_chunks(Req, Ref) ->
                         }
                     };
                 false ->
-                    Event
+                    Event2
             end,
             Data = json:encode(EventWithUsage),
             cowboy_req:stream_body(<<"data: ", Data/binary, "\n\n">>, nofin, Req),
-            stream_chunks(Req, Ref);
+            stream_chunks(Req, Ref, State);
+
+        %% Tool use start (Anthropic streaming)
+        {llm_tool_use_start, Ref, ToolInfo} ->
+            %% Start accumulating tool input
+            Id = maps:get(id, ToolInfo, <<>>),
+            Name = maps:get(name, ToolInfo, <<>>),
+            NewState = State#{current_tool => #{id => Id, name => Name, input => <<>>}},
+            stream_chunks(Req, Ref, NewState);
+
+        %% Tool input delta (Anthropic streaming)
+        {llm_tool_input_delta, Ref, PartialJson} ->
+            %% Accumulate JSON input
+            CurrentTool = maps:get(current_tool, State, #{input => <<>>}),
+            CurrentInput = maps:get(input, CurrentTool, <<>>),
+            NewInput = <<CurrentInput/binary, PartialJson/binary>>,
+            NewTool = CurrentTool#{input => NewInput},
+            NewState = State#{current_tool => NewTool},
+            stream_chunks(Req, Ref, NewState);
+
+        %% Content block stop (Anthropic streaming)
+        {llm_content_block_stop, Ref} ->
+            %% If we have a current tool, emit it as a complete tool_use
+            case maps:get(current_tool, State, undefined) of
+                undefined ->
+                    stream_chunks(Req, Ref, State);
+                Tool ->
+                    %% Get the accumulated input JSON
+                    InputJson = maps:get(input, Tool, <<"{}">>),
+                    ToolUse = #{
+                        id => maps:get(id, Tool, <<>>),
+                        name => maps:get(name, Tool, <<>>),
+                        arguments => InputJson
+                    },
+                    Event = #{
+                        done => false,
+                        content => <<>>,
+                        tool_use => ToolUse
+                    },
+                    Data = json:encode(Event),
+                    cowboy_req:stream_body(<<"data: ", Data/binary, "\n\n">>, nofin, Req),
+                    NewState = maps:remove(current_tool, State),
+                    stream_chunks(Req, Ref, NewState)
+            end;
+
         {llm_done, Ref} ->
             cowboy_req:stream_body(<<"data: [DONE]\n\n">>, fin, Req),
             {ok, Req, []};
@@ -169,6 +240,16 @@ stream_chunks(Req, Ref) ->
         cowboy_req:stream_body(<<"data: ", ErrorData/binary, "\n\n">>, fin, Req),
         {ok, Req, []}
     end.
+
+%% Format a tool call for JSON output
+format_tool_call(#{id := Id, name := Name, arguments := Args}) ->
+    #{
+        id => Id,
+        name => Name,
+        arguments => Args
+    };
+format_tool_call(TC) ->
+    TC.
 
 handle_health(Req0) ->
     ProviderHealth = check_llm_health:check_all(),
@@ -301,9 +382,15 @@ build_chat_opts(Model, Params) ->
         undefined -> Opts;
         Temp -> Opts#{temperature => Temp}
     end,
-    case maps:get(<<"max_tokens">>, Params, undefined) of
+    Opts2 = case maps:get(<<"max_tokens">>, Params, undefined) of
         undefined -> Opts1;
         MaxTokens -> Opts1#{max_tokens => MaxTokens}
+    end,
+    %% Add tools if provided (for function calling)
+    case maps:get(<<"tools">>, Params, undefined) of
+        undefined -> Opts2;
+        [] -> Opts2;
+        Tools when is_list(Tools) -> Opts2#{tools => Tools}
     end.
 
 format_messages(Messages) ->

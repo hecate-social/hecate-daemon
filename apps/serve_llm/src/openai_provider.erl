@@ -89,10 +89,38 @@ build_request(Model, Messages, Opts, Stream) ->
         undefined -> Base;
         Temp -> Base#{temperature => Temp}
     end,
-    case maps:get(max_tokens, Opts, undefined) of
+    Base2 = case maps:get(max_tokens, Opts, undefined) of
         undefined -> Base1;
         MaxTokens -> Base1#{max_tokens => MaxTokens}
+    end,
+    %% Add tools if provided (OpenAI function calling format)
+    case maps:get(tools, Opts, undefined) of
+        undefined -> Base2;
+        [] -> Base2;
+        Tools when is_list(Tools) ->
+            ToolSchemas = [tool_to_openai_schema(T) || T <- Tools],
+            Base2#{tools => ToolSchemas}
     end.
+
+%% @doc Convert tool definition to OpenAI's function calling format.
+tool_to_openai_schema(#{name := Name, description := Desc, input_schema := Schema}) ->
+    #{
+        type => <<"function">>,
+        function => #{
+            name => Name,
+            description => Desc,
+            parameters => Schema
+        }
+    };
+tool_to_openai_schema(#{<<"name">> := Name, <<"description">> := Desc, <<"input_schema">> := Schema}) ->
+    #{
+        type => <<"function">>,
+        function => #{
+            name => Name,
+            description => Desc,
+            parameters => Schema
+        }
+    }.
 
 normalize_model(#{<<"id">> := Id} = M) ->
     OwnedBy = maps:get(<<"owned_by">>, M, <<"unknown">>),
@@ -123,17 +151,38 @@ is_chat_model(Id) ->
 normalize_response(#{<<"choices">> := [Choice | _]} = Resp) ->
     Message = maps:get(<<"message">>, Choice, #{}),
     Content = maps:get(<<"content">>, Message, <<>>),
+    FinishReason = maps:get(<<"finish_reason">>, Choice, <<>>),
     Usage = maps:get(<<"usage">>, Resp, #{}),
-    #{
+    BaseResp = #{
         content => Content,
         model => maps:get(<<"model">>, Resp, <<>>),
         done => true,
+        stop_reason => FinishReason,
         eval_count => maps:get(<<"completion_tokens">>, Usage, 0),
         prompt_eval_count => maps:get(<<"prompt_tokens">>, Usage, 0),
         message => #{role => <<"assistant">>, content => Content}
-    };
+    },
+    %% Handle tool calls
+    case maps:get(<<"tool_calls">>, Message, undefined) of
+        undefined -> BaseResp;
+        [] -> BaseResp;
+        ToolCalls when is_list(ToolCalls) ->
+            NormalizedCalls = [normalize_tool_call(TC) || TC <- ToolCalls],
+            BaseResp#{tool_calls => NormalizedCalls}
+    end;
 normalize_response(_) ->
     #{content => <<>>, done => true}.
+
+normalize_tool_call(#{<<"id">> := Id, <<"function">> := Func}) ->
+    Name = maps:get(<<"name">>, Func, <<>>),
+    Args = maps:get(<<"arguments">>, Func, <<"{}">>),
+    #{
+        id => Id,
+        name => Name,
+        arguments => Args  %% JSON string in OpenAI format
+    };
+normalize_tool_call(_) ->
+    #{id => <<>>, name => <<>>, arguments => <<"{}">>}.
 
 stream_loop(ClientRef, Ref, Caller, Buffer) ->
     receive
@@ -176,19 +225,47 @@ normalize_stream_chunk(#{<<"choices">> := [Choice | _]} = Resp) ->
     FinishReason = maps:get(<<"finish_reason">>, Choice, null),
     Done = FinishReason =/= null,
     Base = #{content => Content, done => Done},
+    %% Handle tool calls in streaming delta
+    Base1 = case maps:get(<<"tool_calls">>, Delta, undefined) of
+        undefined -> Base;
+        [] -> Base;
+        ToolCalls when is_list(ToolCalls) ->
+            %% Streaming tool calls come in deltas
+            NormalizedCalls = [normalize_stream_tool_call(TC) || TC <- ToolCalls],
+            Base#{tool_call_deltas => NormalizedCalls}
+    end,
     case Done of
         true ->
             Usage = maps:get(<<"usage">>, Resp, #{}),
-            Base#{
+            Base1#{
                 model => maps:get(<<"model">>, Resp, <<>>),
+                stop_reason => FinishReason,
                 eval_count => maps:get(<<"completion_tokens">>, Usage, 0),
                 prompt_eval_count => maps:get(<<"prompt_tokens">>, Usage, 0)
             };
         false ->
-            Base
+            Base1
     end;
 normalize_stream_chunk(_) ->
     #{content => <<>>, done => false}.
+
+normalize_stream_tool_call(#{<<"index">> := Index} = TC) ->
+    Func = maps:get(<<"function">>, TC, #{}),
+    Base = #{index => Index},
+    Base1 = case maps:get(<<"id">>, TC, undefined) of
+        undefined -> Base;
+        Id -> Base#{id => Id}
+    end,
+    Base2 = case maps:get(<<"name">>, Func, undefined) of
+        undefined -> Base1;
+        Name -> Base1#{name => Name}
+    end,
+    case maps:get(<<"arguments">>, Func, undefined) of
+        undefined -> Base2;
+        Args -> Base2#{arguments_delta => Args}
+    end;
+normalize_stream_tool_call(_) ->
+    #{}.
 
 parse_sse(Buffer) ->
     Lines = binary:split(Buffer, <<"\n">>, [global]),

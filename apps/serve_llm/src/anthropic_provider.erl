@@ -122,28 +122,64 @@ build_request(Model, System, Messages, Opts, Stream) ->
         true -> Base1#{stream => true};
         false -> Base1
     end,
-    case maps:get(temperature, Opts, undefined) of
+    Base3 = case maps:get(temperature, Opts, undefined) of
         undefined -> Base2;
         Temp -> Base2#{temperature => Temp}
+    end,
+    %% Add tools if provided
+    case maps:get(tools, Opts, undefined) of
+        undefined -> Base3;
+        [] -> Base3;
+        Tools when is_list(Tools) ->
+            ToolSchemas = [tool_to_anthropic_schema(T) || T <- Tools],
+            Base3#{tools => ToolSchemas}
     end.
+
+%% @doc Convert tool definition to Anthropic's schema format.
+tool_to_anthropic_schema(#{name := Name, description := Desc, input_schema := Schema}) ->
+    #{
+        name => Name,
+        description => Desc,
+        input_schema => Schema
+    };
+tool_to_anthropic_schema(#{<<"name">> := Name, <<"description">> := Desc, <<"input_schema">> := Schema}) ->
+    #{
+        name => Name,
+        description => Desc,
+        input_schema => Schema
+    }.
 
 normalize_response(#{<<"content">> := Content} = Resp) when is_list(Content) ->
     Text = extract_text(Content),
+    ToolCalls = extract_tool_calls(Content),
+    StopReason = maps:get(<<"stop_reason">>, Resp, <<>>),
     Usage = maps:get(<<"usage">>, Resp, #{}),
-    #{
+    BaseResp = #{
         content => Text,
         model => maps:get(<<"model">>, Resp, <<>>),
         done => true,
+        stop_reason => StopReason,
         eval_count => maps:get(<<"output_tokens">>, Usage, 0),
         prompt_eval_count => maps:get(<<"input_tokens">>, Usage, 0),
         message => #{role => <<"assistant">>, content => Text}
-    };
+    },
+    case ToolCalls of
+        [] -> BaseResp;
+        _ -> BaseResp#{tool_calls => ToolCalls}
+    end;
 normalize_response(_) ->
     #{content => <<>>, done => true}.
 
 extract_text([]) -> <<>>;
 extract_text([#{<<"type">> := <<"text">>, <<"text">> := Text} | _]) -> Text;
 extract_text([_ | Rest]) -> extract_text(Rest).
+
+extract_tool_calls(Content) ->
+    [#{
+        id => maps:get(<<"id">>, Block, <<>>),
+        name => maps:get(<<"name">>, Block, <<>>),
+        arguments => maps:get(<<"input">>, Block, #{})
+    } || Block <- Content, maps:get(<<"type">>, Block, <<>>) =:= <<"tool_use">>].
 
 stream_loop(ClientRef, Ref, Caller, Buffer) ->
     receive
@@ -172,21 +208,44 @@ stream_loop(ClientRef, Ref, Caller, Buffer) ->
 
 process_sse_event(Data, Ref, Caller) ->
     try json:decode(Data) of
+        %% Text content delta
         #{<<"type">> := <<"content_block_delta">>,
           <<"delta">> := #{<<"type">> := <<"text_delta">>, <<"text">> := Text}} ->
             Caller ! {llm_chunk, Ref, #{content => Text, done => false}};
+
+        %% Tool use input delta (accumulates JSON)
+        #{<<"type">> := <<"content_block_delta">>,
+          <<"delta">> := #{<<"type">> := <<"input_json_delta">>, <<"partial_json">> := PartialJson}} ->
+            Caller ! {llm_tool_input_delta, Ref, PartialJson};
+
+        %% Tool use block start - LLM wants to use a tool
+        #{<<"type">> := <<"content_block_start">>,
+          <<"content_block">> := #{<<"type">> := <<"tool_use">>, <<"id">> := Id, <<"name">> := Name}} ->
+            Caller ! {llm_tool_use_start, Ref, #{id => Id, name => Name, input => <<>>}};
+
+        %% Content block stop (might be text or tool)
+        #{<<"type">> := <<"content_block_stop">>} ->
+            Caller ! {llm_content_block_stop, Ref};
+
+        %% Message delta with stop reason
         #{<<"type">> := <<"message_delta">>,
-          <<"delta">> := #{<<"stop_reason">> := _}} = Msg ->
+          <<"delta">> := #{<<"stop_reason">> := StopReason}} = Msg ->
             Usage = maps:get(<<"usage">>, Msg, #{}),
             Caller ! {llm_chunk, Ref, #{
                 content => <<>>,
                 done => true,
+                stop_reason => StopReason,
                 eval_count => maps:get(<<"output_tokens">>, Usage, 0)
             }};
+
+        %% Message stop
         #{<<"type">> := <<"message_stop">>} ->
             Caller ! {llm_done, Ref};
+
+        %% Error
         #{<<"type">> := <<"error">>, <<"error">> := #{<<"message">> := ErrMsg}} ->
             Caller ! {llm_error, Ref, ErrMsg};
+
         _ ->
             ok
     catch _:_ ->
