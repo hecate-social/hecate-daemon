@@ -15,8 +15,8 @@ start_link() ->
 init([]) ->
     filelib:ensure_dir(?DB_PATH),
     {ok, Db} = esqlite3:open(?DB_PATH),
-    ok = esqlite3:exec("PRAGMA journal_mode=WAL;", Db),
-    ok = esqlite3:exec("PRAGMA synchronous=NORMAL;", Db),
+    ok = esqlite3:exec(Db, "PRAGMA journal_mode=WAL;"),
+    ok = esqlite3:exec(Db, "PRAGMA synchronous=NORMAL;"),
     {ok, #state{db = Db}}.
 
 %% @doc Initialize database schema
@@ -49,7 +49,7 @@ handle_call(init_schema, _From, #state{db = Db} = State) ->
 handle_call({execute, Sql, Params}, _From, #state{db = Db} = State) ->
     case Params of
         [] ->
-            Result = esqlite3:exec(Sql, Db),
+            Result = esqlite3:exec(Db, Sql),
             {reply, Result, State};
         _ ->
             case esqlite3:prepare(Sql, Db) of
@@ -214,5 +214,5 @@ create_tables(Db) ->
         );",
         "CREATE INDEX IF NOT EXISTS idx_incidents_project ON incidents(project_id);"
     ],
-    lists:foreach(fun(Sql) -> ok = esqlite3:exec(Sql, Db) end, Stmts),
+    lists:foreach(fun(Sql) -> ok = esqlite3:exec(Db, Sql) end, Stmts),
     ok.
