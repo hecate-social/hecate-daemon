@@ -23,9 +23,12 @@ jobs:
           - os: linux
             arch: arm64
             runner: ubuntu-22.04-arm  # 20.04-arm not available, 22.04 is oldest arm64
-          - os: darwin
-            arch: arm64
-            runner: macos-latest
+          # darwin-arm64 disabled: macula_nifs Rust NIFs fail to link on
+          # macOS CI (missing BEAM NIF symbols). Re-enable when precompiled
+          # NIF binaries are available or CI toolchain is fixed.
+          # - os: darwin
+          #   arch: arm64
+          #   runner: macos-latest
 
     steps:
       - name: Checkout code
@@ -92,7 +95,6 @@ jobs:
           files: |
             artifacts/hecate-daemon-linux-amd64/hecate-daemon-linux-amd64
             artifacts/hecate-daemon-linux-arm64/hecate-daemon-linux-arm64
-            artifacts/hecate-daemon-darwin-arm64/hecate-daemon-darwin-arm64
             artifacts/hecate-daemon-*-tarball/*.tar.gz
           body: |
             ## Installation
@@ -109,8 +111,8 @@ jobs:
             chmod +x hecate
             ./hecate start
 
-            # macOS (arm64)
-            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-darwin-arm64 -o hecate
+            # Linux (arm64)
+            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-linux-arm64 -o hecate
             chmod +x hecate
             ./hecate start
             ```
