@@ -6,6 +6,8 @@
 -module(detect_llms).
 -behaviour(gen_server).
 
+-include_lib("evoq/include/evoq_types.hrl").
+
 -export([start_link/0, poll_now/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
@@ -110,7 +112,8 @@ emit_removed(ModelName) ->
     store_event(<<"llm_removed_v1">>, llm_removed_v1:to_map(Event)).
 
 store_event(EventType, EventData) ->
-    reckon_evoq_adapter:append(serve_llm_store, <<"llms">>, EventType, EventData, #{}).
+    Event = EventData#{event_type => EventType},
+    reckon_evoq_adapter:append(serve_llm_store, <<"llms">>, ?ANY_VERSION, [Event]).
 
 build_model_info(ModelName, ModelInfo) ->
     #{

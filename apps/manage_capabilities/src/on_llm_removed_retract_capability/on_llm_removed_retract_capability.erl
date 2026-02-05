@@ -4,6 +4,8 @@
 -module(on_llm_removed_retract_capability).
 -behaviour(gen_server).
 
+-include_lib("evoq/include/evoq_types.hrl").
+
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
@@ -34,7 +36,7 @@ handle_info(subscribe, State) ->
     %% Subscribe to llm events from serve_llm_store
     SubRef = subscribe_to_llm_events(),
     {noreply, State#state{subscription_ref = SubRef}};
-handle_info({event, EventType, EventData}, #state{agent_identity = AgentId} = State) ->
+handle_info({event, #evoq_event{event_type = EventType, data = EventData}}, #state{agent_identity = AgentId} = State) ->
     handle_event(EventType, EventData, AgentId),
     {noreply, State};
 handle_info(_Info, State) ->
@@ -46,11 +48,13 @@ terminate(_Reason, _State) ->
 %% Internal
 
 subscribe_to_llm_events() ->
-    Self = self(),
-    Callback = fun(EventType, EventData, _Metadata) ->
-        Self ! {event, EventType, EventData}
-    end,
-    case reckon_evoq_adapter:subscribe(serve_llm_store, <<"llms">>, Callback) of
+    case reckon_evoq_adapter:subscribe(
+        serve_llm_store,
+        stream,
+        <<"llms">>,
+        <<"on_llm_removed_retract_capability">>,
+        #{start_from => 0, subscriber_pid => self()}
+    ) of
         {ok, SubRef} -> SubRef;
         {error, _} -> undefined
     end.

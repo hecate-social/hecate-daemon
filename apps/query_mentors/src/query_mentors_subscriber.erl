@@ -59,8 +59,8 @@ project_event(#{event_type := <<"learning_endorsed_v1">>} = E, State) ->
     safe_project(fun() -> learning_endorsed_v1_to_learnings:project(E) end, State);
 project_event(#{event_type := <<"learning_disputed_v1">>} = E, State) ->
     safe_project(fun() -> learning_disputed_v1_to_learnings:project(E) end, State);
-project_event(#{event_type := <<"dispute_resolved_v1">>} = E, State) ->
-    safe_project(fun() -> dispute_resolved_v1_to_learnings:project(E) end, State);
+project_event(#{event_type := <<"learning_dispute_resolved_v1">>} = E, State) ->
+    safe_project(fun() -> learning_dispute_resolved_v1_to_learnings:project(E) end, State);
 project_event(#{event_type := <<"mentor_subscribed_v1">>} = E, State) ->
     safe_project(fun() -> mentor_subscribed_v1_to_subscriptions:project(E) end, State);
 project_event(#{event_type := <<"mentor_unsubscribed_v1">>} = E, State) ->

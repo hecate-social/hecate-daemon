@@ -1,6 +1,6 @@
-%%% @doc maybe_resolve_dispute handler
+%%% @doc maybe_resolve_learning_dispute handler
 %%% Business logic for resolving disputes.
--module(maybe_resolve_dispute).
+-module(maybe_resolve_learning_dispute).
 
 -include_lib("evoq/include/evoq.hrl").
 
@@ -8,27 +8,27 @@
 
 -dialyzer({nowarn_function, [dispatch/1]}).
 
--spec handle(resolve_dispute_v1:resolve_dispute_v1()) ->
-    {ok, [dispute_resolved_v1:dispute_resolved_v1()]} | {error, term()}.
+-spec handle(resolve_learning_dispute_v1:resolve_learning_dispute_v1()) ->
+    {ok, [learning_dispute_resolved_v1:learning_dispute_resolved_v1()]} | {error, term()}.
 handle(Cmd) ->
-    LearningId = resolve_dispute_v1:get_learning_id(Cmd),
-    ResolverId = resolve_dispute_v1:get_resolver_id(Cmd),
-    Resolution = resolve_dispute_v1:get_resolution(Cmd),
-    Event = dispute_resolved_v1:new(LearningId, ResolverId, Resolution),
+    LearningId = resolve_learning_dispute_v1:get_learning_id(Cmd),
+    ResolverId = resolve_learning_dispute_v1:get_resolver_id(Cmd),
+    Resolution = resolve_learning_dispute_v1:get_resolution(Cmd),
+    Event = learning_dispute_resolved_v1:new(LearningId, ResolverId, Resolution),
     {ok, [Event]}.
 
--spec dispatch(resolve_dispute_v1:resolve_dispute_v1()) ->
+-spec dispatch(resolve_learning_dispute_v1:resolve_learning_dispute_v1()) ->
     {ok, non_neg_integer(), [map()]} | {error, term()}.
 dispatch(Cmd) ->
-    LearningId = resolve_dispute_v1:get_learning_id(Cmd),
+    LearningId = resolve_learning_dispute_v1:get_learning_id(Cmd),
     Timestamp = erlang:system_time(millisecond),
 
     EvoqCmd = #evoq_command{
         command_id = generate_command_id(LearningId, Timestamp),
-        command_type = resolve_dispute,
+        command_type = resolve_learning_dispute,
         aggregate_type = learning_aggregate,
         aggregate_id = <<"learning-", LearningId/binary>>,
-        payload = resolve_dispute_v1:to_map(Cmd),
+        payload = resolve_learning_dispute_v1:to_map(Cmd),
         metadata = #{timestamp => Timestamp, aggregate_type => learning_aggregate},
         causation_id = undefined,
         correlation_id = undefined

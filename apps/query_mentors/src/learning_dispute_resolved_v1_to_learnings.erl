@@ -1,5 +1,5 @@
-%%% @doc Projection: dispute_resolved_v1 -> learnings table (UPDATE status)
--module(dispute_resolved_v1_to_learnings).
+%%% @doc Projection: learning_dispute_resolved_v1 -> learnings table (UPDATE status)
+-module(learning_dispute_resolved_v1_to_learnings).
 
 -export([project/1]).
 

@@ -145,7 +145,7 @@ handle_resolve(Req0) ->
         learning_id => LearningId,
         resolution => maps:get(<<"resolution">>, Params, undefined)
     },
-    dispatch_simple_cmd(Req1, resolve_dispute_v1, maybe_resolve_dispute, CmdParams).
+    dispatch_simple_cmd(Req1, resolve_learning_dispute_v1, maybe_resolve_learning_dispute, CmdParams).
 
 %% POST /mentors/expertise
 handle_declare_expertise(Req0) ->

@@ -4,6 +4,8 @@
 -module(report_llm_status).
 -behaviour(gen_server).
 
+-include_lib("evoq/include/evoq_types.hrl").
+
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
@@ -137,4 +139,5 @@ emit_status(ModelName, Status) ->
     store_event(<<"llm_status_reported_v1">>, llm_status_reported_v1:to_map(Event)).
 
 store_event(EventType, EventData) ->
-    reckon_evoq_adapter:append(serve_llm_store, <<"llm_status">>, EventType, EventData, #{}).
+    Event = EventData#{event_type => EventType},
+    reckon_evoq_adapter:append(serve_llm_store, <<"llm_status">>, ?ANY_VERSION, [Event]).

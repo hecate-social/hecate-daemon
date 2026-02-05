@@ -63,7 +63,7 @@ A learning moves through desks, accumulating slips:
 | `learning_rejected_v1` | reject_learning | Mentor rejects with reason |
 | `learning_endorsed_v1` | endorse_learning | Another agent vouches |
 | `learning_disputed_v1` | dispute_learning | Someone challenges validity |
-| `dispute_resolved_v1` | resolve_dispute | Dispute outcome |
+| `learning_dispute_resolved_v1` | resolve_learning_dispute | Dispute outcome |
 
 ### Mentor Subscription Dossier
 

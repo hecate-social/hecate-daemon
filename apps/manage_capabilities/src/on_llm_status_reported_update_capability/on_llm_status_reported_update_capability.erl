@@ -5,6 +5,8 @@
 -module(on_llm_status_reported_update_capability).
 -behaviour(gen_server).
 
+-include_lib("evoq/include/evoq_types.hrl").
+
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
@@ -33,7 +35,7 @@ handle_cast(_Msg, State) ->
 handle_info(subscribe, State) ->
     SubRef = subscribe_to_status_events(),
     {noreply, State#state{subscription_ref = SubRef}};
-handle_info({event, EventType, EventData}, #state{agent_identity = AgentId} = State) ->
+handle_info({event, #evoq_event{event_type = EventType, data = EventData}}, #state{agent_identity = AgentId} = State) ->
     handle_event(EventType, EventData, AgentId),
     {noreply, State};
 handle_info(_Info, State) ->
@@ -45,11 +47,13 @@ terminate(_Reason, _State) ->
 %% Internal
 
 subscribe_to_status_events() ->
-    Self = self(),
-    Callback = fun(EventType, EventData, _Metadata) ->
-        Self ! {event, EventType, EventData}
-    end,
-    case reckon_evoq_adapter:subscribe(serve_llm_store, <<"llm_status">>, Callback) of
+    case reckon_evoq_adapter:subscribe(
+        serve_llm_store,
+        stream,
+        <<"llm_status">>,
+        <<"on_llm_status_reported_update_capability">>,
+        #{start_from => 0, subscriber_pid => self()}
+    ) of
         {ok, SubRef} -> SubRef;
         {error, _} -> undefined
     end.

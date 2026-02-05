@@ -8,6 +8,8 @@
 -module(on_connector_registered_start_listener).
 -behaviour(gen_server).
 
+-include_lib("evoq/include/evoq_types.hrl").
+
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
@@ -47,7 +49,7 @@ handle_info(rebuild_from_state, State) ->
     %% which will dispatch a register command, triggering this PM via events.
     {noreply, State};
 
-handle_info({event, EventType, EventData}, State) ->
+handle_info({event, #evoq_event{event_type = EventType, data = EventData}}, State) ->
     NewState = handle_event(EventType, EventData, State),
     {noreply, NewState};
 
@@ -64,11 +66,13 @@ terminate(_Reason, #state{active_listeners = Listeners}) ->
 %% Internal
 
 subscribe_to_connector_events() ->
-    Self = self(),
-    Callback = fun(EventType, EventData, _Metadata) ->
-        Self ! {event, EventType, EventData}
-    end,
-    case reckon_evoq_adapter:subscribe(manage_connectors_store, <<"connectors">>, Callback) of
+    case reckon_evoq_adapter:subscribe(
+        manage_connectors_store,
+        stream,
+        <<"connectors">>,
+        <<"on_connector_registered_start_listener">>,
+        #{start_from => 0, subscriber_pid => self()}
+    ) of
         {ok, SubRef} -> SubRef;
         {error, _} -> undefined
     end.

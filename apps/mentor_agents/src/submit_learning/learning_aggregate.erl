@@ -73,7 +73,7 @@ execute(#{command_type := <<"endorse_learning">>} = Payload, State) ->
     execute_endorse(Payload, State);
 execute(#{command_type := <<"dispute_learning">>} = Payload, State) ->
     execute_dispute(Payload, State);
-execute(#{command_type := <<"resolve_dispute">>} = Payload, State) ->
+execute(#{command_type := <<"resolve_learning_dispute">>} = Payload, State) ->
     execute_resolve(Payload, State);
 execute(Payload, State) ->
     %% Default: submit_learning
@@ -128,8 +128,8 @@ execute_dispute(_Payload, _State) ->
     {error, learning_not_validated}.
 
 execute_resolve(Payload, #learning_state{status = S}) when S band ?DISPUTED =/= 0, S band ?RESOLVED =:= 0 ->
-    {ok, Cmd} = resolve_dispute_v1:from_map(Payload),
-    convert_events(maybe_resolve_dispute:handle(Cmd), fun dispute_resolved_v1:to_map/1);
+    {ok, Cmd} = resolve_learning_dispute_v1:from_map(Payload),
+    convert_events(maybe_resolve_learning_dispute:handle(Cmd), fun learning_dispute_resolved_v1:to_map/1);
 execute_resolve(_Payload, #learning_state{learning_id = undefined}) ->
     {error, learning_not_found};
 execute_resolve(_Payload, _State) ->
@@ -184,7 +184,7 @@ apply_event(#{event_type := <<"learning_disputed_v1">>} = E, State) ->
         status = State#learning_state.status bor ?DISPUTED,
         disputer_ids = [AgentId | State#learning_state.disputer_ids]
     };
-apply_event(#{event_type := <<"dispute_resolved_v1">>} = _E, State) ->
+apply_event(#{event_type := <<"learning_dispute_resolved_v1">>} = _E, State) ->
     State#learning_state{
         status = State#learning_state.status bor ?RESOLVED
     };
