@@ -61,8 +61,14 @@ handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) -
 
 handle_call({subscribe, _Topic, _Callback}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
-handle_call({subscribe, Topic, Callback}, _From, #state{client = Client, subscriptions = Subs} = State) ->
-    case macula:subscribe(Client, Topic, Callback) of
+handle_call({subscribe, Topic, CallbackPid}, _From, #state{client = Client, subscriptions = Subs} = State) ->
+    %% macula:subscribe expects a fun/1, not a pid
+    %% Wrap the pid in a function that sends mesh_fact messages
+    CallbackFun = fun(EventData) ->
+        CallbackPid ! {mesh_fact, Topic, EventData},
+        ok
+    end,
+    case macula:subscribe(Client, Topic, CallbackFun) of
         {ok, SubRef} ->
             NewSubs = Subs#{SubRef => Topic},
             {reply, {ok, SubRef}, State#state{subscriptions = NewSubs}};

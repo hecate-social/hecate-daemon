@@ -12,7 +12,8 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    hecate_mesh_client:subscribe(<<"hecate.learning.validated">>, self()),
+    %% Delay subscription to allow mesh client to connect
+    self() ! try_subscribe,
     {ok, #state{}}.
 
 handle_call(_Request, _From, State) ->
@@ -21,6 +22,20 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info(try_subscribe, State) ->
+    case hecate_mesh_client:subscribe(<<"hecate.learning.validated">>, self()) of
+        {ok, _SubRef} ->
+            io:format("[remote_learning_listener] Subscribed to hecate.learning.validated~n"),
+            {noreply, State};
+        {error, not_connected} ->
+            %% Mesh not connected yet, retry in 5 seconds
+            erlang:send_after(5000, self(), try_subscribe),
+            {noreply, State};
+        {error, Reason} ->
+            logger:warning("[remote_learning_listener] Subscribe failed: ~p, retrying...", [Reason]),
+            erlang:send_after(5000, self(), try_subscribe),
+            {noreply, State}
+    end;
 handle_info({mesh_fact, _Topic, Payload}, State) ->
     project_remote_learning(Payload),
     {noreply, State};

@@ -12,8 +12,8 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    hecate_mesh_client:subscribe(<<"hecate.mentor.available">>, self()),
-    hecate_mesh_client:subscribe(<<"hecate.mentor.withdrawn">>, self()),
+    %% Delay subscription to allow mesh client to connect
+    self() ! try_subscribe,
     {ok, #state{}}.
 
 handle_call(_Request, _From, State) ->
@@ -22,6 +22,24 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info(try_subscribe, State) ->
+    case hecate_mesh_client:subscribe(<<"hecate.mentor.available">>, self()) of
+        {ok, _} ->
+            case hecate_mesh_client:subscribe(<<"hecate.mentor.withdrawn">>, self()) of
+                {ok, _} ->
+                    io:format("[mentor_discovery_listener] Subscribed to mentor topics~n"),
+                    {noreply, State};
+                {error, _} ->
+                    erlang:send_after(5000, self(), try_subscribe),
+                    {noreply, State}
+            end;
+        {error, not_connected} ->
+            erlang:send_after(5000, self(), try_subscribe),
+            {noreply, State};
+        {error, _} ->
+            erlang:send_after(5000, self(), try_subscribe),
+            {noreply, State}
+    end;
 handle_info({mesh_fact, <<"hecate.mentor.available">>, Payload}, State) ->
     project_mentor_available(Payload),
     {noreply, State};
