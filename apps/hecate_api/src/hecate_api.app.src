@@ -24,7 +24,9 @@
         manage_ucan,
         query_ucan,
         mentor_agents,
-        query_mentors
+        query_mentors,
+        manage_alc,
+        query_alc
     ]},
     {env, [
         {http_port, 4444},

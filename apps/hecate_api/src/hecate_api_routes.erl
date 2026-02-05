@@ -26,7 +26,8 @@ routes() ->
     ++ ucan_routes()
     ++ llm_routes()
     ++ connector_routes()
-    ++ mentor_routes().
+    ++ mentor_routes()
+    ++ alc_routes().
 
 %% Health check
 health_routes() ->
@@ -143,4 +144,45 @@ mentor_routes() ->
         {"/mentors/unsubscribe", hecate_api_mentors, [unsubscribe]},
         {"/mentors/subscriptions", hecate_api_mentors, [list_subs]},
         {"/mentors/remote", hecate_api_mentors, [list_remote]}
+    ].
+
+%% Application Lifecycle (ALC)
+alc_routes() ->
+    [
+        {"/alc/projects", hecate_api_alc, [list_projects]},
+        {"/alc/projects/initiate", hecate_api_alc, [initiate]},
+        {"/alc/projects/:project_id", hecate_api_alc, [get_project]},
+        {"/alc/projects/:project_id/discovery/start", hecate_api_alc, [discovery_start]},
+        {"/alc/projects/:project_id/discovery/findings", hecate_api_alc, [discovery_list_findings]},
+        {"/alc/projects/:project_id/discovery/findings/record", hecate_api_alc, [discovery_finding]},
+        {"/alc/projects/:project_id/discovery/terms", hecate_api_alc, [discovery_list_terms]},
+        {"/alc/projects/:project_id/discovery/terms/define", hecate_api_alc, [discovery_term]},
+        {"/alc/projects/:project_id/discovery/complete", hecate_api_alc, [discovery_complete]},
+        %% Phase transition
+        {"/alc/projects/:project_id/transition", hecate_api_alc, [transition_phase]},
+        %% Architecture & Planning
+        {"/alc/projects/:project_id/architecture/start", hecate_api_alc, [architecture_start]},
+        {"/alc/projects/:project_id/architecture/dossiers", hecate_api_alc, [architecture_list_dossiers]},
+        {"/alc/projects/:project_id/architecture/dossiers/define", hecate_api_alc, [architecture_dossier]},
+        {"/alc/projects/:project_id/architecture/spokes", hecate_api_alc, [architecture_list_spokes]},
+        {"/alc/projects/:project_id/architecture/spokes/inventory", hecate_api_alc, [architecture_spoke]},
+        {"/alc/projects/:project_id/architecture/plan", hecate_api_alc, [architecture_plan]},
+        {"/alc/projects/:project_id/architecture/plan/approve", hecate_api_alc, [architecture_approve_plan]},
+        {"/alc/projects/:project_id/architecture/complete", hecate_api_alc, [architecture_complete]},
+        %% Testing & Implementation
+        {"/alc/projects/:project_id/testing/start", hecate_api_alc, [testing_start]},
+        {"/alc/projects/:project_id/testing/skeleton", hecate_api_alc, [testing_skeleton]},
+        {"/alc/projects/:project_id/testing/implement", hecate_api_alc, [testing_implement_spoke]},
+        {"/alc/projects/:project_id/testing/implementations", hecate_api_alc, [testing_list_implementations]},
+        {"/alc/projects/:project_id/testing/verify", hecate_api_alc, [testing_verify_build]},
+        {"/alc/projects/:project_id/testing/builds", hecate_api_alc, [testing_list_builds]},
+        {"/alc/projects/:project_id/testing/complete", hecate_api_alc, [testing_complete]},
+        %% Deployment & Operations
+        {"/alc/projects/:project_id/deployment/start", hecate_api_alc, [deployment_start]},
+        {"/alc/projects/:project_id/deployment/record", hecate_api_alc, [deployment_record]},
+        {"/alc/projects/:project_id/deployment/deployments", hecate_api_alc, [deployment_list_deployments]},
+        {"/alc/projects/:project_id/deployment/incident", hecate_api_alc, [deployment_report_incident]},
+        {"/alc/projects/:project_id/deployment/incident/resolve", hecate_api_alc, [deployment_resolve_incident]},
+        {"/alc/projects/:project_id/deployment/incidents", hecate_api_alc, [deployment_list_incidents]},
+        {"/alc/projects/:project_id/deployment/complete", hecate_api_alc, [deployment_complete]}
     ].
