@@ -142,40 +142,42 @@ stream_chunks(Req, Ref) ->
 stream_chunks(Req, Ref, State) ->
     receive
         {llm_chunk, Ref, Chunk} ->
-            Content = maps:get(content, Chunk, maps:get(<<"content">>, Chunk, <<>>)),
-            Done = maps:get(done, Chunk, maps:get(<<"done">>, Chunk, false)),
-            StopReason = maps:get(stop_reason, Chunk, maps:get(<<"stop_reason">>, Chunk, undefined)),
+            %% Ollama puts content inside "message", OpenAI at top level
+            Content = case maps:get(<<"message">>, Chunk, undefined) of
+                #{<<"content">> := C} -> C;
+                _ -> maps:get(<<"content">>, Chunk, <<>>)
+            end,
+            Done = maps:get(<<"done">>, Chunk, false),
+            StopReason = maps:get(<<"done_reason">>, Chunk, maps:get(<<"stop_reason">>, Chunk, undefined)),
             Event = #{content => Content, done => Done},
 
             %% Handle tool calls in chunk (OpenAI streaming format)
-            Event1 = case maps:get(tool_calls, Chunk, undefined) of
+            Event1 = case maps:get(<<"tool_calls">>, Chunk, undefined) of
                 undefined -> Event;
                 ToolCalls when is_list(ToolCalls) ->
                     %% Full tool calls (non-streaming or final)
-                    Message = #{
+                    Msg = #{
                         role => <<"assistant">>,
                         content => Content,
                         tool_calls => [format_tool_call(TC) || TC <- ToolCalls]
                     },
-                    Event#{message => Message}
+                    Event#{message => Msg}
             end,
 
-            %% Add stop_reason if tool_use
+            %% Add stop_reason if present
             Event2 = case StopReason of
-                <<"tool_use">> -> Event1#{stop_reason => <<"tool_use">>};
-                <<"end_turn">> -> Event1#{stop_reason => <<"end_turn">>};
                 undefined -> Event1;
                 null -> Event1;
-                _ -> Event1#{stop_reason => StopReason}
+                Reason -> Event1#{stop_reason => Reason}
             end,
 
             EventWithUsage = case Done of
                 true ->
                     Event2#{
-                        model => maps:get(model, Chunk, maps:get(<<"model">>, Chunk, <<>>)),
+                        model => maps:get(<<"model">>, Chunk, <<>>),
                         usage => #{
-                            prompt_tokens => maps:get(prompt_eval_count, Chunk, maps:get(<<"prompt_eval_count">>, Chunk, 0)),
-                            completion_tokens => maps:get(eval_count, Chunk, maps:get(<<"eval_count">>, Chunk, 0))
+                            prompt_tokens => maps:get(<<"prompt_eval_count">>, Chunk, 0),
+                            completion_tokens => maps:get(<<"eval_count">>, Chunk, 0)
                         }
                     };
                 false ->
