@@ -210,12 +210,13 @@ stream_chunks(Req, Ref, State) ->
                 undefined ->
                     stream_chunks(Req, Ref, State);
                 Tool ->
-                    %% Get the accumulated input JSON
+                    %% Get the accumulated input JSON and decode it to avoid double-encoding
                     InputJson = maps:get(input, Tool, <<"{}">>),
+                    InputMap = try json:decode(InputJson) catch _:_ -> #{} end,
                     ToolUse = #{
                         id => maps:get(id, Tool, <<>>),
                         name => maps:get(name, Tool, <<>>),
-                        arguments => InputJson
+                        arguments => InputMap
                     },
                     Event = #{
                         done => false,
@@ -242,11 +243,16 @@ stream_chunks(Req, Ref, State) ->
     end.
 
 %% Format a tool call for JSON output
+%% Decode arguments if they're a JSON string to avoid double-encoding
 format_tool_call(#{id := Id, name := Name, arguments := Args}) ->
+    DecodedArgs = case is_binary(Args) of
+        true -> try json:decode(Args) catch _:_ -> #{} end;
+        false -> Args
+    end,
     #{
         id => Id,
         name => Name,
-        arguments => Args
+        arguments => DecodedArgs
     };
 format_tool_call(TC) ->
     TC.
