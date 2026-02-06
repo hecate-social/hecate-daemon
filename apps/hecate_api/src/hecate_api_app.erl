@@ -4,13 +4,15 @@
 -export([start/2, stop/1]).
 
 -dialyzer({nowarn_function, [start/2, auto_register_default_connector/0,
-                             start_socket_listener/2, ensure_socket_dir/1]}).
+                             start_socket_listener/2, ensure_socket_dir/1,
+                             get_socket_path/0]}).
 
 start(_StartType, _StartArgs) ->
     %% Get HTTP configuration
     Port = application:get_env(hecate_api, http_port, 4444),
     TcpEnabled = application:get_env(manage_connectors, tcp_listener, true),
-    SocketPath = application:get_env(hecate_api, socket_path, undefined),
+    %% Socket path: check OS env first (k3s deployment), then app config
+    SocketPath = get_socket_path(),
 
     %% Compile shared routes
     Dispatch = hecate_api_routes:compile(),
@@ -81,6 +83,21 @@ start_socket_listener(Path, Dispatch) ->
             logger:info("Hecate API listening on Unix socket: ~s", [Path]);
         {error, Reason} ->
             logger:warning("Failed to start Unix socket listener: ~p", [Reason])
+    end.
+
+%% @private Get socket path from OS env (HECATE_SOCKET_PATH) or app config.
+%% OS env takes precedence for k3s deployments.
+get_socket_path() ->
+    case os:getenv("HECATE_SOCKET_PATH") of
+        false ->
+            %% Fall back to app config
+            application:get_env(hecate_api, socket_path, undefined);
+        "" ->
+            %% Empty env var means disabled
+            undefined;
+        EnvPath ->
+            %% Return as string (list)
+            EnvPath
     end.
 
 %% @private Ensure the socket directory exists with proper permissions.
