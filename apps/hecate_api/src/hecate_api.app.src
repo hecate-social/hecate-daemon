@@ -30,7 +30,11 @@
     ]},
     {env, [
         {http_port, 4444},
-        {http_host, "127.0.0.1"}
+        {http_host, "127.0.0.1"},
+        %% Unix socket for local TUI communication (optional)
+        %% When set, starts additional listener on this socket path
+        %% {socket_path, "/run/hecate/daemon.sock"}
+        {socket_path, undefined}
     ]},
     {modules, []},
     {licenses, ["Apache-2.0"]},
