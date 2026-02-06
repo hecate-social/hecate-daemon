@@ -183,7 +183,7 @@ stream_chunks(Req, Ref, State) ->
                 false ->
                     Event2
             end,
-            Data = json:encode(EventWithUsage),
+            Data = iolist_to_binary(json:encode(EventWithUsage)),
             cowboy_req:stream_body(<<"data: ", Data/binary, "\n\n">>, nofin, Req),
             stream_chunks(Req, Ref, State);
 
@@ -225,7 +225,7 @@ stream_chunks(Req, Ref, State) ->
                         content => <<>>,
                         tool_use => ToolUse
                     },
-                    Data = json:encode(Event),
+                    Data = iolist_to_binary(json:encode(Event)),
                     cowboy_req:stream_body(<<"data: ", Data/binary, "\n\n">>, nofin, Req),
                     NewState = maps:remove(current_tool, State),
                     stream_chunks(Req, Ref, NewState)
@@ -235,11 +235,11 @@ stream_chunks(Req, Ref, State) ->
             cowboy_req:stream_body(<<"data: [DONE]\n\n">>, fin, Req),
             {ok, Req, []};
         {llm_error, Ref, Reason} ->
-            ErrorData = json:encode(#{error => format_error(Reason)}),
+            ErrorData = iolist_to_binary(json:encode(#{error => format_error(Reason)})),
             cowboy_req:stream_body(<<"data: ", ErrorData/binary, "\n\n">>, fin, Req),
             {ok, Req, []}
     after 120000 ->
-        ErrorData = json:encode(#{error => <<"Timeout">>}),
+        ErrorData = iolist_to_binary(json:encode(#{error => <<"Timeout">>})),
         cowboy_req:stream_body(<<"data: ", ErrorData/binary, "\n\n">>, fin, Req),
         {ok, Req, []}
     end.
