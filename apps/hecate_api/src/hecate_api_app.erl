@@ -5,11 +5,12 @@
 
 -dialyzer({nowarn_function, [start/2, auto_register_default_connector/0,
                              start_socket_listener/2, ensure_socket_dir/1,
-                             get_socket_path/0]}).
+                             get_socket_path/0, get_api_host/0, parse_ip/1]}).
 
 start(_StartType, _StartArgs) ->
     %% Get HTTP configuration
     Port = application:get_env(hecate_api, http_port, 4444),
+    Host = get_api_host(),
     TcpEnabled = application:get_env(manage_connectors, tcp_listener, true),
     %% Socket path: check OS env first (k3s deployment), then app config
     SocketPath = get_socket_path(),
@@ -20,11 +21,12 @@ start(_StartType, _StartArgs) ->
     %% Start TCP listener (opt-in, enabled by default during transition)
     case TcpEnabled of
         true ->
+            TransportOpts = [{port, Port}, {ip, Host}],
             {ok, _} = cowboy:start_clear(hecate_http_listener,
-                [{port, Port}],
+                TransportOpts,
                 #{env => #{dispatch => Dispatch}}
             ),
-            logger:info("Hecate API listening on http://127.0.0.1:~p", [Port]);
+            logger:info("Hecate API listening on http://~s:~p", [inet:ntoa(Host), Port]);
         false ->
             logger:info("Hecate TCP listener disabled (Unix sockets only)")
     end,
@@ -98,6 +100,32 @@ get_socket_path() ->
         EnvPath ->
             %% Return as string (list)
             EnvPath
+    end.
+
+%% @private Get API host from OS env (HECATE_API_HOST) or app config.
+%% Defaults to 127.0.0.1 for security (localhost-only).
+get_api_host() ->
+    HostStr = case os:getenv("HECATE_API_HOST") of
+        false ->
+            case application:get_env(hecate_api, http_host) of
+                {ok, H} when is_list(H) -> H;
+                {ok, H} when is_tuple(H) -> H;
+                _ -> "127.0.0.1"
+            end;
+        "" ->
+            "127.0.0.1";
+        EnvHost ->
+            EnvHost
+    end,
+    parse_ip(HostStr).
+
+%% @private Parse IP address string to tuple.
+parse_ip(Host) when is_tuple(Host) ->
+    Host;
+parse_ip(Host) when is_list(Host) ->
+    case inet:parse_address(Host) of
+        {ok, Ip} -> Ip;
+        {error, _} -> {127, 0, 0, 1}
     end.
 
 %% @private Ensure the socket directory exists with proper permissions.
