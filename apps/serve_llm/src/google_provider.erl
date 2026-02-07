@@ -181,10 +181,8 @@ stream_loop(ClientRef, Ref, Caller, Buffer) ->
         {hackney_response, ClientRef, done} ->
             Caller ! {llm_done, Ref};
         {hackney_response, ClientRef, Chunk} when is_binary(Chunk) ->
-            error_logger:info_msg("[GOOGLE RAW] Chunk=~p~n", [Chunk]),
             NewBuffer = <<Buffer/binary, Chunk/binary>>,
             {Events, Rest} = parse_sse(NewBuffer),
-            error_logger:info_msg("[GOOGLE PARSED] Events=~p~n", [Events]),
             lists:foreach(fun(EventData) ->
                 process_sse_event(EventData, Ref, Caller)
             end, Events),
@@ -201,7 +199,6 @@ process_sse_event(Data, Ref, Caller) ->
         #{<<"candidates">> := [Candidate | _]} = Resp ->
             Content = maps:get(<<"content">>, Candidate, #{}),
             Parts = maps:get(<<"parts">>, Content, []),
-            error_logger:info_msg("[GOOGLE DEBUG] Candidate=~p~nContent=~p~nParts=~p~n", [Candidate, Content, Parts]),
             Text = extract_text(Parts),
             FinishReason = maps:get(<<"finishReason">>, Candidate, null),
             Done = FinishReason =/= null,
