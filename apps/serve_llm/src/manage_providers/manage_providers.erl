@@ -244,13 +244,15 @@ default_ollama_config() ->
     #{type => ollama, url => Url, enabled => true}.
 
 %% @doc Auto-detect providers from environment variables.
-%% Checks for OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY.
+%% Checks for OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, GROQ_API_KEY.
 %% Only adds providers not already configured.
 auto_detect_env_providers(Providers) ->
     EnvProviders = [
-        {<<"openai">>, "OPENAI_API_KEY", openai, "https://api.openai.com/v1"},
+        {<<"openai">>, "OPENAI_API_KEY", openai, "https://api.openai.com"},
         {<<"anthropic">>, "ANTHROPIC_API_KEY", anthropic, "https://api.anthropic.com"},
-        {<<"google">>, "GOOGLE_API_KEY", google, "https://generativelanguage.googleapis.com"}
+        {<<"google">>, "GOOGLE_API_KEY", google, "https://generativelanguage.googleapis.com"},
+        %% Groq uses OpenAI-compatible API with function calling support
+        {<<"groq">>, "GROQ_API_KEY", openai, "https://api.groq.com/openai"}
     ],
     lists:foldl(fun({Name, EnvVar, Type, Url}, Acc) ->
         case {maps:is_key(Name, Acc), os:getenv(EnvVar)} of
