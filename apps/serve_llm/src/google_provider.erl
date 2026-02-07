@@ -202,13 +202,14 @@ process_sse_event(Data, Ref, Caller) ->
             Text = extract_text(Parts),
             FinishReason = maps:get(<<"finishReason">>, Candidate, null),
             Done = FinishReason =/= null,
-            ChunkMap = #{content => Text, done => Done},
+            %% Use binary keys to match what hecate_api_llm expects
+            ChunkMap = #{<<"content">> => Text, <<"done">> => Done},
             FinalChunk = case Done of
                 true ->
                     Usage = maps:get(<<"usageMetadata">>, Resp, #{}),
                     ChunkMap#{
-                        eval_count => maps:get(<<"candidatesTokenCount">>, Usage, 0),
-                        prompt_eval_count => maps:get(<<"promptTokenCount">>, Usage, 0)
+                        <<"eval_count">> => maps:get(<<"candidatesTokenCount">>, Usage, 0),
+                        <<"prompt_eval_count">> => maps:get(<<"promptTokenCount">>, Usage, 0)
                     };
                 false ->
                     ChunkMap

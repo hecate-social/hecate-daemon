@@ -224,7 +224,8 @@ normalize_stream_chunk(#{<<"choices">> := [Choice | _]} = Resp) ->
     Content = maps:get(<<"content">>, Delta, <<>>),
     FinishReason = maps:get(<<"finish_reason">>, Choice, null),
     Done = FinishReason =/= null,
-    Base = #{content => Content, done => Done},
+    %% Use binary keys to match what hecate_api_llm expects
+    Base = #{<<"content">> => Content, <<"done">> => Done},
     %% Handle tool calls in streaming delta
     Base1 = case maps:get(<<"tool_calls">>, Delta, undefined) of
         undefined -> Base;
@@ -232,37 +233,38 @@ normalize_stream_chunk(#{<<"choices">> := [Choice | _]} = Resp) ->
         ToolCalls when is_list(ToolCalls) ->
             %% Streaming tool calls come in deltas
             NormalizedCalls = [normalize_stream_tool_call(TC) || TC <- ToolCalls],
-            Base#{tool_call_deltas => NormalizedCalls}
+            Base#{<<"tool_call_deltas">> => NormalizedCalls}
     end,
     case Done of
         true ->
             Usage = maps:get(<<"usage">>, Resp, #{}),
             Base1#{
-                model => maps:get(<<"model">>, Resp, <<>>),
-                stop_reason => FinishReason,
-                eval_count => maps:get(<<"completion_tokens">>, Usage, 0),
-                prompt_eval_count => maps:get(<<"prompt_tokens">>, Usage, 0)
+                <<"model">> => maps:get(<<"model">>, Resp, <<>>),
+                <<"stop_reason">> => FinishReason,
+                <<"eval_count">> => maps:get(<<"completion_tokens">>, Usage, 0),
+                <<"prompt_eval_count">> => maps:get(<<"prompt_tokens">>, Usage, 0)
             };
         false ->
             Base1
     end;
 normalize_stream_chunk(_) ->
-    #{content => <<>>, done => false}.
+    #{<<"content">> => <<>>, <<"done">> => false}.
 
 normalize_stream_tool_call(#{<<"index">> := Index} = TC) ->
     Func = maps:get(<<"function">>, TC, #{}),
-    Base = #{index => Index},
+    %% Use binary keys for consistency
+    Base = #{<<"index">> => Index},
     Base1 = case maps:get(<<"id">>, TC, undefined) of
         undefined -> Base;
-        Id -> Base#{id => Id}
+        Id -> Base#{<<"id">> => Id}
     end,
     Base2 = case maps:get(<<"name">>, Func, undefined) of
         undefined -> Base1;
-        Name -> Base1#{name => Name}
+        Name -> Base1#{<<"name">> => Name}
     end,
     case maps:get(<<"arguments">>, Func, undefined) of
         undefined -> Base2;
-        Args -> Base2#{arguments_delta => Args}
+        Args -> Base2#{<<"arguments_delta">> => Args}
     end;
 normalize_stream_tool_call(_) ->
     #{}.

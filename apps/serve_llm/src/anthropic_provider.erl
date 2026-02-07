@@ -211,7 +211,8 @@ process_sse_event(Data, Ref, Caller) ->
         %% Text content delta
         #{<<"type">> := <<"content_block_delta">>,
           <<"delta">> := #{<<"type">> := <<"text_delta">>, <<"text">> := Text}} ->
-            Caller ! {llm_chunk, Ref, #{content => Text, done => false}};
+            %% Use binary keys to match what hecate_api_llm expects
+            Caller ! {llm_chunk, Ref, #{<<"content">> => Text, <<"done">> => false}};
 
         %% Tool use input delta (accumulates JSON)
         #{<<"type">> := <<"content_block_delta">>,
@@ -231,11 +232,12 @@ process_sse_event(Data, Ref, Caller) ->
         #{<<"type">> := <<"message_delta">>,
           <<"delta">> := #{<<"stop_reason">> := StopReason}} = Msg ->
             Usage = maps:get(<<"usage">>, Msg, #{}),
+            %% Use binary keys to match what hecate_api_llm expects
             Caller ! {llm_chunk, Ref, #{
-                content => <<>>,
-                done => true,
-                stop_reason => StopReason,
-                eval_count => maps:get(<<"output_tokens">>, Usage, 0)
+                <<"content">> => <<>>,
+                <<"done">> => true,
+                <<"stop_reason">> => StopReason,
+                <<"eval_count">> => maps:get(<<"output_tokens">>, Usage, 0)
             }};
 
         %% Message stop
