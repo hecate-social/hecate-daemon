@@ -107,11 +107,52 @@ build_request(SystemInstruction, Contents, Opts) ->
         undefined -> Base;
         _ -> Base#{systemInstruction => SystemInstruction}
     end,
+    %% Add tools if provided
+    Base2 = case maps:get(tools, Opts, undefined) of
+        undefined -> Base1;
+        [] -> Base1;
+        Tools when is_list(Tools) ->
+            FunctionDecls = [tool_to_gemini_schema(T) || T <- Tools],
+            Base1#{tools => [#{functionDeclarations => FunctionDecls}]}
+    end,
     Config = build_generation_config(Opts),
     case maps:size(Config) of
-        0 -> Base1;
-        _ -> Base1#{generationConfig => Config}
+        0 -> Base2;
+        _ -> Base2#{generationConfig => Config}
     end.
+
+%% @doc Convert tool definition to Gemini's function declaration format.
+tool_to_gemini_schema(#{name := Name, description := Desc, input_schema := Schema}) ->
+    #{
+        name => Name,
+        description => Desc,
+        parameters => normalize_schema(Schema)
+    };
+tool_to_gemini_schema(#{<<"name">> := Name, <<"description">> := Desc, <<"input_schema">> := Schema}) ->
+    #{
+        name => Name,
+        description => Desc,
+        parameters => normalize_schema(Schema)
+    }.
+
+%% Normalize JSON schema for Gemini (type must be uppercase)
+normalize_schema(Schema) when is_map(Schema) ->
+    Schema1 = case maps:get(<<"type">>, Schema, maps:get(type, Schema, undefined)) of
+        undefined -> Schema;
+        Type -> Schema#{type => string:uppercase(ensure_binary(Type))}
+    end,
+    %% Recursively normalize properties
+    case maps:get(<<"properties">>, Schema1, maps:get(properties, Schema1, undefined)) of
+        undefined -> Schema1;
+        Props when is_map(Props) ->
+            NormalizedProps = maps:map(fun(_K, V) -> normalize_schema(V) end, Props),
+            Schema1#{properties => NormalizedProps}
+    end;
+normalize_schema(Other) -> Other.
+
+ensure_binary(B) when is_binary(B) -> B;
+ensure_binary(L) when is_list(L) -> list_to_binary(L);
+ensure_binary(A) when is_atom(A) -> atom_to_binary(A, utf8).
 
 build_generation_config(Opts) ->
     Config = #{},
@@ -153,21 +194,52 @@ normalize_response(#{<<"candidates">> := [Candidate | _]} = Resp) ->
     Content = maps:get(<<"content">>, Candidate, #{}),
     Parts = maps:get(<<"parts">>, Content, []),
     Text = extract_text(Parts),
+    ToolCalls = extract_function_calls(Parts),
     Usage = maps:get(<<"usageMetadata">>, Resp, #{}),
-    #{
+    FinishReason = maps:get(<<"finishReason">>, Candidate, <<>>),
+    BaseResp = #{
         content => Text,
         model => <<>>,
         done => true,
+        stop_reason => FinishReason,
         eval_count => maps:get(<<"candidatesTokenCount">>, Usage, 0),
         prompt_eval_count => maps:get(<<"promptTokenCount">>, Usage, 0),
         message => #{role => <<"assistant">>, content => Text}
-    };
+    },
+    case ToolCalls of
+        [] -> BaseResp;
+        _ -> BaseResp#{tool_calls => ToolCalls}
+    end;
 normalize_response(_) ->
     #{content => <<>>, done => true}.
 
 extract_text([]) -> <<>>;
 extract_text([#{<<"text">> := Text} | _]) -> Text;
+extract_text([#{<<"functionCall">> := _} | Rest]) -> extract_text(Rest);
 extract_text([_ | Rest]) -> extract_text(Rest).
+
+%% Extract function calls from parts
+extract_function_calls(Parts) ->
+    lists:filtermap(fun extract_function_call/1, Parts).
+
+extract_function_call(#{<<"functionCall">> := #{<<"name">> := Name, <<"args">> := Args}}) ->
+    {true, #{
+        id => generate_tool_id(),
+        name => Name,
+        arguments => Args
+    }};
+extract_function_call(#{<<"functionCall">> := #{<<"name">> := Name}}) ->
+    {true, #{
+        id => generate_tool_id(),
+        name => Name,
+        arguments => #{}
+    }};
+extract_function_call(_) ->
+    false.
+
+generate_tool_id() ->
+    <<H:64, L:64>> = crypto:strong_rand_bytes(16),
+    iolist_to_binary(io_lib:format("call_~16.16.0b~16.16.0b", [H, L])).
 
 stream_loop(ClientRef, Ref, Caller, Buffer) ->
     receive
@@ -200,19 +272,32 @@ process_sse_event(Data, Ref, Caller) ->
             Content = maps:get(<<"content">>, Candidate, #{}),
             Parts = maps:get(<<"parts">>, Content, []),
             Text = extract_text(Parts),
+            ToolCalls = extract_function_calls(Parts),
             FinishReason = maps:get(<<"finishReason">>, Candidate, null),
             Done = FinishReason =/= null,
             %% Use binary keys to match what hecate_api_llm expects
             ChunkMap = #{<<"content">> => Text, <<"done">> => Done},
+            %% Add tool calls if present
+            ChunkMap1 = case ToolCalls of
+                [] -> ChunkMap;
+                _ -> ChunkMap#{<<"tool_calls">> => ToolCalls}
+            end,
+            %% Add stop reason if done
+            ChunkMap2 = case Done of
+                true when FinishReason =/= null ->
+                    ChunkMap1#{<<"stop_reason">> => FinishReason};
+                _ ->
+                    ChunkMap1
+            end,
             FinalChunk = case Done of
                 true ->
                     Usage = maps:get(<<"usageMetadata">>, Resp, #{}),
-                    ChunkMap#{
+                    ChunkMap2#{
                         <<"eval_count">> => maps:get(<<"candidatesTokenCount">>, Usage, 0),
                         <<"prompt_eval_count">> => maps:get(<<"promptTokenCount">>, Usage, 0)
                     };
                 false ->
-                    ChunkMap
+                    ChunkMap2
             end,
             Caller ! {llm_chunk, Ref, FinalChunk};
         _ ->
