@@ -248,8 +248,9 @@ stream_chunks(Req, Ref, State) ->
             ErrorData = iolist_to_binary(json:encode(#{error => format_error(Reason)})),
             cowboy_req:stream_body(<<"data: ", ErrorData/binary, "\n\n">>, fin, Req),
             {ok, Req, []}
-    after 120000 ->
-        ErrorData = iolist_to_binary(json:encode(#{error => <<"Timeout">>})),
+    after 300000 ->
+        %% 5-minute timeout for model loading (matches provider recv_timeout)
+        ErrorData = iolist_to_binary(json:encode(#{error => <<"Timeout waiting for LLM response">>})),
         cowboy_req:stream_body(<<"data: ", ErrorData/binary, "\n\n">>, fin, Req),
         {ok, Req, []}
     end.
