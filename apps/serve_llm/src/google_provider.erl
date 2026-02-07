@@ -113,7 +113,11 @@ build_request(SystemInstruction, Contents, Opts) ->
         [] -> Base1;
         Tools when is_list(Tools) ->
             FunctionDecls = [tool_to_gemini_schema(T) || T <- Tools],
-            Base1#{tools => [#{functionDeclarations => FunctionDecls}]}
+            %% Add toolConfig to allow tool use (AUTO mode)
+            Base1#{
+                tools => [#{functionDeclarations => FunctionDecls}],
+                toolConfig => #{functionCallingConfig => #{mode => <<"AUTO">>}}
+            }
     end,
     Config = build_generation_config(Opts),
     case maps:size(Config) of
@@ -137,16 +141,46 @@ tool_to_gemini_schema(#{<<"name">> := Name, <<"description">> := Desc, <<"input_
 
 %% Normalize JSON schema for Gemini (type must be uppercase)
 normalize_schema(Schema) when is_map(Schema) ->
-    Schema1 = case maps:get(<<"type">>, Schema, maps:get(type, Schema, undefined)) of
-        undefined -> Schema;
-        Type -> Schema#{type => string:uppercase(ensure_binary(Type))}
+    %% Convert type to uppercase (remove old key, add new)
+    Schema1 = case maps:get(<<"type">>, Schema, undefined) of
+        undefined ->
+            case maps:get(type, Schema, undefined) of
+                undefined -> Schema;
+                Type ->
+                    S = maps:remove(type, Schema),
+                    S#{type => string:uppercase(ensure_binary(Type))}
+            end;
+        Type ->
+            S = maps:remove(<<"type">>, Schema),
+            S#{type => string:uppercase(ensure_binary(Type))}
     end,
     %% Recursively normalize properties
-    case maps:get(<<"properties">>, Schema1, maps:get(properties, Schema1, undefined)) of
-        undefined -> Schema1;
+    Schema2 = case maps:get(<<"properties">>, Schema1, undefined) of
+        undefined ->
+            case maps:get(properties, Schema1, undefined) of
+                undefined -> Schema1;
+                Props when is_map(Props) ->
+                    NormalizedProps = maps:map(fun(_K, V) -> normalize_schema(V) end, Props),
+                    S2 = maps:remove(properties, Schema1),
+                    S2#{properties => NormalizedProps}
+            end;
         Props when is_map(Props) ->
             NormalizedProps = maps:map(fun(_K, V) -> normalize_schema(V) end, Props),
-            Schema1#{properties => NormalizedProps}
+            S2 = maps:remove(<<"properties">>, Schema1),
+            S2#{properties => NormalizedProps}
+    end,
+    %% Also normalize required array
+    case maps:get(<<"required">>, Schema2, undefined) of
+        undefined ->
+            case maps:get(required, Schema2, undefined) of
+                undefined -> Schema2;
+                Req ->
+                    S3 = maps:remove(required, Schema2),
+                    S3#{required => Req}
+            end;
+        Req ->
+            S3 = maps:remove(<<"required">>, Schema2),
+            S3#{required => Req}
     end;
 normalize_schema(Other) -> Other.
 
