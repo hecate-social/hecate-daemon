@@ -64,9 +64,9 @@ start_socket_listener(Path, Dispatch) ->
             [{ip, {local, Path}}],
             #{env => #{dispatch => Dispatch}}) of
         {ok, _} ->
-            %% Set socket permissions for hecate group access only
-            %% Security: only users in 'hecate' group can connect
-            _ = file:change_mode(Path, 8#660),
+            %% Set socket permissions for local access
+            %% Note: 0666 allows any local user; use 0660 + hecate group for stricter security
+            _ = file:change_mode(Path, 8#666),
             logger:info("Hecate API listening on Unix socket: ~s", [Path]);
         {error, Reason} ->
             logger:warning("Failed to start Unix socket listener: ~p", [Reason])
