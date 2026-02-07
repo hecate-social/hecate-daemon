@@ -181,8 +181,10 @@ stream_loop(ClientRef, Ref, Caller, Buffer) ->
         {hackney_response, ClientRef, done} ->
             Caller ! {llm_done, Ref};
         {hackney_response, ClientRef, Chunk} when is_binary(Chunk) ->
+            error_logger:info_msg("[GOOGLE RAW] Chunk=~p~n", [Chunk]),
             NewBuffer = <<Buffer/binary, Chunk/binary>>,
             {Events, Rest} = parse_sse(NewBuffer),
+            error_logger:info_msg("[GOOGLE PARSED] Events=~p~n", [Events]),
             lists:foreach(fun(EventData) ->
                 process_sse_event(EventData, Ref, Caller)
             end, Events),
