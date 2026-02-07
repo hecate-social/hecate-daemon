@@ -117,6 +117,7 @@ llm_routes() ->
         {"/api/llm/health", hecate_api_llm, [health]},
         {"/api/llm/providers", hecate_api_llm, [providers]},
         {"/api/llm/providers/add", hecate_api_llm, [add_provider]},
+        {"/api/llm/providers/reload", hecate_api_llm, [reload_providers]},
         {"/api/llm/providers/:name/remove", hecate_api_llm, [remove_provider]}
     ].
 

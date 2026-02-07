@@ -9,7 +9,7 @@
 -behaviour(gen_server).
 
 -export([start_link/0]).
--export([list/0, add/3, remove/1, provider_for_model/1, refresh_models/0]).
+-export([list/0, add/3, remove/1, provider_for_model/1, refresh_models/0, reload/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(SERVER, ?MODULE).
@@ -57,20 +57,38 @@ provider_for_model(Model) ->
 refresh_models() ->
     gen_server:cast(?SERVER, refresh_models).
 
+%% @doc Reload providers from disk and re-detect from environment variables.
+%% Useful for picking up new API keys without restarting the daemon.
+-spec reload() -> ok.
+reload() ->
+    gen_server:call(?SERVER, reload).
+
 %%% ===================================================================
 %%% gen_server callbacks
 %%% ===================================================================
 
 init([]) ->
     Providers = load_providers(),
+    %% Auto-detect providers from environment variables
+    ProvidersWithEnv = auto_detect_env_providers(Providers),
     {ok, #state{
-        providers = Providers,
+        providers = ProvidersWithEnv,
         model_cache = #{},
         cache_updated_at = 0
     }}.
 
 handle_call(list, _From, #state{providers = Providers} = State) ->
     {reply, Providers, State};
+
+handle_call(reload, _From, _State) ->
+    Providers = load_providers(),
+    ProvidersWithEnv = auto_detect_env_providers(Providers),
+    NewState = #state{
+        providers = ProvidersWithEnv,
+        model_cache = #{},
+        cache_updated_at = 0
+    },
+    {reply, ok, NewState};
 
 handle_call({add, Name, Type, Config}, _From, #state{providers = Providers} = State) ->
     ProviderConfig = Config#{type => Type, enabled => true},
@@ -224,3 +242,32 @@ default_ollama_config() ->
         EnvUrl -> EnvUrl
     end,
     #{type => ollama, url => Url, enabled => true}.
+
+%% @doc Auto-detect providers from environment variables.
+%% Checks for OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY.
+%% Only adds providers not already configured.
+auto_detect_env_providers(Providers) ->
+    EnvProviders = [
+        {<<"openai">>, "OPENAI_API_KEY", openai, "https://api.openai.com/v1"},
+        {<<"anthropic">>, "ANTHROPIC_API_KEY", anthropic, "https://api.anthropic.com"},
+        {<<"google">>, "GOOGLE_API_KEY", google, "https://generativelanguage.googleapis.com"}
+    ],
+    lists:foldl(fun({Name, EnvVar, Type, Url}, Acc) ->
+        case {maps:is_key(Name, Acc), os:getenv(EnvVar)} of
+            {true, _} ->
+                %% Already configured, skip
+                Acc;
+            {false, false} ->
+                %% Env var not set, skip
+                Acc;
+            {false, ApiKey} ->
+                %% Env var set, add provider
+                logger:info("[manage_providers] Auto-detected ~s from ~s", [Name, EnvVar]),
+                Acc#{Name => #{
+                    type => Type,
+                    url => Url,
+                    api_key => list_to_binary(ApiKey),
+                    enabled => true
+                }}
+        end
+    end, Providers, EnvProviders).

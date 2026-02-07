@@ -6,6 +6,7 @@
 %%% - GET  /api/llm/health          - Backend health check (all providers)
 %%% - GET  /api/llm/providers       - List configured providers
 %%% - POST /api/llm/providers/add   - Add a provider
+%%% - POST /api/llm/providers/reload - Reload providers (re-detect from env vars)
 %%% - POST /api/llm/providers/:name/remove - Remove a provider
 %%%
 %%% @end
@@ -63,6 +64,15 @@ init(Req0, [remove_provider]) ->
     case cowboy_req:method(Req0) of
         <<"POST">> ->
             handle_remove_provider(Req0);
+        _ ->
+            method_not_allowed(Req0)
+    end;
+
+%% Route: POST /api/llm/providers/reload
+init(Req0, [reload_providers]) ->
+    case cowboy_req:method(Req0) of
+        <<"POST">> ->
+            handle_reload_providers(Req0);
         _ ->
             method_not_allowed(Req0)
     end;
@@ -336,6 +346,12 @@ handle_remove_provider(Req0) ->
         {error, not_found} ->
             json_response(404, #{ok => false, error => <<"Provider not found">>}, Req0)
     end.
+
+handle_reload_providers(Req0) ->
+    ok = manage_providers:reload(),
+    Providers = manage_providers:list(),
+    ProviderNames = maps:keys(Providers),
+    json_response(200, #{ok => true, providers => ProviderNames}, Req0).
 
 %%% ===================================================================
 %%% Helpers
