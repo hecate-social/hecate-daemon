@@ -31,7 +31,8 @@ chat(Config, Model, Messages, Opts) ->
     Url = base_url(Config) ++ "/api/chat",
     Body = json:encode(build_request(Model, Messages, Opts, false)),
     Headers = [{<<"Content-Type">>, <<"application/json">>}],
-    case hackney:post(Url, Headers, Body, [with_body]) of
+    %% Long timeout for model loading (Ollama may need to load large models)
+    case hackney:post(Url, Headers, Body, [with_body, {recv_timeout, 300000}]) of
         {ok, 200, _RespHeaders, RespBody} ->
             {ok, normalize_response(json:decode(RespBody))};
         {ok, Status, _RespHeaders, RespBody} ->
@@ -45,7 +46,8 @@ chat_stream(Config, Model, Messages, Opts, Caller, Ref) ->
     Url = base_url(Config) ++ "/api/chat",
     Body = json:encode(build_request(Model, Messages, Opts, true)),
     Headers = [{<<"Content-Type">>, <<"application/json">>}],
-    case hackney:post(Url, Headers, Body, [async]) of
+    %% Long recv_timeout for model loading (Ollama may need to load large models into GPU)
+    case hackney:post(Url, Headers, Body, [async, {recv_timeout, 300000}]) of
         {ok, ClientRef} ->
             stream_loop(ClientRef, Ref, Caller, <<>>);
         {error, Reason} ->
