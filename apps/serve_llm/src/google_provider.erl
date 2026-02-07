@@ -199,6 +199,7 @@ process_sse_event(Data, Ref, Caller) ->
         #{<<"candidates">> := [Candidate | _]} = Resp ->
             Content = maps:get(<<"content">>, Candidate, #{}),
             Parts = maps:get(<<"parts">>, Content, []),
+            error_logger:info_msg("[GOOGLE DEBUG] Candidate=~p~nContent=~p~nParts=~p~n", [Candidate, Content, Parts]),
             Text = extract_text(Parts),
             FinishReason = maps:get(<<"finishReason">>, Candidate, null),
             Done = FinishReason =/= null,
