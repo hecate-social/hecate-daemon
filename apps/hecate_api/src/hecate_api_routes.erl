@@ -16,6 +16,7 @@ compile() ->
 -spec routes() -> [tuple()].
 routes() ->
     health_routes()
+    ++ geo_routes()
     ++ identity_routes()
     ++ pairing_routes()
     ++ capability_routes()
@@ -32,6 +33,14 @@ routes() ->
 %% Health check
 health_routes() ->
     [{"/health", hecate_api_health, []}].
+
+%% Geographic restrictions
+geo_routes() ->
+    [
+        {"/api/geo/status", hecate_api_geo, [status]},
+        {"/api/geo/reload", hecate_api_geo, [reload]},
+        {"/api/geo/check/:ip", hecate_api_geo, [check_ip]}
+    ].
 
 %% Identity
 identity_routes() ->

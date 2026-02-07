@@ -1,0 +1,84 @@
+# Geographic Restrictions Configuration
+# =====================================
+#
+# This file controls which countries can access Hecate services.
+# Changes to this file can be hot-reloaded via the /api/geo/reload endpoint.
+#
+# Mode:
+#   blocklist - All countries allowed EXCEPT those in blocked_countries
+#   allowlist - ONLY countries in allowed_countries are allowed
+
+mode: blocklist
+
+# Countries blocked from accessing the service (ISO 3166-1 alpha-2 codes)
+# These countries are denied access when mode is "blocklist"
+blocked_countries:
+  - RU  # Russia
+  - CN  # China
+  - KP  # North Korea
+  - IR  # Iran
+  - BY  # Belarus
+
+# Countries allowed to access the service (ISO 3166-1 alpha-2 codes)
+# Only used when mode is "allowlist"
+allowed_countries:
+  - US  # United States
+  - CA  # Canada
+  - GB  # United Kingdom
+  - IE  # Ireland
+  - DE  # Germany
+  - FR  # France
+  - NL  # Netherlands
+  - BE  # Belgium
+  - LU  # Luxembourg
+  - AT  # Austria
+  - CH  # Switzerland
+  - IT  # Italy
+  - ES  # Spain
+  - PT  # Portugal
+  - PL  # Poland
+  - CZ  # Czech Republic
+  - SK  # Slovakia
+  - HU  # Hungary
+  - RO  # Romania
+  - BG  # Bulgaria
+  - GR  # Greece
+  - HR  # Croatia
+  - SI  # Slovenia
+  - SE  # Sweden
+  - NO  # Norway
+  - FI  # Finland
+  - DK  # Denmark
+  - EE  # Estonia
+  - LV  # Latvia
+  - LT  # Lithuania
+  - AU  # Australia
+  - NZ  # New Zealand
+  - JP  # Japan
+  - KR  # South Korea
+  - SG  # Singapore
+  - IL  # Israel
+
+# IP address overrides (checked before country rules)
+# Supports CIDR notation for ranges
+ip_overrides:
+  # Always allow these IPs/ranges (private networks, localhost)
+  allow:
+    - 127.0.0.0/8
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - ::1/128
+    - fc00::/7
+    - fe80::/10
+
+  # Always deny these IPs/ranges (known malicious, etc.)
+  deny:
+    # Add specific IPs or ranges to block here
+    # Example: - 1.2.3.4
+    # Example: - 5.6.7.0/24
+
+# VPN/Proxy detection (future feature)
+# vpn_detection:
+#   enabled: false
+#   action: warn  # warn, block, or allow

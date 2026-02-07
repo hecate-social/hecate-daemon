@@ -1,0 +1,21 @@
+{application, geo_check, [
+    {description, "Geographic restriction service - IP-based access control"},
+    {vsn, "0.1.0"},
+    {registered, [geo_check_sup]},
+    {mod, {geo_check_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        locus,
+        hackney
+    ]},
+    {env, [
+        {enabled, true},
+        {config_file, "config/geo_restrictions.yaml"},
+        {recheck_interval_ms, 3600000},  %% 1 hour
+        {db_source, {maxmind, "GeoLite2-Country"}}
+    ]},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.
