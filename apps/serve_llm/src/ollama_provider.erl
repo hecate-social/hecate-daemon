@@ -29,16 +29,11 @@ list_models(Config) ->
 -spec chat(map(), binary(), list(), map()) -> {ok, map()} | {error, term()}.
 chat(Config, Model, Messages, Opts) ->
     Url = base_url(Config) ++ "/api/chat",
-    Body = json:encode(#{
-        model => Model,
-        messages => Messages,
-        stream => false,
-        options => maps:get(options, Opts, #{})
-    }),
+    Body = json:encode(build_request(Model, Messages, Opts, false)),
     Headers = [{<<"Content-Type">>, <<"application/json">>}],
     case hackney:post(Url, Headers, Body, [with_body]) of
         {ok, 200, _RespHeaders, RespBody} ->
-            {ok, json:decode(RespBody)};
+            {ok, normalize_response(json:decode(RespBody))};
         {ok, Status, _RespHeaders, RespBody} ->
             {error, {http_error, Status, RespBody}};
         {error, Reason} ->
@@ -48,12 +43,7 @@ chat(Config, Model, Messages, Opts) ->
 -spec chat_stream(map(), binary(), list(), map(), pid(), reference()) -> ok.
 chat_stream(Config, Model, Messages, Opts, Caller, Ref) ->
     Url = base_url(Config) ++ "/api/chat",
-    Body = json:encode(#{
-        model => Model,
-        messages => Messages,
-        stream => true,
-        options => maps:get(options, Opts, #{})
-    }),
+    Body = json:encode(build_request(Model, Messages, Opts, true)),
     Headers = [{<<"Content-Type">>, <<"application/json">>}],
     case hackney:post(Url, Headers, Body, [async]) of
         {ok, ClientRef} ->
@@ -86,6 +76,107 @@ base_url(_) ->
         Url -> Url
     end.
 
+%% Build request with optional tools support
+%% Ollama uses OpenAI-compatible tool format for models that support it
+%% (llama3.1, mistral-nemo, firefunction-v2, command-r+)
+build_request(Model, Messages, Opts, Stream) ->
+    Base = #{
+        model => Model,
+        messages => Messages,
+        stream => Stream,
+        options => maps:get(options, Opts, #{})
+    },
+    %% Add tools if provided (Ollama uses OpenAI-compatible format)
+    case maps:get(tools, Opts, undefined) of
+        undefined -> Base;
+        [] -> Base;
+        Tools when is_list(Tools) ->
+            ToolSchemas = [tool_to_ollama_schema(T) || T <- Tools],
+            Base#{tools => ToolSchemas}
+    end.
+
+%% Convert tool definition to Ollama's format (OpenAI-compatible)
+tool_to_ollama_schema(#{name := Name, description := Desc, input_schema := Schema}) ->
+    #{
+        type => <<"function">>,
+        function => #{
+            name => Name,
+            description => Desc,
+            parameters => Schema
+        }
+    };
+tool_to_ollama_schema(#{<<"name">> := Name, <<"description">> := Desc, <<"input_schema">> := Schema}) ->
+    #{
+        type => <<"function">>,
+        function => #{
+            name => Name,
+            description => Desc,
+            parameters => Schema
+        }
+    }.
+
+%% Normalize response to include tool_calls if present
+normalize_response(#{<<"message">> := Message} = Resp) ->
+    Content = maps:get(<<"content">>, Message, <<>>),
+    BaseResp = Resp#{
+        content => Content,
+        done => maps:get(<<"done">>, Resp, true)
+    },
+    %% Handle tool calls from Ollama
+    case maps:get(<<"tool_calls">>, Message, undefined) of
+        undefined -> BaseResp;
+        [] -> BaseResp;
+        ToolCalls when is_list(ToolCalls) ->
+            NormalizedCalls = [normalize_tool_call(TC) || TC <- ToolCalls],
+            BaseResp#{tool_calls => NormalizedCalls}
+    end;
+normalize_response(Resp) ->
+    Resp.
+
+normalize_tool_call(#{<<"function">> := Func} = TC) ->
+    Name = maps:get(<<"name">>, Func, <<>>),
+    Args = maps:get(<<"arguments">>, Func, #{}),
+    #{
+        id => maps:get(<<"id">>, TC, generate_tool_id()),
+        name => Name,
+        arguments => Args
+    };
+normalize_tool_call(_) ->
+    #{id => <<>>, name => <<>>, arguments => #{}}.
+
+generate_tool_id() ->
+    <<H:64, L:64>> = crypto:strong_rand_bytes(16),
+    iolist_to_binary(io_lib:format("call_~16.16.0b~16.16.0b", [H, L])).
+
+%% Normalize streaming chunk - use binary keys for hecate_api_llm compatibility
+normalize_stream_chunk(#{<<"message">> := Message} = Chunk) ->
+    Content = maps:get(<<"content">>, Message, <<>>),
+    Done = maps:get(<<"done">>, Chunk, false),
+    Base = #{<<"content">> => Content, <<"done">> => Done},
+    %% Handle tool calls in streaming
+    Base1 = case maps:get(<<"tool_calls">>, Message, undefined) of
+        undefined -> Base;
+        [] -> Base;
+        ToolCalls when is_list(ToolCalls) ->
+            NormalizedCalls = [normalize_tool_call(TC) || TC <- ToolCalls],
+            Base#{<<"tool_calls">> => NormalizedCalls}
+    end,
+    %% Add usage stats if done
+    case Done of
+        true ->
+            Base1#{
+                <<"eval_count">> => maps:get(<<"eval_count">>, Chunk, 0),
+                <<"prompt_eval_count">> => maps:get(<<"prompt_eval_count">>, Chunk, 0)
+            };
+        false ->
+            Base1
+    end;
+normalize_stream_chunk(Chunk) ->
+    %% Fallback: convert to binary keys
+    Done = maps:get(<<"done">>, Chunk, maps:get(done, Chunk, false)),
+    Content = maps:get(<<"content">>, Chunk, maps:get(content, Chunk, <<>>)),
+    #{<<"content">> => Content, <<"done">> => Done}.
+
 normalize_model(OllamaModel) ->
     Name = maps:get(<<"name">>, OllamaModel, <<"unknown">>),
     Details = maps:get(<<"details">>, OllamaModel, #{}),
@@ -114,7 +205,7 @@ stream_loop(ClientRef, Ref, Caller, Buffer) ->
             NewBuffer = <<Buffer/binary, Chunk/binary>>,
             {Parsed, Rest} = parse_ndjson(NewBuffer),
             lists:foreach(fun(ChunkMap) ->
-                Caller ! {llm_chunk, Ref, ChunkMap}
+                Caller ! {llm_chunk, Ref, normalize_stream_chunk(ChunkMap)}
             end, Parsed),
             stream_loop(ClientRef, Ref, Caller, Rest);
         {hackney_response, ClientRef, {error, Reason}} ->
