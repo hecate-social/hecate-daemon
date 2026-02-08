@@ -1,0 +1,32 @@
+%%% @doc API handler: POST /api/cartwheels/:cartwheel_id/deployment/start
+%%%
+%%% Starts the deployment phase for a cartwheel.
+%%% @end
+-module(start_deployment_api).
+
+-export([init/2]).
+
+init(Req0, State) ->
+    case cowboy_req:method(Req0) of
+        <<"POST">> -> handle_post(Req0, State);
+        _ -> hecate_api_utils:method_not_allowed(Req0)
+    end.
+
+handle_post(Req0, _State) ->
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    CmdParams = #{cartwheel_id => CartwheelId},
+    dispatch(CmdParams, Req0).
+
+dispatch(CmdParams, Req) ->
+    case start_deployment_v1:new(CmdParams) of
+        {ok, Cmd} -> do_dispatch(Cmd, Req);
+        {error, Reason} -> hecate_api_utils:bad_request(Reason, Req)
+    end.
+
+do_dispatch(Cmd, Req) ->
+    case maybe_start_deployment:dispatch(Cmd) of
+        {ok, Version, Events} ->
+            hecate_api_utils:json_ok(#{version => Version, events => Events}, Req);
+        {error, Reason} ->
+            hecate_api_utils:bad_request(Reason, Req)
+    end.

@@ -121,16 +121,16 @@ ucan_routes() ->
         {"/ucan/verify", hecate_api_ucan, [verify_action]}
     ].
 
-%% LLM
+%% LLM - vertical handlers in spokes
 llm_routes() ->
     [
-        {"/api/llm/models", hecate_api_llm, [models]},
-        {"/api/llm/chat", hecate_api_llm, [chat]},
-        {"/api/llm/health", hecate_api_llm, [health]},
-        {"/api/llm/providers", hecate_api_llm, [providers]},
-        {"/api/llm/providers/add", hecate_api_llm, [add_provider]},
-        {"/api/llm/providers/reload", hecate_api_llm, [reload_providers]},
-        {"/api/llm/providers/:name/remove", hecate_api_llm, [remove_provider]}
+        {"/api/llm/models", list_available_llms_api, []},
+        {"/api/llm/chat", chat_to_llm_api, []},
+        {"/api/llm/health", check_llm_health_api, []},
+        {"/api/llm/providers", list_providers_api, []},
+        {"/api/llm/providers/add", add_provider_api, []},
+        {"/api/llm/providers/reload", reload_providers_api, []},
+        {"/api/llm/providers/:name/remove", remove_provider_api, []}
     ].
 
 %% Connectors
@@ -176,43 +176,44 @@ torch_routes() ->
 %% Cartwheel (bounded contexts) - vertical handlers in spokes
 cartwheel_routes() ->
     [
-        %% Core cartwheel routes - vertical handlers
+        %% Core cartwheel routes
         {"/api/cartwheel", get_active_cartwheel_api, []},
         {"/api/cartwheels", list_cartwheels_api, []},
+        {"/api/cartwheels/initiate", initiate_cartwheel_api, []},
         {"/api/cartwheels/:cartwheel_id", get_cartwheel_api, []},
-        %% Legacy ALC routes for backward compatibility (TODO: split into spokes)
-        {"/alc/projects", list_cartwheels_api, []},
-        {"/alc/projects/initiate", initiate_cartwheel_api, []},
-        {"/alc/projects/:cartwheel_id", hecate_api_cartwheel, [get]},
-        {"/alc/projects/:cartwheel_id/discovery/start", hecate_api_cartwheel, [discovery_start]},
-        {"/alc/projects/:cartwheel_id/discovery/findings", hecate_api_cartwheel, [discovery_list_findings]},
-        {"/alc/projects/:cartwheel_id/discovery/findings/record", hecate_api_cartwheel, [discovery_finding]},
-        {"/alc/projects/:cartwheel_id/discovery/terms", hecate_api_cartwheel, [discovery_list_terms]},
-        {"/alc/projects/:cartwheel_id/discovery/terms/define", hecate_api_cartwheel, [discovery_term]},
-        {"/alc/projects/:cartwheel_id/discovery/complete", hecate_api_cartwheel, [discovery_complete]},
-        {"/alc/projects/:cartwheel_id/transition", hecate_api_cartwheel, [transition_phase]},
-        {"/alc/projects/:cartwheel_id/architecture/start", hecate_api_cartwheel, [architecture_start]},
-        {"/alc/projects/:cartwheel_id/architecture/dossiers", hecate_api_cartwheel, [architecture_list_dossiers]},
-        {"/alc/projects/:cartwheel_id/architecture/dossiers/define", hecate_api_cartwheel, [architecture_dossier]},
-        {"/alc/projects/:cartwheel_id/architecture/spokes", hecate_api_cartwheel, [architecture_list_spokes]},
-        {"/alc/projects/:cartwheel_id/architecture/spokes/inventory", hecate_api_cartwheel, [architecture_spoke]},
-        {"/alc/projects/:cartwheel_id/architecture/plan", hecate_api_cartwheel, [architecture_plan]},
-        {"/alc/projects/:cartwheel_id/architecture/plan/approve", hecate_api_cartwheel, [architecture_approve_plan]},
-        {"/alc/projects/:cartwheel_id/architecture/complete", hecate_api_cartwheel, [architecture_complete]},
-        {"/alc/projects/:cartwheel_id/testing/start", hecate_api_cartwheel, [testing_start]},
-        {"/alc/projects/:cartwheel_id/testing/skeleton", hecate_api_cartwheel, [testing_skeleton]},
-        {"/alc/projects/:cartwheel_id/testing/implement", hecate_api_cartwheel, [testing_implement_spoke]},
-        {"/alc/projects/:cartwheel_id/testing/implementations", hecate_api_cartwheel, [testing_list_implementations]},
-        {"/alc/projects/:cartwheel_id/testing/verify", hecate_api_cartwheel, [testing_verify_build]},
-        {"/alc/projects/:cartwheel_id/testing/builds", hecate_api_cartwheel, [testing_list_builds]},
-        {"/alc/projects/:cartwheel_id/testing/complete", hecate_api_cartwheel, [testing_complete]},
-        {"/alc/projects/:cartwheel_id/deployment/start", hecate_api_cartwheel, [deployment_start]},
-        {"/alc/projects/:cartwheel_id/deployment/record", hecate_api_cartwheel, [deployment_record]},
-        {"/alc/projects/:cartwheel_id/deployment/deployments", hecate_api_cartwheel, [deployment_list_deployments]},
-        {"/alc/projects/:cartwheel_id/deployment/incident", hecate_api_cartwheel, [deployment_report_incident]},
-        {"/alc/projects/:cartwheel_id/deployment/incident/resolve", hecate_api_cartwheel, [deployment_resolve_incident]},
-        {"/alc/projects/:cartwheel_id/deployment/incidents", hecate_api_cartwheel, [deployment_list_incidents]},
-        {"/alc/projects/:cartwheel_id/deployment/complete", hecate_api_cartwheel, [deployment_complete]}
+        {"/api/cartwheels/:cartwheel_id/transition", transition_phase_api, []},
+        %% Discovery & Analysis phase
+        {"/api/cartwheels/:cartwheel_id/discovery/start", start_discovery_api, []},
+        {"/api/cartwheels/:cartwheel_id/discovery/findings", list_findings_api, []},
+        {"/api/cartwheels/:cartwheel_id/discovery/findings/record", record_finding_api, []},
+        {"/api/cartwheels/:cartwheel_id/discovery/terms", list_terms_api, []},
+        {"/api/cartwheels/:cartwheel_id/discovery/terms/define", define_term_api, []},
+        {"/api/cartwheels/:cartwheel_id/discovery/complete", complete_discovery_api, []},
+        %% Architecture & Planning phase
+        {"/api/cartwheels/:cartwheel_id/architecture/start", start_architecture_api, []},
+        {"/api/cartwheels/:cartwheel_id/architecture/dossiers", list_dossier_designs_api, []},
+        {"/api/cartwheels/:cartwheel_id/architecture/dossiers/define", define_dossier_api, []},
+        {"/api/cartwheels/:cartwheel_id/architecture/spokes", list_spoke_inventory_api, []},
+        {"/api/cartwheels/:cartwheel_id/architecture/spokes/inventory", inventory_spoke_api, []},
+        {"/api/cartwheels/:cartwheel_id/architecture/plan", draft_plan_api, []},
+        {"/api/cartwheels/:cartwheel_id/architecture/plan/approve", approve_plan_api, []},
+        {"/api/cartwheels/:cartwheel_id/architecture/complete", complete_architecture_api, []},
+        %% Testing & Implementation phase
+        {"/api/cartwheels/:cartwheel_id/testing/start", start_testing_api, []},
+        {"/api/cartwheels/:cartwheel_id/testing/skeleton", create_skeleton_api, []},
+        {"/api/cartwheels/:cartwheel_id/testing/implement", implement_spoke_api, []},
+        {"/api/cartwheels/:cartwheel_id/testing/implementations", list_spoke_implementations_api, []},
+        {"/api/cartwheels/:cartwheel_id/testing/verify", verify_build_api, []},
+        {"/api/cartwheels/:cartwheel_id/testing/builds", list_build_verifications_api, []},
+        {"/api/cartwheels/:cartwheel_id/testing/complete", complete_testing_api, []},
+        %% Deployment & Operations phase
+        {"/api/cartwheels/:cartwheel_id/deployment/start", start_deployment_api, []},
+        {"/api/cartwheels/:cartwheel_id/deployment/record", record_deployment_api, []},
+        {"/api/cartwheels/:cartwheel_id/deployment/deployments", list_deployments_api, []},
+        {"/api/cartwheels/:cartwheel_id/deployment/incident", report_incident_api, []},
+        {"/api/cartwheels/:cartwheel_id/deployment/incident/resolve", resolve_incident_api, []},
+        {"/api/cartwheels/:cartwheel_id/deployment/incidents", list_incidents_api, []},
+        {"/api/cartwheels/:cartwheel_id/deployment/complete", complete_deployment_api, []}
     ].
 
 %% Agents (specialists and generalists)
