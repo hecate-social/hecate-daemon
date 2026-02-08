@@ -28,7 +28,10 @@ routes() ->
     ++ llm_routes()
     ++ connector_routes()
     ++ mentor_routes()
-    ++ alc_routes().
+    ++ torch_routes()
+    ++ cartwheel_routes()
+    ++ agent_routes()
+    ++ telemetry_routes().
 
 %% Health check
 health_routes() ->
@@ -160,43 +163,68 @@ mentor_routes() ->
         {"/mentors/remote", hecate_api_mentors, [list_remote]}
     ].
 
-%% Application Lifecycle (ALC)
-alc_routes() ->
+%% Torch (business endeavors)
+torch_routes() ->
     [
-        {"/alc/projects", hecate_api_alc, [list_projects]},
-        {"/alc/projects/initiate", hecate_api_alc, [initiate]},
-        {"/alc/projects/:project_id", hecate_api_alc, [get_project]},
-        {"/alc/projects/:project_id/discovery/start", hecate_api_alc, [discovery_start]},
-        {"/alc/projects/:project_id/discovery/findings", hecate_api_alc, [discovery_list_findings]},
-        {"/alc/projects/:project_id/discovery/findings/record", hecate_api_alc, [discovery_finding]},
-        {"/alc/projects/:project_id/discovery/terms", hecate_api_alc, [discovery_list_terms]},
-        {"/alc/projects/:project_id/discovery/terms/define", hecate_api_alc, [discovery_term]},
-        {"/alc/projects/:project_id/discovery/complete", hecate_api_alc, [discovery_complete]},
-        %% Phase transition
-        {"/alc/projects/:project_id/transition", hecate_api_alc, [transition_phase]},
-        %% Architecture & Planning
-        {"/alc/projects/:project_id/architecture/start", hecate_api_alc, [architecture_start]},
-        {"/alc/projects/:project_id/architecture/dossiers", hecate_api_alc, [architecture_list_dossiers]},
-        {"/alc/projects/:project_id/architecture/dossiers/define", hecate_api_alc, [architecture_dossier]},
-        {"/alc/projects/:project_id/architecture/spokes", hecate_api_alc, [architecture_list_spokes]},
-        {"/alc/projects/:project_id/architecture/spokes/inventory", hecate_api_alc, [architecture_spoke]},
-        {"/alc/projects/:project_id/architecture/plan", hecate_api_alc, [architecture_plan]},
-        {"/alc/projects/:project_id/architecture/plan/approve", hecate_api_alc, [architecture_approve_plan]},
-        {"/alc/projects/:project_id/architecture/complete", hecate_api_alc, [architecture_complete]},
-        %% Testing & Implementation
-        {"/alc/projects/:project_id/testing/start", hecate_api_alc, [testing_start]},
-        {"/alc/projects/:project_id/testing/skeleton", hecate_api_alc, [testing_skeleton]},
-        {"/alc/projects/:project_id/testing/implement", hecate_api_alc, [testing_implement_spoke]},
-        {"/alc/projects/:project_id/testing/implementations", hecate_api_alc, [testing_list_implementations]},
-        {"/alc/projects/:project_id/testing/verify", hecate_api_alc, [testing_verify_build]},
-        {"/alc/projects/:project_id/testing/builds", hecate_api_alc, [testing_list_builds]},
-        {"/alc/projects/:project_id/testing/complete", hecate_api_alc, [testing_complete]},
-        %% Deployment & Operations
-        {"/alc/projects/:project_id/deployment/start", hecate_api_alc, [deployment_start]},
-        {"/alc/projects/:project_id/deployment/record", hecate_api_alc, [deployment_record]},
-        {"/alc/projects/:project_id/deployment/deployments", hecate_api_alc, [deployment_list_deployments]},
-        {"/alc/projects/:project_id/deployment/incident", hecate_api_alc, [deployment_report_incident]},
-        {"/alc/projects/:project_id/deployment/incident/resolve", hecate_api_alc, [deployment_resolve_incident]},
-        {"/alc/projects/:project_id/deployment/incidents", hecate_api_alc, [deployment_list_incidents]},
-        {"/alc/projects/:project_id/deployment/complete", hecate_api_alc, [deployment_complete]}
+        {"/api/torch", hecate_api_torch, [get]},
+        {"/api/torch/initiate", hecate_api_torch, [initiate]},
+        {"/api/torches", hecate_api_torch, [list]},
+        {"/api/torches/:torch_id", hecate_api_torch, [get_by_id]}
+    ].
+
+%% Cartwheel (bounded contexts) - replaces alc_routes
+cartwheel_routes() ->
+    [
+        {"/api/cartwheel", hecate_api_cartwheel, [get_active]},
+        {"/api/cartwheels", hecate_api_cartwheel, [list]},
+        {"/api/cartwheels/:cartwheel_id", hecate_api_cartwheel, [get]},
+        %% Legacy ALC routes for backward compatibility
+        {"/alc/projects", hecate_api_cartwheel, [list]},
+        {"/alc/projects/initiate", hecate_api_cartwheel, [initiate]},
+        {"/alc/projects/:cartwheel_id", hecate_api_cartwheel, [get]},
+        {"/alc/projects/:cartwheel_id/discovery/start", hecate_api_cartwheel, [discovery_start]},
+        {"/alc/projects/:cartwheel_id/discovery/findings", hecate_api_cartwheel, [discovery_list_findings]},
+        {"/alc/projects/:cartwheel_id/discovery/findings/record", hecate_api_cartwheel, [discovery_finding]},
+        {"/alc/projects/:cartwheel_id/discovery/terms", hecate_api_cartwheel, [discovery_list_terms]},
+        {"/alc/projects/:cartwheel_id/discovery/terms/define", hecate_api_cartwheel, [discovery_term]},
+        {"/alc/projects/:cartwheel_id/discovery/complete", hecate_api_cartwheel, [discovery_complete]},
+        {"/alc/projects/:cartwheel_id/transition", hecate_api_cartwheel, [transition_phase]},
+        {"/alc/projects/:cartwheel_id/architecture/start", hecate_api_cartwheel, [architecture_start]},
+        {"/alc/projects/:cartwheel_id/architecture/dossiers", hecate_api_cartwheel, [architecture_list_dossiers]},
+        {"/alc/projects/:cartwheel_id/architecture/dossiers/define", hecate_api_cartwheel, [architecture_dossier]},
+        {"/alc/projects/:cartwheel_id/architecture/spokes", hecate_api_cartwheel, [architecture_list_spokes]},
+        {"/alc/projects/:cartwheel_id/architecture/spokes/inventory", hecate_api_cartwheel, [architecture_spoke]},
+        {"/alc/projects/:cartwheel_id/architecture/plan", hecate_api_cartwheel, [architecture_plan]},
+        {"/alc/projects/:cartwheel_id/architecture/plan/approve", hecate_api_cartwheel, [architecture_approve_plan]},
+        {"/alc/projects/:cartwheel_id/architecture/complete", hecate_api_cartwheel, [architecture_complete]},
+        {"/alc/projects/:cartwheel_id/testing/start", hecate_api_cartwheel, [testing_start]},
+        {"/alc/projects/:cartwheel_id/testing/skeleton", hecate_api_cartwheel, [testing_skeleton]},
+        {"/alc/projects/:cartwheel_id/testing/implement", hecate_api_cartwheel, [testing_implement_spoke]},
+        {"/alc/projects/:cartwheel_id/testing/implementations", hecate_api_cartwheel, [testing_list_implementations]},
+        {"/alc/projects/:cartwheel_id/testing/verify", hecate_api_cartwheel, [testing_verify_build]},
+        {"/alc/projects/:cartwheel_id/testing/builds", hecate_api_cartwheel, [testing_list_builds]},
+        {"/alc/projects/:cartwheel_id/testing/complete", hecate_api_cartwheel, [testing_complete]},
+        {"/alc/projects/:cartwheel_id/deployment/start", hecate_api_cartwheel, [deployment_start]},
+        {"/alc/projects/:cartwheel_id/deployment/record", hecate_api_cartwheel, [deployment_record]},
+        {"/alc/projects/:cartwheel_id/deployment/deployments", hecate_api_cartwheel, [deployment_list_deployments]},
+        {"/alc/projects/:cartwheel_id/deployment/incident", hecate_api_cartwheel, [deployment_report_incident]},
+        {"/alc/projects/:cartwheel_id/deployment/incident/resolve", hecate_api_cartwheel, [deployment_resolve_incident]},
+        {"/alc/projects/:cartwheel_id/deployment/incidents", hecate_api_cartwheel, [deployment_list_incidents]},
+        {"/alc/projects/:cartwheel_id/deployment/complete", hecate_api_cartwheel, [deployment_complete]}
+    ].
+
+%% Agents (specialists and generalists)
+agent_routes() ->
+    [
+        {"/api/agents", hecate_api_agents, [list]},
+        {"/api/agents/:agent_id", hecate_api_agents, [get]}
+    ].
+
+%% Telemetry and cost tracking
+telemetry_routes() ->
+    [
+        {"/api/telemetry/cost", hecate_api_telemetry, [total_cost]},
+        {"/api/telemetry/cost/:torch_id", hecate_api_telemetry, [cost_by_torch]},
+        {"/api/telemetry/cost/:torch_id/cartwheels", hecate_api_telemetry, [cost_by_cartwheel]},
+        {"/api/telemetry/cost/:torch_id/agents", hecate_api_telemetry, [cost_by_agent]}
     ].

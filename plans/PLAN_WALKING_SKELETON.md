@@ -1,8 +1,9 @@
 # Plan: Hecate Walking Skeleton
 
-## Status: PLANNING
+## Status: IN PROGRESS (Daemon Complete)
 
 **Created:** 2026-02-08
+**Updated:** 2026-02-08
 **Goal:** End-to-end thin slice proving the Torch → Cartwheel → Agent architecture
 
 ---
@@ -124,6 +125,18 @@ apps/manage_torches/
 │       ├── activate_cartwheel_v1.erl    # Command
 │       ├── cartwheel_activated_v1.erl   # Event
 │       └── maybe_activate_cartwheel.erl # Handler
+└── rebar.config
+
+apps/query_torches/
+├── src/
+│   ├── query_torches.app.src
+│   ├── query_torches_app.erl
+│   ├── query_torches_sup.erl
+│   ├── query_torches_store.erl         # SQLite read model
+│   ├── torch_initiated_v1_to_torches.erl  # Projection
+│   ├── cartwheel_activated_v1_to_torches.erl  # Updates active cartwheel
+│   ├── find_torch.erl                  # Query by ID
+│   └── list_torches.erl                # List all
 └── rebar.config
 ```
 
@@ -257,12 +270,13 @@ apps/hecate_telemetry/
 ### SQLite Schema
 
 ```sql
--- LLM call tracking
+-- LLM call tracking with full attribution hierarchy
 CREATE TABLE llm_calls (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     torch_id TEXT NOT NULL,
-    agent_id TEXT,
-    task_id TEXT,
+    cartwheel_id TEXT,          -- NULL during Torch-level work (DnA discovery)
+    agent_id TEXT,              -- NULL for direct user LLM calls
+    task_id TEXT,               -- NULL for ad-hoc calls
     model TEXT NOT NULL,
     tokens_in INTEGER NOT NULL,
     tokens_out INTEGER NOT NULL,
@@ -271,7 +285,9 @@ CREATE TABLE llm_calls (
 );
 
 CREATE INDEX idx_llm_calls_torch ON llm_calls(torch_id, timestamp);
+CREATE INDEX idx_llm_calls_cartwheel ON llm_calls(cartwheel_id, timestamp);
 CREATE INDEX idx_llm_calls_agent ON llm_calls(agent_id, timestamp);
+CREATE INDEX idx_llm_calls_task ON llm_calls(task_id, timestamp);
 
 -- Agent metrics (future)
 CREATE TABLE agent_metrics (
@@ -314,6 +330,8 @@ Defer:
 | GET | `/api/agents/:id` | `hecate_api_agents` | Get agent status |
 | GET | `/api/telemetry/cost` | `hecate_api_telemetry` | Cost summary |
 | GET | `/api/telemetry/cost/:torch_id` | `hecate_api_telemetry` | Cost by Torch |
+| GET | `/api/telemetry/cost/:torch_id/cartwheels` | `hecate_api_telemetry` | Cost by Cartwheel |
+| GET | `/api/telemetry/cost/:torch_id/agents` | `hecate_api_telemetry` | Cost by Agent |
 
 ### Skeleton Scope
 
@@ -372,51 +390,55 @@ Implement all routes with basic functionality. Hardcode single Torch for skeleto
 
 ## Implementation Order
 
-### Step 1: Rename (manage_alc → manage_cartwheels)
-- [ ] Rename directories and files
-- [ ] Update module names
-- [ ] Add torch_id to aggregate
-- [ ] Rename events (project → cartwheel)
-- [ ] Update query_alc → query_cartwheels
-- [ ] Update rebar.config dependencies
-- [ ] Verify compilation
+### Step 1: Rename (manage_alc → manage_cartwheels) ✅
+- [x] Rename directories and files
+- [x] Update module names
+- [x] Add torch_id to aggregate
+- [x] Rename events (project → cartwheel)
+- [x] Update query_alc → query_cartwheels
+- [x] Update rebar.config dependencies
+- [x] Verify compilation
 
-### Step 2: Create manage_torches
-- [ ] Create app structure
-- [ ] Implement torch_aggregate.erl
-- [ ] Implement initiate_torch/ spoke
-- [ ] Implement activate_cartwheel/ spoke
-- [ ] Wire up supervisor
-- [ ] Add to umbrella rebar.config
-- [ ] Verify compilation
+### Step 2: Create manage_torches + query_torches ✅
+- [x] Create manage_torches app structure
+- [x] Implement torch_aggregate.erl
+- [x] Implement initiate_torch/ spoke
+- [x] Implement activate_cartwheel/ spoke
+- [x] Wire up manage_torches supervisor
+- [x] Create query_torches app structure
+- [x] Implement query_torches_store.erl (SQLite)
+- [x] Implement projections (torch_initiated, cartwheel_activated)
+- [x] Implement queries (find_torch, list_torches)
+- [x] Add both to umbrella rebar.config
+- [x] Verify compilation
 
-### Step 3: Create manage_agents (minimal)
-- [ ] Create app structure
-- [ ] Implement agent_aggregate.erl (minimal)
-- [ ] Implement activate_specialist/ spoke
-- [ ] Wire up supervisor
-- [ ] Verify compilation
+### Step 3: Create manage_agents (minimal) ✅
+- [x] Create app structure
+- [x] Implement agent_aggregate.erl (minimal)
+- [x] Implement activate_specialist/ spoke
+- [x] Wire up supervisor
+- [x] Verify compilation
 
-### Step 4: Create hecate_telemetry
-- [ ] Create app structure
-- [ ] Create SQLite schema
-- [ ] Implement store module
-- [ ] Implement collector module
-- [ ] Wire up supervisor
-- [ ] Verify compilation
+### Step 4: Create hecate_telemetry ✅
+- [x] Create app structure
+- [x] Create SQLite schema
+- [x] Implement store module
+- [x] Implement collector module
+- [x] Wire up supervisor
+- [x] Verify compilation
 
-### Step 5: Update hecate_api
-- [ ] Add torch routes
-- [ ] Add cartwheel routes
-- [ ] Add agent routes
-- [ ] Add telemetry routes
-- [ ] Update router
-- [ ] Verify compilation
+### Step 5: Update hecate_api ✅
+- [x] Add torch routes
+- [x] Add cartwheel routes
+- [x] Add agent routes
+- [x] Add telemetry routes
+- [x] Update router
+- [x] Verify compilation
 
-### Step 6: Instrument serve_llm
-- [ ] Add telemetry calls to LLM providers
-- [ ] Pass torch_id through context
-- [ ] Verify telemetry recording
+### Step 6: Instrument serve_llm ✅
+- [x] Add telemetry calls to LLM chat
+- [x] Pass torch_id through context (via Opts map)
+- [x] Verify telemetry recording
 
 ### Step 7: Update TUI
 - [ ] Add /torch command
@@ -469,6 +491,7 @@ The skeleton is complete when:
 | App | Files |
 |-----|-------|
 | `manage_torches` | ~10 files (aggregate, 2 spokes, app/sup) |
+| `query_torches` | ~8 files (store, 2 projections, 2 queries, app/sup) |
 | `manage_agents` | ~7 files (aggregate, 1 spoke, app/sup) |
 | `hecate_telemetry` | ~5 files (store, collector, schema, app/sup) |
 

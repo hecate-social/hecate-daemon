@@ -1,0 +1,15 @@
+{application, hecate_telemetry, [
+    {description, "Telemetry and cost tracking for Hecate"},
+    {vsn, "0.1.0"},
+    {registered, [hecate_telemetry_store]},
+    {mod, {hecate_telemetry_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        esqlite
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

@@ -25,8 +25,11 @@
         query_ucan,
         mentor_agents,
         query_mentors,
-        manage_alc,
-        query_alc
+        manage_cartwheels,
+        query_cartwheels,
+        manage_torches,
+        query_torches,
+        hecate_telemetry
     ]},
     {env, [
         {http_port, 4444},

@@ -1,0 +1,122 @@
+%%% @doc SQLite connection pool for query_torches read models.
+-module(query_torches_store).
+-behaviour(gen_server).
+
+-export([start_link/0, init_schema/0, execute/1, execute/2, query/1, query/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+
+-record(state, {db :: reference()}).
+
+-define(DB_PATH, "data/query_torches.db").
+
+%% @doc Start the SQLite store process.
+-spec start_link() -> {ok, pid()} | {error, term()}.
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+init([]) ->
+    filelib:ensure_dir(?DB_PATH),
+    {ok, Db} = esqlite3:open(?DB_PATH),
+    ok = esqlite3:exec(Db, "PRAGMA journal_mode=WAL;"),
+    ok = esqlite3:exec(Db, "PRAGMA synchronous=NORMAL;"),
+    {ok, #state{db = Db}}.
+
+%% @doc Initialize database schema.
+-spec init_schema() -> ok.
+init_schema() ->
+    gen_server:call(?MODULE, init_schema).
+
+%% @doc Execute SQL statement (no results).
+-spec execute(iodata()) -> ok | {error, term()}.
+execute(Sql) ->
+    gen_server:call(?MODULE, {execute, Sql, []}).
+
+%% @doc Execute SQL statement with parameters (no results).
+-spec execute(iodata(), [term()]) -> ok | {error, term()}.
+execute(Sql, Params) ->
+    gen_server:call(?MODULE, {execute, Sql, Params}).
+
+%% @doc Query SQL (returns rows).
+-spec query(iodata()) -> {ok, [tuple()]} | {error, term()}.
+query(Sql) ->
+    gen_server:call(?MODULE, {query, Sql, []}).
+
+%% @doc Query SQL with parameters (returns rows).
+-spec query(iodata(), [term()]) -> {ok, [tuple()]} | {error, term()}.
+query(Sql, Params) ->
+    gen_server:call(?MODULE, {query, Sql, Params}).
+
+handle_call(init_schema, _From, #state{db = Db} = State) ->
+    Result = create_tables(Db),
+    {reply, Result, State};
+
+handle_call({execute, Sql, Params}, _From, #state{db = Db} = State) ->
+    case Params of
+        [] ->
+            Result = esqlite3:exec(Db, Sql),
+            {reply, Result, State};
+        _ ->
+            case esqlite3:prepare(Sql, Db) of
+                {ok, Stmt} ->
+                    ok = esqlite3:bind(Stmt, Params),
+                    step_until_done(Stmt),
+                    {reply, ok, State};
+                {error, _} = Err ->
+                    {reply, Err, State}
+            end
+    end;
+
+handle_call({query, Sql, Params}, _From, #state{db = Db} = State) ->
+    case esqlite3:prepare(Sql, Db) of
+        {ok, Stmt} ->
+            case Params of
+                [] -> ok;
+                _ -> ok = esqlite3:bind(Stmt, Params)
+            end,
+            Rows = esqlite3:fetchall(Stmt),
+            {reply, {ok, Rows}, State};
+        {error, _} = Err ->
+            {reply, Err, State}
+    end;
+
+handle_call(_Request, _From, State) ->
+    {reply, {error, unknown_call}, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(_Reason, #state{db = Db}) ->
+    esqlite3:close(Db).
+
+%% Internal
+
+step_until_done(Stmt) ->
+    case esqlite3:step(Stmt) of
+        '$done' -> ok;
+        {row, _} -> step_until_done(Stmt);
+        ok -> ok
+    end.
+
+create_tables(Db) ->
+    Stmts = [
+        "CREATE TABLE IF NOT EXISTS torches (
+            torch_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            brief TEXT,
+            status INTEGER NOT NULL DEFAULT 1,
+            repos TEXT,
+            skills TEXT,
+            context_map TEXT,
+            active_cartwheel_id TEXT,
+            initiated_at INTEGER NOT NULL,
+            initiated_by TEXT
+        );",
+        "CREATE INDEX IF NOT EXISTS idx_torches_status ON torches(status);",
+        "CREATE INDEX IF NOT EXISTS idx_torches_name ON torches(name);",
+        "CREATE INDEX IF NOT EXISTS idx_torches_active_cartwheel ON torches(active_cartwheel_id);"
+    ],
+    lists:foreach(fun(Sql) -> ok = esqlite3:exec(Db, Sql) end, Stmts),
+    ok.

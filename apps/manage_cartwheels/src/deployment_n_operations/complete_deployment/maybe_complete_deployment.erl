@@ -1,0 +1,68 @@
+%%% @doc maybe_complete_deployment handler
+%%% Business logic for completing the deployment and operations phase.
+%%% Validates the command and dispatches via evoq.
+-module(maybe_complete_deployment).
+
+-include_lib("evoq/include/evoq.hrl").
+
+-export([handle/1, dispatch/1]).
+
+-dialyzer({nowarn_function, [dispatch/1]}).
+
+%% @doc Handle complete_deployment_v1 command (business logic only)
+-spec handle(complete_deployment_v1:complete_deployment_v1()) ->
+    {ok, [deployment_completed_v1:deployment_completed_v1()]} | {error, term()}.
+handle(Cmd) ->
+    CartwheelId = complete_deployment_v1:get_cartwheel_id(Cmd),
+    case validate_command(CartwheelId) of
+        ok ->
+            Event = create_event(Cmd),
+            {ok, [Event]};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+%% @doc Dispatch command via evoq
+-spec dispatch(complete_deployment_v1:complete_deployment_v1()) ->
+    {ok, non_neg_integer(), [map()]} | {error, term()}.
+dispatch(Cmd) ->
+    CartwheelId = complete_deployment_v1:get_cartwheel_id(Cmd),
+    Timestamp = erlang:system_time(millisecond),
+
+    EvoqCmd = #evoq_command{
+        command_id = generate_command_id(CartwheelId, Timestamp),
+        command_type = complete_deployment,
+        aggregate_type = cartwheel_aggregate,
+        aggregate_id = <<"alc-", CartwheelId/binary>>,
+        payload = complete_deployment_v1:to_map(Cmd),
+        metadata = #{timestamp => Timestamp, aggregate_type => cartwheel_aggregate},
+        causation_id = undefined,
+        correlation_id = undefined
+    },
+
+    Opts = #{
+        store_id => manage_cartwheels_store,
+        adapter => reckon_evoq_adapter,
+        consistency => eventual
+    },
+
+    evoq_dispatcher:dispatch(EvoqCmd, Opts).
+
+%% Internal
+
+validate_command(CartwheelId) when
+    is_binary(CartwheelId), byte_size(CartwheelId) > 0 ->
+    ok;
+validate_command(_) ->
+    {error, invalid_command}.
+
+create_event(Cmd) ->
+    deployment_completed_v1:new(#{
+        cartwheel_id => complete_deployment_v1:get_cartwheel_id(Cmd)
+    }).
+
+generate_command_id(CartwheelId, Timestamp) ->
+    Hash = crypto:hash(sha256, <<CartwheelId/binary, (integer_to_binary(Timestamp))/binary>>),
+    HashHex = binary:encode_hex(Hash),
+    ShortHash = binary:part(HashHex, 0, 16),
+    <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

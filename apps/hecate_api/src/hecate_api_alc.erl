@@ -10,10 +10,10 @@
 %% Orchestration
 init(Req0, [initiate]) ->
     handle_initiate(Req0);
-init(Req0, [list_projects]) ->
-    handle_list_projects(Req0);
-init(Req0, [get_project]) ->
-    handle_get_project(Req0);
+init(Req0, [list_cartwheels]) ->
+    handle_list_cartwheels(Req0);
+init(Req0, [get_cartwheel]) ->
+    handle_get_cartwheel(Req0);
 
 %% Discovery & Analysis
 init(Req0, [discovery_start]) ->
@@ -91,15 +91,15 @@ handle_initiate(Req0) ->
         name => maps:get(<<"name">>, Params),
         description => maps:get(<<"description">>, Params, undefined)
     },
-    case initiate_project_v1:new(CmdParams) of
+    case initiate_cartwheel_v1:new(CmdParams) of
         {ok, Cmd} ->
-            case maybe_initiate_project:dispatch(Cmd) of
+            case maybe_initiate_cartwheel:dispatch(Cmd) of
                 {ok, Version, Events} ->
                     json_response(Req1, 201, #{
                         ok => true,
                         version => Version,
                         events => Events,
-                        project_id => initiate_project_v1:get_project_id(Cmd)
+                        cartwheel_id => initiate_cartwheel_v1:get_cartwheel_id(Cmd)
                     });
                 {error, Reason} ->
                     error_response(Req1, 400, Reason)
@@ -109,20 +109,20 @@ handle_initiate(Req0) ->
     end.
 
 %% GET /alc/projects
-handle_list_projects(Req0) ->
+handle_list_cartwheels(Req0) ->
     QS = cowboy_req:parse_qs(Req0),
     Filters = build_filters(QS),
-    case list_projects:execute(Filters) of
+    case list_cartwheels:execute(Filters) of
         {ok, Projects} ->
             json_response(Req0, 200, #{ok => true, projects => Projects});
         {error, Reason} ->
             error_response(Req0, 500, Reason)
     end.
 
-%% GET /alc/projects/:project_id
-handle_get_project(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
-    case get_project:execute(ProjectId) of
+%% GET /alc/projects/:cartwheel_id
+handle_get_cartwheel(Req0) ->
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    case get_cartwheel:execute(CartwheelId) of
         {ok, Project} ->
             json_response(Req0, 200, #{ok => true, project => Project});
         {error, not_found} ->
@@ -131,18 +131,18 @@ handle_get_project(Req0) ->
             error_response(Req0, 500, Reason)
     end.
 
-%% POST /alc/projects/:project_id/discovery/start
+%% POST /alc/projects/:cartwheel_id/discovery/start
 handle_discovery_start(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
-    dispatch_simple_cmd(Req0, start_discovery_v1, maybe_start_discovery, #{project_id => ProjectId}).
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    dispatch_simple_cmd(Req0, start_discovery_v1, maybe_start_discovery, #{cartwheel_id => CartwheelId}).
 
-%% POST /alc/projects/:project_id/discovery/findings
+%% POST /alc/projects/:cartwheel_id/discovery/findings
 handle_discovery_finding(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         title => maps:get(<<"title">>, Params),
         category => maps:get(<<"category">>, Params, <<"requirement">>),
         content => maps:get(<<"content">>, Params, undefined),
@@ -150,94 +150,94 @@ handle_discovery_finding(Req0) ->
     },
     dispatch_simple_cmd(Req1, record_finding_v1, maybe_record_finding, CmdParams).
 
-%% GET /alc/projects/:project_id/discovery/findings
+%% GET /alc/projects/:cartwheel_id/discovery/findings
 handle_discovery_list_findings(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     QS = cowboy_req:parse_qs(Req0),
     Filters = build_filters(QS),
-    case list_findings:execute(Filters#{project_id => ProjectId}) of
+    case list_findings:execute(Filters#{cartwheel_id => CartwheelId}) of
         {ok, Findings} ->
             json_response(Req0, 200, #{ok => true, findings => Findings});
         {error, Reason} ->
             error_response(Req0, 500, Reason)
     end.
 
-%% POST /alc/projects/:project_id/discovery/terms
+%% POST /alc/projects/:cartwheel_id/discovery/terms
 handle_discovery_term(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         term => maps:get(<<"term">>, Params),
         definition => maps:get(<<"definition">>, Params)
     },
     dispatch_simple_cmd(Req1, define_term_v1, maybe_define_term, CmdParams).
 
-%% GET /alc/projects/:project_id/discovery/terms
+%% GET /alc/projects/:cartwheel_id/discovery/terms
 handle_discovery_list_terms(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
-    case list_terms:execute(#{project_id => ProjectId}) of
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    case list_terms:execute(#{cartwheel_id => CartwheelId}) of
         {ok, Terms} ->
             json_response(Req0, 200, #{ok => true, terms => Terms});
         {error, Reason} ->
             error_response(Req0, 500, Reason)
     end.
 
-%% POST /alc/projects/:project_id/discovery/complete
+%% POST /alc/projects/:cartwheel_id/discovery/complete
 handle_discovery_complete(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
-    dispatch_simple_cmd(Req0, complete_discovery_v1, maybe_complete_discovery, #{project_id => ProjectId}).
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    dispatch_simple_cmd(Req0, complete_discovery_v1, maybe_complete_discovery, #{cartwheel_id => CartwheelId}).
 
-%% POST /alc/projects/:project_id/transition
+%% POST /alc/projects/:cartwheel_id/transition
 handle_transition_phase(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         from_phase => maps:get(<<"from_phase">>, Params),
         to_phase => maps:get(<<"to_phase">>, Params)
     },
     dispatch_simple_cmd(Req1, transition_phase_v1, maybe_transition_phase, CmdParams).
 
-%% POST /alc/projects/:project_id/architecture/start
+%% POST /alc/projects/:cartwheel_id/architecture/start
 handle_architecture_start(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
-    dispatch_simple_cmd(Req0, start_architecture_v1, maybe_start_architecture, #{project_id => ProjectId}).
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    dispatch_simple_cmd(Req0, start_architecture_v1, maybe_start_architecture, #{cartwheel_id => CartwheelId}).
 
-%% POST /alc/projects/:project_id/architecture/dossiers
+%% POST /alc/projects/:cartwheel_id/architecture/dossiers
 handle_architecture_dossier(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         dossier_name => maps:get(<<"dossier_name">>, Params),
         stream_pattern => maps:get(<<"stream_pattern">>, Params, <<"default">>),
         description => maps:get(<<"description">>, Params, undefined)
     },
     dispatch_simple_cmd(Req1, define_dossier_v1, maybe_define_dossier, CmdParams).
 
-%% GET /alc/projects/:project_id/architecture/dossiers
+%% GET /alc/projects/:cartwheel_id/architecture/dossiers
 handle_architecture_list_dossiers(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     QS = cowboy_req:parse_qs(Req0),
     Filters = build_filters(QS),
-    case list_dossier_designs:execute(Filters#{project_id => ProjectId}) of
+    case list_dossier_designs:execute(Filters#{cartwheel_id => CartwheelId}) of
         {ok, Dossiers} ->
             json_response(Req0, 200, #{ok => true, dossiers => Dossiers});
         {error, Reason} ->
             error_response(Req0, 500, Reason)
     end.
 
-%% POST /alc/projects/:project_id/architecture/spokes
+%% POST /alc/projects/:cartwheel_id/architecture/spokes
 handle_architecture_spoke(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         spoke_name => maps:get(<<"spoke_name">>, Params),
         spoke_type => maps:get(<<"spoke_type">>, Params),
         priority => maps:get(<<"priority">>, Params, <<"should">>),
@@ -246,185 +246,185 @@ handle_architecture_spoke(Req0) ->
     },
     dispatch_simple_cmd(Req1, inventory_spoke_v1, maybe_inventory_spoke, CmdParams).
 
-%% GET /alc/projects/:project_id/architecture/spokes
+%% GET /alc/projects/:cartwheel_id/architecture/spokes
 handle_architecture_list_spokes(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     QS = cowboy_req:parse_qs(Req0),
     Filters = build_filters(QS),
-    case list_spoke_inventory:execute(Filters#{project_id => ProjectId}) of
+    case list_spoke_inventory:execute(Filters#{cartwheel_id => CartwheelId}) of
         {ok, Spokes} ->
             json_response(Req0, 200, #{ok => true, spokes => Spokes});
         {error, Reason} ->
             error_response(Req0, 500, Reason)
     end.
 
-%% POST /alc/projects/:project_id/architecture/plan
+%% POST /alc/projects/:cartwheel_id/architecture/plan
 handle_architecture_plan(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         title => maps:get(<<"title">>, Params),
         content_ref => maps:get(<<"content_ref">>, Params, undefined)
     },
     dispatch_simple_cmd(Req1, draft_plan_v1, maybe_draft_plan, CmdParams).
 
-%% POST /alc/projects/:project_id/architecture/plan/approve
+%% POST /alc/projects/:cartwheel_id/architecture/plan/approve
 handle_architecture_approve_plan(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         plan_id => maps:get(<<"plan_id">>, Params)
     },
     dispatch_simple_cmd(Req1, approve_plan_v1, maybe_approve_plan, CmdParams).
 
-%% POST /alc/projects/:project_id/architecture/complete
+%% POST /alc/projects/:cartwheel_id/architecture/complete
 handle_architecture_complete(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
-    dispatch_simple_cmd(Req0, complete_architecture_v1, maybe_complete_architecture, #{project_id => ProjectId}).
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    dispatch_simple_cmd(Req0, complete_architecture_v1, maybe_complete_architecture, #{cartwheel_id => CartwheelId}).
 
-%% POST /alc/projects/:project_id/testing/start
+%% POST /alc/projects/:cartwheel_id/testing/start
 handle_testing_start(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
-    dispatch_simple_cmd(Req0, start_testing_v1, maybe_start_testing, #{project_id => ProjectId}).
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    dispatch_simple_cmd(Req0, start_testing_v1, maybe_start_testing, #{cartwheel_id => CartwheelId}).
 
-%% POST /alc/projects/:project_id/testing/skeleton
+%% POST /alc/projects/:cartwheel_id/testing/skeleton
 handle_testing_skeleton(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         description => maps:get(<<"description">>, Params, undefined)
     },
     dispatch_simple_cmd(Req1, create_skeleton_v1, maybe_create_skeleton, CmdParams).
 
-%% POST /alc/projects/:project_id/testing/implement
+%% POST /alc/projects/:cartwheel_id/testing/implement
 handle_testing_implement_spoke(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         spoke_id => maps:get(<<"spoke_id">>, Params),
         implementation_notes => maps:get(<<"implementation_notes">>, Params, undefined)
     },
     dispatch_simple_cmd(Req1, implement_spoke_v1, maybe_implement_spoke, CmdParams).
 
-%% GET /alc/projects/:project_id/testing/implementations
+%% GET /alc/projects/:cartwheel_id/testing/implementations
 handle_testing_list_implementations(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     QS = cowboy_req:parse_qs(Req0),
     Filters = build_filters(QS),
-    case list_spoke_implementations:execute(Filters#{project_id => ProjectId}) of
+    case list_spoke_implementations:execute(Filters#{cartwheel_id => CartwheelId}) of
         {ok, Implementations} ->
             json_response(Req0, 200, #{ok => true, implementations => Implementations});
         {error, Reason} ->
             error_response(Req0, 500, Reason)
     end.
 
-%% POST /alc/projects/:project_id/testing/verify
+%% POST /alc/projects/:cartwheel_id/testing/verify
 handle_testing_verify_build(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         result => maps:get(<<"result">>, Params, <<"pass">>),
         notes => maps:get(<<"notes">>, Params, undefined)
     },
     dispatch_simple_cmd(Req1, verify_build_v1, maybe_verify_build, CmdParams).
 
-%% GET /alc/projects/:project_id/testing/builds
+%% GET /alc/projects/:cartwheel_id/testing/builds
 handle_testing_list_builds(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     QS = cowboy_req:parse_qs(Req0),
     Filters = build_filters(QS),
-    case list_build_verifications:execute(Filters#{project_id => ProjectId}) of
+    case list_build_verifications:execute(Filters#{cartwheel_id => CartwheelId}) of
         {ok, Builds} ->
             json_response(Req0, 200, #{ok => true, builds => Builds});
         {error, Reason} ->
             error_response(Req0, 500, Reason)
     end.
 
-%% POST /alc/projects/:project_id/testing/complete
+%% POST /alc/projects/:cartwheel_id/testing/complete
 handle_testing_complete(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
-    dispatch_simple_cmd(Req0, complete_testing_v1, maybe_complete_testing, #{project_id => ProjectId}).
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    dispatch_simple_cmd(Req0, complete_testing_v1, maybe_complete_testing, #{cartwheel_id => CartwheelId}).
 
-%% POST /alc/projects/:project_id/deployment/start
+%% POST /alc/projects/:cartwheel_id/deployment/start
 handle_deployment_start(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
-    dispatch_simple_cmd(Req0, start_deployment_v1, maybe_start_deployment, #{project_id => ProjectId}).
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    dispatch_simple_cmd(Req0, start_deployment_v1, maybe_start_deployment, #{cartwheel_id => CartwheelId}).
 
-%% POST /alc/projects/:project_id/deployment/record
+%% POST /alc/projects/:cartwheel_id/deployment/record
 handle_deployment_record(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         environment => maps:get(<<"environment">>, Params),
         version => maps:get(<<"version">>, Params),
         notes => maps:get(<<"notes">>, Params, undefined)
     },
     dispatch_simple_cmd(Req1, record_deployment_v1, maybe_record_deployment, CmdParams).
 
-%% GET /alc/projects/:project_id/deployment/deployments
+%% GET /alc/projects/:cartwheel_id/deployment/deployments
 handle_deployment_list_deployments(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     QS = cowboy_req:parse_qs(Req0),
     Filters = build_filters(QS),
-    case list_deployments:execute(Filters#{project_id => ProjectId}) of
+    case list_deployments:execute(Filters#{cartwheel_id => CartwheelId}) of
         {ok, Deployments} ->
             json_response(Req0, 200, #{ok => true, deployments => Deployments});
         {error, Reason} ->
             error_response(Req0, 500, Reason)
     end.
 
-%% POST /alc/projects/:project_id/deployment/incident
+%% POST /alc/projects/:cartwheel_id/deployment/incident
 handle_deployment_report_incident(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         severity => maps:get(<<"severity">>, Params, <<"medium">>),
         description => maps:get(<<"description">>, Params)
     },
     dispatch_simple_cmd(Req1, report_incident_v1, maybe_report_incident, CmdParams).
 
-%% POST /alc/projects/:project_id/deployment/incident/resolve
+%% POST /alc/projects/:cartwheel_id/deployment/incident/resolve
 handle_deployment_resolve_incident(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
     Params = json:decode(Body),
     CmdParams = #{
-        project_id => ProjectId,
+        cartwheel_id => CartwheelId,
         incident_id => maps:get(<<"incident_id">>, Params),
         resolution => maps:get(<<"resolution">>, Params)
     },
     dispatch_simple_cmd(Req1, resolve_incident_v1, maybe_resolve_incident, CmdParams).
 
-%% GET /alc/projects/:project_id/deployment/incidents
+%% GET /alc/projects/:cartwheel_id/deployment/incidents
 handle_deployment_list_incidents(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
     QS = cowboy_req:parse_qs(Req0),
     Filters = build_filters(QS),
-    case list_incidents:execute(Filters#{project_id => ProjectId}) of
+    case list_incidents:execute(Filters#{cartwheel_id => CartwheelId}) of
         {ok, Incidents} ->
             json_response(Req0, 200, #{ok => true, incidents => Incidents});
         {error, Reason} ->
             error_response(Req0, 500, Reason)
     end.
 
-%% POST /alc/projects/:project_id/deployment/complete
+%% POST /alc/projects/:cartwheel_id/deployment/complete
 handle_deployment_complete(Req0) ->
-    ProjectId = cowboy_req:binding(project_id, Req0),
-    dispatch_simple_cmd(Req0, complete_deployment_v1, maybe_complete_deployment, #{project_id => ProjectId}).
+    CartwheelId = cowboy_req:binding(cartwheel_id, Req0),
+    dispatch_simple_cmd(Req0, complete_deployment_v1, maybe_complete_deployment, #{cartwheel_id => CartwheelId}).
 
 %% Internal helpers
 

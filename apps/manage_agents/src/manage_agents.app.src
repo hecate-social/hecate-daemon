@@ -1,0 +1,15 @@
+{application, manage_agents, [
+    {description, "Agent command service (CQRS write side)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {manage_agents_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.
