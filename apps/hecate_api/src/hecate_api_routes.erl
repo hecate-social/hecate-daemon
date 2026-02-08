@@ -169,7 +169,8 @@ torch_routes() ->
         {"/api/torch", hecate_api_torch, [get]},
         {"/api/torch/initiate", hecate_api_torch, [initiate]},
         {"/api/torches", hecate_api_torch, [list]},
-        {"/api/torches/:torch_id", hecate_api_torch, [get_by_id]}
+        {"/api/torches/:torch_id", hecate_api_torch, [get_by_id]},
+        {"/api/torches/:torch_id/cartwheels/identify", hecate_api_torch, [identify_cartwheel]}
     ].
 
 %% Cartwheel (bounded contexts) - replaces alc_routes

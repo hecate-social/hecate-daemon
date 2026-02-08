@@ -1,7 +1,13 @@
 %%% @doc manage_cartwheels top-level supervisor
 %%%
 %%% Starts this domain's ReckonDB store.
-%%% No emitters — Cartwheel is internal lifecycle tracking.
+%%% No emitters - Cartwheel is internal lifecycle tracking.
+%%%
+%%% Supervises:
+%%% - initiate_cartwheel_spoke_sup: Contains the listener and policy for
+%%%   cartwheel initiation triggered by cartwheel_identified facts.
+%%%
+%%% @end
 -module(manage_cartwheels_sup).
 -behaviour(supervisor).
 
@@ -46,8 +52,8 @@ init([]) ->
 
     Children = [
         #{
-            id => on_torch_initiated_initiate_cartwheel_sup,
-            start => {on_torch_initiated_initiate_cartwheel_sup, start_link, []},
+            id => initiate_cartwheel_spoke_sup,
+            start => {initiate_cartwheel_spoke_sup, start_link, []},
             restart => permanent,
             type => supervisor
         }

@@ -20,6 +20,7 @@
     repos               :: [binary()],
     skills              :: [binary()],
     context_map         :: map(),
+    identified_cartwheels :: map(),  %% context_name => cartwheel_id
     active_cartwheel_id :: binary() | undefined,
     initiated_at        :: non_neg_integer() | undefined,
     initiated_by        :: binary() | undefined
@@ -38,6 +39,7 @@ initial_state() ->
         repos = [],
         skills = [],
         context_map = #{},
+        identified_cartwheels = #{},
         active_cartwheel_id = undefined,
         initiated_at = undefined,
         initiated_by = undefined
@@ -47,6 +49,8 @@ initial_state() ->
 -spec execute(map(), state()) -> {ok, [map()]} | {error, term()}.
 execute(#{command_type := <<"initiate_torch">>} = Payload, State) ->
     execute_initiate_torch(Payload, State);
+execute(#{command_type := <<"identify_cartwheel">>} = Payload, State) ->
+    execute_identify_cartwheel(Payload, State);
 execute(#{command_type := <<"activate_cartwheel">>} = Payload, State) ->
     execute_activate_cartwheel(Payload, State);
 execute(_Payload, _State) ->
@@ -57,6 +61,15 @@ execute_initiate_torch(Payload, #torch_state{status = 0}) ->
     convert_events(maybe_initiate_torch:handle(Cmd), fun torch_initiated_v1:to_map/1);
 execute_initiate_torch(_Payload, _State) ->
     {error, torch_already_initiated}.
+
+execute_identify_cartwheel(_Payload, #torch_state{torch_id = undefined}) ->
+    {error, torch_not_found};
+execute_identify_cartwheel(_Payload, #torch_state{status = Status}) when Status band ?INITIATED =:= 0 ->
+    {error, torch_not_initiated};
+execute_identify_cartwheel(Payload, #torch_state{identified_cartwheels = Identified} = _State) ->
+    {ok, Cmd} = identify_cartwheel_v1:from_map(Payload),
+    Context = #{identified_cartwheels => Identified},
+    convert_events(maybe_identify_cartwheel:handle(Cmd, Context), fun cartwheel_identified_v1:to_map/1).
 
 execute_activate_cartwheel(_Payload, #torch_state{torch_id = undefined}) ->
     {error, torch_not_found};
@@ -78,6 +91,10 @@ apply_event(#{<<"event_type">> := <<"torch_initiated_v1">>} = E, State) ->
     apply_torch_initiated(E, State);
 apply_event(#{event_type := <<"torch_initiated_v1">>} = E, State) ->
     apply_torch_initiated(E, State);
+apply_event(#{<<"event_type">> := <<"cartwheel_identified_v1">>} = E, State) ->
+    apply_cartwheel_identified(E, State);
+apply_event(#{event_type := <<"cartwheel_identified_v1">>} = E, State) ->
+    apply_cartwheel_identified(E, State);
 apply_event(#{<<"event_type">> := <<"cartwheel_activated_v1">>} = E, State) ->
     apply_cartwheel_activated(E, State);
 apply_event(#{event_type := <<"cartwheel_activated_v1">>} = E, State) ->
@@ -96,6 +113,15 @@ apply_torch_initiated(E, State) ->
         context_map = get_value(context_map, E, #{}),
         initiated_at = get_value(initiated_at, E),
         initiated_by = get_value(initiated_by, E)
+    }.
+
+apply_cartwheel_identified(E, State) ->
+    CartwheelId = get_value(cartwheel_id, E),
+    ContextName = get_value(context_name, E),
+    CurrentIdentified = State#torch_state.identified_cartwheels,
+    UpdatedIdentified = CurrentIdentified#{ContextName => CartwheelId},
+    State#torch_state{
+        identified_cartwheels = UpdatedIdentified
     }.
 
 apply_cartwheel_activated(E, State) ->

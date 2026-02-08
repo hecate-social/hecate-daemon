@@ -1,4 +1,10 @@
 %%% @doc manage_torches top-level supervisor
+%%%
+%%% Supervises:
+%%% - torch_initiated_v1_to_mesh: Emitter that publishes torch initiation facts
+%%% - cartwheel_identified_v1_to_mesh: Emitter that publishes cartwheel identification facts
+%%%
+%%% @end
 -module(manage_torches_sup).
 -behaviour(supervisor).
 
@@ -11,5 +17,25 @@ start_link() ->
 
 -spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 init([]) ->
-    Children = [],
-    {ok, {{one_for_one, 10, 10}, Children}}.
+    SupFlags = #{
+        strategy => one_for_one,
+        intensity => 10,
+        period => 10
+    },
+
+    Children = [
+        #{
+            id => torch_initiated_v1_to_mesh,
+            start => {torch_initiated_v1_to_mesh, start_link, []},
+            restart => permanent,
+            type => worker
+        },
+        #{
+            id => cartwheel_identified_v1_to_mesh,
+            start => {cartwheel_identified_v1_to_mesh, start_link, []},
+            restart => permanent,
+            type => worker
+        }
+    ],
+
+    {ok, {SupFlags, Children}}.

@@ -1,10 +1,11 @@
 %%% @doc Torch API endpoints.
 %%%
 %%% Provides REST interface to Torch management (business endeavors):
-%%% - GET  /api/torch                - Get current/active torch
-%%% - POST /api/torch/initiate       - Initiate a new torch
-%%% - GET  /api/torches              - List all torches
-%%% - GET  /api/torches/:torch_id    - Get specific torch by ID
+%%% - GET  /api/torch                             - Get current/active torch
+%%% - POST /api/torch/initiate                    - Initiate a new torch
+%%% - GET  /api/torches                           - List all torches
+%%% - GET  /api/torches/:torch_id                 - Get specific torch by ID
+%%% - POST /api/torches/:torch_id/cartwheels/identify - Identify a cartwheel within a torch
 %%%
 %%% @end
 -module(hecate_api_torch).
@@ -43,6 +44,15 @@ init(Req0, [get_by_id]) ->
     case cowboy_req:method(Req0) of
         <<"GET">> ->
             handle_get_by_id(Req0);
+        _ ->
+            method_not_allowed(Req0)
+    end;
+
+%% Route: POST /api/torches/:torch_id/cartwheels/identify
+init(Req0, [identify_cartwheel]) ->
+    case cowboy_req:method(Req0) of
+        <<"POST">> ->
+            handle_identify_cartwheel(Req0);
         _ ->
             method_not_allowed(Req0)
     end;
@@ -128,6 +138,57 @@ handle_get_by_id(Req0) ->
             json_response(500, #{ok => false, error => format_error(Reason)}, Req0)
     end.
 
+%% @doc Identify a cartwheel within a torch.
+%% This is the parent (torch) declaring "I need a cartwheel called X".
+%% The cartwheel service will react to the mesh fact and initiate the cartwheel.
+handle_identify_cartwheel(Req0) ->
+    TorchId = cowboy_req:binding(torch_id, Req0),
+    {ok, Body, Req1} = cowboy_req:read_body(Req0),
+    try json:decode(Body) of
+        Params ->
+            ContextName = maps:get(<<"context_name">>, Params, undefined),
+            Description = maps:get(<<"description">>, Params, undefined),
+            IdentifiedBy = maps:get(<<"identified_by">>, Params, undefined),
+
+            case validate_identify_params(ContextName) of
+                ok ->
+                    CmdParams = #{
+                        torch_id => TorchId,
+                        context_name => ContextName,
+                        description => Description,
+                        identified_by => IdentifiedBy
+                    },
+                    case identify_cartwheel_v1:new(CmdParams) of
+                        {ok, Cmd} ->
+                            case dispatch_identify_cartwheel_command(Cmd) of
+                                {ok, Version, Events} ->
+                                    %% Extract cartwheel_id from first event
+                                    CartwheelId = case Events of
+                                        [#{<<"cartwheel_id">> := CId} | _] -> CId;
+                                        _ -> undefined
+                                    end,
+                                    json_response(201, #{
+                                        ok => true,
+                                        torch_id => TorchId,
+                                        cartwheel_id => CartwheelId,
+                                        context_name => ContextName,
+                                        version => Version,
+                                        events => Events
+                                    }, Req1);
+                                {error, Reason} ->
+                                    json_response(400, #{ok => false, error => format_error(Reason)}, Req1)
+                            end;
+                        {error, Reason} ->
+                            json_response(400, #{ok => false, error => format_error(Reason)}, Req1)
+                    end;
+                {error, Reason} ->
+                    json_response(400, #{ok => false, error => Reason}, Req1)
+            end
+    catch
+        _:_ ->
+            json_response(400, #{ok => false, error => <<"Invalid JSON">>}, Req1)
+    end.
+
 %%% ===================================================================
 %%% Helpers
 %%% ===================================================================
@@ -137,6 +198,13 @@ validate_initiate_params(undefined) ->
 validate_initiate_params(Name) when not is_binary(Name); byte_size(Name) =:= 0 ->
     {error, <<"name must be a non-empty string">>};
 validate_initiate_params(_Name) ->
+    ok.
+
+validate_identify_params(undefined) ->
+    {error, <<"context_name is required">>};
+validate_identify_params(ContextName) when not is_binary(ContextName); byte_size(ContextName) =:= 0 ->
+    {error, <<"context_name must be a non-empty string">>};
+validate_identify_params(_ContextName) ->
     ok.
 
 %% @doc Dispatch torch command via evoq.
@@ -154,12 +222,28 @@ dispatch_torch_command(Cmd) ->
             {error, Reason}
     end.
 
-%% @doc Notify process managers about torch events.
-%% This triggers cross-domain integration (e.g., torch -> cartwheel).
+%% @doc Emit torch events to mesh for cross-domain integration.
+%% The mesh emitter publishes facts to hecate.torch.initiated topic.
+%% Listeners in other domains (e.g., manage_cartwheels) subscribe and react.
 notify_process_managers(EventMaps) ->
     lists:foreach(fun(EventMap) ->
-        on_torch_initiated_initiate_cartwheel:handle_event(EventMap)
+        torch_initiated_v1_to_mesh:emit(EventMap)
     end, EventMaps).
+
+%% @doc Dispatch identify_cartwheel command.
+%% After successful handling, emits the cartwheel_identified fact to mesh.
+dispatch_identify_cartwheel_command(Cmd) ->
+    case maybe_identify_cartwheel:handle(Cmd) of
+        {ok, Events} ->
+            EventMaps = [cartwheel_identified_v1:to_map(E) || E <- Events],
+            %% Emit to mesh for manage_cartwheels to react
+            lists:foreach(fun(EventMap) ->
+                cartwheel_identified_v1_to_mesh:emit(EventMap)
+            end, EventMaps),
+            {ok, 0, EventMaps};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 build_filters(QS) ->
     lists:foldl(fun({K, V}, Acc) ->
