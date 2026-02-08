@@ -163,25 +163,26 @@ mentor_routes() ->
         {"/mentors/remote", hecate_api_mentors, [list_remote]}
     ].
 
-%% Torch (business endeavors)
+%% Torch (business endeavors) - vertical handlers in spokes
 torch_routes() ->
     [
-        {"/api/torch", hecate_api_torch, [get]},
-        {"/api/torch/initiate", hecate_api_torch, [initiate]},
-        {"/api/torches", hecate_api_torch, [list]},
-        {"/api/torches/:torch_id", hecate_api_torch, [get_by_id]},
-        {"/api/torches/:torch_id/cartwheels/identify", hecate_api_torch, [identify_cartwheel]}
+        {"/api/torch", get_active_torch_api, []},
+        {"/api/torch/initiate", initiate_torch_api, []},
+        {"/api/torches", list_torches_api, []},
+        {"/api/torches/:torch_id", get_torch_api, []},
+        {"/api/torches/:torch_id/cartwheels/identify", identify_cartwheel_api, []}
     ].
 
-%% Cartwheel (bounded contexts) - replaces alc_routes
+%% Cartwheel (bounded contexts) - vertical handlers in spokes
 cartwheel_routes() ->
     [
-        {"/api/cartwheel", hecate_api_cartwheel, [get_active]},
-        {"/api/cartwheels", hecate_api_cartwheel, [list]},
-        {"/api/cartwheels/:cartwheel_id", hecate_api_cartwheel, [get]},
-        %% Legacy ALC routes for backward compatibility
-        {"/alc/projects", hecate_api_cartwheel, [list]},
-        {"/alc/projects/initiate", hecate_api_cartwheel, [initiate]},
+        %% Core cartwheel routes - vertical handlers
+        {"/api/cartwheel", get_active_cartwheel_api, []},
+        {"/api/cartwheels", list_cartwheels_api, []},
+        {"/api/cartwheels/:cartwheel_id", get_cartwheel_api, []},
+        %% Legacy ALC routes for backward compatibility (TODO: split into spokes)
+        {"/alc/projects", list_cartwheels_api, []},
+        {"/alc/projects/initiate", initiate_cartwheel_api, []},
         {"/alc/projects/:cartwheel_id", hecate_api_cartwheel, [get]},
         {"/alc/projects/:cartwheel_id/discovery/start", hecate_api_cartwheel, [discovery_start]},
         {"/alc/projects/:cartwheel_id/discovery/findings", hecate_api_cartwheel, [discovery_list_findings]},

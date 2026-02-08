@@ -1,0 +1,12 @@
+{application, shared, [
+    {description, "Shared utilities for Hecate umbrella apps"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {shared_app, []}},
+    {applications, [
+        kernel,
+        stdlib
+    ]},
+    {env, []},
+    {modules, []}
+]}.
