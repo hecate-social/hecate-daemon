@@ -1056,6 +1056,92 @@ Agents enforce role boundaries—a contributor can't approve architecture decisi
 
 ---
 
+## Telemetry Infrastructure
+
+### Architecture: Embedded + Optional Export
+
+SQLite stores telemetry locally by default. Optional Prometheus export for power users.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TELEMETRY STORAGE                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ~/.hecate/telemetry.db (SQLite - always on)                 │
+│  ├── agent_metrics   - time-series: tokens, duration, errors │
+│  ├── task_traces     - spans with parent relationships       │
+│  └── agent_logs      - structured logs with severity         │
+│                                                               │
+│  All records include: torch_id, agent_id, timestamp          │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+         │
+         │ (optional, if enabled)
+         ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Prometheus Export (:9090/metrics)                           │
+│  ├── hecate_tokens_total{torch, agent, model}                │
+│  ├── hecate_task_duration_seconds{torch, agent, phase}       │
+│  ├── hecate_tasks_completed_total{torch, agent}              │
+│  └── hecate_errors_total{torch, agent, type}                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Torch Attribution
+
+All telemetry is attributed to a Torch for cost tracking and analysis:
+
+```sql
+-- agent_metrics table
+CREATE TABLE agent_metrics (
+    id INTEGER PRIMARY KEY,
+    torch_id TEXT NOT NULL,      -- Which Torch
+    agent_id TEXT NOT NULL,      -- Which agent
+    metric_name TEXT NOT NULL,   -- tokens_used, task_duration, etc.
+    metric_value REAL NOT NULL,
+    labels TEXT,                 -- JSON: {model, phase, task_type}
+    timestamp INTEGER NOT NULL
+);
+
+-- Indexes for common queries
+CREATE INDEX idx_metrics_torch ON agent_metrics(torch_id, timestamp);
+CREATE INDEX idx_metrics_agent ON agent_metrics(agent_id, timestamp);
+```
+
+### Configuration
+
+```toml
+# ~/.config/hecate-tui/config.toml
+[telemetry]
+enabled = true
+storage = "sqlite"        # Always SQLite
+retention_days = 30       # Auto-cleanup old data
+
+[telemetry.export.prometheus]
+enabled = false           # Disabled by default
+port = 9090
+```
+
+### TUI Commands
+
+```
+/metrics                      # Summary across all Torches
+/metrics torch macula-geo     # Metrics for specific Torch
+/scorecard dna-specialist     # Agent scorecard
+/cost                         # LLM cost breakdown by Torch
+/cost macula-geo              # Cost for specific Torch
+```
+
+### Why This Approach
+
+1. **Works offline** - SQLite has no external dependencies
+2. **Zero config default** - Just works out of the box
+3. **Torch-attributed** - Every metric tied to a Torch for billing/analysis
+4. **Power user friendly** - Enable Prometheus for Grafana dashboards
+5. **Retention managed** - Auto-cleanup prevents unbounded growth
+
+---
+
 ## Open Questions
 
 ### Answered
@@ -1069,10 +1155,11 @@ Agents enforce role boundaries—a contributor can't approve architecture decisi
 | Skill System | Profiles + layered detection: auto-detect → profile → per-repo override |
 | Mesh Distribution | v1: Local-only; Future: Hybrid with overflow to remote nodes |
 | Team Collaboration | v1: Single human per Torch; v2: Sequential handoff; v3: Role-based |
+| Telemetry Infrastructure | SQLite embedded + optional Prometheus export; Torch-attributed |
 
 ### Remaining
 
-1. **Telemetry Infrastructure:** Prometheus vs custom vs hybrid?
+1. **Human Feedback UX:** How to make rating frictionless in TUI?
 3. **Team Collaboration:** Multiple humans + shared agent pool?
 4. **Telemetry Infrastructure:** Prometheus vs custom vs hybrid?
 5. **Human Feedback UX:** How to make rating frictionless in TUI?
