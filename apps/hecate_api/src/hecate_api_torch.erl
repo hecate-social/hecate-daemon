@@ -207,17 +207,13 @@ validate_identify_params(ContextName) when not is_binary(ContextName); byte_size
 validate_identify_params(_ContextName) ->
     ok.
 
-%% @doc Dispatch torch command via evoq.
-%% For now, uses maybe_initiate_torch:handle/1 directly.
-%% TODO: Integrate with evoq_dispatcher when manage_torches store is set up.
+%% @doc Dispatch torch command via evoq (persists to ReckonDB).
 dispatch_torch_command(Cmd) ->
-    case maybe_initiate_torch:handle(Cmd) of
-        {ok, Events} ->
-            %% Convert events to maps for JSON response
-            EventMaps = [torch_initiated_v1:to_map(E) || E <- Events],
+    case maybe_initiate_torch:dispatch(Cmd) of
+        {ok, Version, Events} ->
             %% Notify process manager(s) about torch initiated event
-            notify_process_managers(EventMaps),
-            {ok, 0, EventMaps};
+            notify_process_managers(Events),
+            {ok, Version, Events};
         {error, Reason} ->
             {error, Reason}
     end.
