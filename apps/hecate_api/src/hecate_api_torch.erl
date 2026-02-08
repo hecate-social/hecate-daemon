@@ -219,19 +219,17 @@ dispatch_torch_command(Cmd) ->
     end.
 
 %% @doc Process events after successful dispatch.
-%% 1. Project to read models (SQLite) for queries
-%% 2. Emit to mesh for cross-domain integration
+%% 1. Emit to pg for internal integration (projections)
+%% 2. Emit to mesh for external integration (cross-daemon)
 notify_process_managers(EventMaps) ->
+    logger:info("[API] notify_process_managers: ~p events", [length(EventMaps)]),
     lists:foreach(fun(EventMap) ->
-        %% Project to read model for queries
-        project_torch_event(EventMap),
-        %% Emit to mesh for cross-domain listeners
-        torch_initiated_v1_to_mesh:emit(EventMap)
+        emit_torch_event(EventMap)
     end, EventMaps).
 
-%% @doc Project torch event to appropriate read model.
-project_torch_event(#{<<"event_type">> := <<"torch_initiated_v1">>} = Event) ->
-    %% Convert binary keys to atoms for projection
+%% @doc Emit torch event to appropriate transports.
+emit_torch_event(#{<<"event_type">> := <<"torch_initiated_v1">>} = Event) ->
+    %% Convert binary keys to atoms for pg consumers
     AtomEvent = #{
         torch_id => maps:get(<<"torch_id">>, Event),
         name => maps:get(<<"name">>, Event),
@@ -239,8 +237,11 @@ project_torch_event(#{<<"event_type">> := <<"torch_initiated_v1">>} = Event) ->
         initiated_at => maps:get(<<"initiated_at">>, Event),
         initiated_by => maps:get(<<"initiated_by">>, Event, undefined)
     },
-    torch_initiated_v1_to_torches:project(AtomEvent);
-project_torch_event(_) ->
+    %% INTERNAL: Emit to pg for projections (intra-daemon)
+    torch_initiated_v1_to_pg:emit(AtomEvent),
+    %% EXTERNAL: Emit to mesh for other agents (WAN)
+    torch_initiated_v1_to_mesh:emit(Event);
+emit_torch_event(_Other) ->
     ok.
 
 %% @doc Dispatch identify_cartwheel command.

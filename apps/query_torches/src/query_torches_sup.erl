@@ -9,9 +9,19 @@ start_link() ->
 
 init([]) ->
     Children = [
-        %% SQLite connection worker
-        {query_torches_store,
-            {query_torches_store, start_link, []},
-            permanent, 5000, worker, [query_torches_store]}
+        %% SQLite connection worker (must start first)
+        #{
+            id => query_torches_store,
+            start => {query_torches_store, start_link, []},
+            restart => permanent,
+            type => worker
+        },
+        %% Projection spoke: torch_initiated_v1 -> torches
+        #{
+            id => torch_initiated_v1_to_torches_sup,
+            start => {torch_initiated_v1_to_torches_sup, start_link, []},
+            restart => permanent,
+            type => supervisor
+        }
     ],
-    {ok, {{one_for_one, 10, 10}, Children}}.
+    {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.
