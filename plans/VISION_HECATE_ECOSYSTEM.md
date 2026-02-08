@@ -987,6 +987,75 @@ tni_specialist = "beam03.lab"  # Has GPU for ML tests
 
 ---
 
+## Team Collaboration
+
+### Evolution Path
+
+Team collaboration follows a staged evolution:
+
+```
+v1: SINGLE HUMAN                 v2: SEQUENTIAL HANDOFF           v3: ROLE-BASED
+┌─────────────────┐              ┌─────────────────┐              ┌─────────────────┐
+│ Torch           │              │ Torch           │              │ Torch           │
+│ └── Owner: rl   │      →       │ └── Owner: rl   │      →       │ └── Humans:     │
+│ └── Agents: 4+N │              │ └── Handoff Log │              │     ├── rl (own)│
+│                 │              │ └── Agents: 4+N │              │     ├── alice   │
+└─────────────────┘              └─────────────────┘              │     └── bob     │
+                                                                  └─────────────────┘
+```
+
+### v1: Single Human per Torch
+
+One human owns each Torch. Agents respond only to that human.
+
+```toml
+# torch.toml
+[torch]
+name = "macula-platform"
+owner = "rl"  # Only rl can interact with agents
+```
+
+**Why single-human for v1:**
+- No conflict resolution needed
+- Clear accountability
+- Simpler agent interactions
+- Event stream captures everything for future handoff
+
+### v2: Sequential Handoff (Future)
+
+One active human at a time, with explicit handoff:
+
+```
+[handoff_initiated_v1]
+├── from: "rl"
+├── to: "alice"
+├── context: "DnA complete, ready for AnP"
+└── briefing_requested: true
+    ↓
+Agents brief alice on current state
+    ↓
+[handoff_completed_v1]
+├── new_owner: "alice"
+└── acknowledged: true
+```
+
+The event-sourced model naturally supports this—alice can replay events to understand history.
+
+### v3: Role-Based Access (Future)
+
+Multiple humans with specific roles:
+
+| Role | Permissions |
+|------|-------------|
+| **Owner** | All phases, all decisions, can handoff |
+| **Reviewer** | Approve/reject in specific phases |
+| **Contributor** | Submit work, cannot approve |
+| **Observer** | Read-only, can comment |
+
+Agents enforce role boundaries—a contributor can't approve architecture decisions.
+
+---
+
 ## Open Questions
 
 ### Answered
@@ -999,10 +1068,11 @@ tni_specialist = "beam03.lab"  # Has GPU for ML tests
 | Domain vs Telemetry | Domain events = business outcomes; Telemetry = operational metrics |
 | Skill System | Profiles + layered detection: auto-detect → profile → per-repo override |
 | Mesh Distribution | v1: Local-only; Future: Hybrid with overflow to remote nodes |
+| Team Collaboration | v1: Single human per Torch; v2: Sequential handoff; v3: Role-based |
 
 ### Remaining
 
-1. **Team Collaboration:** Multiple humans + shared agent pool?
+1. **Telemetry Infrastructure:** Prometheus vs custom vs hybrid?
 3. **Team Collaboration:** Multiple humans + shared agent pool?
 4. **Telemetry Infrastructure:** Prometheus vs custom vs hybrid?
 5. **Human Feedback UX:** How to make rating frictionless in TUI?
