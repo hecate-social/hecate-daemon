@@ -109,10 +109,9 @@ jobs:
   manifest:
     name: Create Manifest
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
     needs: [build-amd64, build-arm64]
-    # Run even if arm64 was skipped (non-tag push)
-    if: always() && needs.build-amd64.result == 'success'
+    # Run if amd64 succeeded, even if arm64 was skipped (non-tag push)
+    if: always() && github.event_name != 'pull_request' && needs.build-amd64.result == 'success'
     permissions:
       contents: read
       packages: write
