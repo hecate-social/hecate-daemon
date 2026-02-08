@@ -19,6 +19,8 @@ init([]) ->
     {ok, Db} = esqlite3:open(?DB_PATH),
     ok = esqlite3:exec(Db, "PRAGMA journal_mode=WAL;"),
     ok = esqlite3:exec(Db, "PRAGMA synchronous=NORMAL;"),
+    %% Create tables on startup
+    ok = create_tables(Db),
     {ok, #state{db = Db}}.
 
 %% @doc Initialize database schema.
