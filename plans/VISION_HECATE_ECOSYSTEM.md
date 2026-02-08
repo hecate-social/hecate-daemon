@@ -928,6 +928,65 @@ Agent working on hecate-daemon:
 
 ---
 
+## Mesh Distribution
+
+### v1: Local-Only
+
+All agents run on the local daemon where the TUI is connected:
+
+```
+┌─────────────────────────────────────────┐
+│  LOCAL MACHINE (hecate-daemon)           │
+│  ├── DnA Specialist                      │
+│  ├── AnP Specialist                      │
+│  ├── TnI Specialist                      │
+│  ├── DnO Specialist                      │
+│  └── Generalist Pool (0-8)               │
+└─────────────────────────────────────────┘
+         │
+         │ (mesh for data sync only)
+         ▼
+    Macula Mesh (Torch events, artifacts)
+```
+
+**Why local-only for v1:**
+- Simpler to implement and debug
+- No network failure handling for agent coordination
+- Works fully offline
+- Proves the agent model before adding distribution complexity
+
+The mesh is still used for:
+- Torch event replication across devices
+- Artifact synchronization
+- Capability announcements (for future discovery)
+
+### Future: Hybrid with Preference
+
+Evolution path when distribution is needed:
+
+```toml
+# torch.toml (future)
+[agents]
+default_placement = "local"  # Specialists and generalists local
+
+[agents.overflow]
+enabled = true
+nodes = ["beam01.lab", "beam02.lab"]  # Overflow destinations
+threshold = 4  # Overflow when >4 generalists needed locally
+
+[agents.placement]
+# Explicit placement for resource-intensive roles
+tni_specialist = "beam03.lab"  # Has GPU for ML tests
+```
+
+**Future capabilities:**
+- Generalist overflow to remote nodes when local capacity exceeded
+- Explicit placement for resource requirements (GPU, memory)
+- Torch homing for shared/team scenarios
+- Capability-based auto-placement
+
+---
+
 ## Open Questions
 
 ### Answered
@@ -939,10 +998,11 @@ Agent working on hecate-daemon:
 | Agent Spawning Model | Specialists (4 long-lived) + Generalist Pool (0-8 ephemeral) |
 | Domain vs Telemetry | Domain events = business outcomes; Telemetry = operational metrics |
 | Skill System | Profiles + layered detection: auto-detect → profile → per-repo override |
+| Mesh Distribution | v1: Local-only; Future: Hybrid with overflow to remote nodes |
 
 ### Remaining
 
-1. **Mesh Distribution:** How are agents distributed across mesh nodes?
+1. **Team Collaboration:** Multiple humans + shared agent pool?
 3. **Team Collaboration:** Multiple humans + shared agent pool?
 4. **Telemetry Infrastructure:** Prometheus vs custom vs hybrid?
 5. **Human Feedback UX:** How to make rating frictionless in TUI?
