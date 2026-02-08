@@ -792,6 +792,142 @@ Task completed → Human reviews output → Quick rating (1-5 or 👍/👎)
 
 ---
 
+## Skill System
+
+### Overview
+
+Skills are knowledge packages that agents load to work effectively in specific contexts. The skill system uses **profiles with layered detection**: auto-detection provides defaults, profiles bundle common patterns, and per-repo overrides handle edge cases.
+
+### Skill Layers
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      SKILL LOADING                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  Layer 1: Auto-Detection (Baseline)                          │
+│  ├── Scan for markers: rebar.config, mix.exs, go.mod        │
+│  ├── Load core language skills automatically                 │
+│  └── Zero config for common cases                            │
+│                                                               │
+│  Layer 2: Profiles (Reusable Bundles)                        │
+│  ├── erlang-cqrs: evoq + vertical-slicing + screaming-arch  │
+│  ├── go-tui: bubbletea + lipgloss + tui-ux-patterns         │
+│  ├── elixir-phoenix: phoenix + ecto + liveview              │
+│  └── Organization-wide consistency                           │
+│                                                               │
+│  Layer 3: Per-Repo Override                                  │
+│  ├── skills_add: add specific skills                         │
+│  ├── skills_remove: exclude irrelevant skills                │
+│  └── Full control when needed                                │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Profile Definition
+
+Profiles live in `hecate-agents/profiles/`:
+
+```toml
+# hecate-agents/profiles/erlang-cqrs.toml
+[profile]
+name = "erlang-cqrs"
+description = "Erlang event-sourced CQRS with ReckonDB/Evoq"
+
+[profile.inherits]
+profiles = ["erlang-core", "erlang-otp"]
+
+[profile.skills]
+required = [
+    "erlang-evoq",
+    "vertical-slicing",
+    "screaming-architecture",
+    "cqrs-patterns",
+    "event-sourcing"
+]
+
+[profile.detection]
+markers = ["rebar.config", "apps/*/src/*_aggregate.erl"]
+confidence = "high"  # Auto-apply if markers found
+```
+
+### Torch Configuration
+
+```toml
+# torch.toml
+[torch]
+name = "macula-platform"
+
+# Default profile for all repos in this Torch
+default_profile = "erlang-cqrs"
+
+[repos."hecate-social/hecate-daemon"]
+role = "core"
+profile = "erlang-cqrs"           # Explicit (or auto-detected)
+skills_add = ["hecate-mesh"]      # Add daemon-specific skills
+skills_remove = ["erlang-jsx"]    # We use OTP json, not jsx
+
+[repos."hecate-social/hecate-tui"]
+role = "client"
+profile = "go-tui"
+skills_add = ["hecate-tui-commands"]
+```
+
+### Skill Types
+
+| Type | Location | Purpose |
+|------|----------|---------|
+| **Philosophy** | `philosophy/` | Mental models (DDD, vertical slicing) |
+| **Guides** | `guides/` | How-to knowledge (cartwheel sequences) |
+| **Codegen** | `skills/codegen/` | Templates and patterns |
+| **Antipatterns** | `skills/` | What NOT to do |
+| **Language** | `skills/{lang}/` | Language-specific idioms |
+| **Framework** | `skills/{framework}/` | Framework conventions |
+
+### Detection Markers
+
+```toml
+# Built-in detection rules
+[detection.erlang]
+markers = ["rebar.config", "*.erl", "src/*.app.src"]
+skills = ["erlang-core"]
+
+[detection.elixir]
+markers = ["mix.exs", "*.ex", "*.exs"]
+skills = ["elixir-core"]
+
+[detection.go]
+markers = ["go.mod", "go.sum", "*.go"]
+skills = ["go-core"]
+
+[detection.phoenix]
+markers = ["mix.exs", "lib/*_web/"]
+requires = ["elixir"]
+skills = ["elixir-phoenix", "elixir-liveview"]
+
+[detection.evoq]
+markers = ["rebar.config", "*_aggregate.erl", "*_v1.erl"]
+requires = ["erlang"]
+skills = ["erlang-evoq", "cqrs-patterns"]
+```
+
+### Token Efficiency
+
+Skills are loaded on-demand to minimize token usage:
+
+1. **Embedded skills** - Always loaded (core philosophy, ~500 tokens)
+2. **Profile skills** - Loaded when repo is active (~2000 tokens)
+3. **On-demand skills** - Loaded when specific task requires (~500-1000 tokens each)
+
+```
+Agent working on hecate-daemon:
+├── Embedded: SOUL.md, core principles (always)
+├── Profile: erlang-cqrs bundle (on repo open)
+└── On-demand: CODEGEN_ERLANG_EVOQ.md (when writing aggregate)
+```
+
+---
+
 ## Open Questions
 
 ### Answered
@@ -802,11 +938,11 @@ Task completed → Human reviews output → Quick rating (1-5 or 👍/👎)
 | Agent Memory | Event streams + projections provide context |
 | Agent Spawning Model | Specialists (4 long-lived) + Generalist Pool (0-8 ephemeral) |
 | Domain vs Telemetry | Domain events = business outcomes; Telemetry = operational metrics |
+| Skill System | Profiles + layered detection: auto-detect → profile → per-repo override |
 
 ### Remaining
 
-1. **Skill System:** How do language/framework skills integrate with detection?
-2. **Mesh Distribution:** How are agents distributed across mesh nodes?
+1. **Mesh Distribution:** How are agents distributed across mesh nodes?
 3. **Team Collaboration:** Multiple humans + shared agent pool?
 4. **Telemetry Infrastructure:** Prometheus vs custom vs hybrid?
 5. **Human Feedback UX:** How to make rating frictionless in TUI?
@@ -828,7 +964,7 @@ Task completed → Human reviews output → Quick rating (1-5 or 👍/👎)
 ## Next Steps
 
 1. Complete Cartwheel and Walking Skeleton documentation
-2. Design skill system integration
-3. Prototype agent spawning in hecate-daemon
-4. Design TUI command center view
-5. Implement Torch repo structure
+2. Prototype agent spawning in hecate-daemon
+3. Design TUI command center view
+4. Implement Torch repo structure
+5. Create skill profiles in hecate-agents
