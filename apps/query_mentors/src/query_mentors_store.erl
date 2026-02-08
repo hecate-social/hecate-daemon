@@ -52,7 +52,7 @@ handle_call({execute, Sql, Params}, _From, #state{db = Db} = State) ->
             Result = esqlite3:exec(Db, Sql),
             {reply, Result, State};
         _ ->
-            case esqlite3:prepare(Sql, Db) of
+            case esqlite3:prepare(Db, Sql) of
                 {ok, Stmt} ->
                     ok = esqlite3:bind(Stmt, Params),
                     step_until_done(Stmt),
@@ -63,7 +63,7 @@ handle_call({execute, Sql, Params}, _From, #state{db = Db} = State) ->
     end;
 
 handle_call({query, Sql, Params}, _From, #state{db = Db} = State) ->
-    case esqlite3:prepare(Sql, Db) of
+    case esqlite3:prepare(Db, Sql) of
         {ok, Stmt} ->
             case Params of
                 [] -> ok;
