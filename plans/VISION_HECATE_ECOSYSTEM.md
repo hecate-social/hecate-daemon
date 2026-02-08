@@ -423,13 +423,189 @@ Agents coordinate commits across repos:
 
 ---
 
+## Torch as Event Stream
+
+### The Core Insight
+
+**A Torch is not just a repository—it's an aggregate with an event stream.**
+
+Every significant action in a Torch's lifecycle is captured as an event. Artifacts (VISION.md, CONTEXT_MAP.md, etc.) become projections of these events, not primary sources.
+
+```
+TORCH AGGREGATE
+├── State (current phase, active agents, task board)
+├── Event Stream (complete history)
+└── Projections (artifacts, dashboards, reports)
+```
+
+### Why Event Sourcing for Torches?
+
+1. **Complete History** - Every decision, every change, every agent action recorded
+2. **Time Travel** - "What did the context map look like before that refactor?"
+3. **Auditability** - Perfect record for compliance, learning, AI training
+4. **Mesh Distribution** - Events naturally distribute across the mesh
+5. **Multi-Agent Coordination** - Agents subscribe to Torch events, react appropriately
+
+### Event Types by Phase
+
+#### Ignition Events
+```erlang
+%% Torch lifecycle
+torch_ignited_v1          %% Torch created with initial brief
+torch_paused_v1           %% Work paused (human decision)
+torch_resumed_v1          %% Work resumed
+torch_completed_v1        %% Torch achieved its goal
+torch_archived_v1         %% Torch retired to history
+```
+
+#### DnA Phase Events
+```erlang
+%% Discovery & Analysis
+context_map_drafted_v1    %% Initial context map created
+context_identified_v1     %% New bounded context discovered
+question_raised_v1        %% Clarification needed from human
+question_resolved_v1      %% Human answered the question
+research_completed_v1     %% Spike/research finished
+requirements_captured_v1  %% Requirements documented
+```
+
+#### AnP Phase Events
+```erlang
+%% Architecture & Planning
+pathway_selected_v1       %% Human chose which context first
+cartwheel_designed_v1     %% Spoke structure defined
+adr_recorded_v1           %% Architecture decision made
+plan_drafted_v1           %% Implementation plan created
+task_added_v1             %% Task added to kanban
+task_estimated_v1         %% Story points assigned
+```
+
+#### TnI Phase Events
+```erlang
+%% Testing & Implementation
+skeleton_started_v1       %% Walking skeleton begun
+spoke_skeleton_complete_v1 %% One spoke wired up
+spoke_fleshed_out_v1      %% Spoke fully implemented
+test_added_v1             %% Test coverage increased
+code_reviewed_v1          %% PR reviewed and approved
+```
+
+#### DnO Phase Events
+```erlang
+%% Deployment & Operations
+deployed_to_dev_v1        %% Deployed to dev environment
+deployed_to_staging_v1    %% Deployed to staging
+deployed_to_prod_v1       %% Production deployment
+incident_recorded_v1      %% Production issue logged
+runbook_updated_v1        %% Operational docs updated
+```
+
+#### Agent Events
+```erlang
+%% Agent lifecycle (cross-phase)
+agent_spawned_v1          %% New agent created for task
+agent_task_assigned_v1    %% Agent picked up work
+agent_task_completed_v1   %% Agent finished work
+agent_retired_v1          %% Agent gracefully stopped
+agent_handed_off_v1       %% Work transferred between agents
+```
+
+### Projections
+
+Events project into multiple views:
+
+| Projection | Purpose | Updated By |
+|------------|---------|------------|
+| **Artifact Files** | VISION.md, CONTEXT_MAP.md, etc. | File writer on relevant events |
+| **TUI Dashboard** | Real-time Torch status | Live subscription |
+| **Kanban Board** | Task tracking | task_* events |
+| **Agent Registry** | Active agents | agent_* events |
+| **Metrics** | Progress, velocity | Aggregate all events |
+| **Audit Log** | Compliance record | All events |
+
+**Key Insight:** Artifacts become projections, not primary sources. When a human edits VISION.md directly, that's captured as `vision_manually_updated_v1` event.
+
+### Storage Strategy
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     TORCH EVENT STREAM                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  Local (ReckonDB)                                            │
+│  ├── Primary event store                                     │
+│  ├── Fast queries for TUI                                    │
+│  └── Survives network partition                              │
+│                                                               │
+│  Mesh (Macula DHT)                                           │
+│  ├── Distributed replication                                 │
+│  ├── Cross-device sync                                       │
+│  └── Content-addressed for integrity                         │
+│                                                               │
+│  Torch Repo (Git)                                            │
+│  ├── Artifact projections (markdown files)                   │
+│  ├── Human-readable history                                  │
+│  └── Versioned snapshots                                     │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Example: Event Flow
+
+```
+Human: "We need geo-restriction for compliance"
+        │
+        ▼
+[torch_ignited_v1]
+├── torch_id: "macula-geo"
+├── brief: "Geo-restriction for compliance..."
+└── ignited_by: "human:rl"
+        │
+        ▼
+Projection: Creates ~/work/.../macula-geo/BRIEF.md
+        │
+        ▼
+Hecate-DnA agent subscribes, starts work
+        │
+        ▼
+[context_identified_v1]
+├── context: "geo_check"
+├── description: "IP-based country detection"
+└── identified_by: "agent:dna-001"
+        │
+        ▼
+Projection: Updates CONTEXT_MAP.md
+        │
+        ▼
+... (more events) ...
+        │
+        ▼
+[deployed_to_prod_v1]
+├── version: "1.0.0"
+├── deployed_by: "agent:dno-001"
+└── approved_by: "human:rl"
+        │
+        ▼
+Torch complete! Full history preserved.
+```
+
+### Benefits
+
+1. **Nothing Lost** - Every decision, draft, iteration preserved
+2. **AI Training** - Event streams are perfect training data
+3. **Reproducibility** - Replay events to recreate any state
+4. **Distributed** - Naturally works across mesh nodes
+5. **Async-First** - Agents work independently, sync via events
+
+---
+
 ## Open Questions
 
 1. **Skill System:** How do language/framework skills integrate with detection?
-2. **Agent Persistence:** Do agents survive daemon restart?
+2. **Agent Persistence:** Do agents survive daemon restart? (Answer: Yes, via event replay)
 3. **Mesh Distribution:** How are agents distributed across mesh nodes?
 4. **Team Collaboration:** Multiple humans + shared agent pool?
-5. **Agent Memory:** How do agents learn and retain context?
+5. **Agent Memory:** How do agents learn and retain context? (Answer: Event streams + projections)
 
 ---
 
