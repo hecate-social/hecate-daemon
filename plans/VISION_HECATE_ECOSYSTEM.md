@@ -500,15 +500,20 @@ incident_recorded_v1      %% Production issue logged
 runbook_updated_v1        %% Operational docs updated
 ```
 
-#### Agent Events
-```erlang
-%% Agent lifecycle (cross-phase)
-agent_spawned_v1          %% New agent created for task
-agent_task_assigned_v1    %% Agent picked up work
-agent_task_completed_v1   %% Agent finished work
-agent_retired_v1          %% Agent gracefully stopped
-agent_handed_off_v1       %% Work transferred between agents
-```
+### Domain Events vs Agent Telemetry
+
+**Critical distinction:** Domain events capture WHAT was accomplished, not WHO did it.
+
+The litmus test: *"If a human did this work instead of an agent, would this event still be recorded?"*
+
+| Event | Domain Event? | Reasoning |
+|-------|---------------|-----------|
+| `context_map_drafted_v1` | ✅ Yes | We'd record that a context map was drafted |
+| `agent_spawned_v1` | ❌ No | "Employee clocked in" isn't project history |
+| `spoke_tests_passed_v1` | ✅ Yes | We'd record that tests passed |
+| `tokens_consumed_v1` | ❌ No | "Sarah drank 3 coffees" isn't project history |
+
+Agent lifecycle events (`agent_spawned`, `agent_retired`, `task_picked_up`) are **operational telemetry**, not domain events. They belong in a separate observability system.
 
 ### Projections
 
@@ -519,9 +524,8 @@ Events project into multiple views:
 | **Artifact Files** | VISION.md, CONTEXT_MAP.md, etc. | File writer on relevant events |
 | **TUI Dashboard** | Real-time Torch status | Live subscription |
 | **Kanban Board** | Task tracking | task_* events |
-| **Agent Registry** | Active agents | agent_* events |
-| **Metrics** | Progress, velocity | Aggregate all events |
-| **Audit Log** | Compliance record | All events |
+| **Progress Metrics** | Velocity, completion rate | Aggregate domain events |
+| **Audit Log** | Compliance record | All domain events |
 
 **Key Insight:** Artifacts become projections, not primary sources. When a human edits VISION.md directly, that's captured as `vision_manually_updated_v1` event.
 
@@ -599,13 +603,214 @@ Torch complete! Full history preserved.
 
 ---
 
+## Agent Swarm Architecture
+
+### Specialists + Generalist Pool
+
+The agent swarm uses a hybrid model: long-lived phase specialists for continuity, ephemeral generalists for burst capacity.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         TORCH AGENT SWARM                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  SPECIALISTS (Long-lived, one per phase)                             │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐                 │
+│  │   DnA   │  │   AnP   │  │   TnI   │  │   DnO   │                 │
+│  │Specialist│ │Specialist│ │Specialist│ │Specialist│                 │
+│  └────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘                 │
+│       │            │            │            │                        │
+│       └────────────┴─────┬──────┴────────────┘                       │
+│                          │                                            │
+│                          ▼                                            │
+│  GENERALIST POOL (Ephemeral, task-scoped)                            │
+│  ┌─────────────────────────────────────────────────────────────┐     │
+│  │  ┌───┐  ┌───┐  ┌───┐  ┌───┐  ┌───┐  ┌───┐  ┌───┐  ┌───┐   │     │
+│  │  │ G │  │ G │  │ G │  │   │  │   │  │   │  │   │  │   │   │     │
+│  │  │ 1 │  │ 2 │  │ 3 │  │ - │  │ - │  │ - │  │ - │  │ - │   │     │
+│  │  └───┘  └───┘  └───┘  └───┘  └───┘  └───┘  └───┘  └───┘   │     │
+│  │  active active active  ←── available slots (max 8) ──→     │     │
+│  └─────────────────────────────────────────────────────────────┘     │
+│                                                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Specialists
+
+Four specialists spawn when the Torch ignites. They're long-lived and phase-aware:
+
+| Specialist | Responsibilities |
+|------------|------------------|
+| **DnA Specialist** | Research, context discovery, requirements gathering |
+| **AnP Specialist** | Architecture decisions, cartwheel design, planning |
+| **TnI Specialist** | Implementation, testing, code review coordination |
+| **DnO Specialist** | Deployment, monitoring, incident response |
+
+**Specialist traits:**
+- Maintain phase context and memory across tasks
+- Coordinate work within their phase
+- Request generalists when workload exceeds capacity
+- Hand off to next phase specialist at transitions
+- Idle but persist when not in active phase
+
+### Generalists
+
+Generalists spawn on-demand when specialists need parallel capacity:
+
+```
+DnA Specialist needs to research 4 contexts in parallel
+    ↓
+Requests 3 generalists (specialist handles 1 itself)
+    ↓
+Generalists complete research, report back
+    ↓
+Generalists retire, specialist consolidates findings
+```
+
+**Generalist traits:**
+- Task-scoped (retire when task completes)
+- No cross-task memory
+- Assigned to and coordinated by a specialist
+- Cannot spawn other generalists
+
+### Pool Configuration
+
+```toml
+# torch.toml or ~/.config/hecate-tui/config.toml
+[agents.pool]
+min_generalists = 0        # No idle generalists by default
+max_generalists = 8        # Hard cap on concurrent assistants
+idle_timeout = "5m"        # Retire idle generalists after 5 min
+
+[agents.specialists]
+spawn_on_ignition = true   # All 4 specialists spawn immediately
+idle_allowed = true        # Specialists can idle (don't retire)
+```
+
+---
+
+## Agent Performance Measurement
+
+Agent performance is tracked via **telemetry**, separate from domain events.
+
+### Telemetry Streams
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    AGENT TELEMETRY                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  Metrics (Quantitative)                                      │
+│  ├── tokens_consumed        - LLM token usage per task       │
+│  ├── task_duration_ms       - Time to complete task          │
+│  ├── tasks_completed        - Count of completed tasks       │
+│  ├── error_count            - Failures requiring retry       │
+│  └── handoff_count          - Work transfers between agents  │
+│                                                               │
+│  Traces (Request Flow)                                       │
+│  ├── task_id                - Unique task identifier         │
+│  ├── agent_id               - Which agent handled it         │
+│  ├── parent_task_id         - For subtask relationships      │
+│  └── timestamps             - Start, checkpoints, end        │
+│                                                               │
+│  Logs (Qualitative)                                          │
+│  ├── decisions              - Why agent chose an approach    │
+│  ├── blockers               - What slowed progress           │
+│  └── quality_notes          - Self-assessment of output      │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Performance Dimensions
+
+| Dimension | Metrics | Used For |
+|-----------|---------|----------|
+| **Efficiency** | tokens/task, duration, cost | Resource optimization |
+| **Quality** | rework_rate, review_rejections | Output improvement |
+| **Throughput** | tasks/hour, parallel_capacity | Capacity planning |
+| **Reliability** | error_rate, retry_count | Stability monitoring |
+| **Collaboration** | handoff_clarity, specialist_load | Team balance |
+
+### Agent Scorecards
+
+Aggregate telemetry into per-agent scorecards:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  AGENT SCORECARD: DnA-Specialist                             │
+│  Torch: macula-geo | Period: Last 7 days                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  Tasks Completed:     12        Avg Duration:    8.3 min     │
+│  Tokens Used:         45,230    Avg Tokens/Task: 3,769       │
+│  Error Rate:          8.3%      Rework Rate:     16.7%       │
+│  Generalists Used:    6         Delegation Rate: 50%         │
+│                                                               │
+│  Quality Signals:                                             │
+│  ├── Human approvals on first try: 83%                       │
+│  ├── Context maps accepted without revision: 75%             │
+│  └── Research depth rating (human): 4.2/5                    │
+│                                                               │
+│  Cost:                                                        │
+│  ├── LLM API cost: $2.47                                     │
+│  └── Estimated human-equivalent hours saved: 18h             │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Human Feedback Loop
+
+Performance measurement requires human input for quality signals:
+
+```
+Task completed → Human reviews output → Quick rating (1-5 or 👍/👎)
+                                     → Optional: specific feedback
+                                     → Stored as telemetry, not domain event
+```
+
+**Feedback types:**
+- **Approval signals**: Accept, request revision, reject
+- **Quality ratings**: 1-5 scale on specific dimensions
+- **Freeform notes**: "Too verbose", "Missed edge case", "Excellent"
+
+### Telemetry Storage
+
+| Storage | Purpose | Retention |
+|---------|---------|-----------|
+| **Prometheus/OpenTelemetry** | Real-time metrics, alerting | 30 days |
+| **Structured Logs** | Debugging, audit | 90 days |
+| **Scorecard Snapshots** | Historical comparison | Indefinite |
+| **Aggregated Stats** | Trend analysis, billing | Indefinite |
+
+### Why Separate from Domain Events?
+
+1. **Different consumers** - Ops team vs. project stakeholders
+2. **Different retention** - Telemetry can age out, domain events are forever
+3. **Different privacy** - Token costs may be sensitive, project progress isn't
+4. **Different scale** - Telemetry is high-volume, domain events are sparse
+5. **Clean domain model** - Business events stay focused on business outcomes
+
+---
+
 ## Open Questions
 
+### Answered
+
+| Question | Answer |
+|----------|--------|
+| Agent Persistence | Yes, specialists survive restart via event replay |
+| Agent Memory | Event streams + projections provide context |
+| Agent Spawning Model | Specialists (4 long-lived) + Generalist Pool (0-8 ephemeral) |
+| Domain vs Telemetry | Domain events = business outcomes; Telemetry = operational metrics |
+
+### Remaining
+
 1. **Skill System:** How do language/framework skills integrate with detection?
-2. **Agent Persistence:** Do agents survive daemon restart? (Answer: Yes, via event replay)
-3. **Mesh Distribution:** How are agents distributed across mesh nodes?
-4. **Team Collaboration:** Multiple humans + shared agent pool?
-5. **Agent Memory:** How do agents learn and retain context? (Answer: Event streams + projections)
+2. **Mesh Distribution:** How are agents distributed across mesh nodes?
+3. **Team Collaboration:** Multiple humans + shared agent pool?
+4. **Telemetry Infrastructure:** Prometheus vs custom vs hybrid?
+5. **Human Feedback UX:** How to make rating frictionless in TUI?
+6. **Cost Attribution:** How to allocate LLM costs across Torches/tasks?
 
 ---
 
