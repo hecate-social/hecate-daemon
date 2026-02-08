@@ -1,6 +1,6 @@
 # Plan: Hecate Walking Skeleton
 
-## Status: IN PROGRESS (Daemon Complete)
+## Status: IN PROGRESS (Phases 1-7 Complete)
 
 **Created:** 2026-02-08
 **Updated:** 2026-02-08
@@ -440,14 +440,14 @@ Implement all routes with basic functionality. Hardcode single Torch for skeleto
 - [x] Pass torch_id through context (via Opts map)
 - [x] Verify telemetry recording
 
-### Step 7: Update TUI
-- [ ] Add /torch command
-- [ ] Rename /alc → /cartwheel
-- [ ] Add /agents command
-- [ ] Add /cost command
-- [ ] Update statusbar
-- [ ] Update client for new endpoints
-- [ ] Verify build
+### Step 7: Update TUI ✅
+- [x] Add /torch command
+- [x] Rename /alc → /cartwheel
+- [x] Add /agents command
+- [x] Add /cost command
+- [x] Update statusbar (torch context, phase badge, agent count)
+- [x] Update client for new endpoints
+- [x] Verify build
 
 ### Step 8: Integration Testing
 - [ ] Initiate Torch → Cartwheel created
