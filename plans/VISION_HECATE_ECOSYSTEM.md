@@ -1226,6 +1226,113 @@ At phase transitions, aggregate signals into phase rating:
 
 ---
 
+## Cost Attribution
+
+### Full Hierarchy + Model-Aware
+
+Every LLM call is attributed with full context for flexible analysis:
+
+```sql
+CREATE TABLE llm_calls (
+    id INTEGER PRIMARY KEY,
+    torch_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    task_id TEXT,              -- NULL for non-task calls
+    model TEXT NOT NULL,       -- claude-3-opus, ollama/llama3, etc.
+    tokens_in INTEGER NOT NULL,
+    tokens_out INTEGER NOT NULL,
+    cost_usd REAL,             -- NULL for local models
+    timestamp INTEGER NOT NULL
+);
+```
+
+### Progressive Disclosure
+
+Show summaries by default, drill down on demand:
+
+```
+/cost                           # Torch-level summary (default)
+
+Torch                    Tokens        Cost (USD)
+─────────────────────────────────────────────────
+macula-geo               145,230       $4.35
+macula-platform          892,100       $26.76
+hecate-daemon            234,500       $7.04
+─────────────────────────────────────────────────
+Total (30 days)                        $38.15
+```
+
+```
+/cost macula-geo                # Agent breakdown
+
+Agent                    Tokens        Cost (USD)   % of Torch
+─────────────────────────────────────────────────────────────
+DnA-Specialist           45,000        $1.35        31%
+AnP-Specialist           62,000        $1.86        43%
+TnI-Specialist           28,000        $0.84        19%
+Generalists (3)          10,230        $0.31         7%
+─────────────────────────────────────────────────────────────
+```
+
+```
+/cost macula-geo --tasks        # Task-level detail
+
+Task                           Agent         Tokens    Cost
+────────────────────────────────────────────────────────────
+Draft context map              DnA           12,000    $0.36
+Research geo_check context     DnA            8,500    $0.26
+Design geo_check cartwheel     AnP           18,000    $0.54
+...
+```
+
+```
+/cost --by-model                # Model breakdown
+
+Model                    Tokens        Cost (USD)
+─────────────────────────────────────────────────
+claude-3-opus            45,000        $2.70
+claude-3-sonnet          80,000        $1.20
+claude-3-haiku           20,230        $0.05
+ollama/llama3            (local)       $0.00
+─────────────────────────────────────────────────
+```
+
+### Model Pricing
+
+Pricing stored in config, updated as providers change:
+
+```toml
+# ~/.config/hecate-tui/config.toml
+[cost.models]
+# Per 1K tokens (input/output)
+"claude-3-opus" = { input = 0.015, output = 0.075 }
+"claude-3-sonnet" = { input = 0.003, output = 0.015 }
+"claude-3-haiku" = { input = 0.00025, output = 0.00125 }
+"gpt-4-turbo" = { input = 0.01, output = 0.03 }
+"ollama/*" = { input = 0.0, output = 0.0 }  # Local = free
+```
+
+### Use Cases
+
+| Question | Command |
+|----------|---------|
+| What's my total spend? | `/cost` |
+| Which Torch costs most? | `/cost` |
+| Which phase is expensive? | `/cost {torch}` |
+| What tasks burn tokens? | `/cost {torch} --tasks` |
+| Should I use a cheaper model? | `/cost --by-model` |
+| Compare Torch efficiency | `/cost --per-task-avg` |
+
+### Why Full Attribution
+
+1. **Optimization** - Identify expensive tasks, switch models
+2. **Budgeting** - Set per-Torch or per-month limits
+3. **Comparison** - Which Torch is most efficient?
+4. **Billing** - If Torches have different funding sources
+5. **Learning** - Understand cost drivers over time
+
+---
+
 ## Open Questions
 
 ### Answered
@@ -1241,10 +1348,11 @@ At phase transitions, aggregate signals into phase rating:
 | Team Collaboration | v1: Single human per Torch; v2: Sequential handoff; v3: Role-based |
 | Telemetry Infrastructure | SQLite embedded + optional Prometheus export; Torch-attributed |
 | Human Feedback UX | Hybrid: approval-is-feedback + optional quick react (y/n/c) |
+| Cost Attribution | Full hierarchy (Torch→Agent→Task) + model-aware; progressive disclosure |
 
 ### Remaining
 
-1. **Cost Attribution:** How to allocate LLM costs across Torches/tasks?
+(All key questions answered)
 3. **Team Collaboration:** Multiple humans + shared agent pool?
 4. **Telemetry Infrastructure:** Prometheus vs custom vs hybrid?
 5. **Human Feedback UX:** How to make rating frictionless in TUI?
