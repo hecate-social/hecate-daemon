@@ -44,6 +44,13 @@ init([]) ->
         period => 10
     },
 
-    Children = [],
+    Children = [
+        #{
+            id => on_torch_initiated_initiate_cartwheel_sup,
+            start => {on_torch_initiated_initiate_cartwheel_sup, start_link, []},
+            restart => permanent,
+            type => supervisor
+        }
+    ],
 
     {ok, {SupFlags, Children}}.

@@ -147,10 +147,19 @@ dispatch_torch_command(Cmd) ->
         {ok, Events} ->
             %% Convert events to maps for JSON response
             EventMaps = [torch_initiated_v1:to_map(E) || E <- Events],
+            %% Notify process manager(s) about torch initiated event
+            notify_process_managers(EventMaps),
             {ok, 0, EventMaps};
         {error, Reason} ->
             {error, Reason}
     end.
+
+%% @doc Notify process managers about torch events.
+%% This triggers cross-domain integration (e.g., torch -> cartwheel).
+notify_process_managers(EventMaps) ->
+    lists:foreach(fun(EventMap) ->
+        on_torch_initiated_initiate_cartwheel:handle_event(EventMap)
+    end, EventMaps).
 
 build_filters(QS) ->
     lists:foldl(fun({K, V}, Acc) ->
