@@ -6,9 +6,13 @@
 -export([emit/1]).
 
 -define(GROUP, torch_initiated_v1).
+-define(SCOPE, pg).
 
 %% @doc Emit torch_initiated_v1 event to pg group.
 %% All processes joined to the group will receive {torch_initiated_v1, Event}.
 -spec emit(map()) -> ok.
 emit(Event) ->
-    pg:broadcast(?GROUP, {torch_initiated_v1, Event}).
+    Message = {torch_initiated_v1, Event},
+    Members = pg:get_members(?SCOPE, ?GROUP),
+    lists:foreach(fun(Pid) -> Pid ! Message end, Members),
+    ok.

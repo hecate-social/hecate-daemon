@@ -58,8 +58,18 @@ maybe_add_name(Filters, Clauses, Params, N) ->
             {Clauses ++ [Clause], Params ++ [Name], N + 1}
     end.
 
+%% Handle both tuple and list formats from esqlite3
 row_to_map({TorchId, Name, Brief, Status, Repos, Skills, ContextMap,
             ActiveCartwheelId, InitiatedAt, InitiatedBy}) ->
+    row_to_map_impl(TorchId, Name, Brief, Status, Repos, Skills, ContextMap,
+                    ActiveCartwheelId, InitiatedAt, InitiatedBy);
+row_to_map([TorchId, Name, Brief, Status, Repos, Skills, ContextMap,
+            ActiveCartwheelId, InitiatedAt, InitiatedBy]) ->
+    row_to_map_impl(TorchId, Name, Brief, Status, Repos, Skills, ContextMap,
+                    ActiveCartwheelId, InitiatedAt, InitiatedBy).
+
+row_to_map_impl(TorchId, Name, Brief, Status, Repos, Skills, ContextMap,
+                ActiveCartwheelId, InitiatedAt, InitiatedBy) ->
     #{
         torch_id => TorchId,
         name => Name,

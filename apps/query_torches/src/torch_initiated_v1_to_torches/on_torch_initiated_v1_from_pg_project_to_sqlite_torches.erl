@@ -7,6 +7,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(GROUP, torch_initiated_v1).
+-define(SCOPE, pg).
 
 -spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
@@ -16,8 +17,8 @@ init([]) ->
     %% Ensure pg scope exists
     ok = ensure_pg_scope(),
     %% Join the pg group for torch_initiated_v1 events
-    ok = pg:join(?GROUP, self()),
-    logger:info("[~s] Joined pg group ~p", [?MODULE, ?GROUP]),
+    ok = pg:join(?SCOPE, ?GROUP, self()),
+    logger:info("[~s] Joined pg group ~p in scope ~p", [?MODULE, ?GROUP, ?SCOPE]),
     {ok, #{}}.
 
 handle_call(_Request, _From, State) ->
@@ -48,7 +49,7 @@ terminate(_Reason, _State) ->
 %% Internal
 
 ensure_pg_scope() ->
-    case pg:start(pg) of
+    case pg:start(?SCOPE) of
         {ok, _Pid} -> ok;
         {error, {already_started, _Pid}} -> ok
     end.
