@@ -47,6 +47,9 @@ dispatch(Cmd, Req) ->
     case maybe_initiate_torch:handle(Cmd) of
         {ok, Events} ->
             EventMaps = [torch_initiated_v1:to_map(E) || E <- Events],
+            %% INTERNAL: Emit to pg for projections (intra-daemon)
+            emit_to_pg(Events),
+            %% EXTERNAL: Emit to mesh for other agents (WAN)
             emit_to_mesh(EventMaps),
             hecate_api_utils:json_ok(201, #{
                 torch_id => initiate_torch_v1:get_torch_id(Cmd),
@@ -56,6 +59,19 @@ dispatch(Cmd, Req) ->
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
+
+emit_to_pg(Events) ->
+    lists:foreach(fun(E) ->
+        %% Convert record to atom-keyed map for pg consumers
+        AtomMap = #{
+            torch_id => torch_initiated_v1:get_torch_id(E),
+            name => torch_initiated_v1:get_name(E),
+            brief => torch_initiated_v1:get_brief(E),
+            initiated_at => torch_initiated_v1:get_initiated_at(E),
+            initiated_by => torch_initiated_v1:get_initiated_by(E)
+        },
+        torch_initiated_v1_to_pg:emit(AtomMap)
+    end, Events).
 
 emit_to_mesh(EventMaps) ->
     lists:foreach(fun(E) -> torch_initiated_v1_to_mesh:emit(E) end, EventMaps).
