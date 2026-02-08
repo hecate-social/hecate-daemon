@@ -218,13 +218,30 @@ dispatch_torch_command(Cmd) ->
             {error, Reason}
     end.
 
-%% @doc Emit torch events to mesh for cross-domain integration.
-%% The mesh emitter publishes facts to hecate.torch.initiated topic.
-%% Listeners in other domains (e.g., manage_cartwheels) subscribe and react.
+%% @doc Process events after successful dispatch.
+%% 1. Project to read models (SQLite) for queries
+%% 2. Emit to mesh for cross-domain integration
 notify_process_managers(EventMaps) ->
     lists:foreach(fun(EventMap) ->
+        %% Project to read model for queries
+        project_torch_event(EventMap),
+        %% Emit to mesh for cross-domain listeners
         torch_initiated_v1_to_mesh:emit(EventMap)
     end, EventMaps).
+
+%% @doc Project torch event to appropriate read model.
+project_torch_event(#{<<"event_type">> := <<"torch_initiated_v1">>} = Event) ->
+    %% Convert binary keys to atoms for projection
+    AtomEvent = #{
+        torch_id => maps:get(<<"torch_id">>, Event),
+        name => maps:get(<<"name">>, Event),
+        brief => maps:get(<<"brief">>, Event, undefined),
+        initiated_at => maps:get(<<"initiated_at">>, Event),
+        initiated_by => maps:get(<<"initiated_by">>, Event, undefined)
+    },
+    torch_initiated_v1_to_torches:project(AtomEvent);
+project_torch_event(_) ->
+    ok.
 
 %% @doc Dispatch identify_cartwheel command.
 %% After successful handling, emits the cartwheel_identified fact to mesh.
