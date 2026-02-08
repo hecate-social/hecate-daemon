@@ -1142,6 +1142,90 @@ port = 9090
 
 ---
 
+## Human Feedback UX
+
+### Principle: Don't Add Steps, Enhance Existing Interactions
+
+Feedback collection must be frictionless. The approach: leverage existing approval flow as implicit feedback, offer optional explicit feedback for depth.
+
+### Feedback Layers
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    FEEDBACK COLLECTION                       │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  Layer 1: Implicit (Zero Effort)                             │
+│  ├── Approve output    → positive signal                     │
+│  ├── Request changes   → negative signal + reason            │
+│  ├── Reject            → strong negative signal              │
+│  └── Time-to-approve   → confidence indicator                │
+│                                                               │
+│  Layer 2: Quick React (Optional, Inline)                     │
+│  ├── [y] 👍 good       → explicit positive                   │
+│  ├── [n] 👎 needs work → explicit negative                   │
+│  ├── [c] 📝 comment    → open note input                     │
+│  └── [Enter] skip      → no explicit signal                  │
+│                                                               │
+│  Layer 3: Async Detailed (Power User)                        │
+│  └── /feedback {agent} "detailed note about quality"         │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Inline Quick React
+
+After agent output, optional single-keypress feedback:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ DnA-Specialist: Here's the context map:                      │
+│                                                              │
+│ [context map content...]                                     │
+│                                                              │
+│ ─────────────────────────────────────────────────────────── │
+│ [y] good  [n] needs work  [c] comment  [Enter] continue     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- Appears briefly after significant outputs
+- Disappears on any key (including Enter to skip)
+- No interruption to flow if ignored
+
+### Phase Transition Summary
+
+At phase transitions, aggregate signals into phase rating:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ DnA PHASE COMPLETE                                           │
+│                                                              │
+│ Implicit signals:  8 approvals, 2 change requests           │
+│ Explicit signals:  5 👍, 1 👎                                │
+│ Derived rating:    4.2/5                                    │
+│                                                              │
+│ Proceeding to AnP...                                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### TUI Commands
+
+```
+/feedback {agent} "note"    # Async detailed feedback
+/signals                    # View recent feedback signals
+/signals dna-specialist     # Signals for specific agent
+```
+
+### Why This Works
+
+1. **Zero friction default** - Approval flow already happens
+2. **Opt-in depth** - Quick react when human wants to signal
+3. **Non-blocking** - Skip with Enter, no forced interaction
+4. **Aggregated insight** - Phase summaries derive from signals
+5. **Power user escape hatch** - `/feedback` for detailed notes
+
+---
+
 ## Open Questions
 
 ### Answered
@@ -1156,10 +1240,11 @@ port = 9090
 | Mesh Distribution | v1: Local-only; Future: Hybrid with overflow to remote nodes |
 | Team Collaboration | v1: Single human per Torch; v2: Sequential handoff; v3: Role-based |
 | Telemetry Infrastructure | SQLite embedded + optional Prometheus export; Torch-attributed |
+| Human Feedback UX | Hybrid: approval-is-feedback + optional quick react (y/n/c) |
 
 ### Remaining
 
-1. **Human Feedback UX:** How to make rating frictionless in TUI?
+1. **Cost Attribution:** How to allocate LLM costs across Torches/tasks?
 3. **Team Collaboration:** Multiple humans + shared agent pool?
 4. **Telemetry Infrastructure:** Prometheus vs custom vs hybrid?
 5. **Human Feedback UX:** How to make rating frictionless in TUI?
