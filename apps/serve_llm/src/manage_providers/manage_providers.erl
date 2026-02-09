@@ -244,13 +244,18 @@ default_ollama_config() ->
     #{type => ollama, url => Url, enabled => true}.
 
 %% @doc Auto-detect providers from environment variables.
-%% Checks for OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY, GROQ_API_KEY.
+%% Checks for OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY/GEMINI_API_KEY, GROQ_API_KEY.
 %% Only adds providers not already configured.
 auto_detect_env_providers(Providers) ->
+    %% Resolve Google/Gemini key: prefer GOOGLE_API_KEY, fall back to GEMINI_API_KEY
+    GoogleEnvVar = case os:getenv("GOOGLE_API_KEY") of
+        false -> "GEMINI_API_KEY";
+        _ -> "GOOGLE_API_KEY"
+    end,
     EnvProviders = [
         {<<"openai">>, "OPENAI_API_KEY", openai, "https://api.openai.com"},
         {<<"anthropic">>, "ANTHROPIC_API_KEY", anthropic, "https://api.anthropic.com"},
-        {<<"google">>, "GOOGLE_API_KEY", google, "https://generativelanguage.googleapis.com"},
+        {<<"google">>, GoogleEnvVar, google, "https://generativelanguage.googleapis.com"},
         %% Groq uses OpenAI-compatible API with function calling support
         {<<"groq">>, "GROQ_API_KEY", openai, "https://api.groq.com/openai"}
     ],
