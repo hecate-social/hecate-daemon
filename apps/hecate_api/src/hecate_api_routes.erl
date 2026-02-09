@@ -170,6 +170,9 @@ torch_routes() ->
         {"/api/torch/initiate", initiate_torch_api, []},
         {"/api/torches", list_torches_api, []},
         {"/api/torches/:torch_id", get_torch_api, []},
+        {"/api/torches/:torch_id/vision/refine", refine_vision_api, []},
+        {"/api/torches/:torch_id/vision/submit", submit_vision_api, []},
+        {"/api/torches/:torch_id/archive", archive_torch_api, []},
         {"/api/torches/:torch_id/cartwheels/identify", identify_cartwheel_api, []}
     ].
 

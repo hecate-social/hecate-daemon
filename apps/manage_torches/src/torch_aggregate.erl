@@ -80,6 +80,10 @@ execute(State, #{command_type := <<"identify_cartwheel">>} = Payload) ->
     execute_identify_cartwheel(Payload, State);
 execute(State, #{command_type := <<"activate_cartwheel">>} = Payload) ->
     execute_activate_cartwheel(Payload, State);
+execute(State, #{command_type := <<"refine_vision">>} = Payload) ->
+    execute_refine_vision(Payload, State);
+execute(State, #{command_type := <<"submit_vision">>} = Payload) ->
+    execute_submit_vision(Payload, State);
 execute(State, #{command_type := <<"archive_torch">>} = Payload) ->
     execute_archive_torch(Payload, State);
 execute(_State, _Payload) ->
@@ -107,6 +111,28 @@ execute_activate_cartwheel(Payload, #torch_state{status = Status} = _State) when
     convert_events(maybe_activate_cartwheel:handle(Cmd), fun cartwheel_activated_v1:to_map/1);
 execute_activate_cartwheel(_Payload, _State) ->
     {error, torch_not_initiated}.
+
+execute_refine_vision(_Payload, #torch_state{torch_id = undefined}) ->
+    {error, torch_not_found};
+execute_refine_vision(_Payload, #torch_state{status = Status}) when Status band ?ARCHIVED =/= 0 ->
+    {error, torch_archived};
+execute_refine_vision(_Payload, #torch_state{status = Status}) when Status band ?DNA_ACTIVE =:= 0 ->
+    {error, dna_not_active};
+execute_refine_vision(Payload, _State) ->
+    {ok, Cmd} = refine_vision_v1:from_map(Payload),
+    convert_events(maybe_refine_vision:handle(Cmd), fun torch_vision_refined_v1:to_map/1).
+
+execute_submit_vision(_Payload, #torch_state{torch_id = undefined}) ->
+    {error, torch_not_found};
+execute_submit_vision(_Payload, #torch_state{status = Status}) when Status band ?ARCHIVED =/= 0 ->
+    {error, torch_archived};
+execute_submit_vision(_Payload, #torch_state{status = Status}) when Status band ?DNA_ACTIVE =:= 0 ->
+    {error, dna_not_active};
+execute_submit_vision(_Payload, #torch_state{status = Status}) when Status band ?DNA_COMPLETE =/= 0 ->
+    {error, dna_already_complete};
+execute_submit_vision(Payload, _State) ->
+    {ok, Cmd} = submit_vision_v1:from_map(Payload),
+    convert_events(maybe_submit_vision:handle(Cmd), fun torch_vision_submitted_v1:to_map/1).
 
 execute_archive_torch(_Payload, #torch_state{torch_id = undefined}) ->
     {error, torch_not_found};
@@ -145,6 +171,14 @@ apply_event(#{<<"event_type">> := <<"cartwheel_activated_v1">>} = E, State) ->
     apply_cartwheel_activated(E, State);
 apply_event(#{event_type := <<"cartwheel_activated_v1">>} = E, State) ->
     apply_cartwheel_activated(E, State);
+apply_event(#{<<"event_type">> := <<"torch_vision_refined_v1">>} = E, State) ->
+    apply_torch_vision_refined(E, State);
+apply_event(#{event_type := <<"torch_vision_refined_v1">>} = E, State) ->
+    apply_torch_vision_refined(E, State);
+apply_event(#{<<"event_type">> := <<"torch_vision_submitted_v1">>} = _E, State) ->
+    apply_torch_vision_submitted(State);
+apply_event(#{event_type := <<"torch_vision_submitted_v1">>} = _E, State) ->
+    apply_torch_vision_submitted(State);
 apply_event(#{<<"event_type">> := <<"torch_archived_v1">>} = _E, State) ->
     apply_torch_archived(State);
 apply_event(#{event_type := <<"torch_archived_v1">>} = _E, State) ->
@@ -183,6 +217,29 @@ apply_cartwheel_activated(E, State) ->
         active_cartwheel_id = CartwheelId,
         context_map = UpdatedMap
     }.
+
+apply_torch_vision_refined(E, State) ->
+    %% Only update fields that are non-undefined (partial update)
+    S1 = case get_value(brief, E) of
+        undefined -> State;
+        Brief -> State#torch_state{brief = Brief}
+    end,
+    S2 = case get_value(repos, E) of
+        undefined -> S1;
+        Repos -> S1#torch_state{repos = Repos}
+    end,
+    S3 = case get_value(skills, E) of
+        undefined -> S2;
+        Skills -> S2#torch_state{skills = Skills}
+    end,
+    case get_value(context_map, E) of
+        undefined -> S3;
+        ContextMap -> S3#torch_state{context_map = ContextMap}
+    end.
+
+apply_torch_vision_submitted(#torch_state{status = Status} = State) ->
+    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?DNA_COMPLETE), ?DNA_ACTIVE),
+    State#torch_state{status = NewStatus}.
 
 apply_torch_archived(#torch_state{status = Status} = State) ->
     State#torch_state{
