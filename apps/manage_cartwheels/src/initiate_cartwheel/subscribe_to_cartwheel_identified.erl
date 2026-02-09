@@ -38,6 +38,8 @@ start_link() ->
 %%====================================================================
 
 init([]) ->
+    %% Ensure pg scope exists before joining
+    ok = ensure_pg_scope(),
     %% Join pg group for internal events (same-daemon)
     ok = pg:join(?PG_SCOPE, ?PG_GROUP, self()),
     logger:info("[subscribe_to_cartwheel_identified] Joined pg group ~p", [?PG_GROUP]),
@@ -99,3 +101,9 @@ subscribe_to_mesh(Topic) ->
 
 unsubscribe_mesh(undefined) -> ok;
 unsubscribe_mesh(SubRef) -> hecate_mesh_client:unsubscribe(SubRef).
+
+ensure_pg_scope() ->
+    case pg:start(?PG_SCOPE) of
+        {ok, _Pid} -> ok;
+        {error, {already_started, _Pid}} -> ok
+    end.
