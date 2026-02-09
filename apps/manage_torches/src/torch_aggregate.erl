@@ -42,12 +42,12 @@
 -spec flag_map() -> evoq_bit_flags:flag_map().
 flag_map() -> #{
     0              => <<"New">>,
-    ?INITIATED     => <<"🌱 Initiated">>,
-    ?DNA_ACTIVE    => <<"🔍 Discovering">>,
-    ?DNA_COMPLETE  => <<"✅ Discovery Done">>,
-    ?IMPLEMENTING  => <<"🔨 Implementing">>,
-    ?COMPLETED     => <<"🏁 Completed">>,
-    ?ARCHIVED      => <<"📦 Archived">>
+    ?INITIATED     => <<"🌱 Initiated"/utf8>>,
+    ?DNA_ACTIVE    => <<"🔍 Discovering"/utf8>>,
+    ?DNA_COMPLETE  => <<"✅ Discovery Done"/utf8>>,
+    ?IMPLEMENTING  => <<"🔨 Implementing"/utf8>>,
+    ?COMPLETED     => <<"🏁 Completed"/utf8>>,
+    ?ARCHIVED      => <<"📦 Archived"/utf8>>
 }.
 
 %% @doc Behaviour callback: init/1

@@ -29,8 +29,8 @@
 -spec flag_map() -> evoq_bit_flags:flag_map().
 flag_map() -> #{
     0          => <<"New">>,
-    ?ACTIVE    => <<"🟢 Active">>,
-    ?WITHDRAWN => <<"🚫 Withdrawn">>
+    ?ACTIVE    => <<"🟢 Active"/utf8>>,
+    ?WITHDRAWN => <<"🚫 Withdrawn"/utf8>>
 }.
 
 %% @doc Behaviour callback: init/1

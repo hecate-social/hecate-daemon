@@ -35,10 +35,10 @@
 -spec flag_map() -> evoq_bit_flags:flag_map().
 flag_map() -> #{
     0           => <<"New">>,
-    ?REGISTERED => <<"📋 Registered">>,
-    ?ACTIVE     => <<"🟢 Active">>,
-    ?SUSPENDED  => <<"⏸️ Suspended">>,
-    ?REVOKED    => <<"🚫 Revoked">>
+    ?REGISTERED => <<"📋 Registered"/utf8>>,
+    ?ACTIVE     => <<"🟢 Active"/utf8>>,
+    ?SUSPENDED  => <<"⏸️ Suspended"/utf8>>,
+    ?REVOKED    => <<"🚫 Revoked"/utf8>>
 }.
 
 %% @doc Behaviour callback: init/1

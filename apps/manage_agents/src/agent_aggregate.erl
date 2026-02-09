@@ -36,10 +36,10 @@
 -spec flag_map() -> evoq_bit_flags:flag_map().
 flag_map() -> #{
     0          => <<"New">>,
-    ?ACTIVATED => <<"⚡ Activated">>,
-    ?IDLE      => <<"💤 Idle">>,
-    ?WORKING   => <<"🔧 Working">>,
-    ?RETIRED   => <<"🪦 Retired">>
+    ?ACTIVATED => <<"⚡ Activated"/utf8>>,
+    ?IDLE      => <<"💤 Idle"/utf8>>,
+    ?WORKING   => <<"🔧 Working"/utf8>>,
+    ?RETIRED   => <<"🪦 Retired"/utf8>>
 }.
 
 %% @doc Behaviour callback: init/1

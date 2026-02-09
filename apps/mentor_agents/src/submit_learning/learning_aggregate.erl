@@ -49,12 +49,12 @@
 -spec flag_map() -> evoq_bit_flags:flag_map().
 flag_map() -> #{
     0          => <<"New">>,
-    ?SUBMITTED => <<"📨 Submitted">>,
-    ?VALIDATED => <<"✅ Validated">>,
-    ?REJECTED  => <<"❌ Rejected">>,
-    ?ENDORSED  => <<"👍 Endorsed">>,
-    ?DISPUTED  => <<"⚠️ Disputed">>,
-    ?RESOLVED  => <<"✅ Resolved">>
+    ?SUBMITTED => <<"📨 Submitted"/utf8>>,
+    ?VALIDATED => <<"✅ Validated"/utf8>>,
+    ?REJECTED  => <<"❌ Rejected"/utf8>>,
+    ?ENDORSED  => <<"👍 Endorsed"/utf8>>,
+    ?DISPUTED  => <<"⚠️ Disputed"/utf8>>,
+    ?RESOLVED  => <<"✅ Resolved"/utf8>>
 }.
 
 %% @doc Behaviour callback: init/1

@@ -54,17 +54,17 @@
 -spec flag_map() -> evoq_bit_flags:flag_map().
 flag_map() -> #{
     0                      => <<"New">>,
-    ?INITIATED             => <<"🌱 Initiated">>,
-    ?DISCOVERY_ACTIVE      => <<"🔍 DnA Active">>,
-    ?DISCOVERY_COMPLETE    => <<"✅ DnA Done">>,
-    ?ARCHITECTURE_ACTIVE   => <<"📐 AnP Active">>,
-    ?ARCHITECTURE_COMPLETE => <<"✅ AnP Done">>,
-    ?TESTING_ACTIVE        => <<"🧪 TnI Active">>,
-    ?TESTING_COMPLETE      => <<"✅ TnI Done">>,
-    ?DEPLOYMENT_ACTIVE     => <<"🚀 DnO Active">>,
-    ?DEPLOYMENT_COMPLETE   => <<"✅ DnO Done">>,
-    ?COMPLETED             => <<"🏁 Completed">>,
-    ?REVISITING            => <<"🔄 Revisiting">>
+    ?INITIATED             => <<"🌱 Initiated"/utf8>>,
+    ?DISCOVERY_ACTIVE      => <<"🔍 DnA Active"/utf8>>,
+    ?DISCOVERY_COMPLETE    => <<"✅ DnA Done"/utf8>>,
+    ?ARCHITECTURE_ACTIVE   => <<"📐 AnP Active"/utf8>>,
+    ?ARCHITECTURE_COMPLETE => <<"✅ AnP Done"/utf8>>,
+    ?TESTING_ACTIVE        => <<"🧪 TnI Active"/utf8>>,
+    ?TESTING_COMPLETE      => <<"✅ TnI Done"/utf8>>,
+    ?DEPLOYMENT_ACTIVE     => <<"🚀 DnO Active"/utf8>>,
+    ?DEPLOYMENT_COMPLETE   => <<"✅ DnO Done"/utf8>>,
+    ?COMPLETED             => <<"🏁 Completed"/utf8>>,
+    ?REVISITING            => <<"🔄 Revisiting"/utf8>>
 }.
 
 %% @doc Behaviour callback: init/1

@@ -29,8 +29,8 @@
 -spec flag_map() -> evoq_bit_flags:flag_map().
 flag_map() -> #{
     0              => <<"New">>,
-    ?SUBSCRIBED    => <<"🔔 Subscribed">>,
-    ?UNSUBSCRIBED  => <<"🔕 Unsubscribed">>
+    ?SUBSCRIBED    => <<"🔔 Subscribed"/utf8>>,
+    ?UNSUBSCRIBED  => <<"🔕 Unsubscribed"/utf8>>
 }.
 
 %% @doc Behaviour callback: init/1
