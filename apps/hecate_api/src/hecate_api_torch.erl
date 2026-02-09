@@ -245,13 +245,17 @@ emit_torch_event(_Other) ->
     ok.
 
 %% @doc Dispatch identify_cartwheel command.
-%% After successful handling, emits the cartwheel_identified fact to mesh.
+%% After successful handling, emits the cartwheel_identified fact to:
+%% 1. pg (internal) - for same-daemon process managers
+%% 2. mesh (external) - for remote-daemon reactors
 dispatch_identify_cartwheel_command(Cmd) ->
     case maybe_identify_cartwheel:handle(Cmd) of
         {ok, Events} ->
             EventMaps = [cartwheel_identified_v1:to_map(E) || E <- Events],
-            %% Emit to mesh for manage_cartwheels to react
             lists:foreach(fun(EventMap) ->
+                %% INTERNAL: Emit to pg for same-daemon consumers
+                cartwheel_identified_v1_to_pg:emit(EventMap),
+                %% EXTERNAL: Emit to mesh for remote-daemon consumers
                 cartwheel_identified_v1_to_mesh:emit(EventMap)
             end, EventMaps),
             {ok, 0, EventMaps};

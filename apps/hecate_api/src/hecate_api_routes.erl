@@ -174,12 +174,18 @@ torch_routes() ->
     ].
 
 %% Cartwheel (bounded contexts) - vertical handlers in spokes
+%%
+%% NOTE: There is NO direct cartwheel creation endpoint.
+%% Cartwheels are created through the parent-child pattern:
+%%   Torch identifies cartwheel → cartwheel_identified_v1 → manage_cartwheels listener
+%%   → initiate_cartwheel command → cartwheel_initiated_v1 event
+%% Use: POST /api/torches/:torch_id/cartwheels/identify
 cartwheel_routes() ->
     [
-        %% Core cartwheel routes
+        %% Core cartwheel routes (read-only + lifecycle operations)
         {"/api/cartwheel", get_active_cartwheel_api, []},
         {"/api/cartwheels", list_cartwheels_api, []},
-        {"/api/cartwheels/initiate", initiate_cartwheel_api, []},
+        %% No initiate endpoint - cartwheels created via torch identification
         {"/api/cartwheels/:cartwheel_id", get_cartwheel_api, []},
         {"/api/cartwheels/:cartwheel_id/transition", transition_phase_api, []},
         %% Discovery & Analysis phase
