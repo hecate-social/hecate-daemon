@@ -57,8 +57,9 @@ handle_cast(_Msg, State) ->
 
 %% Handle pg message (internal, same-daemon)
 handle_info({cartwheel_identified_v1, FactData}, State) ->
-    logger:debug("[subscribe_to_cartwheel_identified] Received from pg"),
-    on_cartwheel_identified_maybe_initiate_cartwheel:handle(FactData),
+    logger:info("[subscribe_to_cartwheel_identified] Received cartwheel_identified from pg: ~p", [maps:get(<<"cartwheel_id">>, FactData, unknown)]),
+    Result = on_cartwheel_identified_maybe_initiate_cartwheel:handle(FactData),
+    logger:info("[subscribe_to_cartwheel_identified] Policy result: ~p", [Result]),
     {noreply, State};
 
 %% Handle mesh message (external, remote-daemon)
