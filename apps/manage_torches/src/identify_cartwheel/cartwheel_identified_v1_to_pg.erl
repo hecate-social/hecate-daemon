@@ -18,6 +18,6 @@
 emit(Event) ->
     Message = {cartwheel_identified_v1, Event},
     Members = pg:get_members(?SCOPE, ?GROUP),
-    logger:info("[cartwheel_identified_v1_to_pg] Emitting to ~p members: ~p", [length(Members), Members]),
+    logger:debug("[cartwheel_identified_v1_to_pg] Emitting to ~p members", [length(Members)]),
     lists:foreach(fun(Pid) -> Pid ! Message end, Members),
     ok.

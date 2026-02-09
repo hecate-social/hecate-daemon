@@ -2,8 +2,13 @@
 %%% Maintains Torch state and applies events.
 %%% A Torch represents a high-level project or initiative containing multiple Cartwheels.
 -module(torch_aggregate).
+-behaviour(evoq_aggregate).
 
--export([execute/2, apply_event/2, initial_state/0]).
+%% Behaviour callbacks
+-export([init/1, execute/2, apply/2]).
+
+%% Aliases for backward compatibility and testing
+-export([initial_state/0, apply_event/2]).
 
 %% Bit flags for torch status
 -define(INITIATED,     1).   %% 2^0
@@ -29,6 +34,11 @@
 -type state() :: #torch_state{}.
 -export_type([state/0]).
 
+%% @doc Behaviour callback: init/1
+-spec init(binary()) -> {ok, state()}.
+init(_AggregateId) ->
+    {ok, initial_state()}.
+
 -spec initial_state() -> state().
 initial_state() ->
     #torch_state{
@@ -46,14 +56,15 @@ initial_state() ->
     }.
 
 %% @doc Execute command against aggregate state
--spec execute(map(), state()) -> {ok, [map()]} | {error, term()}.
-execute(#{command_type := <<"initiate_torch">>} = Payload, State) ->
+%% NOTE: evoq calls execute(State, Payload) - state first, then payload!
+-spec execute(state(), map()) -> {ok, [map()]} | {error, term()}.
+execute(State, #{command_type := <<"initiate_torch">>} = Payload) ->
     execute_initiate_torch(Payload, State);
-execute(#{command_type := <<"identify_cartwheel">>} = Payload, State) ->
+execute(State, #{command_type := <<"identify_cartwheel">>} = Payload) ->
     execute_identify_cartwheel(Payload, State);
-execute(#{command_type := <<"activate_cartwheel">>} = Payload, State) ->
+execute(State, #{command_type := <<"activate_cartwheel">>} = Payload) ->
     execute_activate_cartwheel(Payload, State);
-execute(_Payload, _State) ->
+execute(_State, _Payload) ->
     {error, unknown_command}.
 
 execute_initiate_torch(Payload, #torch_state{status = 0}) ->
@@ -85,7 +96,14 @@ convert_events({ok, Events}, ToMapFun) ->
 convert_events({error, Reason}, _ToMapFun) ->
     {error, Reason}.
 
+%% @doc Behaviour callback: apply/2
+%% NOTE: evoq calls apply(State, Event) - state first, then event!
+-spec apply(state(), map()) -> state().
+apply(State, Event) ->
+    apply_event(Event, State).
+
 %% @doc Apply event to state (event sourcing)
+%% Legacy function with (Event, State) order - use apply/2 instead
 -spec apply_event(map(), state()) -> state().
 apply_event(#{<<"event_type">> := <<"torch_initiated_v1">>} = E, State) ->
     apply_torch_initiated(E, State);

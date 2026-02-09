@@ -3,8 +3,13 @@
 %%% Handles orchestration events (initiate_cartwheel, transition_phase, revisit_phase)
 %%% and DnA events (discovery_started, finding_recorded, term_defined, discovery_completed).
 -module(cartwheel_aggregate).
+-behaviour(evoq_aggregate).
 
--export([execute/2, apply_event/2, initial_state/0]).
+%% Behaviour callbacks
+-export([init/1, execute/2, apply/2]).
+
+%% Aliases for backward compatibility and testing
+-export([initial_state/0, apply_event/2]).
 
 -define(INITIATED,             1).   %% 2^0
 -define(DISCOVERY_ACTIVE,      2).   %% 2^1
@@ -42,6 +47,11 @@
 -type state() :: #cartwheel_state{}.
 -export_type([state/0]).
 
+%% @doc Behaviour callback: init/1
+-spec init(binary()) -> {ok, state()}.
+init(_AggregateId) ->
+    {ok, initial_state()}.
+
 -spec initial_state() -> state().
 initial_state() ->
     #cartwheel_state{
@@ -66,52 +76,53 @@ initial_state() ->
     }.
 
 %% @doc Execute command against aggregate state
--spec execute(map(), state()) -> {ok, [map()]} | {error, term()}.
-execute(#{command_type := <<"initiate_cartwheel">>} = Payload, State) ->
+%% NOTE: evoq calls execute(State, Payload) - state first, then payload!
+-spec execute(state(), map()) -> {ok, [map()]} | {error, term()}.
+execute(State, #{command_type := <<"initiate_cartwheel">>} = Payload) ->
     execute_initiate_cartwheel(Payload, State);
-execute(#{command_type := <<"start_discovery">>} = Payload, State) ->
+execute(State, #{command_type := <<"start_discovery">>} = Payload) ->
     execute_start_discovery(Payload, State);
-execute(#{command_type := <<"record_finding">>} = Payload, State) ->
+execute(State, #{command_type := <<"record_finding">>} = Payload) ->
     execute_record_finding(Payload, State);
-execute(#{command_type := <<"define_term">>} = Payload, State) ->
+execute(State, #{command_type := <<"define_term">>} = Payload) ->
     execute_define_term(Payload, State);
-execute(#{command_type := <<"complete_discovery">>} = Payload, State) ->
+execute(State, #{command_type := <<"complete_discovery">>} = Payload) ->
     execute_complete_discovery(Payload, State);
-execute(#{command_type := <<"transition_phase">>} = Payload, State) ->
+execute(State, #{command_type := <<"transition_phase">>} = Payload) ->
     execute_transition_phase(Payload, State);
-execute(#{command_type := <<"start_architecture">>} = Payload, State) ->
+execute(State, #{command_type := <<"start_architecture">>} = Payload) ->
     execute_start_architecture(Payload, State);
-execute(#{command_type := <<"define_dossier">>} = Payload, State) ->
+execute(State, #{command_type := <<"define_dossier">>} = Payload) ->
     execute_define_dossier(Payload, State);
-execute(#{command_type := <<"inventory_spoke">>} = Payload, State) ->
+execute(State, #{command_type := <<"inventory_spoke">>} = Payload) ->
     execute_inventory_spoke(Payload, State);
-execute(#{command_type := <<"draft_plan">>} = Payload, State) ->
+execute(State, #{command_type := <<"draft_plan">>} = Payload) ->
     execute_draft_plan(Payload, State);
-execute(#{command_type := <<"approve_plan">>} = Payload, State) ->
+execute(State, #{command_type := <<"approve_plan">>} = Payload) ->
     execute_approve_plan(Payload, State);
-execute(#{command_type := <<"complete_architecture">>} = Payload, State) ->
+execute(State, #{command_type := <<"complete_architecture">>} = Payload) ->
     execute_complete_architecture(Payload, State);
-execute(#{command_type := <<"start_testing">>} = Payload, State) ->
+execute(State, #{command_type := <<"start_testing">>} = Payload) ->
     execute_start_testing(Payload, State);
-execute(#{command_type := <<"create_skeleton">>} = Payload, State) ->
+execute(State, #{command_type := <<"create_skeleton">>} = Payload) ->
     execute_create_skeleton(Payload, State);
-execute(#{command_type := <<"implement_spoke">>} = Payload, State) ->
+execute(State, #{command_type := <<"implement_spoke">>} = Payload) ->
     execute_implement_spoke(Payload, State);
-execute(#{command_type := <<"verify_build">>} = Payload, State) ->
+execute(State, #{command_type := <<"verify_build">>} = Payload) ->
     execute_verify_build(Payload, State);
-execute(#{command_type := <<"complete_testing">>} = Payload, State) ->
+execute(State, #{command_type := <<"complete_testing">>} = Payload) ->
     execute_complete_testing(Payload, State);
-execute(#{command_type := <<"start_deployment">>} = Payload, State) ->
+execute(State, #{command_type := <<"start_deployment">>} = Payload) ->
     execute_start_deployment(Payload, State);
-execute(#{command_type := <<"record_deployment">>} = Payload, State) ->
+execute(State, #{command_type := <<"record_deployment">>} = Payload) ->
     execute_record_deployment(Payload, State);
-execute(#{command_type := <<"report_incident">>} = Payload, State) ->
+execute(State, #{command_type := <<"report_incident">>} = Payload) ->
     execute_report_incident(Payload, State);
-execute(#{command_type := <<"resolve_incident">>} = Payload, State) ->
+execute(State, #{command_type := <<"resolve_incident">>} = Payload) ->
     execute_resolve_incident(Payload, State);
-execute(#{command_type := <<"complete_deployment">>} = Payload, State) ->
+execute(State, #{command_type := <<"complete_deployment">>} = Payload) ->
     execute_complete_deployment(Payload, State);
-execute(_Payload, _State) ->
+execute(_State, _Payload) ->
     {error, unknown_command}.
 
 execute_initiate_cartwheel(Payload, #cartwheel_state{status = 0}) ->
@@ -350,7 +361,14 @@ convert_events({ok, Events}, ToMapFun) ->
 convert_events({error, Reason}, _ToMapFun) ->
     {error, Reason}.
 
+%% @doc Behaviour callback: apply/2
+%% NOTE: evoq calls apply(State, Event) - state first, then event!
+-spec apply(state(), map()) -> state().
+apply(State, Event) ->
+    apply_event(Event, State).
+
 %% @doc Apply event to state (event sourcing)
+%% Legacy function with (Event, State) order - use apply/2 instead
 -spec apply_event(map(), state()) -> state().
 apply_event(#{event_type := <<"cartwheel_initiated_v1">>} = E, State) ->
     State#cartwheel_state{

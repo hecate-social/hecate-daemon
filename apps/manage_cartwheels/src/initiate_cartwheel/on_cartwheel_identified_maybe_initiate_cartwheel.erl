@@ -27,10 +27,8 @@ handle(FactData) ->
     ContextName = get_field(context_name, FactData),
     Description = get_field(description, FactData),
 
-    logger:info("[policy] Processing cartwheel ~s (~s) from torch ~s",
+    logger:debug("[policy] Processing cartwheel ~s (~s) from torch ~s",
                 [CartwheelId, ContextName, TorchId]),
-    logger:info("[policy] Extracted fields - torch_id: ~p, cartwheel_id: ~p, context_name: ~p",
-                [TorchId, CartwheelId, ContextName]),
 
     %% Policy: Always initiate (future: conditional)
     do_initiate(#{
