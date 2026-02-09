@@ -10,12 +10,16 @@
 %% Aliases for backward compatibility and testing
 -export([initial_state/0, apply_event/2]).
 
+%% Bit flag descriptions for status display
+-export([flag_map/0]).
+
 %% Bit flags for torch status
 -define(INITIATED,     1).   %% 2^0
 -define(DNA_ACTIVE,    2).   %% 2^1 (Discovery & Analysis active)
 -define(DNA_COMPLETE,  4).   %% 2^2 (Discovery & Analysis complete)
 -define(IMPLEMENTING,  8).   %% 2^3
 -define(COMPLETED,    16).   %% 2^4
+-define(ARCHIVED,     32).   %% 2^5 (soft deleted)
 
 -record(torch_state, {
     torch_id            :: binary() | undefined,
@@ -33,6 +37,18 @@
 
 -type state() :: #torch_state{}.
 -export_type([state/0]).
+
+%% @doc Flag map for status display via evoq_bit_flags:to_string/2
+-spec flag_map() -> evoq_bit_flags:flag_map().
+flag_map() -> #{
+    0              => <<"New">>,
+    ?INITIATED     => <<"🌱 Initiated">>,
+    ?DNA_ACTIVE    => <<"🔍 Discovering">>,
+    ?DNA_COMPLETE  => <<"✅ Discovery Done">>,
+    ?IMPLEMENTING  => <<"🔨 Implementing">>,
+    ?COMPLETED     => <<"🏁 Completed">>,
+    ?ARCHIVED      => <<"📦 Archived">>
+}.
 
 %% @doc Behaviour callback: init/1
 -spec init(binary()) -> {ok, state()}.
@@ -64,6 +80,8 @@ execute(State, #{command_type := <<"identify_cartwheel">>} = Payload) ->
     execute_identify_cartwheel(Payload, State);
 execute(State, #{command_type := <<"activate_cartwheel">>} = Payload) ->
     execute_activate_cartwheel(Payload, State);
+execute(State, #{command_type := <<"archive_torch">>} = Payload) ->
+    execute_archive_torch(Payload, State);
 execute(_State, _Payload) ->
     {error, unknown_command}.
 
@@ -89,6 +107,16 @@ execute_activate_cartwheel(Payload, #torch_state{status = Status} = _State) when
     convert_events(maybe_activate_cartwheel:handle(Cmd), fun cartwheel_activated_v1:to_map/1);
 execute_activate_cartwheel(_Payload, _State) ->
     {error, torch_not_initiated}.
+
+execute_archive_torch(_Payload, #torch_state{torch_id = undefined}) ->
+    {error, torch_not_found};
+execute_archive_torch(_Payload, #torch_state{status = Status}) when Status band ?ARCHIVED =/= 0 ->
+    {error, torch_already_archived};
+execute_archive_torch(_Payload, #torch_state{status = Status}) when Status band ?INITIATED =:= 0 ->
+    {error, torch_not_initiated};
+execute_archive_torch(Payload, _State) ->
+    {ok, Cmd} = archive_torch_v1:from_map(Payload),
+    convert_events(maybe_archive_torch:handle(Cmd), fun torch_archived_v1:to_map/1).
 
 convert_events({ok, Events}, ToMapFun) ->
     EventMaps = [ToMapFun(E) || E <- Events],
@@ -117,6 +145,10 @@ apply_event(#{<<"event_type">> := <<"cartwheel_activated_v1">>} = E, State) ->
     apply_cartwheel_activated(E, State);
 apply_event(#{event_type := <<"cartwheel_activated_v1">>} = E, State) ->
     apply_cartwheel_activated(E, State);
+apply_event(#{<<"event_type">> := <<"torch_archived_v1">>} = _E, State) ->
+    apply_torch_archived(State);
+apply_event(#{event_type := <<"torch_archived_v1">>} = _E, State) ->
+    apply_torch_archived(State);
 apply_event(_E, State) ->
     State.
 
@@ -150,6 +182,11 @@ apply_cartwheel_activated(E, State) ->
     State#torch_state{
         active_cartwheel_id = CartwheelId,
         context_map = UpdatedMap
+    }.
+
+apply_torch_archived(#torch_state{status = Status} = State) ->
+    State#torch_state{
+        status = evoq_bit_flags:set(Status, ?ARCHIVED)
     }.
 
 %% Helper to get value from map with atom or binary keys

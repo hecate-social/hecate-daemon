@@ -2,8 +2,16 @@
 %%% Maintains learning state and applies events.
 %%% Shared across all learning lifecycle spokes.
 -module(learning_aggregate).
+-behaviour(evoq_aggregate).
 
--export([execute/2, apply_event/2, initial_state/0]).
+%% Behaviour callbacks
+-export([init/1, execute/2, apply/2]).
+
+%% Aliases for backward compatibility and testing
+-export([initial_state/0, apply_event/2]).
+
+%% Bit flag descriptions for status display
+-export([flag_map/0]).
 
 -define(SUBMITTED,  1).   %% 2^0
 -define(VALIDATED,  2).   %% 2^1
@@ -37,6 +45,23 @@
 -type state() :: #learning_state{}.
 -export_type([state/0]).
 
+%% @doc Flag map for status display via evoq_bit_flags:to_string/2
+-spec flag_map() -> evoq_bit_flags:flag_map().
+flag_map() -> #{
+    0          => <<"New">>,
+    ?SUBMITTED => <<"📨 Submitted">>,
+    ?VALIDATED => <<"✅ Validated">>,
+    ?REJECTED  => <<"❌ Rejected">>,
+    ?ENDORSED  => <<"👍 Endorsed">>,
+    ?DISPUTED  => <<"⚠️ Disputed">>,
+    ?RESOLVED  => <<"✅ Resolved">>
+}.
+
+%% @doc Behaviour callback: init/1
+-spec init(binary()) -> {ok, state()}.
+init(_AggregateId) ->
+    {ok, initial_state()}.
+
 -spec initial_state() -> state().
 initial_state() ->
     #learning_state{
@@ -62,20 +87,21 @@ initial_state() ->
     }.
 
 %% @doc Execute command against aggregate state
--spec execute(map(), state()) -> {ok, [map()]} | {error, term()}.
-execute(#{command_type := <<"submit_learning">>} = Payload, State) ->
+%% NOTE: evoq calls execute(State, Payload) - state first, then payload!
+-spec execute(state(), map()) -> {ok, [map()]} | {error, term()}.
+execute(State, #{command_type := <<"submit_learning">>} = Payload) ->
     execute_submit(Payload, State);
-execute(#{command_type := <<"validate_learning">>} = Payload, State) ->
+execute(State, #{command_type := <<"validate_learning">>} = Payload) ->
     execute_validate(Payload, State);
-execute(#{command_type := <<"reject_learning">>} = Payload, State) ->
+execute(State, #{command_type := <<"reject_learning">>} = Payload) ->
     execute_reject(Payload, State);
-execute(#{command_type := <<"endorse_learning">>} = Payload, State) ->
+execute(State, #{command_type := <<"endorse_learning">>} = Payload) ->
     execute_endorse(Payload, State);
-execute(#{command_type := <<"dispute_learning">>} = Payload, State) ->
+execute(State, #{command_type := <<"dispute_learning">>} = Payload) ->
     execute_dispute(Payload, State);
-execute(#{command_type := <<"resolve_learning_dispute">>} = Payload, State) ->
+execute(State, #{command_type := <<"resolve_learning_dispute">>} = Payload) ->
     execute_resolve(Payload, State);
-execute(Payload, State) ->
+execute(State, Payload) ->
     %% Default: submit_learning
     execute_submit(Payload, State).
 
@@ -85,6 +111,7 @@ execute_submit(Payload, #learning_state{learning_id = undefined}) ->
 execute_submit(_Payload, _State) ->
     {error, learning_already_exists}.
 
+%% Guards use raw band — evoq_bit_flags calls are not allowed in guards
 execute_validate(Payload, #learning_state{status = S}) when S band ?SUBMITTED =/= 0, S band ?VALIDATED =:= 0, S band ?REJECTED =:= 0 ->
     {ok, Cmd} = validate_learning_v1:from_map(Payload),
     convert_events(maybe_validate_learning:handle(Cmd), fun learning_validated_v1:to_map/1);
@@ -141,7 +168,14 @@ convert_events({ok, Events}, ToMapFun) ->
 convert_events({error, Reason}, _ToMapFun) ->
     {error, Reason}.
 
+%% @doc Behaviour callback: apply/2
+%% NOTE: evoq calls apply(State, Event) - state first, then event!
+-spec apply(state(), map()) -> state().
+apply(State, Event) ->
+    apply_event(Event, State).
+
 %% @doc Apply event to state (event sourcing)
+%% Legacy function with (Event, State) order - use apply/2 instead
 -spec apply_event(map(), state()) -> state().
 apply_event(#{event_type := <<"learning_submitted_v1">>} = E, State) ->
     State#learning_state{
@@ -163,30 +197,30 @@ apply_event(#{event_type := <<"learning_submitted_v1">>} = E, State) ->
     };
 apply_event(#{event_type := <<"learning_validated_v1">>} = E, State) ->
     State#learning_state{
-        status = State#learning_state.status bor ?VALIDATED,
+        status = evoq_bit_flags:set(State#learning_state.status, ?VALIDATED),
         validator_id = maps:get(validator_id, E),
         validated_at = maps:get(validated_at, E)
     };
 apply_event(#{event_type := <<"learning_rejected_v1">>} = E, State) ->
     State#learning_state{
-        status = State#learning_state.status bor ?REJECTED,
+        status = evoq_bit_flags:set(State#learning_state.status, ?REJECTED),
         validator_id = maps:get(validator_id, E)
     };
 apply_event(#{event_type := <<"learning_endorsed_v1">>} = E, State) ->
     AgentId = maps:get(agent_id, E),
     State#learning_state{
-        status = State#learning_state.status bor ?ENDORSED,
+        status = evoq_bit_flags:set(State#learning_state.status, ?ENDORSED),
         endorser_ids = [AgentId | State#learning_state.endorser_ids]
     };
 apply_event(#{event_type := <<"learning_disputed_v1">>} = E, State) ->
     AgentId = maps:get(agent_id, E),
     State#learning_state{
-        status = State#learning_state.status bor ?DISPUTED,
+        status = evoq_bit_flags:set(State#learning_state.status, ?DISPUTED),
         disputer_ids = [AgentId | State#learning_state.disputer_ids]
     };
 apply_event(#{event_type := <<"learning_dispute_resolved_v1">>} = _E, State) ->
     State#learning_state{
-        status = State#learning_state.status bor ?RESOLVED
+        status = evoq_bit_flags:set(State#learning_state.status, ?RESOLVED)
     };
 apply_event(_E, State) ->
     State.

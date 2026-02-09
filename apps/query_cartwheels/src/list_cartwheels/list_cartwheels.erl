@@ -28,7 +28,7 @@ execute(Filters) ->
     AllParams = Params ++ [Limit, Offset],
     case query_cartwheels_store:query(Sql, AllParams) of
         {ok, Rows} ->
-            {ok, [row_to_map(R) || R <- Rows]};
+            {ok, [enrich_status(row_to_map(R)) || R <- Rows]};
         {error, Reason} ->
             {error, Reason}
     end.
@@ -59,6 +59,10 @@ maybe_add_status(Filters, Clauses, Params, N) ->
             Clause = "status & ?" ++ integer_to_list(N) ++ " != 0",
             {Clauses ++ [Clause], Params ++ [Mask], N + 1}
     end.
+
+enrich_status(#{status := Status} = Row) ->
+    Label = evoq_bit_flags:to_string(Status, cartwheel_aggregate:flag_map()),
+    Row#{status_label => Label}.
 
 row_to_map({CartwheelId, TorchId, ContextName, Description, CurrentPhase, Status,
             FindingCount, TermCount, DossierCount, SpokeCount,

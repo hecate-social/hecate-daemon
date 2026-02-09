@@ -13,7 +13,7 @@ execute(CartwheelId) ->
           "FROM cartwheels WHERE cartwheel_id = ?1",
     case query_cartwheels_store:query(Sql, [CartwheelId]) of
         {ok, [Row]} ->
-            {ok, row_to_map(Row)};
+            {ok, enrich_status(row_to_map(Row))};
         {ok, []} ->
             {error, not_found};
         {error, Reason} ->
@@ -21,6 +21,10 @@ execute(CartwheelId) ->
     end.
 
 %% Internal
+
+enrich_status(#{status := Status} = Row) ->
+    Label = evoq_bit_flags:to_string(Status, cartwheel_aggregate:flag_map()),
+    Row#{status_label => Label}.
 
 row_to_map({CartwheelId, TorchId, ContextName, Description, CurrentPhase, Status,
             FindingCount, TermCount, DossierCount, SpokeCount,

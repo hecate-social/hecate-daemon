@@ -11,7 +11,7 @@ execute(TorchId) ->
           "FROM torches WHERE torch_id = ?1",
     case query_torches_store:query(Sql, [TorchId]) of
         {ok, [Row]} ->
-            {ok, row_to_map(Row)};
+            {ok, enrich_status(row_to_map(Row))};
         {ok, []} ->
             {error, not_found};
         {error, Reason} ->
@@ -34,6 +34,10 @@ row_to_map({TorchId, Name, Brief, Status, Repos, Skills, ContextMap,
         initiated_at => InitiatedAt,
         initiated_by => InitiatedBy
     }.
+
+enrich_status(#{status := Status} = Row) ->
+    Label = evoq_bit_flags:to_string(Status, torch_aggregate:flag_map()),
+    Row#{status_label => Label}.
 
 -spec decode_json(binary() | undefined) -> term().
 decode_json(undefined) -> undefined;

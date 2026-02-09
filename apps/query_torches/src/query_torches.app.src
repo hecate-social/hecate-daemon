@@ -6,7 +6,9 @@
     {applications, [
         kernel,
         stdlib,
-        esqlite
+        esqlite,
+        evoq,
+        manage_torches
     ]},
     {env, []},
     {modules, []},

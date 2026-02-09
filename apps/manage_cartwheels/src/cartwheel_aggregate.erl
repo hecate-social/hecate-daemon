@@ -11,6 +11,9 @@
 %% Aliases for backward compatibility and testing
 -export([initial_state/0, apply_event/2]).
 
+%% Bit flag descriptions for status display
+-export([flag_map/0]).
+
 -define(INITIATED,             1).   %% 2^0
 -define(DISCOVERY_ACTIVE,      2).   %% 2^1
 -define(DISCOVERY_COMPLETE,    4).   %% 2^2
@@ -46,6 +49,23 @@
 
 -type state() :: #cartwheel_state{}.
 -export_type([state/0]).
+
+%% @doc Flag map for status display via evoq_bit_flags:to_string/2
+-spec flag_map() -> evoq_bit_flags:flag_map().
+flag_map() -> #{
+    0                      => <<"New">>,
+    ?INITIATED             => <<"🌱 Initiated">>,
+    ?DISCOVERY_ACTIVE      => <<"🔍 DnA Active">>,
+    ?DISCOVERY_COMPLETE    => <<"✅ DnA Done">>,
+    ?ARCHITECTURE_ACTIVE   => <<"📐 AnP Active">>,
+    ?ARCHITECTURE_COMPLETE => <<"✅ AnP Done">>,
+    ?TESTING_ACTIVE        => <<"🧪 TnI Active">>,
+    ?TESTING_COMPLETE      => <<"✅ TnI Done">>,
+    ?DEPLOYMENT_ACTIVE     => <<"🚀 DnO Active">>,
+    ?DEPLOYMENT_COMPLETE   => <<"✅ DnO Done">>,
+    ?COMPLETED             => <<"🏁 Completed">>,
+    ?REVISITING            => <<"🔄 Revisiting">>
+}.
 
 %% @doc Behaviour callback: init/1
 -spec init(binary()) -> {ok, state()}.
@@ -393,14 +413,14 @@ apply_event(#{event_type := <<"term_defined_v1">>} = _E, State) ->
     };
 apply_event(#{event_type := <<"discovery_completed_v1">>} = _E, State) ->
     State#cartwheel_state{
-        status = State#cartwheel_state.status bor ?DISCOVERY_COMPLETE
+        status = evoq_bit_flags:set(State#cartwheel_state.status, ?DISCOVERY_COMPLETE)
     };
 apply_event(#{event_type := <<"phase_transitioned_v1">>} = E, State) ->
     ToPhase = maps:get(to_phase, E),
     StatusFlag = phase_to_active_flag(ToPhase),
     State#cartwheel_state{
         current_phase = ToPhase,
-        status = State#cartwheel_state.status bor StatusFlag,
+        status = evoq_bit_flags:set(State#cartwheel_state.status, StatusFlag),
         phase_started_at = maps:get(transitioned_at, E)
     };
 apply_event(#{event_type := <<"architecture_started_v1">>} = E, State) ->
@@ -423,7 +443,7 @@ apply_event(#{event_type := <<"plan_approved_v1">>} = _E, State) ->
     };
 apply_event(#{event_type := <<"architecture_completed_v1">>} = _E, State) ->
     State#cartwheel_state{
-        status = State#cartwheel_state.status bor ?ARCHITECTURE_COMPLETE
+        status = evoq_bit_flags:set(State#cartwheel_state.status, ?ARCHITECTURE_COMPLETE)
     };
 apply_event(#{event_type := <<"testing_started_v1">>} = E, State) ->
     State#cartwheel_state{
@@ -443,7 +463,7 @@ apply_event(#{event_type := <<"build_verified_v1">>} = _E, State) ->
     };
 apply_event(#{event_type := <<"testing_completed_v1">>} = _E, State) ->
     State#cartwheel_state{
-        status = State#cartwheel_state.status bor ?TESTING_COMPLETE
+        status = evoq_bit_flags:set(State#cartwheel_state.status, ?TESTING_COMPLETE)
     };
 apply_event(#{event_type := <<"deployment_started_v1">>} = E, State) ->
     State#cartwheel_state{
@@ -463,7 +483,7 @@ apply_event(#{event_type := <<"incident_resolved_v1">>} = _E, State) ->
     };
 apply_event(#{event_type := <<"deployment_completed_v1">>} = _E, State) ->
     State#cartwheel_state{
-        status = State#cartwheel_state.status bor ?DEPLOYMENT_COMPLETE,
+        status = evoq_bit_flags:set(State#cartwheel_state.status, ?DEPLOYMENT_COMPLETE),
         completed_at = erlang:system_time(millisecond)
     };
 apply_event(_E, State) ->

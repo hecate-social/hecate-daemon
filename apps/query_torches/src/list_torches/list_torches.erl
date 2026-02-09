@@ -3,8 +3,12 @@
 
 -export([execute/1]).
 
+%% Bit flag for archived status
+-define(ARCHIVED, 32).
+
 %% @doc List torches with optional filters.
-%% Supported filters: status, limit, offset.
+%% Supported filters: status, include_archived (default false), limit, offset.
+%% By default, archived torches are excluded unless include_archived=true.
 -spec execute(map()) -> {ok, [map()]} | {error, term()}.
 execute(Filters) ->
     {WhereClauses, Params} = build_where(Filters),
@@ -27,7 +31,7 @@ execute(Filters) ->
     AllParams = Params ++ [Limit, Offset],
     case query_torches_store:query(Sql, AllParams) of
         {ok, Rows} ->
-            {ok, [row_to_map(R) || R <- Rows]};
+            {ok, [enrich_status(row_to_map(R)) || R <- Rows]};
         {error, Reason} ->
             {error, Reason}
     end.
@@ -38,9 +42,20 @@ build_where(Filters) ->
     build_where(Filters, [], [], 1).
 
 build_where(Filters, Clauses, Params, N) ->
-    {C1, P1, N1} = maybe_add_status(Filters, Clauses, Params, N),
+    {C0, P0, N0} = maybe_exclude_archived(Filters, Clauses, Params, N),
+    {C1, P1, N1} = maybe_add_status(Filters, C0, P0, N0),
     {C2, P2, _N2} = maybe_add_name(Filters, C1, P1, N1),
     {C2, P2}.
+
+%% Exclude archived torches by default unless include_archived is true
+maybe_exclude_archived(Filters, Clauses, Params, N) ->
+    case maps:get(include_archived, Filters, false) of
+        true -> {Clauses, Params, N};
+        _ ->
+            %% Use bitwise AND to check if ARCHIVED flag is NOT set
+            Clause = "(status & " ++ integer_to_list(?ARCHIVED) ++ ") = 0",
+            {Clauses ++ [Clause], Params, N}
+    end.
 
 maybe_add_status(Filters, Clauses, Params, N) ->
     case maps:get(status, Filters, undefined) of
@@ -82,6 +97,10 @@ row_to_map_impl(TorchId, Name, Brief, Status, Repos, Skills, ContextMap,
         initiated_at => InitiatedAt,
         initiated_by => InitiatedBy
     }.
+
+enrich_status(#{status := Status} = Row) ->
+    Label = evoq_bit_flags:to_string(Status, torch_aggregate:flag_map()),
+    Row#{status_label => Label}.
 
 -spec decode_json(binary() | undefined) -> term().
 decode_json(undefined) -> undefined;

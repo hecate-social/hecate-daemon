@@ -2,8 +2,16 @@
 %%% Maintains Agent state and applies events.
 %%% An Agent represents an AI specialist or generalist that can work on tasks.
 -module(agent_aggregate).
+-behaviour(evoq_aggregate).
 
--export([execute/2, apply_event/2, initial_state/0]).
+%% Behaviour callbacks
+-export([init/1, execute/2, apply/2]).
+
+%% Aliases for backward compatibility and testing
+-export([initial_state/0, apply_event/2]).
+
+%% Bit flag descriptions for status display
+-export([flag_map/0]).
 
 %% Bit flags for agent status
 -define(ACTIVATED, 1).   %% 2^0 - Agent has been activated
@@ -24,6 +32,21 @@
 -type state() :: #agent_state{}.
 -export_type([state/0]).
 
+%% @doc Flag map for status display via evoq_bit_flags:to_string/2
+-spec flag_map() -> evoq_bit_flags:flag_map().
+flag_map() -> #{
+    0          => <<"New">>,
+    ?ACTIVATED => <<"⚡ Activated">>,
+    ?IDLE      => <<"💤 Idle">>,
+    ?WORKING   => <<"🔧 Working">>,
+    ?RETIRED   => <<"🪦 Retired">>
+}.
+
+%% @doc Behaviour callback: init/1
+-spec init(binary()) -> {ok, state()}.
+init(_AggregateId) ->
+    {ok, initial_state()}.
+
 -spec initial_state() -> state().
 initial_state() ->
     #agent_state{
@@ -37,10 +60,11 @@ initial_state() ->
     }.
 
 %% @doc Execute command against aggregate state
--spec execute(map(), state()) -> {ok, [map()]} | {error, term()}.
-execute(#{command_type := <<"activate_specialist">>} = Payload, State) ->
+%% NOTE: evoq calls execute(State, Payload) - state first, then payload!
+-spec execute(state(), map()) -> {ok, [map()]} | {error, term()}.
+execute(State, #{command_type := <<"activate_specialist">>} = Payload) ->
     execute_activate_specialist(Payload, State);
-execute(_Payload, _State) ->
+execute(_State, _Payload) ->
     {error, unknown_command}.
 
 execute_activate_specialist(Payload, #agent_state{status = 0}) ->
@@ -55,7 +79,14 @@ convert_events({ok, Events}, ToMapFun) ->
 convert_events({error, Reason}, _ToMapFun) ->
     {error, Reason}.
 
+%% @doc Behaviour callback: apply/2
+%% NOTE: evoq calls apply(State, Event) - state first, then event!
+-spec apply(state(), map()) -> state().
+apply(State, Event) ->
+    apply_event(Event, State).
+
 %% @doc Apply event to state (event sourcing)
+%% Legacy function with (Event, State) order - use apply/2 instead
 -spec apply_event(map(), state()) -> state().
 apply_event(#{<<"event_type">> := <<"specialist_activated_v1">>} = E, State) ->
     apply_specialist_activated(E, State);
