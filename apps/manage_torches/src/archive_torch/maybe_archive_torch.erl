@@ -1,26 +1,21 @@
-%%% @doc maybe_initiate_torch handler
-%%% Business logic for initiating torches.
+%%% @doc maybe_archive_torch handler
+%%% Business logic for archiving torches.
 %%% Validates the command and dispatches via evoq.
--module(maybe_initiate_torch).
+-module(maybe_archive_torch).
 
 -include_lib("evoq/include/evoq.hrl").
 
--export([handle/1, handle/2, dispatch/1]).
+-export([handle/1, dispatch/1]).
 
 -dialyzer({nowarn_function, [dispatch/1]}).
 
-%% @doc Handle initiate_torch_v1 command (business logic only)
--spec handle(initiate_torch_v1:initiate_torch_v1()) ->
-    {ok, [torch_initiated_v1:torch_initiated_v1()]} | {error, term()}.
+%% @doc Handle archive_torch_v1 command (business logic only)
+%% Returns list of events to emit.
+-spec handle(archive_torch_v1:archive_torch_v1()) ->
+    {ok, [torch_archived_v1:torch_archived_v1()]} | {error, term()}.
 handle(Cmd) ->
-    handle(Cmd, undefined).
-
-%% @doc Handle with state (for aggregate pattern)
--spec handle(initiate_torch_v1:initiate_torch_v1(), term()) ->
-    {ok, [torch_initiated_v1:torch_initiated_v1()]} | {error, term()}.
-handle(Cmd, _State) ->
-    Name = initiate_torch_v1:get_name(Cmd),
-    case validate_command(Name) of
+    TorchId = archive_torch_v1:get_torch_id(Cmd),
+    case validate_command(TorchId) of
         ok ->
             Event = create_event(Cmd),
             {ok, [Event]};
@@ -28,19 +23,19 @@ handle(Cmd, _State) ->
             {error, Reason}
     end.
 
-%% @doc Dispatch command via evoq (persists to ReckonDB)
--spec dispatch(initiate_torch_v1:initiate_torch_v1()) ->
+%% @doc Dispatch command via evoq (persists to ReckonDB, enforces aggregate guards)
+-spec dispatch(archive_torch_v1:archive_torch_v1()) ->
     {ok, non_neg_integer(), [map()]} | {error, term()}.
 dispatch(Cmd) ->
-    TorchId = initiate_torch_v1:get_torch_id(Cmd),
+    TorchId = archive_torch_v1:get_torch_id(Cmd),
     Timestamp = erlang:system_time(millisecond),
 
     EvoqCmd = #evoq_command{
         command_id = generate_command_id(TorchId, Timestamp),
-        command_type = initiate_torch,
+        command_type = archive_torch,
         aggregate_type = torch_aggregate,
         aggregate_id = TorchId,
-        payload = initiate_torch_v1:to_map(Cmd),
+        payload = archive_torch_v1:to_map(Cmd),
         metadata = #{timestamp => Timestamp, aggregate_type => torch_aggregate},
         causation_id = undefined,
         correlation_id = undefined
@@ -56,17 +51,16 @@ dispatch(Cmd) ->
 
 %% Internal
 
-validate_command(Name) when is_binary(Name), byte_size(Name) > 0 ->
+validate_command(TorchId) when is_binary(TorchId), byte_size(TorchId) > 0 ->
     ok;
 validate_command(_) ->
-    {error, invalid_command}.
+    {error, invalid_torch_id}.
 
 create_event(Cmd) ->
-    torch_initiated_v1:new(#{
-        torch_id => initiate_torch_v1:get_torch_id(Cmd),
-        name => initiate_torch_v1:get_name(Cmd),
-        brief => initiate_torch_v1:get_brief(Cmd),
-        initiated_by => initiate_torch_v1:get_initiated_by(Cmd)
+    torch_archived_v1:new(#{
+        torch_id => archive_torch_v1:get_torch_id(Cmd),
+        archived_by => archive_torch_v1:get_archived_by(Cmd),
+        reason => archive_torch_v1:get_reason(Cmd)
     }).
 
 generate_command_id(TorchId, Timestamp) ->

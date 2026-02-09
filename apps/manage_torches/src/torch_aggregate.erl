@@ -73,21 +73,23 @@ initial_state() ->
 
 %% @doc Execute command against aggregate state
 %% NOTE: evoq calls execute(State, Payload) - state first, then payload!
+%% Supports both atom keys (from tests) and binary keys (from to_map/evoq dispatch).
 -spec execute(state(), map()) -> {ok, [map()]} | {error, term()}.
-execute(State, #{command_type := <<"initiate_torch">>} = Payload) ->
-    execute_initiate_torch(Payload, State);
-execute(State, #{command_type := <<"identify_cartwheel">>} = Payload) ->
-    execute_identify_cartwheel(Payload, State);
-execute(State, #{command_type := <<"activate_cartwheel">>} = Payload) ->
-    execute_activate_cartwheel(Payload, State);
-execute(State, #{command_type := <<"refine_vision">>} = Payload) ->
-    execute_refine_vision(Payload, State);
-execute(State, #{command_type := <<"submit_vision">>} = Payload) ->
-    execute_submit_vision(Payload, State);
-execute(State, #{command_type := <<"archive_torch">>} = Payload) ->
-    execute_archive_torch(Payload, State);
-execute(_State, _Payload) ->
-    {error, unknown_command}.
+execute(State, Payload) ->
+    case get_command_type(Payload) of
+        <<"initiate_torch">> -> execute_initiate_torch(Payload, State);
+        <<"identify_cartwheel">> -> execute_identify_cartwheel(Payload, State);
+        <<"activate_cartwheel">> -> execute_activate_cartwheel(Payload, State);
+        <<"refine_vision">> -> execute_refine_vision(Payload, State);
+        <<"submit_vision">> -> execute_submit_vision(Payload, State);
+        <<"archive_torch">> -> execute_archive_torch(Payload, State);
+        _ -> {error, unknown_command}
+    end.
+
+%% Extract command_type from atom or binary keyed map
+get_command_type(#{command_type := V}) -> V;
+get_command_type(#{<<"command_type">> := V}) -> V;
+get_command_type(_) -> undefined.
 
 execute_initiate_torch(Payload, #torch_state{status = 0}) ->
     {ok, Cmd} = initiate_torch_v1:from_map(Payload),

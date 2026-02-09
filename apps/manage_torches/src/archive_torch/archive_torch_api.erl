@@ -1,10 +1,9 @@
-%%% @doc API handler: POST /api/torches/:torch_id/vision/submit
+%%% @doc API handler: POST /api/torches/:torch_id/archive
 %%%
-%%% Finalizes a torch's vision, completing the DnA phase.
-%%% Dispatches through evoq → torch_aggregate for state validation.
-%%% Lives in the submit_vision spoke for vertical slicing.
+%%% Archives a torch (soft delete via compensating event).
+%%% Lives in the archive_torch spoke for vertical slicing.
 %%% @end
--module(submit_vision_api).
+-module(archive_torch_api).
 
 -export([init/2]).
 
@@ -22,32 +21,34 @@ handle_post(Req0, _State) ->
         _ ->
             case hecate_api_utils:read_json_body(Req0) of
                 {ok, Params, Req1} ->
-                    do_submit(TorchId, Params, Req1);
+                    do_archive(TorchId, Params, Req1);
                 {error, invalid_json, Req1} ->
                     hecate_api_utils:bad_request(<<"Invalid JSON">>, Req1)
             end
     end.
 
-do_submit(TorchId, Params, Req) ->
-    SubmittedBy = hecate_api_utils:get_field(submitted_by, Params),
+do_archive(TorchId, Params, Req) ->
+    ArchivedBy = hecate_api_utils:get_field(archived_by, Params),
+    Reason = hecate_api_utils:get_field(reason, Params),
 
     CmdParams = #{
         torch_id => TorchId,
-        submitted_by => SubmittedBy
+        archived_by => ArchivedBy,
+        reason => Reason
     },
-    case submit_vision_v1:new(CmdParams) of
-        {ok, Cmd} -> dispatch(Cmd, TorchId, Req);
+    case archive_torch_v1:new(CmdParams) of
+        {ok, Cmd} -> dispatch(Cmd, Req);
         {error, Reason} -> hecate_api_utils:bad_request(Reason, Req)
     end.
 
-dispatch(Cmd, TorchId, Req) ->
-    case maybe_submit_vision:dispatch(Cmd) of
+dispatch(Cmd, Req) ->
+    case maybe_archive_torch:dispatch(Cmd) of
         {ok, _Version, EventMaps} ->
             %% INTERNAL: Emit to pg for projections (intra-daemon)
             emit_to_pg(EventMaps),
             hecate_api_utils:json_ok(200, #{
-                torch_id => TorchId,
-                submitted => true,
+                torch_id => archive_torch_v1:get_torch_id(Cmd),
+                archived => true,
                 events => EventMaps
             }, Req);
         {error, Reason} ->
@@ -56,5 +57,5 @@ dispatch(Cmd, TorchId, Req) ->
 
 emit_to_pg(EventMaps) ->
     lists:foreach(fun(E) ->
-        torch_vision_submitted_v1_to_pg:emit(E)
+        torch_archived_v1_to_pg:emit(E)
     end, EventMaps).

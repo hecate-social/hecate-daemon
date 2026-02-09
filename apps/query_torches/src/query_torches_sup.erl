@@ -22,6 +22,13 @@ init([]) ->
             start => {torch_initiated_v1_to_torches_sup, start_link, []},
             restart => permanent,
             type => supervisor
+        },
+        %% Projection spoke: torch_archived_v1 -> torches (updates status with ARCHIVED flag)
+        #{
+            id => torch_archived_v1_to_torches_sup,
+            start => {torch_archived_v1_to_torches_sup, start_link, []},
+            restart => permanent,
+            type => supervisor
         }
     ],
     {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

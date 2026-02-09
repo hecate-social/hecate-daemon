@@ -5,7 +5,11 @@
 %%% @end
 -module(maybe_identify_cartwheel).
 
--export([handle/1, handle/2]).
+-include_lib("evoq/include/evoq.hrl").
+
+-export([handle/1, handle/2, dispatch/1]).
+
+-dialyzer({nowarn_function, [dispatch/1]}).
 
 %% @doc Handle the command without prior state (for API dispatch)
 -spec handle(identify_cartwheel_v1:identify_cartwheel_v1()) ->
@@ -49,3 +53,35 @@ create_event(TorchId, ContextName, Cmd) ->
         {error, Reason} ->
             {error, Reason}
     end.
+
+%% @doc Dispatch command via evoq (persists to ReckonDB, enforces aggregate guards)
+-spec dispatch(identify_cartwheel_v1:identify_cartwheel_v1()) ->
+    {ok, non_neg_integer(), [map()]} | {error, term()}.
+dispatch(Cmd) ->
+    TorchId = identify_cartwheel_v1:get_torch_id(Cmd),
+    Timestamp = erlang:system_time(millisecond),
+
+    EvoqCmd = #evoq_command{
+        command_id = generate_command_id(TorchId, Timestamp),
+        command_type = identify_cartwheel,
+        aggregate_type = torch_aggregate,
+        aggregate_id = TorchId,
+        payload = identify_cartwheel_v1:to_map(Cmd),
+        metadata = #{timestamp => Timestamp, aggregate_type => torch_aggregate},
+        causation_id = undefined,
+        correlation_id = undefined
+    },
+
+    Opts = #{
+        store_id => manage_torches_store,
+        adapter => reckon_evoq_adapter,
+        consistency => eventual
+    },
+
+    evoq_dispatcher:dispatch(EvoqCmd, Opts).
+
+generate_command_id(TorchId, Timestamp) ->
+    Hash = crypto:hash(sha256, <<TorchId/binary, (integer_to_binary(Timestamp))/binary>>),
+    HashHex = binary:encode_hex(Hash),
+    ShortHash = binary:part(HashHex, 0, 16),
+    <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

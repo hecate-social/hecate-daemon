@@ -1,6 +1,7 @@
 %%% @doc API handler: POST /api/torches/:torch_id/vision/refine
 %%%
 %%% Iteratively refines a torch's vision during DnA phase.
+%%% Dispatches through evoq → torch_aggregate for state validation.
 %%% Lives in the refine_vision spoke for vertical slicing.
 %%% @end
 -module(refine_vision_api).
@@ -43,18 +44,17 @@ do_refine(TorchId, Params, Req) ->
         refined_by => RefinedBy
     },
     case refine_vision_v1:new(CmdParams) of
-        {ok, Cmd} -> dispatch(Cmd, Req);
+        {ok, Cmd} -> dispatch(Cmd, TorchId, Req);
         {error, Reason} -> hecate_api_utils:bad_request(Reason, Req)
     end.
 
-dispatch(Cmd, Req) ->
-    case maybe_refine_vision:handle(Cmd) of
-        {ok, Events} ->
-            EventMaps = [torch_vision_refined_v1:to_map(E) || E <- Events],
+dispatch(Cmd, TorchId, Req) ->
+    case maybe_refine_vision:dispatch(Cmd) of
+        {ok, _Version, EventMaps} ->
             %% INTERNAL: Emit to pg for projections (intra-daemon)
-            emit_to_pg(Events),
+            emit_to_pg(EventMaps),
             hecate_api_utils:json_ok(200, #{
-                torch_id => refine_vision_v1:get_torch_id(Cmd),
+                torch_id => TorchId,
                 refined => true,
                 events => EventMaps
             }, Req);
@@ -62,17 +62,7 @@ dispatch(Cmd, Req) ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
 
-emit_to_pg(Events) ->
+emit_to_pg(EventMaps) ->
     lists:foreach(fun(E) ->
-        %% Convert record to atom-keyed map for pg consumers
-        AtomMap = #{
-            torch_id => torch_vision_refined_v1:get_torch_id(E),
-            brief => torch_vision_refined_v1:get_brief(E),
-            repos => torch_vision_refined_v1:get_repos(E),
-            skills => torch_vision_refined_v1:get_skills(E),
-            context_map => torch_vision_refined_v1:get_context_map(E),
-            refined_by => torch_vision_refined_v1:get_refined_by(E),
-            refined_at => torch_vision_refined_v1:get_refined_at(E)
-        },
-        torch_vision_refined_v1_to_pg:emit(AtomMap)
-    end, Events).
+        torch_vision_refined_v1_to_pg:emit(E)
+    end, EventMaps).

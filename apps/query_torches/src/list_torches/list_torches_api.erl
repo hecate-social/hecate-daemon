@@ -28,6 +28,8 @@ build_filters(QS) ->
 
 parse_filter({<<"status">>, V}, Acc) -> Acc#{status => V};
 parse_filter({<<"name">>, V}, Acc) -> Acc#{name => V};
+parse_filter({<<"include_archived">>, <<"true">>}, Acc) -> Acc#{include_archived => true};
+parse_filter({<<"include_archived">>, <<"1">>}, Acc) -> Acc#{include_archived => true};
 parse_filter({<<"limit">>, V}, Acc) -> maybe_int(limit, V, Acc);
 parse_filter({<<"offset">>, V}, Acc) -> maybe_int(offset, V, Acc);
 parse_filter(_, Acc) -> Acc.

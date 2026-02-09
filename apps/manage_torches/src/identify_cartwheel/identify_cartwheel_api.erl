@@ -51,16 +51,15 @@ create_identification(TorchId, ContextName, Description, IdentifiedBy, Req) ->
     end.
 
 dispatch(Cmd, TorchId, ContextName, Req) ->
-    case maybe_identify_cartwheel:handle(Cmd) of
-        {ok, Events} ->
-            EventMaps = [cartwheel_identified_v1:to_map(E) || E <- Events],
+    case maybe_identify_cartwheel:dispatch(Cmd) of
+        {ok, Version, EventMaps} ->
             emit_to_mesh(EventMaps),
             CartwheelId = extract_cartwheel_id(EventMaps),
             hecate_api_utils:json_ok(201, #{
                 torch_id => TorchId,
                 cartwheel_id => CartwheelId,
                 context_name => ContextName,
-                version => 0,
+                version => Version,
                 events => EventMaps
             }, Req);
         {error, Reason} ->

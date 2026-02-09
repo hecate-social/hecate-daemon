@@ -31,7 +31,8 @@ routes() ->
     ++ torch_routes()
     ++ cartwheel_routes()
     ++ agent_routes()
-    ++ telemetry_routes().
+    ++ telemetry_routes()
+    ++ facts_routes().
 
 %% Health check
 health_routes() ->
@@ -240,3 +241,7 @@ telemetry_routes() ->
         {"/api/telemetry/cost/:torch_id/cartwheels", hecate_api_telemetry, [cost_by_cartwheel]},
         {"/api/telemetry/cost/:torch_id/agents", hecate_api_telemetry, [cost_by_agent]}
     ].
+
+%% Facts stream (SSE for TUI fact delivery)
+facts_routes() ->
+    [{"/api/facts/stream", tui_facts_stream_api, []}].

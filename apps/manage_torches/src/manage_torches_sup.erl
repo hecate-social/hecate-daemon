@@ -2,6 +2,7 @@
 %%%
 %%% Starts this domain's ReckonDB store and supervises:
 %%% - torch_initiated_v1_to_mesh: Emitter that publishes torch initiation facts
+%%% - torch_initiated_v1_to_tui: Emitter that broadcasts torch initiation facts to TUI SSE clients
 %%% - cartwheel_identified_v1_to_mesh: Emitter that publishes cartwheel identification facts
 %%%
 %%% @end
@@ -55,6 +56,12 @@ init([]) ->
         #{
             id => torch_initiated_v1_to_mesh,
             start => {torch_initiated_v1_to_mesh, start_link, []},
+            restart => permanent,
+            type => worker
+        },
+        #{
+            id => torch_initiated_v1_to_tui,
+            start => {torch_initiated_v1_to_tui, start_link, []},
             restart => permanent,
             type => worker
         },

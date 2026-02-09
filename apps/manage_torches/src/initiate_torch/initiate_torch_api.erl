@@ -44,34 +44,32 @@ create_torch(Name, Brief, InitiatedBy, Req) ->
     end.
 
 dispatch(Cmd, Req) ->
-    case maybe_initiate_torch:handle(Cmd) of
-        {ok, Events} ->
-            EventMaps = [torch_initiated_v1:to_map(E) || E <- Events],
+    case maybe_initiate_torch:dispatch(Cmd) of
+        {ok, Version, EventMaps} ->
             %% INTERNAL: Emit to pg for projections (intra-daemon)
-            emit_to_pg(Events),
+            emit_to_pg(EventMaps),
             %% EXTERNAL: Emit to mesh for other agents (WAN)
             emit_to_mesh(EventMaps),
+            %% Return full torch data for TUI compatibility
+            TorchId = initiate_torch_v1:get_torch_id(Cmd),
             hecate_api_utils:json_ok(201, #{
-                torch_id => initiate_torch_v1:get_torch_id(Cmd),
-                version => 0,
+                torch_id => TorchId,
+                name => initiate_torch_v1:get_name(Cmd),
+                brief => initiate_torch_v1:get_brief(Cmd),
+                status => 3,  %% INITIATED | DNA_ACTIVE flags
+                initiated_at => erlang:system_time(millisecond),
+                initiated_by => initiate_torch_v1:get_initiated_by(Cmd),
+                version => Version,
                 events => EventMaps
             }, Req);
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
 
-emit_to_pg(Events) ->
+emit_to_pg(EventMaps) ->
     lists:foreach(fun(E) ->
-        %% Convert record to atom-keyed map for pg consumers
-        AtomMap = #{
-            torch_id => torch_initiated_v1:get_torch_id(E),
-            name => torch_initiated_v1:get_name(E),
-            brief => torch_initiated_v1:get_brief(E),
-            initiated_at => torch_initiated_v1:get_initiated_at(E),
-            initiated_by => torch_initiated_v1:get_initiated_by(E)
-        },
-        torch_initiated_v1_to_pg:emit(AtomMap)
-    end, Events).
+        torch_initiated_v1_to_pg:emit(E)
+    end, EventMaps).
 
 emit_to_mesh(EventMaps) ->
     lists:foreach(fun(E) -> torch_initiated_v1_to_mesh:emit(E) end, EventMaps).
