@@ -38,8 +38,6 @@ routes() ->
     ++ monitoring_routes()
     ++ rescue_routes()
     ++ venture_status_routes()
-    ++ torch_routes()
-    ++ cartwheel_routes()
     ++ agent_routes()
     ++ telemetry_routes()
     ++ facts_routes().
@@ -333,68 +331,6 @@ rescue_routes() ->
 venture_status_routes() ->
     [
         {"/api/ventures/:venture_id/status", get_venture_status_api, []}
-    ].
-
-%% Torch (LEGACY — kept for Phase 8 cleanup) — spoke handlers
-torch_routes() ->
-    [
-        {"/api/torch", get_active_torch_api, []},
-        {"/api/torch/initiate", initiate_torch_api, []},
-        {"/api/torches", get_torches_page_api, []},
-        {"/api/torches/:torch_id", get_torch_by_id_api, []},
-        {"/api/torches/:torch_id/vision/refine", refine_vision_api, []},
-        {"/api/torches/:torch_id/vision/submit", submit_vision_api, []},
-        {"/api/torches/:torch_id/archive", archive_torch_api, []},
-        {"/api/torches/:torch_id/cartwheels/identify", identify_cartwheel_api, []}
-    ].
-
-%% Cartwheel (bounded contexts) — spoke handlers (already vertical)
-%%
-%% NOTE: There is NO direct cartwheel creation endpoint.
-%% Cartwheels are created through the parent-child pattern:
-%%   Torch identifies cartwheel → cartwheel_identified_v1 → manage_cartwheels listener
-%%   → initiate_cartwheel command → cartwheel_initiated_v1 event
-%% Use: POST /api/torches/:torch_id/cartwheels/identify
-cartwheel_routes() ->
-    [
-        %% Core cartwheel routes (read-only + lifecycle operations)
-        {"/api/cartwheel", get_active_cartwheel_api, []},
-        {"/api/cartwheels", get_cartwheels_page_api, []},
-        %% No initiate endpoint - cartwheels created via torch identification
-        {"/api/cartwheels/:cartwheel_id", get_cartwheel_by_id_api, []},
-        {"/api/cartwheels/:cartwheel_id/transition", transition_phase_api, []},
-        %% Discovery & Analysis phase
-        {"/api/cartwheels/:cartwheel_id/discovery/start", start_discovery_api, []},
-        {"/api/cartwheels/:cartwheel_id/discovery/findings", get_findings_page_api, []},
-        {"/api/cartwheels/:cartwheel_id/discovery/findings/record", record_finding_api, []},
-        {"/api/cartwheels/:cartwheel_id/discovery/terms", get_terms_page_api, []},
-        {"/api/cartwheels/:cartwheel_id/discovery/terms/define", define_term_api, []},
-        {"/api/cartwheels/:cartwheel_id/discovery/complete", complete_discovery_api, []},
-        %% Architecture & Planning phase
-        {"/api/cartwheels/:cartwheel_id/architecture/start", start_architecture_api, []},
-        {"/api/cartwheels/:cartwheel_id/architecture/dossiers", get_dossier_designs_page_api, []},
-        {"/api/cartwheels/:cartwheel_id/architecture/dossiers/define", define_dossier_api, []},
-        {"/api/cartwheels/:cartwheel_id/architecture/spokes", get_spoke_inventory_page_api, []},
-        {"/api/cartwheels/:cartwheel_id/architecture/spokes/inventory", inventory_spoke_api, []},
-        {"/api/cartwheels/:cartwheel_id/architecture/plan", draft_plan_api, []},
-        {"/api/cartwheels/:cartwheel_id/architecture/plan/approve", approve_plan_api, []},
-        {"/api/cartwheels/:cartwheel_id/architecture/complete", complete_architecture_api, []},
-        %% Testing & Implementation phase
-        {"/api/cartwheels/:cartwheel_id/testing/start", start_testing_api, []},
-        {"/api/cartwheels/:cartwheel_id/testing/skeleton", create_skeleton_api, []},
-        {"/api/cartwheels/:cartwheel_id/testing/implement", implement_spoke_api, []},
-        {"/api/cartwheels/:cartwheel_id/testing/implementations", get_spoke_implementations_page_api, []},
-        {"/api/cartwheels/:cartwheel_id/testing/verify", verify_build_api, []},
-        {"/api/cartwheels/:cartwheel_id/testing/builds", get_build_verifications_page_api, []},
-        {"/api/cartwheels/:cartwheel_id/testing/complete", complete_testing_api, []},
-        %% Deployment & Operations phase
-        {"/api/cartwheels/:cartwheel_id/deployment/start", start_deployment_api, []},
-        {"/api/cartwheels/:cartwheel_id/deployment/record", record_deployment_api, []},
-        {"/api/cartwheels/:cartwheel_id/deployment/deployments", get_deployments_page_api, []},
-        {"/api/cartwheels/:cartwheel_id/deployment/incident", report_incident_api, []},
-        {"/api/cartwheels/:cartwheel_id/deployment/incident/resolve", resolve_incident_api, []},
-        {"/api/cartwheels/:cartwheel_id/deployment/incidents", get_incidents_page_api, []},
-        {"/api/cartwheels/:cartwheel_id/deployment/complete", complete_deployment_api, []}
     ].
 
 %% Agents (specialists and generalists)

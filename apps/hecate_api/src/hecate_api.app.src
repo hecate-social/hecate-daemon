@@ -25,10 +25,6 @@
         query_ucan,
         mentor_agents,
         query_mentors,
-        manage_cartwheels,
-        query_cartwheels,
-        manage_torches,
-        query_torches,
         hecate_telemetry
     ]},
     {env, [
