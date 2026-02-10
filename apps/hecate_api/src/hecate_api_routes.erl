@@ -28,6 +28,7 @@ routes() ->
     ++ llm_routes()
     ++ connector_routes()
     ++ mentor_routes()
+    ++ venture_routes()
     ++ torch_routes()
     ++ cartwheel_routes()
     ++ agent_routes()
@@ -164,7 +165,19 @@ mentor_routes() ->
         {"/api/mentors/remote", get_remote_learnings_page_api, []}
     ].
 
-%% Torch (business endeavors) — spoke handlers (already vertical)
+%% Ventures (business endeavors) — desk handlers
+venture_routes() ->
+    [
+        {"/api/venture", get_active_venture_api, []},
+        {"/api/ventures/setup", setup_venture_api, []},
+        {"/api/ventures", get_ventures_page_api, []},
+        {"/api/ventures/:venture_id", get_venture_by_id_api, []},
+        {"/api/ventures/:venture_id/vision/refine", refine_vision_api, []},
+        {"/api/ventures/:venture_id/vision/submit", submit_vision_api, []},
+        {"/api/ventures/:venture_id/archive", archive_venture_api, []}
+    ].
+
+%% Torch (LEGACY — kept for Phase 8 cleanup) — spoke handlers
 torch_routes() ->
     [
         {"/api/torch", get_active_torch_api, []},
