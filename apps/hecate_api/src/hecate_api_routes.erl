@@ -32,6 +32,7 @@ routes() ->
     ++ discovery_routes()
     ++ design_routes()
     ++ plan_routes()
+    ++ generation_routes()
     ++ torch_routes()
     ++ cartwheel_routes()
     ++ agent_routes()
@@ -230,6 +231,24 @@ plan_routes() ->
         {"/api/ventures/:venture_id/divisions/:division_id/plan", get_plan_by_division_id_api, []},
         {"/api/ventures/:venture_id/divisions/:division_id/plan/desks", get_planned_desks_page_api, []},
         {"/api/ventures/:venture_id/divisions/:division_id/plan/dependencies", get_planned_dependencies_page_api, []}
+    ].
+
+%% Generation (generate_division process) — desk handlers
+generation_routes() ->
+    [
+        %% Lifecycle
+        {"/api/ventures/:venture_id/divisions/:division_id/generation/start", start_generation_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/generation/pause", pause_generation_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/generation/resume", resume_generation_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/generation/complete", complete_generation_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/generation/archive", archive_generation_api, []},
+        %% Domain commands
+        {"/api/ventures/:venture_id/divisions/:division_id/generation/modules/generate", generate_module_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/generation/tests/generate", generate_test_api, []},
+        %% Queries
+        {"/api/ventures/:venture_id/divisions/:division_id/generation", get_generation_by_division_id_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/generation/modules", get_generated_modules_page_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/generation/tests", get_generated_tests_page_api, []}
     ].
 
 %% Torch (LEGACY — kept for Phase 8 cleanup) — spoke handlers

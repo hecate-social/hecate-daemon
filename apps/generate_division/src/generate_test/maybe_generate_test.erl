@@ -1,0 +1,57 @@
+-module(maybe_generate_test).
+-export([handle/1, handle/2, dispatch/1]).
+-include_lib("evoq/include/evoq.hrl").
+
+-dialyzer({nowarn_function, [dispatch/1]}).
+
+handle(Cmd) -> handle(Cmd, #{}).
+
+handle(Cmd, Context) ->
+    case generate_test_v1:validate(Cmd) of
+        ok ->
+            TestName = generate_test_v1:get_test_name(Cmd),
+            GeneratedTests = maps:get(generated_tests, Context, #{}),
+            case maps:is_key(TestName, GeneratedTests) of
+                true ->
+                    {error, {duplicate_test_name, TestName}};
+                false ->
+                    Event = test_generated_v1:new(#{
+                        division_id => generate_test_v1:get_division_id(Cmd),
+                        test_name => TestName,
+                        test_type => generate_test_v1:get_test_type(Cmd),
+                        module_name => generate_test_v1:get_module_name(Cmd),
+                        file_path => generate_test_v1:get_file_path(Cmd),
+                        content => generate_test_v1:get_content(Cmd),
+                        description => generate_test_v1:get_description(Cmd),
+                        generated_by => generate_test_v1:get_generated_by(Cmd)
+                    }),
+                    {ok, [Event]}
+            end;
+        {error, _} = Err -> Err
+    end.
+
+dispatch(Cmd) ->
+    DivisionId = generate_test_v1:get_division_id(Cmd),
+    Timestamp = erlang:system_time(millisecond),
+    EvoqCmd = #evoq_command{
+        command_id = generate_command_id(DivisionId, Timestamp),
+        command_type = generate_test,
+        aggregate_type = generation_aggregate,
+        aggregate_id = DivisionId,
+        payload = generate_test_v1:to_map(Cmd),
+        metadata = #{timestamp => Timestamp, aggregate_type => generation_aggregate},
+        causation_id = undefined,
+        correlation_id = undefined
+    },
+    Opts = #{
+        store_id => generate_division_store,
+        adapter => reckon_evoq_adapter,
+        consistency => eventual
+    },
+    evoq_dispatcher:dispatch(EvoqCmd, Opts).
+
+generate_command_id(DivisionId, Timestamp) ->
+    Hash = crypto:hash(sha256, <<DivisionId/binary, (integer_to_binary(Timestamp))/binary>>),
+    HashHex = binary:encode_hex(Hash),
+    ShortHash = binary:part(HashHex, 0, 16),
+    <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.
