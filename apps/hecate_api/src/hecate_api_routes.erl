@@ -29,6 +29,7 @@ routes() ->
     ++ connector_routes()
     ++ mentor_routes()
     ++ venture_routes()
+    ++ discovery_routes()
     ++ torch_routes()
     ++ cartwheel_routes()
     ++ agent_routes()
@@ -175,6 +176,22 @@ venture_routes() ->
         {"/api/ventures/:venture_id/vision/refine", refine_vision_api, []},
         {"/api/ventures/:venture_id/vision/submit", submit_vision_api, []},
         {"/api/ventures/:venture_id/archive", archive_venture_api, []}
+    ].
+
+%% Discovery (discover_divisions process) — desk handlers
+discovery_routes() ->
+    [
+        %% Lifecycle
+        {"/api/ventures/:venture_id/discovery/start", start_discovery_api, []},
+        {"/api/ventures/:venture_id/discovery/pause", pause_discovery_api, []},
+        {"/api/ventures/:venture_id/discovery/resume", resume_discovery_api, []},
+        {"/api/ventures/:venture_id/discovery/complete", complete_discovery_api, []},
+        {"/api/ventures/:venture_id/discovery/archive", archive_discovery_api, []},
+        %% Division discovery
+        {"/api/ventures/:venture_id/discovery/divisions/discover", discover_division_api, []},
+        %% Queries
+        {"/api/ventures/:venture_id/discovery", get_discovery_by_venture_id_api, []},
+        {"/api/ventures/:venture_id/divisions", get_discovered_divisions_page_api, []}
     ].
 
 %% Torch (LEGACY — kept for Phase 8 cleanup) — spoke handlers
