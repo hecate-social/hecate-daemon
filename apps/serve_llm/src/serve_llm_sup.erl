@@ -62,10 +62,10 @@ init([]) ->
             {chat_to_llm_responder, start_link, []},
             permanent, 5000, worker, [chat_to_llm_responder]},
 
-        %% list_available_llms_responder: handles list requests from mesh
-        {list_available_llms_responder,
-            {list_available_llms_responder, start_link, []},
-            permanent, 5000, worker, [list_available_llms_responder]},
+        %% get_available_llms_page_responder: handles list requests from mesh
+        {get_available_llms_page_responder,
+            {get_available_llms_page_responder, start_link, []},
+            permanent, 5000, worker, [get_available_llms_page_responder]},
 
         %% check_llm_health_responder: handles health requests from mesh
         {check_llm_health_responder,

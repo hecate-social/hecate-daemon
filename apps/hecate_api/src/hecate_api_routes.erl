@@ -46,14 +46,14 @@ geo_routes() ->
         {"/api/geo/check/:ip", hecate_api_geo, [check_ip]}
     ].
 
-%% Identity
+%% Identity (gen_server, not event-sourced)
 identity_routes() ->
     [
-        {"/identity", hecate_api_identity, []},
-        {"/identity/init", hecate_api_identity, [do_init]}
+        {"/api/identity", hecate_api_identity, []},
+        {"/api/identity/init", hecate_api_identity, [do_init]}
     ].
 
-%% Pairing
+%% Pairing (gen_server, not event-sourced)
 pairing_routes() ->
     [
         {"/api/pairing/start", hecate_api_pairing, [start]},
@@ -61,123 +61,123 @@ pairing_routes() ->
         {"/api/pairing/cancel", hecate_api_pairing, [cancel]}
     ].
 
-%% Capabilities
+%% Capabilities — spoke handlers
 capability_routes() ->
     [
-        {"/capabilities/announce", hecate_api_capabilities, [announce]},
-        {"/capabilities/discover", hecate_api_capabilities, [discover]},
-        {"/capabilities/:mri", hecate_api_capabilities, [get]},
-        {"/capabilities/:mri/update", hecate_api_capabilities, [update]},
-        {"/capabilities/:mri/retract", hecate_api_capabilities, [retract]}
+        {"/api/capabilities", get_capabilities_page_api, []},
+        {"/api/capabilities/announce", announce_capability_api, []},
+        {"/api/capabilities/:mri", get_capability_by_mri_api, []},
+        {"/api/capabilities/:mri/update", update_capability_api, []},
+        {"/api/capabilities/:mri/retract", retract_capability_api, []}
     ].
 
-%% Reputation
+%% Reputation — spoke handlers
 reputation_routes() ->
     [
-        {"/reputation/:agent_identity", hecate_api_reputation, [get]},
-        {"/rpc-calls", hecate_api_reputation, [list_calls]},
-        {"/disputes", hecate_api_reputation, [list_disputes]},
-        {"/rpc/track", hecate_api_rpc, [track]},
-        {"/api/rpc/call", hecate_api_rpc, [call]}
+        {"/api/reputation/:agent_identity", get_reputation_api, []},
+        {"/api/reputation/calls", get_rpc_calls_page_api, []},
+        {"/api/reputation/disputes", get_disputes_page_api, []},
+        {"/api/rpc/track", track_rpc_call_api, []},
+        {"/api/rpc/call", call_rpc_api, []}
     ].
 
-%% Social
+%% Social — spoke handlers
 social_routes() ->
     [
-        {"/social/follow", hecate_api_social, [follow]},
-        {"/social/unfollow", hecate_api_social, [unfollow]},
-        {"/social/endorse", hecate_api_social, [endorse]},
-        {"/social/endorsement/revoke", hecate_api_social, [revoke_endorsement]},
-        {"/social/followers/:agent_identity", hecate_api_social, [get_followers]},
-        {"/social/following/:agent_identity", hecate_api_social, [get_following]},
-        {"/social/endorsements/:agent_identity", hecate_api_social, [get_endorsements]},
-        {"/social/graph/:agent_identity", hecate_api_social, [get_social_graph]}
+        {"/api/social/follow", follow_agent_api, []},
+        {"/api/social/unfollow", unfollow_agent_api, []},
+        {"/api/social/endorse", endorse_capability_api, []},
+        {"/api/social/endorsements/revoke", revoke_endorsement_api, []},
+        {"/api/social/followers/:agent_identity", get_followers_by_agent_api, []},
+        {"/api/social/following/:agent_identity", get_following_by_agent_api, []},
+        {"/api/social/endorsements/:agent_identity", get_endorsements_by_agent_api, []},
+        {"/api/social/graph/:agent_identity", get_social_graph_api, []}
     ].
 
-%% Subscriptions
+%% Subscriptions — spoke handlers
 subscription_routes() ->
     [
-        {"/subscriptions", hecate_api_subscriptions, [list]},
-        {"/subscriptions/subscribe", hecate_api_subscriptions, [subscribe]},
-        {"/subscriptions/unsubscribe", hecate_api_subscriptions, [unsubscribe]},
-        {"/subscriptions/stats", hecate_api_subscriptions, [stats]}
+        {"/api/subscriptions", get_subscriptions_by_agent_api, []},
+        {"/api/subscriptions/subscribe", subscribe_api, []},
+        {"/api/subscriptions/unsubscribe", unsubscribe_api, []},
+        {"/api/subscriptions/stats", get_subscription_stats_api, []}
     ].
 
-%% Identity management
+%% Identity management — spoke handlers
 identity_management_routes() ->
     [
-        {"/agents", hecate_api_identities, [list]},
-        {"/agents/register", hecate_api_identities, [register]},
-        {"/agents/:agent_identity", hecate_api_identities, [get]},
-        {"/agents/:agent_identity/update", hecate_api_identities, [update]}
+        {"/api/identities", get_identities_page_api, []},
+        {"/api/identities/register", register_identity_api, []},
+        {"/api/identities/:agent_identity", find_identity_api, []},
+        {"/api/identities/:agent_identity/update", update_identity_api, []}
     ].
 
-%% UCAN
+%% UCAN — spoke handlers
 ucan_routes() ->
     [
-        {"/ucan/grant", hecate_api_ucan, [grant]},
-        {"/ucan/revoke/:capability_id", hecate_api_ucan, [revoke]},
-        {"/ucan/capabilities", hecate_api_ucan, [list]},
-        {"/ucan/verify/:capability_id", hecate_api_ucan, [verify]},
-        {"/ucan/verify", hecate_api_ucan, [verify_action]}
+        {"/api/ucan/grant", grant_ucan_api, []},
+        {"/api/ucan/revoke/:capability_id", revoke_ucan_api, []},
+        {"/api/ucan/capabilities", find_ucan_capabilities_api, []},
+        {"/api/ucan/verify/:capability_id", verify_ucan_api, []},
+        {"/api/ucan/verify", verify_ucan_api, []}
     ].
 
-%% LLM - vertical handlers in spokes
+%% LLM — spoke handlers (already vertical)
 llm_routes() ->
     [
-        {"/api/llm/models", list_available_llms_api, []},
+        {"/api/llm/models", get_available_llms_page_api, []},
         {"/api/llm/chat", chat_to_llm_api, []},
         {"/api/llm/health", check_llm_health_api, []},
-        {"/api/llm/providers", list_providers_api, []},
+        {"/api/llm/providers", get_providers_page_api, []},
         {"/api/llm/providers/add", add_provider_api, []},
         {"/api/llm/providers/reload", reload_providers_api, []},
         {"/api/llm/providers/:name/remove", remove_provider_api, []}
     ].
 
-%% Connectors
+%% Connectors — spoke handlers
 connector_routes() ->
     [
-        {"/connectors", hecate_api_connectors, [list]},
-        {"/connectors/register", hecate_api_connectors, [register]},
-        {"/connectors/:connector_id", hecate_api_connectors, [get]},
-        {"/connectors/:connector_id/revoke", hecate_api_connectors, [revoke]}
+        {"/api/connectors", list_connectors_api, []},
+        {"/api/connectors/register", register_connector_api, []},
+        {"/api/connectors/:connector_id", get_connector_api, []},
+        {"/api/connectors/:connector_id/revoke", revoke_connector_api, []}
     ].
 
-%% Mentors
+%% Mentors — spoke handlers
 mentor_routes() ->
     [
-        {"/mentors/learnings", hecate_api_mentors, [list_learnings]},
-        {"/mentors/learnings/submit", hecate_api_mentors, [submit]},
-        {"/mentors/learnings/:learning_id", hecate_api_mentors, [get_learning]},
-        {"/mentors/learnings/:learning_id/validate", hecate_api_mentors, [validate]},
-        {"/mentors/learnings/:learning_id/reject", hecate_api_mentors, [reject]},
-        {"/mentors/learnings/:learning_id/endorse", hecate_api_mentors, [endorse]},
-        {"/mentors/learnings/:learning_id/dispute", hecate_api_mentors, [dispute]},
-        {"/mentors/learnings/:learning_id/resolve", hecate_api_mentors, [resolve]},
-        {"/mentors/expertise", hecate_api_mentors, [declare]},
-        {"/mentors/expertise/withdraw", hecate_api_mentors, [withdraw]},
-        {"/mentors/profiles", hecate_api_mentors, [list_mentors]},
-        {"/mentors/profiles/:agent_id", hecate_api_mentors, [get_profile]},
-        {"/mentors/subscribe", hecate_api_mentors, [subscribe]},
-        {"/mentors/unsubscribe", hecate_api_mentors, [unsubscribe]},
-        {"/mentors/subscriptions", hecate_api_mentors, [list_subs]},
-        {"/mentors/remote", hecate_api_mentors, [list_remote]}
+        {"/api/mentors/learnings", get_learnings_page_api, []},
+        {"/api/mentors/learnings/submit", submit_learning_api, []},
+        {"/api/mentors/learnings/:learning_id", get_learning_by_id_api, []},
+        {"/api/mentors/learnings/:learning_id/validate", validate_learning_api, []},
+        {"/api/mentors/learnings/:learning_id/reject", reject_learning_api, []},
+        {"/api/mentors/learnings/:learning_id/endorse", endorse_learning_api, []},
+        {"/api/mentors/learnings/:learning_id/dispute", dispute_learning_api, []},
+        {"/api/mentors/learnings/:learning_id/resolve", resolve_learning_dispute_api, []},
+        {"/api/mentors/expertise", declare_expertise_api, []},
+        {"/api/mentors/expertise/withdraw", withdraw_expertise_api, []},
+        {"/api/mentors/profiles", get_mentors_page_api, []},
+        {"/api/mentors/profiles/:agent_id", get_mentor_profile_by_id_api, []},
+        {"/api/mentors/subscribe", subscribe_to_mentor_api, []},
+        {"/api/mentors/unsubscribe", unsubscribe_from_mentor_api, []},
+        {"/api/mentors/subscriptions", get_subscriptions_page_api, []},
+        {"/api/mentors/remote", get_remote_learnings_page_api, []}
     ].
 
-%% Torch (business endeavors) - vertical handlers in spokes
+%% Torch (business endeavors) — spoke handlers (already vertical)
 torch_routes() ->
     [
         {"/api/torch", get_active_torch_api, []},
         {"/api/torch/initiate", initiate_torch_api, []},
-        {"/api/torches", list_torches_api, []},
-        {"/api/torches/:torch_id", get_torch_api, []},
+        {"/api/torches", get_torches_page_api, []},
+        {"/api/torches/:torch_id", get_torch_by_id_api, []},
         {"/api/torches/:torch_id/vision/refine", refine_vision_api, []},
         {"/api/torches/:torch_id/vision/submit", submit_vision_api, []},
         {"/api/torches/:torch_id/archive", archive_torch_api, []},
         {"/api/torches/:torch_id/cartwheels/identify", identify_cartwheel_api, []}
     ].
 
-%% Cartwheel (bounded contexts) - vertical handlers in spokes
+%% Cartwheel (bounded contexts) — spoke handlers (already vertical)
 %%
 %% NOTE: There is NO direct cartwheel creation endpoint.
 %% Cartwheels are created through the parent-child pattern:
@@ -188,22 +188,22 @@ cartwheel_routes() ->
     [
         %% Core cartwheel routes (read-only + lifecycle operations)
         {"/api/cartwheel", get_active_cartwheel_api, []},
-        {"/api/cartwheels", list_cartwheels_api, []},
+        {"/api/cartwheels", get_cartwheels_page_api, []},
         %% No initiate endpoint - cartwheels created via torch identification
-        {"/api/cartwheels/:cartwheel_id", get_cartwheel_api, []},
+        {"/api/cartwheels/:cartwheel_id", get_cartwheel_by_id_api, []},
         {"/api/cartwheels/:cartwheel_id/transition", transition_phase_api, []},
         %% Discovery & Analysis phase
         {"/api/cartwheels/:cartwheel_id/discovery/start", start_discovery_api, []},
-        {"/api/cartwheels/:cartwheel_id/discovery/findings", list_findings_api, []},
+        {"/api/cartwheels/:cartwheel_id/discovery/findings", get_findings_page_api, []},
         {"/api/cartwheels/:cartwheel_id/discovery/findings/record", record_finding_api, []},
-        {"/api/cartwheels/:cartwheel_id/discovery/terms", list_terms_api, []},
+        {"/api/cartwheels/:cartwheel_id/discovery/terms", get_terms_page_api, []},
         {"/api/cartwheels/:cartwheel_id/discovery/terms/define", define_term_api, []},
         {"/api/cartwheels/:cartwheel_id/discovery/complete", complete_discovery_api, []},
         %% Architecture & Planning phase
         {"/api/cartwheels/:cartwheel_id/architecture/start", start_architecture_api, []},
-        {"/api/cartwheels/:cartwheel_id/architecture/dossiers", list_dossier_designs_api, []},
+        {"/api/cartwheels/:cartwheel_id/architecture/dossiers", get_dossier_designs_page_api, []},
         {"/api/cartwheels/:cartwheel_id/architecture/dossiers/define", define_dossier_api, []},
-        {"/api/cartwheels/:cartwheel_id/architecture/spokes", list_spoke_inventory_api, []},
+        {"/api/cartwheels/:cartwheel_id/architecture/spokes", get_spoke_inventory_page_api, []},
         {"/api/cartwheels/:cartwheel_id/architecture/spokes/inventory", inventory_spoke_api, []},
         {"/api/cartwheels/:cartwheel_id/architecture/plan", draft_plan_api, []},
         {"/api/cartwheels/:cartwheel_id/architecture/plan/approve", approve_plan_api, []},
@@ -212,17 +212,17 @@ cartwheel_routes() ->
         {"/api/cartwheels/:cartwheel_id/testing/start", start_testing_api, []},
         {"/api/cartwheels/:cartwheel_id/testing/skeleton", create_skeleton_api, []},
         {"/api/cartwheels/:cartwheel_id/testing/implement", implement_spoke_api, []},
-        {"/api/cartwheels/:cartwheel_id/testing/implementations", list_spoke_implementations_api, []},
+        {"/api/cartwheels/:cartwheel_id/testing/implementations", get_spoke_implementations_page_api, []},
         {"/api/cartwheels/:cartwheel_id/testing/verify", verify_build_api, []},
-        {"/api/cartwheels/:cartwheel_id/testing/builds", list_build_verifications_api, []},
+        {"/api/cartwheels/:cartwheel_id/testing/builds", get_build_verifications_page_api, []},
         {"/api/cartwheels/:cartwheel_id/testing/complete", complete_testing_api, []},
         %% Deployment & Operations phase
         {"/api/cartwheels/:cartwheel_id/deployment/start", start_deployment_api, []},
         {"/api/cartwheels/:cartwheel_id/deployment/record", record_deployment_api, []},
-        {"/api/cartwheels/:cartwheel_id/deployment/deployments", list_deployments_api, []},
+        {"/api/cartwheels/:cartwheel_id/deployment/deployments", get_deployments_page_api, []},
         {"/api/cartwheels/:cartwheel_id/deployment/incident", report_incident_api, []},
         {"/api/cartwheels/:cartwheel_id/deployment/incident/resolve", resolve_incident_api, []},
-        {"/api/cartwheels/:cartwheel_id/deployment/incidents", list_incidents_api, []},
+        {"/api/cartwheels/:cartwheel_id/deployment/incidents", get_incidents_page_api, []},
         {"/api/cartwheels/:cartwheel_id/deployment/complete", complete_deployment_api, []}
     ].
 

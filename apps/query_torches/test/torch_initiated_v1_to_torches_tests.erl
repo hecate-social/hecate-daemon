@@ -2,6 +2,7 @@
 -module(torch_initiated_v1_to_torches_tests).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("manage_torches/include/torch_status.hrl").
 
 -define(GROUP, torch_initiated_v1).
 -define(SCOPE, pg).
@@ -99,17 +100,20 @@ full_integration_test_() ->
          %% Wait for async processing
          timer:sleep(200),
 
-         %% Verify via list_torches query
-         {ok, Torches} = list_torches:execute(#{limit => 100}),
+         %% Verify via get_torches_page query
+         {ok, Torches} = get_torches_page:execute(#{limit => 100}),
 
          %% Find our torch
          MatchingTorches = [T || T <- Torches, maps:get(torch_id, T) =:= TorchId],
 
+         ExpectedStatus = evoq_bit_flags:set_all(0, [?TORCH_INITIATED, ?TORCH_DNA_ACTIVE]),
+         ExpectedLabel = evoq_bit_flags:to_string(ExpectedStatus, ?TORCH_FLAG_MAP),
          [
              ?_assertEqual(1, length(MatchingTorches)),
              ?_assertEqual(<<"Full Integration Torch">>, maps:get(name, hd(MatchingTorches))),
              ?_assertEqual(<<"End to end test">>, maps:get(brief, hd(MatchingTorches))),
-             ?_assertEqual(1, maps:get(status, hd(MatchingTorches)))
+             ?_assertEqual(ExpectedStatus, maps:get(status, hd(MatchingTorches))),
+             ?_assertEqual(ExpectedLabel, maps:get(status_label, hd(MatchingTorches)))
          ]
      end}.
 

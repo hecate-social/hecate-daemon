@@ -107,6 +107,7 @@ create_tables(Db) ->
             description TEXT,
             current_phase TEXT DEFAULT 'discovery_n_analysis',
             status INTEGER DEFAULT 1,
+            status_label TEXT DEFAULT 'New',
             finding_count INTEGER DEFAULT 0,
             term_count INTEGER DEFAULT 0,
             dossier_count INTEGER DEFAULT 0,

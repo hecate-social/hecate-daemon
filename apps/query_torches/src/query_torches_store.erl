@@ -109,6 +109,7 @@ create_tables(Db) ->
             name TEXT NOT NULL,
             brief TEXT,
             status INTEGER NOT NULL DEFAULT 1,
+            status_label TEXT DEFAULT 'New',
             repos TEXT,
             skills TEXT,
             context_map TEXT,

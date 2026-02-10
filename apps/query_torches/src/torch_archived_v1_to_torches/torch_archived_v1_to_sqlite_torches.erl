@@ -2,21 +2,35 @@
 %%% Updates torch status with ARCHIVED bit flag in the SQLite read model.
 -module(torch_archived_v1_to_sqlite_torches).
 
+-include_lib("manage_torches/include/torch_status.hrl").
+
 -export([project/1]).
 
-%% Bit flags matching torch_aggregate.erl
--define(ARCHIVED, 32).  %% 2^5
-
 %% @doc Project torch_archived_v1 event to torches table.
-%% Sets the ARCHIVED bit flag on the torch's status.
+%% Sets the ARCHIVED bit flag and recomputes status_label.
 -spec project(map()) -> ok | {error, term()}.
-project(#{torch_id := TorchId} = _E) ->
+project(Event) ->
+    TorchId = get(torch_id, Event),
     logger:info("[PROJECTION] ~s: projecting archive for ~s", [?MODULE, TorchId]),
-    %% Use bitwise OR to set the ARCHIVED flag without clearing other bits
-    Sql = "UPDATE torches SET status = status | ?1 WHERE torch_id = ?2",
-    Result = query_torches_store:execute(Sql, [?ARCHIVED, TorchId]),
-    logger:info("[PROJECTION] ~s: result = ~p", [?MODULE, Result]),
-    Result;
-project(Other) ->
-    logger:warning("[PROJECTION] ~s: unexpected event ~p", [?MODULE, Other]),
-    {error, {unexpected_event, Other}}.
+    %% 1. Set the ARCHIVED flag
+    ok = query_torches_store:execute(
+        "UPDATE torches SET status = status | ?1 WHERE torch_id = ?2",
+        [?TORCH_ARCHIVED, TorchId]),
+    %% 2. Read back new status, recompute label
+    case query_torches_store:query(
+        "SELECT status FROM torches WHERE torch_id = ?1", [TorchId]) of
+        {ok, [{NewStatus}]} ->
+            Label = evoq_bit_flags:to_string(NewStatus, ?TORCH_FLAG_MAP),
+            query_torches_store:execute(
+                "UPDATE torches SET status_label = ?1 WHERE torch_id = ?2",
+                [Label, TorchId]);
+        _ -> ok
+    end.
+
+%% @doc Get value from event map, handling both atom and binary keys.
+-spec get(atom(), map()) -> term().
+get(Key, Map) when is_atom(Key) ->
+    case maps:find(Key, Map) of
+        {ok, V} -> V;
+        error -> maps:get(atom_to_binary(Key, utf8), Map, undefined)
+    end.

@@ -56,7 +56,7 @@ echo ""
 # Step 1: Check daemon health
 echo "[1/5] Checking daemon health..."
 HEALTH=$(${CURL} "${BASE}/health" 2>&1) || true
-if echo "${HEALTH}" | grep -q '"ok"'; then
+if echo "${HEALTH}" | grep -q '"healthy"'; then
     assert_ok "Daemon is healthy" "ok"
 else
     echo "  FAIL: Daemon not reachable at ${SOCKET}"

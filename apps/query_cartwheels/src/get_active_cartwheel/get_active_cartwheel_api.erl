@@ -23,9 +23,9 @@ handle_get(Req0, _State) ->
     end.
 
 get_active_torch_cartwheel() ->
-    case list_torches:execute(#{limit => 1}) of
+    case get_torches_page:execute(#{limit => 1}) of
         {ok, [#{active_cartwheel_id := Id}]} when Id =/= undefined, Id =/= null ->
-            get_cartwheel:execute(Id);
+            get_cartwheel_by_id:execute(Id);
         {ok, _} ->
             none;
         {error, _} = E ->

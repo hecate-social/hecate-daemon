@@ -4,6 +4,8 @@
 -module(torch_aggregate).
 -behaviour(evoq_aggregate).
 
+-include("torch_status.hrl").
+
 %% Behaviour callbacks
 -export([init/1, execute/2, apply/2]).
 
@@ -13,13 +15,13 @@
 %% Bit flag descriptions for status display
 -export([flag_map/0]).
 
-%% Bit flags for torch status
--define(INITIATED,     1).   %% 2^0
--define(DNA_ACTIVE,    2).   %% 2^1 (Discovery & Analysis active)
--define(DNA_COMPLETE,  4).   %% 2^2 (Discovery & Analysis complete)
--define(IMPLEMENTING,  8).   %% 2^3
--define(COMPLETED,    16).   %% 2^4
--define(ARCHIVED,     32).   %% 2^5 (soft deleted)
+%% Local aliases for readability (from torch_status.hrl)
+-define(INITIATED,     ?TORCH_INITIATED).
+-define(DNA_ACTIVE,    ?TORCH_DNA_ACTIVE).
+-define(DNA_COMPLETE,  ?TORCH_DNA_COMPLETE).
+-define(IMPLEMENTING,  ?TORCH_IMPLEMENTING).
+-define(COMPLETED,     ?TORCH_COMPLETED).
+-define(ARCHIVED,      ?TORCH_ARCHIVED).
 
 -record(torch_state, {
     torch_id            :: binary() | undefined,
@@ -40,15 +42,7 @@
 
 %% @doc Flag map for status display via evoq_bit_flags:to_string/2
 -spec flag_map() -> evoq_bit_flags:flag_map().
-flag_map() -> #{
-    0              => <<"New">>,
-    ?INITIATED     => <<"🌱 Initiated"/utf8>>,
-    ?DNA_ACTIVE    => <<"🔍 Discovering"/utf8>>,
-    ?DNA_COMPLETE  => <<"✅ Discovery Done"/utf8>>,
-    ?IMPLEMENTING  => <<"🔨 Implementing"/utf8>>,
-    ?COMPLETED     => <<"🏁 Completed"/utf8>>,
-    ?ARCHIVED      => <<"📦 Archived"/utf8>>
-}.
+flag_map() -> ?TORCH_FLAG_MAP.
 
 %% @doc Behaviour callback: init/1
 -spec init(binary()) -> {ok, state()}.
@@ -193,7 +187,7 @@ apply_torch_initiated(E, State) ->
         torch_id = get_value(torch_id, E),
         name = get_value(name, E),
         brief = get_value(brief, E),
-        status = ?INITIATED bor ?DNA_ACTIVE,
+        status = evoq_bit_flags:set_all(0, [?INITIATED, ?DNA_ACTIVE]),
         repos = get_value(repos, E, []),
         skills = get_value(skills, E, []),
         context_map = get_value(context_map, E, #{}),

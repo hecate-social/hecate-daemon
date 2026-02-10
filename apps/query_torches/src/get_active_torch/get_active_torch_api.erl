@@ -13,7 +13,7 @@ init(Req0, State) ->
     end.
 
 handle_get(Req0, _State) ->
-    case list_torches:execute(#{limit => 1}) of
+    case get_torches_page:execute(#{limit => 1}) of
         {ok, [Torch | _]} ->
             hecate_api_utils:json_ok(#{torch => Torch}, Req0);
         {ok, []} ->

@@ -5,6 +5,8 @@
 %%% @end
 -module(initiate_torch_api).
 
+-include("torch_status.hrl").
+
 -export([init/2]).
 
 init(Req0, State) ->
@@ -52,11 +54,14 @@ dispatch(Cmd, Req) ->
             emit_to_mesh(EventMaps),
             %% Return full torch data for TUI compatibility
             TorchId = initiate_torch_v1:get_torch_id(Cmd),
+            Status = evoq_bit_flags:set_all(0, [?TORCH_INITIATED, ?TORCH_DNA_ACTIVE]),
+            StatusLabel = evoq_bit_flags:to_string(Status, ?TORCH_FLAG_MAP),
             hecate_api_utils:json_ok(201, #{
                 torch_id => TorchId,
                 name => initiate_torch_v1:get_name(Cmd),
                 brief => initiate_torch_v1:get_brief(Cmd),
-                status => 3,  %% INITIATED | DNA_ACTIVE flags
+                status => Status,
+                status_label => StatusLabel,
                 initiated_at => erlang:system_time(millisecond),
                 initiated_by => initiate_torch_v1:get_initiated_by(Cmd),
                 version => Version,

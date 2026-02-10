@@ -5,6 +5,8 @@
 -module(cartwheel_aggregate).
 -behaviour(evoq_aggregate).
 
+-include("cartwheel_status.hrl").
+
 %% Behaviour callbacks
 -export([init/1, execute/2, apply/2]).
 
@@ -14,17 +16,18 @@
 %% Bit flag descriptions for status display
 -export([flag_map/0]).
 
--define(INITIATED,             1).   %% 2^0
--define(DISCOVERY_ACTIVE,      2).   %% 2^1
--define(DISCOVERY_COMPLETE,    4).   %% 2^2
--define(ARCHITECTURE_ACTIVE,   8).   %% 2^3
--define(ARCHITECTURE_COMPLETE,16).   %% 2^4
--define(TESTING_ACTIVE,       32).   %% 2^5
--define(TESTING_COMPLETE,     64).   %% 2^6
--define(DEPLOYMENT_ACTIVE,   128).   %% 2^7
--define(DEPLOYMENT_COMPLETE, 256).   %% 2^8
--define(COMPLETED,           512).   %% 2^9
--define(REVISITING,         1024).   %% 2^10
+%% Local aliases for readability (from cartwheel_status.hrl)
+-define(INITIATED,             ?CW_INITIATED).
+-define(DISCOVERY_ACTIVE,      ?CW_DISCOVERY_ACTIVE).
+-define(DISCOVERY_COMPLETE,    ?CW_DISCOVERY_COMPLETE).
+-define(ARCHITECTURE_ACTIVE,   ?CW_ARCHITECTURE_ACTIVE).
+-define(ARCHITECTURE_COMPLETE, ?CW_ARCHITECTURE_COMPLETE).
+-define(TESTING_ACTIVE,        ?CW_TESTING_ACTIVE).
+-define(TESTING_COMPLETE,      ?CW_TESTING_COMPLETE).
+-define(DEPLOYMENT_ACTIVE,     ?CW_DEPLOYMENT_ACTIVE).
+-define(DEPLOYMENT_COMPLETE,   ?CW_DEPLOYMENT_COMPLETE).
+-define(COMPLETED,             ?CW_COMPLETED).
+-define(REVISITING,            ?CW_REVISITING).
 
 -record(cartwheel_state, {
     cartwheel_id           :: binary() | undefined,
@@ -52,20 +55,7 @@
 
 %% @doc Flag map for status display via evoq_bit_flags:to_string/2
 -spec flag_map() -> evoq_bit_flags:flag_map().
-flag_map() -> #{
-    0                      => <<"New">>,
-    ?INITIATED             => <<"🌱 Initiated"/utf8>>,
-    ?DISCOVERY_ACTIVE      => <<"🔍 DnA Active"/utf8>>,
-    ?DISCOVERY_COMPLETE    => <<"✅ DnA Done"/utf8>>,
-    ?ARCHITECTURE_ACTIVE   => <<"📐 AnP Active"/utf8>>,
-    ?ARCHITECTURE_COMPLETE => <<"✅ AnP Done"/utf8>>,
-    ?TESTING_ACTIVE        => <<"🧪 TnI Active"/utf8>>,
-    ?TESTING_COMPLETE      => <<"✅ TnI Done"/utf8>>,
-    ?DEPLOYMENT_ACTIVE     => <<"🚀 DnO Active"/utf8>>,
-    ?DEPLOYMENT_COMPLETE   => <<"✅ DnO Done"/utf8>>,
-    ?COMPLETED             => <<"🏁 Completed"/utf8>>,
-    ?REVISITING            => <<"🔄 Revisiting"/utf8>>
-}.
+flag_map() -> ?CW_FLAG_MAP.
 
 %% @doc Behaviour callback: init/1
 -spec init(binary()) -> {ok, state()}.
@@ -396,7 +386,7 @@ apply_event(#{event_type := <<"cartwheel_initiated_v1">>} = E, State) ->
         torch_id = maps:get(torch_id, E, undefined),
         context_name = maps:get(context_name, E, maps:get(name, E, undefined)),
         current_phase = <<"discovery_n_analysis">>,
-        status = ?INITIATED bor ?DISCOVERY_ACTIVE,
+        status = evoq_bit_flags:set_all(0, [?INITIATED, ?DISCOVERY_ACTIVE]),
         initiated_at = maps:get(initiated_at, E)
     };
 apply_event(#{event_type := <<"discovery_started_v1">>} = E, State) ->
