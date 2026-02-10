@@ -1,0 +1,18 @@
+{application, design_division, [
+    {description, "Design process — design aggregates and events for a division"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {design_division_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        evoq,
+        reckon_db,
+        reckon_evoq
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

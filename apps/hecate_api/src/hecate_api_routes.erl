@@ -30,6 +30,7 @@ routes() ->
     ++ mentor_routes()
     ++ venture_routes()
     ++ discovery_routes()
+    ++ design_routes()
     ++ torch_routes()
     ++ cartwheel_routes()
     ++ agent_routes()
@@ -192,6 +193,24 @@ discovery_routes() ->
         %% Queries
         {"/api/ventures/:venture_id/discovery", get_discovery_by_venture_id_api, []},
         {"/api/ventures/:venture_id/divisions", get_discovered_divisions_page_api, []}
+    ].
+
+%% Design (design_division process) — desk handlers
+design_routes() ->
+    [
+        %% Lifecycle
+        {"/api/ventures/:venture_id/divisions/:division_id/design/start", start_design_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/design/pause", pause_design_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/design/resume", resume_design_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/design/complete", complete_design_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/design/archive", archive_design_api, []},
+        %% Domain commands
+        {"/api/ventures/:venture_id/divisions/:division_id/design/aggregates/design", design_aggregate_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/design/events/design", design_event_api, []},
+        %% Queries
+        {"/api/ventures/:venture_id/divisions/:division_id/design", get_design_by_division_id_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/design/aggregates", get_designed_aggregates_page_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/design/events", get_designed_events_page_api, []}
     ].
 
 %% Torch (LEGACY — kept for Phase 8 cleanup) — spoke handlers
