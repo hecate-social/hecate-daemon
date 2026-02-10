@@ -37,6 +37,7 @@ routes() ->
     ++ deployment_routes()
     ++ monitoring_routes()
     ++ rescue_routes()
+    ++ venture_status_routes()
     ++ torch_routes()
     ++ cartwheel_routes()
     ++ agent_routes()
@@ -326,6 +327,12 @@ rescue_routes() ->
         {"/api/ventures/:venture_id/divisions/:division_id/rescue", get_rescue_by_division_id_api, []},
         {"/api/ventures/:venture_id/divisions/:division_id/rescue/diagnoses", get_diagnoses_page_api, []},
         {"/api/ventures/:venture_id/divisions/:division_id/rescue/fixes", get_fixes_page_api, []}
+    ].
+
+%% Venture status (guide_venture orchestrator) — desk handlers
+venture_status_routes() ->
+    [
+        {"/api/ventures/:venture_id/status", get_venture_status_api, []}
     ].
 
 %% Torch (LEGACY — kept for Phase 8 cleanup) — spoke handlers

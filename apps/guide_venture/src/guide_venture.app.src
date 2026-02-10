@@ -1,0 +1,9 @@
+{application, guide_venture, [
+    {description, "Venture lifecycle orchestrator — passive fact consumer"},
+    {vsn, "0.1.0"},
+    {registered, [venture_state]},
+    {mod, {guide_venture_app, []}},
+    {applications, [kernel, stdlib]},
+    {env, []},
+    {modules, []}
+]}.
