@@ -1,0 +1,11 @@
+{application, query_rescues, [
+    {description, "Rescue query service (CQRS read side)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_rescues_app, []}},
+    {applications, [kernel, stdlib, esqlite, evoq, rescue_division]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

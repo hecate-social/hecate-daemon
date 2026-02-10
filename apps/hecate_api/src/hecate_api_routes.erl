@@ -33,6 +33,10 @@ routes() ->
     ++ design_routes()
     ++ plan_routes()
     ++ generation_routes()
+    ++ testing_routes()
+    ++ deployment_routes()
+    ++ monitoring_routes()
+    ++ rescue_routes()
     ++ torch_routes()
     ++ cartwheel_routes()
     ++ agent_routes()
@@ -249,6 +253,79 @@ generation_routes() ->
         {"/api/ventures/:venture_id/divisions/:division_id/generation", get_generation_by_division_id_api, []},
         {"/api/ventures/:venture_id/divisions/:division_id/generation/modules", get_generated_modules_page_api, []},
         {"/api/ventures/:venture_id/divisions/:division_id/generation/tests", get_generated_tests_page_api, []}
+    ].
+
+%% Testing (test_division process) — desk handlers
+testing_routes() ->
+    [
+        %% Lifecycle
+        {"/api/ventures/:venture_id/divisions/:division_id/testing/start", start_testing_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/testing/pause", pause_testing_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/testing/resume", resume_testing_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/testing/complete", complete_testing_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/testing/archive", archive_testing_api, []},
+        %% Domain commands
+        {"/api/ventures/:venture_id/divisions/:division_id/testing/suites/run", run_test_suite_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/testing/results/record", record_test_result_api, []},
+        %% Queries
+        {"/api/ventures/:venture_id/divisions/:division_id/testing", get_testing_by_division_id_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/testing/suites", get_test_suites_page_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/testing/results", get_test_results_page_api, []}
+    ].
+
+%% Deployment (deploy_division process) — desk handlers
+deployment_routes() ->
+    [
+        %% Lifecycle
+        {"/api/ventures/:venture_id/divisions/:division_id/deployment/start", start_deployment_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/deployment/pause", pause_deployment_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/deployment/resume", resume_deployment_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/deployment/complete", complete_deployment_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/deployment/archive", archive_deployment_api, []},
+        %% Domain commands
+        {"/api/ventures/:venture_id/divisions/:division_id/deployment/releases/deploy", deploy_release_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/deployment/rollouts/stage", stage_rollout_api, []},
+        %% Queries
+        {"/api/ventures/:venture_id/divisions/:division_id/deployment", get_deployment_by_division_id_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/deployment/releases", get_releases_page_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/deployment/rollouts", get_rollout_stages_page_api, []}
+    ].
+
+%% Monitoring (monitor_division process) — desk handlers
+monitoring_routes() ->
+    [
+        %% Lifecycle
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring/start", start_monitoring_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring/pause", pause_monitoring_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring/resume", resume_monitoring_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring/complete", complete_monitoring_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring/archive", archive_monitoring_api, []},
+        %% Domain commands
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring/health-checks/register", register_health_check_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring/health-status/record", record_health_status_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring/incidents/raise", raise_incident_api, []},
+        %% Queries
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring", get_monitoring_by_division_id_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring/health-checks", get_health_checks_page_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/monitoring/incidents", get_incidents_page_api, []}
+    ].
+
+%% Rescue (rescue_division process) — desk handlers
+rescue_routes() ->
+    [
+        %% Lifecycle
+        {"/api/ventures/:venture_id/divisions/:division_id/rescue/start", start_rescue_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/rescue/pause", pause_rescue_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/rescue/resume", resume_rescue_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/rescue/complete", complete_rescue_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/rescue/archive", archive_rescue_api, []},
+        %% Domain commands
+        {"/api/ventures/:venture_id/divisions/:division_id/rescue/diagnoses/diagnose", diagnose_incident_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/rescue/fixes/apply", apply_fix_api, []},
+        %% Queries
+        {"/api/ventures/:venture_id/divisions/:division_id/rescue", get_rescue_by_division_id_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/rescue/diagnoses", get_diagnoses_page_api, []},
+        {"/api/ventures/:venture_id/divisions/:division_id/rescue/fixes", get_fixes_page_api, []}
     ].
 
 %% Torch (LEGACY — kept for Phase 8 cleanup) — spoke handlers
