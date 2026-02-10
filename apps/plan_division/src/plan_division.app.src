@@ -1,0 +1,11 @@
+{application, plan_division, [
+    {description, "Plan process — plan desks and dependencies for a division"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {plan_division_app, []}},
+    {applications, [kernel, stdlib, crypto, evoq, reckon_db, reckon_evoq]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.
