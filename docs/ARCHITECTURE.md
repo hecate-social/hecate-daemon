@@ -248,18 +248,21 @@ The TUI presents hecate node functionality through **Studios** — self-containe
 | **Development Studio** | AI-guided venture lifecycle (all 10 processes) | `craft_ventures` apps |
 | **DevOps Studio** | Node health, providers, capabilities, connectors, agent social | `operate_hecate_node` apps |
 | **Social Studio** | Profile, IRC-style chat channels | New (human social over mesh pub/sub) |
+| **Arcade Studio** | Terminal games, multiplayer over mesh | New (mesh pub/sub + RPC) |
 
 **Two types of social:**
 - **Human Social** (Social Studio) — People talking to people. IRC chat, profiles, feeds. Drives viral adoption.
 - **Agent Social** (DevOps Studio) — Agents discovering and trusting each other. Follow, endorse, reputation. Infrastructure.
 
 **Studio Switcher UX:**
-- **First launch:** Home screen showing all 4 studios as cards (communicates breadth)
-- **During use:** Top bar with studio tabs (Ctrl+1-4 to switch, or `/studio` command)
+- **First launch:** Home screen showing all 5 studios as cards (communicates breadth)
+- **During use:** Top bar with studio tabs (Ctrl+1-5 to switch, or `/studio` command)
 - **State preservation:** Each studio preserves its state when switching away and back
 - **Future:** Studio Explorer for downloading third-party studio plugins from the mesh
 
 > **Design principle:** Studios share the LLM — you can chat contextually within any studio. The AI adapts its persona and knowledge based on which studio is active.
+
+For full UX specifications, screens, and commands, see [TUI_STUDIOS.md](TUI_STUDIOS.md).
 
 ---
 
