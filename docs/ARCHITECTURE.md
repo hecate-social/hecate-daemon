@@ -8,6 +8,7 @@ This document describes the complete architecture of Hecate daemon, a lightweigh
 - [System Architecture](#system-architecture)
 - [CQRS/Event Sourcing Pattern](#cqrsevent-sourcing-pattern)
 - [Hecate Node Mental Model](#hecate-node-mental-model)
+  - [TUI Studios](#tui-studios)
 - [Domain Boundaries](#domain-boundaries)
 - [Event Flow](#event-flow)
 - [Supervision Tree](#supervision-tree)
@@ -234,6 +235,31 @@ The always-running infrastructure that makes a hecate node functional on the mes
 These are **not** venture lifecycle processes — they don't follow the 10-process ALC. They are node-level operations that run continuously.
 
 > **Future:** When the venture framework matures, these may be restructured into a formal `operate_hecate_node` venture with its own divisions. For now, the separate app structure works and ships.
+
+### TUI Studios
+
+The TUI presents hecate node functionality through **Studios** — self-contained workspaces, each with its own state, views, and commands. Studios are a UX concept; they don't map 1:1 to daemon apps.
+
+**v1 Built-In Studios:**
+
+| Studio | Purpose | Daemon Backend |
+|--------|---------|----------------|
+| **LLM Studio** | Free-form AI chat, model selection, tools | `serve_llm` |
+| **Development Studio** | AI-guided venture lifecycle (all 10 processes) | `craft_ventures` apps |
+| **DevOps Studio** | Node health, providers, capabilities, connectors, agent social | `operate_hecate_node` apps |
+| **Social Studio** | Profile, IRC-style chat channels | New (human social over mesh pub/sub) |
+
+**Two types of social:**
+- **Human Social** (Social Studio) — People talking to people. IRC chat, profiles, feeds. Drives viral adoption.
+- **Agent Social** (DevOps Studio) — Agents discovering and trusting each other. Follow, endorse, reputation. Infrastructure.
+
+**Studio Switcher UX:**
+- **First launch:** Home screen showing all 4 studios as cards (communicates breadth)
+- **During use:** Top bar with studio tabs (Ctrl+1-4 to switch, or `/studio` command)
+- **State preservation:** Each studio preserves its state when switching away and back
+- **Future:** Studio Explorer for downloading third-party studio plugins from the mesh
+
+> **Design principle:** Studios share the LLM — you can chat contextually within any studio. The AI adapts its persona and knowledge based on which studio is active.
 
 ---
 
