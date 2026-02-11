@@ -7,6 +7,7 @@ This document describes the complete architecture of Hecate daemon, a lightweigh
 - [Overview](#overview)
 - [System Architecture](#system-architecture)
 - [CQRS/Event Sourcing Pattern](#cqrsevent-sourcing-pattern)
+- [Hecate Node Mental Model](#hecate-node-mental-model)
 - [Domain Boundaries](#domain-boundaries)
 - [Event Flow](#event-flow)
 - [Supervision Tree](#supervision-tree)
@@ -199,9 +200,46 @@ ReckonDB Event Stream
 
 ---
 
+## Hecate Node Mental Model
+
+A **hecate node** is one of:
+- A standalone k3s node (server+agent) running a single `hecate-daemon`
+- A multi-node k3s cluster where each node runs a `hecate-daemon` — the cluster shares one certificate, presenting itself to the mesh as a single identity
+
+A hecate node can host multiple **ventures**. Two ventures are built-in:
+
+### 1. `craft_ventures` (User-Facing)
+
+The AI-guided venture lifecycle system. This is the product — it helps developers build software through a structured, AI-supported process.
+
+**10 processes:** `setup_venture` → `discover_divisions` → `design_division` → `plan_division` → `generate_division` → `test_division` → `deploy_division` → `monitor_division` → `rescue_division`, orchestrated by `guide_venture`.
+
+Each process follows the venture lifecycle protocol (pending → active → paused → completed). See `hecate-agents/philosophy/HECATE_VENTURE_LIFECYCLE.md` for full details.
+
+### 2. `operate_hecate_node` (Infrastructure)
+
+The always-running infrastructure that makes a hecate node functional on the mesh. Currently implemented as separate `manage_*` and `query_*` apps, these handle:
+
+| Concern | CMD App | QRY App | What It Does |
+|---------|---------|---------|-------------|
+| Identity | `manage_identities` | `query_identities` | Who this node is on the mesh |
+| Capabilities | `manage_capabilities` | `query_capabilities` | What this node can do |
+| Social | `manage_social` | `query_social` | Who this node follows/endorses |
+| Subscriptions | `manage_subscriptions` | `query_subscriptions` | What topics this node cares about |
+| Reputation | `manage_reputation` | `query_reputation` | Trust scoring for RPC interactions |
+| UCAN | `manage_ucan` | `query_ucan` | Capability delegation tokens |
+| Connectors | `manage_connectors` | — | How sidecar agents connect |
+| LLM | `serve_llm` | — | AI model access |
+
+These are **not** venture lifecycle processes — they don't follow the 10-process ALC. They are node-level operations that run continuously.
+
+> **Future:** When the venture framework matures, these may be restructured into a formal `operate_hecate_node` venture with its own divisions. For now, the separate app structure works and ships.
+
+---
+
 ## Domain Boundaries
 
-The system is organized into 6 bounded contexts:
+The node operations are organized into bounded contexts:
 
 ### 1. Capabilities (`manage_capabilities` / `query_capabilities`)
 
