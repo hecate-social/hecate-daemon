@@ -35,5 +35,8 @@ Thumbs.db
 # Dialyzer
 .rebar3/
 
+# Runtime data
+data/
+
 # Local config
 *.local
