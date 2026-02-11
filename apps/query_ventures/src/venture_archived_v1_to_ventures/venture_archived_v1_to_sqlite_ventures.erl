@@ -23,6 +23,11 @@ project(Event) ->
             query_ventures_store:execute(
                 "UPDATE ventures SET status_label = ?1 WHERE venture_id = ?2",
                 [Label, VentureId]);
+        {ok, [[NewStatus]]} ->
+            Label = evoq_bit_flags:to_string(NewStatus, ?VENTURE_FLAG_MAP),
+            query_ventures_store:execute(
+                "UPDATE ventures SET status_label = ?1 WHERE venture_id = ?2",
+                [Label, VentureId]);
         _ -> ok
     end.
 
