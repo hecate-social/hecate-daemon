@@ -68,7 +68,6 @@ dispatch(Cmd) ->
     Timestamp = update_capability_v1:get_updated_at(Cmd),
 
     EvoqCmd = #evoq_command{
-        command_id = generate_command_id(MRI, Timestamp),
         command_type = update_capability,
         aggregate_type = capability_aggregate,
         aggregate_id = MRI,
@@ -97,10 +96,3 @@ create_event_from_command(Cmd) ->
     Metadata = update_capability_v1:get_metadata(Cmd),
 
     capability_updated_v1:new(MRI, AgentID, Tags, Desc, DemoProc, Metadata).
-
-generate_command_id(MRI, Timestamp) ->
-    Unique = integer_to_binary(erlang:unique_integer([positive])),
-    Hash = crypto:hash(sha256, <<MRI/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
-    HashHex = binary:encode_hex(Hash),
-    ShortHash = binary:part(HashHex, 0, 16),
-    <<"cmd-upd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

@@ -6,7 +6,6 @@
 
 -export([handle/1, dispatch/1]).
 
--dialyzer({nowarn_function, [dispatch/1]}).
 
 -spec handle(endorse_learning_v1:endorse_learning_v1()) ->
     {ok, [learning_endorsed_v1:learning_endorsed_v1()]} | {error, term()}.
@@ -23,7 +22,6 @@ dispatch(Cmd) ->
     Timestamp = erlang:system_time(millisecond),
 
     EvoqCmd = #evoq_command{
-        command_id = generate_command_id(LearningId, Timestamp),
         command_type = endorse_learning,
         aggregate_type = learning_aggregate,
         aggregate_id = <<"learning-", LearningId/binary>>,
@@ -40,10 +38,3 @@ dispatch(Cmd) ->
     },
 
     evoq_dispatcher:dispatch(EvoqCmd, Opts).
-
-generate_command_id(LearningId, Timestamp) ->
-    Unique = integer_to_binary(erlang:unique_integer([positive])),
-    Hash = crypto:hash(sha256, <<LearningId/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
-    HashHex = binary:encode_hex(Hash),
-    ShortHash = binary:part(HashHex, 0, 16),
-    <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

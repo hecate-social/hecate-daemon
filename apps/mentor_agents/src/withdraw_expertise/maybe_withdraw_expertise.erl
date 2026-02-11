@@ -6,7 +6,6 @@
 
 -export([handle/1, dispatch/1]).
 
--dialyzer({nowarn_function, [dispatch/1]}).
 
 -spec handle(withdraw_expertise_v1:withdraw_expertise_v1()) ->
     {ok, [expertise_withdrawn_v1:expertise_withdrawn_v1()]} | {error, term()}.
@@ -22,7 +21,6 @@ dispatch(Cmd) ->
     Timestamp = erlang:system_time(millisecond),
 
     EvoqCmd = #evoq_command{
-        command_id = generate_command_id(AgentId, Timestamp),
         command_type = withdraw_expertise,
         aggregate_type = mentor_profile_aggregate,
         aggregate_id = <<"mentor-", AgentId/binary>>,
@@ -39,10 +37,3 @@ dispatch(Cmd) ->
     },
 
     evoq_dispatcher:dispatch(EvoqCmd, Opts).
-
-generate_command_id(AgentId, Timestamp) ->
-    Unique = integer_to_binary(erlang:unique_integer([positive])),
-    Hash = crypto:hash(sha256, <<AgentId/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
-    HashHex = binary:encode_hex(Hash),
-    ShortHash = binary:part(HashHex, 0, 16),
-    <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

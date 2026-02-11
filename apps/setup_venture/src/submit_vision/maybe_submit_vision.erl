@@ -6,7 +6,6 @@
 
 -export([handle/1, dispatch/1]).
 
--dialyzer({nowarn_function, [dispatch/1]}).
 
 %% @doc Handle submit_vision_v1 command (business logic only)
 -spec handle(submit_vision_v1:submit_vision_v1()) ->
@@ -29,7 +28,6 @@ dispatch(Cmd) ->
     Timestamp = erlang:system_time(millisecond),
 
     EvoqCmd = #evoq_command{
-        command_id = generate_command_id(VentureId, Timestamp),
         command_type = submit_vision,
         aggregate_type = setup_aggregate,
         aggregate_id = VentureId,
@@ -59,10 +57,3 @@ create_event(Cmd) ->
         venture_id => submit_vision_v1:get_venture_id(Cmd),
         submitted_by => submit_vision_v1:get_submitted_by(Cmd)
     }).
-
-generate_command_id(VentureId, Timestamp) ->
-    Unique = integer_to_binary(erlang:unique_integer([positive])),
-    Hash = crypto:hash(sha256, <<VentureId/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
-    HashHex = binary:encode_hex(Hash),
-    ShortHash = binary:part(HashHex, 0, 16),
-    <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

@@ -9,7 +9,6 @@
 
 %% Suppress dialyzer warnings for calls to evoq_dispatcher (excluded from PLT)
 %% and opaque type usage in dispatch/1
--dialyzer({nowarn_function, [dispatch/1]}).
 
 %% @doc Handle announce_capability_v1 command (business logic only)
 %% Validates MRI format, agent identity, and tags before creating event.
@@ -53,7 +52,6 @@ dispatch(Cmd) ->
     Timestamp = announce_capability_v1:get_announced_at(Cmd),
 
     EvoqCmd = #evoq_command{
-        command_id = generate_command_id(MRI, Timestamp),
         command_type = announce_capability,
         aggregate_type = capability_aggregate,
         aggregate_id = MRI,
@@ -82,10 +80,3 @@ create_event_from_command(Cmd) ->
     Metadata = announce_capability_v1:get_metadata(Cmd),
 
     capability_announced_v1:new(MRI, AgentID, Tags, Desc, DemoProc, Metadata).
-
-generate_command_id(MRI, Timestamp) ->
-    Unique = integer_to_binary(erlang:unique_integer([positive])),
-    Hash = crypto:hash(sha256, <<MRI/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
-    HashHex = binary:encode_hex(Hash),
-    ShortHash = binary:part(HashHex, 0, 16),
-    <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

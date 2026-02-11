@@ -62,7 +62,6 @@ dispatch(Cmd) ->
     Timestamp = retract_capability_v1:get_retracted_at(Cmd),
 
     EvoqCmd = #evoq_command{
-        command_id = generate_command_id(MRI, Timestamp),
         command_type = retract_capability,
         aggregate_type = capability_aggregate,
         aggregate_id = MRI,
@@ -88,10 +87,3 @@ create_event_from_command(Cmd) ->
     Reason = retract_capability_v1:get_reason(Cmd),
 
     capability_retracted_v1:new(MRI, AgentID, Reason).
-
-generate_command_id(MRI, Timestamp) ->
-    Unique = integer_to_binary(erlang:unique_integer([positive])),
-    Hash = crypto:hash(sha256, <<MRI/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
-    HashHex = binary:encode_hex(Hash),
-    ShortHash = binary:part(HashHex, 0, 16),
-    <<"cmd-ret-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

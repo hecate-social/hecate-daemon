@@ -5,7 +5,6 @@
 -export([handle/1, dispatch/1]).
 
 %% Suppress dialyzer warnings for calls to evoq_dispatcher (excluded from PLT)
--dialyzer({nowarn_function, [dispatch/1]}).
 %% Suppress supertype warnings (returns specific map/binary, spec uses map()/binary())
 -dialyzer({nowarn_function, [handle/1, generate_call_id/4]}).
 
@@ -84,7 +83,6 @@ dispatch(Cmd) ->
     Timestamp = erlang:system_time(millisecond),
 
     EvoqCmd = #evoq_command{
-        command_id = generate_command_id(CalleeIdentity, Timestamp),
         command_type = track_rpc_call,
         aggregate_type = reputation_aggregate,
         aggregate_id = CalleeIdentity,
@@ -101,10 +99,3 @@ dispatch(Cmd) ->
     },
 
     evoq_dispatcher:dispatch(EvoqCmd, Opts).
-
-generate_command_id(AggregateId, Timestamp) ->
-    Unique = integer_to_binary(erlang:unique_integer([positive])),
-    Hash = crypto:hash(sha256, <<AggregateId/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
-    HashHex = binary:encode_hex(Hash),
-    ShortHash = binary:part(HashHex, 0, 16),
-    <<"cmd-track_rpc_call-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

@@ -7,7 +7,6 @@
 
 -export([handle/1, dispatch/1]).
 
--dialyzer({nowarn_function, [dispatch/1]}).
 
 %% @doc Handle register_connector_v1 command (business logic).
 %% Computes socket path from connector ID and connectors directory.
@@ -29,7 +28,6 @@ dispatch(Cmd) ->
     Timestamp = erlang:system_time(millisecond),
 
     EvoqCmd = #evoq_command{
-        command_id = generate_command_id(ConnId, Timestamp),
         command_type = register_connector,
         aggregate_type = connector_aggregate,
         aggregate_id = <<"connector-", ConnId/binary>>,
@@ -56,10 +54,3 @@ compute_socket_path(ConnectorId) ->
 connectors_dir() ->
     Default = filename:join([os:getenv("HOME"), ".config", "hecate", "connectors"]),
     application:get_env(manage_connectors, connectors_dir, list_to_binary(Default)).
-
-generate_command_id(ConnId, Timestamp) ->
-    Unique = integer_to_binary(erlang:unique_integer([positive])),
-    Hash = crypto:hash(sha256, <<ConnId/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
-    HashHex = binary:encode_hex(Hash),
-    ShortHash = binary:part(HashHex, 0, 16),
-    <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.
