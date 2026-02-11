@@ -43,7 +43,8 @@ dispatch(Cmd) ->
     evoq_dispatcher:dispatch(EvoqCmd, Opts).
 
 generate_command_id(LearningId, Timestamp) ->
-    Hash = crypto:hash(sha256, <<LearningId/binary, (integer_to_binary(Timestamp))/binary>>),
+    Unique = integer_to_binary(erlang:unique_integer([positive])),
+    Hash = crypto:hash(sha256, <<LearningId/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
     HashHex = binary:encode_hex(Hash),
     ShortHash = binary:part(HashHex, 0, 16),
     <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

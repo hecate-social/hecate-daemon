@@ -99,7 +99,8 @@ create_event_from_command(Cmd) ->
     capability_updated_v1:new(MRI, AgentID, Tags, Desc, DemoProc, Metadata).
 
 generate_command_id(MRI, Timestamp) ->
-    Hash = crypto:hash(sha256, <<MRI/binary, (integer_to_binary(Timestamp))/binary>>),
+    Unique = integer_to_binary(erlang:unique_integer([positive])),
+    Hash = crypto:hash(sha256, <<MRI/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
     HashHex = binary:encode_hex(Hash),
     ShortHash = binary:part(HashHex, 0, 16),
     <<"cmd-upd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

@@ -103,7 +103,8 @@ dispatch(Cmd) ->
     evoq_dispatcher:dispatch(EvoqCmd, Opts).
 
 generate_command_id(AggregateId, Timestamp) ->
-    Hash = crypto:hash(sha256, <<AggregateId/binary, (integer_to_binary(Timestamp))/binary>>),
+    Unique = integer_to_binary(erlang:unique_integer([positive])),
+    Hash = crypto:hash(sha256, <<AggregateId/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
     HashHex = binary:encode_hex(Hash),
     ShortHash = binary:part(HashHex, 0, 16),
     <<"cmd-track_rpc_call-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.

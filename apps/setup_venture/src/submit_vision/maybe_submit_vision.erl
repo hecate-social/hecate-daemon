@@ -61,7 +61,8 @@ create_event(Cmd) ->
     }).
 
 generate_command_id(VentureId, Timestamp) ->
-    Hash = crypto:hash(sha256, <<VentureId/binary, (integer_to_binary(Timestamp))/binary>>),
+    Unique = integer_to_binary(erlang:unique_integer([positive])),
+    Hash = crypto:hash(sha256, <<VentureId/binary, (integer_to_binary(Timestamp))/binary, "-", Unique/binary>>),
     HashHex = binary:encode_hex(Hash),
     ShortHash = binary:part(HashHex, 0, 16),
     <<"cmd-", (integer_to_binary(Timestamp))/binary, "-", ShortHash/binary>>.
