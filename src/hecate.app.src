@@ -24,21 +24,9 @@
     %% Mesh infrastructure (MUST start before domain apps with listeners)
     hecate_mesh,
 
-    %% Command services (CQRS write side)
-    manage_capabilities,
-    manage_reputation,
-    manage_social,
-    manage_subscriptions,
-    manage_identities,
-    manage_ucan,
-
-    %% Query services (CQRS read side)
-    query_capabilities,
-    query_reputation,
-    query_social,
-    query_subscriptions,
-    query_identities,
-    query_ucan
+    %% Node lifecycle (consolidated from 11 apps)
+    guide_node_lifecycle,
+    query_node_lifecycle
     %% Note: hecate_api depends on hecate, not the other way around
    ]},
   {env, [

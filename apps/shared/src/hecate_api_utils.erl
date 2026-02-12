@@ -5,7 +5,7 @@
 %%% @end
 -module(hecate_api_utils).
 
--export([json_response/3, json_ok/2, json_ok/3, json_error/3]).
+-export([json_response/3, json_reply/3, json_ok/2, json_ok/3, json_error/3]).
 -export([format_error/1]).
 -export([method_not_allowed/1, not_found/1, bad_request/2]).
 -export([read_json_body/1]).
@@ -20,6 +20,12 @@ json_response(StatusCode, Body, Req0) ->
         <<"content-type">> => <<"application/json">>
     }, JsonBody, Req0),
     {ok, Req, []}.
+
+%% @doc Send a JSON response (alias for json_response/3).
+-spec json_reply(StatusCode :: non_neg_integer(), Body :: map(), Req :: cowboy_req:req()) ->
+    {ok, cowboy_req:req(), []}.
+json_reply(StatusCode, Body, Req) ->
+    json_response(StatusCode, Body, Req).
 
 %% @doc Send a 200 OK response.
 -spec json_ok(Result :: map(), Req :: cowboy_req:req()) ->

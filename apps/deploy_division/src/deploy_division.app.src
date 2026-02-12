@@ -1,8 +1,0 @@
-{application, deploy_division, [
-    {description, "Deployment process — deploy releases and stage rollouts for a division"},
-    {vsn, "0.1.0"},
-    {registered, []},
-    {mod, {deploy_division_app, []}},
-    {applications, [kernel, stdlib, crypto, evoq, reckon_db, reckon_evoq]},
-    {env, []}, {modules, []}, {licenses, ["Apache-2.0"]}, {links, []}
-]}.

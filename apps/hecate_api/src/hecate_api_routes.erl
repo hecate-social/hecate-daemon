@@ -14,52 +14,19 @@ compile() ->
 routes() ->
     lists:append([
         internal_routes(),
-        %% Venture lifecycle (CMD)
-        guide_venture_routes:routes(),
-        setup_venture_routes:routes(),
-        discover_divisions_routes:routes(),
-        design_division_routes:routes(),
-        plan_division_routes:routes(),
-        generate_division_routes:routes(),
-        test_division_routes:routes(),
-        deploy_division_routes:routes(),
-        monitor_division_routes:routes(),
-        rescue_division_routes:routes(),
-        %% Venture lifecycle (QRY)
-        query_ventures_routes:routes(),
-        query_discoveries_routes:routes(),
-        query_designs_routes:routes(),
-        query_plans_routes:routes(),
-        query_generations_routes:routes(),
-        query_tests_routes:routes(),
-        query_deployments_routes:routes(),
-        query_monitoring_routes:routes(),
-        query_rescues_routes:routes(),
-        %% Capabilities
-        manage_capabilities_routes:routes(),
-        query_capabilities_routes:routes(),
-        %% Reputation
-        manage_reputation_routes:routes(),
-        query_reputation_routes:routes(),
-        %% Social
-        manage_social_routes:routes(),
-        query_social_routes:routes(),
-        %% Subscriptions
-        manage_subscriptions_routes:routes(),
-        query_subscriptions_routes:routes(),
-        %% Identities
-        manage_identities_routes:routes(),
-        query_identities_routes:routes(),
-        %% UCAN
-        manage_ucan_routes:routes(),
-        query_ucan_routes:routes(),
+        %% Venture lifecycle (4 consolidated apps)
+        guide_venture_lifecycle_routes:routes(),
+        query_venture_lifecycle_routes:routes(),
+        guide_division_alc_routes:routes(),
+        query_division_alc_routes:routes(),
+        %% Node lifecycle (2 consolidated apps — was 11 node ops apps)
+        guide_node_lifecycle_routes:routes(),
+        query_node_lifecycle_routes:routes(),
+        %% Mentorships (renamed from mentor_agents + query_mentors)
+        mentor_llms_routes:routes(),
+        query_mentorships_routes:routes(),
         %% LLM
-        serve_llm_routes:routes(),
-        %% Connectors
-        manage_connectors_routes:routes(),
-        %% Mentors
-        mentor_agents_routes:routes(),
-        query_mentors_routes:routes()
+        serve_llm_routes:routes()
     ]).
 
 %% Routes owned by hecate_api itself (not domain apps).

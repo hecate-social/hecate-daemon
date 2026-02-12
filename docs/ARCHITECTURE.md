@@ -213,7 +213,7 @@ A hecate node can host multiple **ventures**. Two ventures are built-in:
 
 The AI-guided venture lifecycle system. This is the product — it helps developers build software through a structured, AI-supported process.
 
-**10 processes:** `setup_venture` → `discover_divisions` → `design_division` → `plan_division` → `generate_division` → `test_division` → `deploy_division` → `monitor_division` → `rescue_division`, orchestrated by `guide_venture`.
+**10 processes:** Managed by 4 consolidated apps — `guide_venture_lifecycle` (inception + discovery), `guide_division_alc` (design → plan → generate → test → deploy → monitor → rescue), `query_venture_lifecycle`, and `query_division_alc`.
 
 Each process follows the venture lifecycle protocol (pending → active → paused → completed). See `hecate-agents/philosophy/HECATE_VENTURE_LIFECYCLE.md` for full details.
 

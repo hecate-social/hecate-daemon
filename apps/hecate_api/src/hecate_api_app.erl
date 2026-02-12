@@ -8,11 +8,15 @@
                              get_socket_path/0]}).
 
 start(_StartType, _StartArgs) ->
+    logger:info("[hecate_api] Starting hecate_api application"),
+
     %% Socket path: check OS env first (k3s deployment), then app config
     SocketPath = get_socket_path(),
+    logger:info("[hecate_api] Socket path resolved to: ~p", [SocketPath]),
 
     %% Compile shared routes
     Dispatch = hecate_api_routes:compile(),
+    logger:info("[hecate_api] Routes compiled successfully"),
 
     %% TCP listener removed for security - Unix socket only
     %% See: hecate-hardening-plan.md Task 1
@@ -20,7 +24,7 @@ start(_StartType, _StartArgs) ->
     %% Start Unix socket listener if configured
     case SocketPath of
         undefined ->
-            ok;
+            logger:info("[hecate_api] Socket path is undefined, skipping listener");
         {ok, Path} when is_list(Path) ->
             start_socket_listener(Path, Dispatch);
         Path when is_list(Path) ->
@@ -30,6 +34,7 @@ start(_StartType, _StartArgs) ->
     end,
 
     Result = hecate_api_sup:start_link(),
+    logger:info("[hecate_api] Supervisor started: ~p", [Result]),
 
     %% Auto-register default TUI connector after sup is up
     auto_register_default_connector(),
@@ -103,7 +108,7 @@ ensure_socket_dir(SocketPath) ->
 %% @private Auto-register the default TUI connector on first boot.
 %% Dispatches a register_connector command if configured.
 auto_register_default_connector() ->
-    case application:get_env(manage_connectors, default_connector) of
+    case application:get_env(guide_node_lifecycle, default_connector) of
         {ok, #{id := ConnId, name := Name, allowed_routes := AllowedRoutes}} ->
             CmdParams = #{
                 connector_id => ConnId,

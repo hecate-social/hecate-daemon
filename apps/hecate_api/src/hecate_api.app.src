@@ -7,24 +7,22 @@
         kernel,
         stdlib,
         cowboy,
-        jsx,
         %% hecate core (must start first for hecate_identity)
         hecate,
-        %% Domain apps
-        manage_capabilities,
-        query_capabilities,
-        manage_reputation,
-        query_reputation,
-        manage_social,
-        query_social,
-        manage_subscriptions,
-        query_subscriptions,
-        manage_identities,
-        query_identities,
-        manage_ucan,
-        query_ucan,
-        mentor_agents,
-        query_mentors,
+        %% Venture lifecycle (4 consolidated apps)
+        guide_venture_lifecycle,
+        query_venture_lifecycle,
+        guide_division_alc,
+        query_division_alc,
+        %% Node lifecycle (2 consolidated apps — was 11 node ops apps)
+        guide_node_lifecycle,
+        query_node_lifecycle,
+        %% Mentorships (renamed)
+        mentor_llms,
+        query_mentorships,
+        %% LLM
+        serve_llm,
+        %% Telemetry
         hecate_telemetry
     ]},
     {env, [

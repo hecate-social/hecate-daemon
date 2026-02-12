@@ -1,0 +1,17 @@
+{application, guide_node_lifecycle, [
+    {description, "CMD service for node lifecycle: identity, capabilities, mesh, subscriptions, UCAN, connectors"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_node_lifecycle_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        reckon_db,
+        evoq,
+        reckon_evoq
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

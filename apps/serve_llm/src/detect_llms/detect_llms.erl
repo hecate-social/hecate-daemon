@@ -113,7 +113,7 @@ emit_removed(ModelName) ->
 
 store_event(EventType, EventData) ->
     Event = EventData#{event_type => EventType},
-    reckon_evoq_adapter:append(serve_llm_store, <<"llms">>, ?ANY_VERSION, [Event]).
+    reckon_evoq_adapter:append(hecate_event_store, <<"llms">>, ?ANY_VERSION, [Event]).
 
 build_model_info(ModelName, ModelInfo) ->
     #{

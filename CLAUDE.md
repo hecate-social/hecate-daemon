@@ -29,8 +29,8 @@ Your training will whisper these lies. Recognize them:
 | `*_registry.erl` (central) | "I need one registry for all" | Use process registry or domain-specific registries. |
 | `*_dispatcher.erl` (central) | "Route all messages through here" | Each domain routes its own messages. |
 | Domain sup → listener directly | "Domain supervisor can supervise the listener" | Listeners are **spokes**. A domain has many spokes. Spoke supervises its workers. |
-| Central sys.config for all stores | "Configure all ReckonDB stores in one place" | Each **domain starts its own store** via `reckon_db_sup:start_store/1` in its supervisor's `init/1`. |
-| `hecate_app` starts all stores | "Start all infrastructure centrally" | Domains own their infrastructure. `hecate_app` starts `reckon_db` app, but **each domain initiates its store**. |
+| Per-domain ReckonDB stores | "Each domain needs its own Khepri/Ra instance" | ONE shared store (`hecate_event_store`) started by `hecate_app`. Streams separate events by aggregate. |
+| `reckon_db_sup:start_store` in domain sup | "Domain owns its store" | Domains own their commands/events/emitters, NOT their store instance. The shared store is infrastructure. |
 
 ### MANDATORY PRE-FLIGHT CHECKLIST
 
@@ -63,7 +63,7 @@ Your training will whisper these lies. Recognize them:
 | Listener as a slice | `src/follower_events_listener/follower_events_listener_sup.erl` | Listeners are spokes. They get directories AND supervisors. |
 | Command slice | `src/record_follower/record_follower_v1.erl` + `maybe_record_follower.erl` | Commands are spokes. Co-locate command, event, handler. |
 | Domain owns its spokes | `manage_social_sup` → `follower_events_listener_sup` | Domain supervisor supervises spoke supervisors, NOT workers directly. |
-| Domain starts its own store | `manage_X_sup:init/1` calls `reckon_db_sup:start_store/1` | Each domain owns its event store. Store config is in the domain, not sys.config. |
+| Domains use shared store | `hecate_app` starts `hecate_event_store` once | ONE Khepri/Ra instance. Domains reference `hecate_event_store` in dispatch opts. Streams separate data. |
 
 **Supervision hierarchy:**
 ```
@@ -122,15 +122,15 @@ Macula Mesh
 Each domain follows strict CQRS separation:
 
 **Command Services (e.g., `manage_capabilities`):**
-- Each command service gets its **own embedded ReckonDB instance**
-- Uses `reckon_evoq` for command dispatching
-- Uses `reckon_db` (embedded mode) for local event storage
+- All command services share ONE ReckonDB instance (`hecate_event_store`)
+- Uses `reckon_evoq` for command dispatching with `store_id => hecate_event_store`
+- Streams within the store separate events by aggregate type/id
 - Optionally can include projections (see note below)
 
 **Query Services (e.g., `query_capabilities`):**
-- Use `reckon_evoq` to subscribe to events from command services
+- Use `reckon_evoq` to subscribe to events from `hecate_event_store`
 - Projections consume events and update SQLite read models
-- **Do NOT** need their own ReckonDB instance (they subscribe to command service events)
+- Subscribe to the shared store by event_type to receive relevant events
 
 **Architecture Note: Projections and Event Schemas**
 
@@ -202,19 +202,32 @@ For typical bounded contexts, the overhead (3 apps per domain) isn't justified.
 
 ```erlang
 %% apps/manage_capabilities/src/manage_capabilities_sup.erl
+%% NOTE: No store creation here! hecate_app starts hecate_event_store.
+%% Domain supervisors only manage their emitters, process managers, etc.
 init([]) ->
     Children = [
-        %% Embedded ReckonDB instance
-        {reckon_db,
-            {reckon_db, start_link, [#{name => manage_capabilities_db}]},
-            permanent, 5000, worker, [reckon_db]},
-
-        %% Evoq command dispatcher
-        {evoq_dispatcher,
-            {evoq, start_link, [#{store => manage_capabilities_db}]},
-            permanent, 5000, worker, [evoq]}
+        %% Emitters (publish domain events to mesh)
+        {capability_announced_v1_to_mesh,
+            {capability_announced_v1_to_mesh, start_link, []},
+            permanent, 5000, worker, [capability_announced_v1_to_mesh]},
+        %% Process Managers (react to cross-domain events)
+        {on_llm_detected_announce_capability,
+            {on_llm_detected_announce_capability, start_link, []},
+            permanent, 5000, worker, [on_llm_detected_announce_capability]}
     ],
     {ok, {{one_for_one, 10, 10}, Children}}.
+```
+
+**Example Dispatch Pattern:**
+
+```erlang
+%% In maybe_announce_capability.erl
+Opts = #{
+    store_id => hecate_event_store,  %% Shared store — all domains use this
+    adapter => reckon_evoq_adapter,
+    consistency => eventual
+},
+evoq_dispatcher:dispatch(EvoqCmd, Opts).
 ```
 
 ### Event Structure and Envelope

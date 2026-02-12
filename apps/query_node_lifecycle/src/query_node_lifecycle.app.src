@@ -1,0 +1,17 @@
+{application, query_node_lifecycle, [
+    {description, "QRY service for node lifecycle: read models for identity, capabilities, mesh, subscriptions, UCAN"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_node_lifecycle_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        esqlite,
+        reckon_evoq,
+        guide_node_lifecycle
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.
