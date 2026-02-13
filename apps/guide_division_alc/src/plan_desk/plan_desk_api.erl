@@ -35,7 +35,6 @@ do_plan_desk(DivisionId, Params, Req) ->
 dispatch(Cmd, Req) ->
     case maybe_plan_desk:dispatch(Cmd) of
         {ok, _Version, EventMaps} ->
-            emit_to_pg(EventMaps),
             hecate_api_utils:json_ok(201, #{
                 division_id => plan_desk_v1:get_division_id(Cmd),
                 desk_name => plan_desk_v1:get_desk_name(Cmd),
@@ -43,6 +42,3 @@ dispatch(Cmd, Req) ->
             }, Req);
         {error, Reason} -> hecate_api_utils:bad_request(Reason, Req)
     end.
-
-emit_to_pg(EventMaps) ->
-    lists:foreach(fun(E) -> desk_planned_v1_to_pg:emit(E) end, EventMaps).

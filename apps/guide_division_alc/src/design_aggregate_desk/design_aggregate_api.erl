@@ -44,7 +44,6 @@ do_design_aggregate(DivisionId, Params, Req) ->
 dispatch(Cmd, Req) ->
     case maybe_design_aggregate:dispatch(Cmd) of
         {ok, _Version, EventMaps} ->
-            emit_to_pg(EventMaps),
             hecate_api_utils:json_ok(201, #{
                 division_id => design_aggregate_v1:get_division_id(Cmd),
                 aggregate_name => design_aggregate_v1:get_aggregate_name(Cmd),
@@ -53,8 +52,3 @@ dispatch(Cmd, Req) ->
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
-
-emit_to_pg(EventMaps) ->
-    lists:foreach(fun(E) ->
-        aggregate_designed_v1_to_pg:emit(E)
-    end, EventMaps).

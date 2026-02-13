@@ -24,9 +24,6 @@ do_record(DivisionId, Params, Req) ->
 dispatch(Cmd, Req) ->
     case maybe_record_test_result:dispatch(Cmd) of
         {ok, _Version, EventMaps} ->
-            emit_to_pg(EventMaps),
             hecate_api_utils:json_ok(201, #{division_id => record_test_result_v1:get_division_id(Cmd),
                 result_id => record_test_result_v1:get_result_id(Cmd), events => EventMaps}, Req);
         {error, Reason} -> hecate_api_utils:bad_request(Reason, Req) end.
-
-emit_to_pg(EventMaps) -> lists:foreach(fun(E) -> test_result_recorded_v1_to_pg:emit(E) end, EventMaps).

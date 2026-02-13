@@ -26,10 +26,7 @@ do_generate(DivisionId, Params, Req) ->
 dispatch(Cmd, Req) ->
     case maybe_generate_module:dispatch(Cmd) of
         {ok, _Version, EventMaps} ->
-            emit_to_pg(EventMaps),
             hecate_api_utils:json_ok(201, #{division_id => generate_module_v1:get_division_id(Cmd),
                 module_name => generate_module_v1:get_module_name(Cmd), events => EventMaps}, Req);
         {error, Reason} -> hecate_api_utils:bad_request(Reason, Req)
     end.
-
-emit_to_pg(EventMaps) -> lists:foreach(fun(E) -> module_generated_v1_to_pg:emit(E) end, EventMaps).

@@ -1,34 +1,33 @@
-%%% @doc Listener: subscribes to pg group for test_generated_v1 events.
+%%% @doc Listener: subscribes to event store for test_generated_v1 events.
 -module(on_test_generated_v1_from_pg_project_to_sqlite_generated_tests).
 -behaviour(gen_server).
 -export([start_link/0]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
--define(GROUP, test_generated_v1).
--define(SCOPE, pg).
+-define(EVENT_TYPE, <<"test_generated_v1">>).
+-define(SUB_NAME, <<"test_generated_v1_to_sqlite_generated_tests">>).
+-define(STORE_ID, dev_studio_store).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    ok = ensure_pg_scope(),
-    ok = pg:join(?SCOPE, ?GROUP, self()),
+    {ok, _} = reckon_evoq_adapter:subscribe(
+        ?STORE_ID, event_type, ?EVENT_TYPE, ?SUB_NAME,
+        #{subscriber_pid => self()}),
     {ok, #{}}.
 
-handle_call(_Req, _From, State) -> {reply, ok, State}.
-handle_cast(_Msg, State) -> {noreply, State}.
-
-handle_info({test_generated_v1, Event}, State) ->
-    case test_generated_v1_to_sqlite_generated_tests:project(Event) of
-        ok -> ok;
-        {error, Reason} ->
-            logger:warning("[test_generated_v1 projection] failed: ~p", [Reason])
-    end,
+handle_info({events, Events}, State) ->
+    lists:foreach(fun(E) ->
+        case test_generated_v1_to_sqlite_generated_tests:project(E) of
+            ok -> ok;
+            {error, Reason} ->
+                logger:warning("[~s] projection failed: ~p", [?EVENT_TYPE, Reason])
+        end
+    end, Events),
     {noreply, State};
 handle_info(_Info, State) -> {noreply, State}.
 
-ensure_pg_scope() ->
-    case pg:start(?SCOPE) of
-        {ok, _} -> ok;
-        {error, {already_started, _}} -> ok
-    end.
+handle_call(_Req, _From, State) -> {reply, ok, State}.
+handle_cast(_Msg, State) -> {noreply, State}.
+terminate(_Reason, _State) -> ok.

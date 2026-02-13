@@ -51,8 +51,6 @@ create_division(VentureId, ContextName, InitiatedBy, Req) ->
 dispatch(Cmd, Req) ->
     case maybe_initiate_division:dispatch(Cmd) of
         {ok, Version, EventMaps} ->
-            emit_to_pg(EventMaps),
-            emit_to_mesh(EventMaps),
             DivisionId = initiate_division_v1:get_division_id(Cmd),
             Status = evoq_bit_flags:set(0, ?DA_INITIATED),
             StatusLabel = evoq_bit_flags:to_string(Status, ?DA_FLAG_MAP),
@@ -70,11 +68,3 @@ dispatch(Cmd, Req) ->
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
-
-emit_to_pg(EventMaps) ->
-    lists:foreach(fun(E) ->
-        division_initiated_v1_to_pg:emit(E)
-    end, EventMaps).
-
-emit_to_mesh(EventMaps) ->
-    lists:foreach(fun(E) -> division_initiated_v1_to_mesh:emit(E) end, EventMaps).

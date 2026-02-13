@@ -10,5 +10,5 @@ do_register(DI, P, Req) ->
     case register_health_check_v1:new(CP) of {ok, Cmd} -> dispatch(Cmd, Req); {error, R} -> hecate_api_utils:bad_request(R, Req) end.
 dispatch(Cmd, Req) ->
     case maybe_register_health_check:dispatch(Cmd) of
-        {ok, _, EM} -> lists:foreach(fun(E) -> health_check_registered_v1_to_pg:emit(E) end, EM), hecate_api_utils:json_ok(201, #{division_id => register_health_check_v1:get_division_id(Cmd), check_id => register_health_check_v1:get_check_id(Cmd), events => EM}, Req);
+        {ok, _, EM} -> hecate_api_utils:json_ok(201, #{division_id => register_health_check_v1:get_division_id(Cmd), check_id => register_health_check_v1:get_check_id(Cmd), events => EM}, Req);
         {error, R} -> hecate_api_utils:bad_request(R, Req) end.

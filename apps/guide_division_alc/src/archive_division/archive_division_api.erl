@@ -35,7 +35,6 @@ do_archive(DivisionId, Params, Req) ->
 dispatch(Cmd, Req) ->
     case maybe_archive_division:dispatch(Cmd) of
         {ok, _Version, EventMaps} ->
-            emit_to_pg(EventMaps),
             hecate_api_utils:json_ok(200, #{
                 division_id => archive_division_v1:get_division_id(Cmd),
                 archived => true,
@@ -44,8 +43,3 @@ dispatch(Cmd, Req) ->
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
-
-emit_to_pg(EventMaps) ->
-    lists:foreach(fun(E) ->
-        division_archived_v1_to_pg:emit(E)
-    end, EventMaps).

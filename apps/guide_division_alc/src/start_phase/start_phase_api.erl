@@ -48,7 +48,6 @@ create_command(DivisionId, Phase, Req) ->
 dispatch(Cmd, Req) ->
     case maybe_start_phase:dispatch(Cmd) of
         {ok, _Version, EventMaps} ->
-            emit_to_pg(EventMaps),
             hecate_api_utils:json_ok(200, #{
                 division_id => start_phase_v1:get_division_id(Cmd),
                 phase => start_phase_v1:get_phase(Cmd),
@@ -58,8 +57,3 @@ dispatch(Cmd, Req) ->
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
-
-emit_to_pg(EventMaps) ->
-    lists:foreach(fun(E) ->
-        phase_started_v1_to_pg:emit(E)
-    end, EventMaps).

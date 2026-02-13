@@ -1,57 +1,42 @@
-%%% @doc TUI emitter: discovery_started_v1 -> TUI SSE connections
-%%%
-%%% Listens to the discovery_started_v1 pg group and broadcasts
-%%% JSON-encoded facts to all connected TUI clients.
-%%% @end
+%%% @doc Emitter: discovery_started_v1 -> TUI SSE connections
+%%% Subscribes to dev_studio_store via evoq, broadcasts facts to TUI clients via pg.
 -module(discovery_started_v1_to_tui).
 -behaviour(gen_server).
-
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
+-define(EVENT_TYPE, <<"discovery_started_v1">>).
+-define(SUB_NAME, <<"discovery_started_v1_to_tui">>).
+-define(STORE_ID, dev_studio_store).
 -define(SCOPE, pg).
--define(EVENT_GROUP, discovery_started_v1).
 -define(TUI_GROUP, tui_connections).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    ok = ensure_pg_scope(),
-    ok = pg:join(?SCOPE, ?EVENT_GROUP, self()),
-    logger:info("[discovery_started_v1_to_tui] Emitter started, joined ~p group", [?EVENT_GROUP]),
+    {ok, _} = reckon_evoq_adapter:subscribe(
+        ?STORE_ID, event_type, ?EVENT_TYPE, ?SUB_NAME,
+        #{subscriber_pid => self()}),
     {ok, #{}}.
 
-handle_call(_Request, _From, State) ->
-    {reply, {error, unknown_call}, State}.
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-handle_info({discovery_started_v1, Event}, State) ->
+handle_info({events, Events}, State) ->
     Members = pg:get_members(?SCOPE, ?TUI_GROUP),
     case Members of
         [] ->
             ok;
         _ ->
-            Data = iolist_to_binary(json:encode(#{
-                <<"fact_type">> => <<"discovery_started_v1">>,
-                <<"data">> => Event
-            })),
-            lists:foreach(fun(Pid) -> Pid ! {tui_fact, Data} end, Members),
-            VentureId = maps:get(<<"venture_id">>, Event, maps:get(venture_id, Event, <<"unknown">>)),
-            logger:info("[discovery_started_v1_to_tui] Broadcast to ~b TUI client(s), venture=~s",
-                        [length(Members), VentureId])
+            lists:foreach(fun(E) ->
+                Data = iolist_to_binary(json:encode(#{
+                    <<"fact_type">> => ?EVENT_TYPE,
+                    <<"data">> => E
+                })),
+                lists:foreach(fun(Pid) -> Pid ! {tui_fact, Data} end, Members)
+            end, Events)
     end,
     {noreply, State};
-handle_info(_Info, State) ->
-    {noreply, State}.
+handle_info(_Info, State) -> {noreply, State}.
 
-terminate(_Reason, _State) ->
-    ok.
-
-ensure_pg_scope() ->
-    case pg:start(?SCOPE) of
-        {ok, _Pid} -> ok;
-        {error, {already_started, _Pid}} -> ok
-    end.
+handle_call(_Req, _From, State) -> {reply, ok, State}.
+handle_cast(_Msg, State) -> {noreply, State}.
+terminate(_Reason, _State) -> ok.

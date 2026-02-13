@@ -11,6 +11,5 @@ do_deploy(DivisionId, Params, Req) ->
     case deploy_release_v1:new(CmdParams) of {ok, Cmd} -> dispatch(Cmd, Req); {error, Reason} -> hecate_api_utils:bad_request(Reason, Req) end.
 dispatch(Cmd, Req) ->
     case maybe_deploy_release:dispatch(Cmd) of
-        {ok, _Version, EventMaps} -> emit_to_pg(EventMaps), hecate_api_utils:json_ok(201, #{division_id => deploy_release_v1:get_division_id(Cmd), release_id => deploy_release_v1:get_release_id(Cmd), events => EventMaps}, Req);
+        {ok, _Version, EventMaps} -> hecate_api_utils:json_ok(201, #{division_id => deploy_release_v1:get_division_id(Cmd), release_id => deploy_release_v1:get_release_id(Cmd), events => EventMaps}, Req);
         {error, Reason} -> hecate_api_utils:bad_request(Reason, Req) end.
-emit_to_pg(EventMaps) -> lists:foreach(fun(E) -> release_deployed_v1_to_pg:emit(E) end, EventMaps).

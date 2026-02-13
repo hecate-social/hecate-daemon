@@ -23,9 +23,6 @@ do_run(DivisionId, Params, Req) ->
 dispatch(Cmd, Req) ->
     case maybe_run_test_suite:dispatch(Cmd) of
         {ok, _Version, EventMaps} ->
-            emit_to_pg(EventMaps),
             hecate_api_utils:json_ok(201, #{division_id => run_test_suite_v1:get_division_id(Cmd),
                 suite_id => run_test_suite_v1:get_suite_id(Cmd), events => EventMaps}, Req);
         {error, Reason} -> hecate_api_utils:bad_request(Reason, Req) end.
-
-emit_to_pg(EventMaps) -> lists:foreach(fun(E) -> test_suite_run_v1_to_pg:emit(E) end, EventMaps).

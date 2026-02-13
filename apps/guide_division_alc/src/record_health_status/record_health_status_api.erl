@@ -10,5 +10,5 @@ do_record(DI, P, Req) ->
     case record_health_status_v1:new(CP) of {ok, Cmd} -> dispatch(Cmd, Req); {error, R} -> hecate_api_utils:bad_request(R, Req) end.
 dispatch(Cmd, Req) ->
     case maybe_record_health_status:dispatch(Cmd) of
-        {ok, _, EM} -> lists:foreach(fun(E) -> health_status_recorded_v1_to_pg:emit(E) end, EM), hecate_api_utils:json_ok(200, #{division_id => record_health_status_v1:get_division_id(Cmd), check_id => record_health_status_v1:get_check_id(Cmd), events => EM}, Req);
+        {ok, _, EM} -> hecate_api_utils:json_ok(200, #{division_id => record_health_status_v1:get_division_id(Cmd), check_id => record_health_status_v1:get_check_id(Cmd), events => EM}, Req);
         {error, R} -> hecate_api_utils:bad_request(R, Req) end.

@@ -35,10 +35,6 @@ handle_post(Req0, _State) ->
                     case maybe_identify_division:dispatch(Cmd) of
                         {ok, Version, Events} ->
                             DivisionId = extract_division_id(Events),
-                            lists:foreach(fun(E) ->
-                                division_identified_v1_to_pg:emit(E),
-                                division_identified_v1_to_mesh:emit(E)
-                            end, Events),
                             Body2 = #{
                                 venture_id => VentureId,
                                 division_id => DivisionId,

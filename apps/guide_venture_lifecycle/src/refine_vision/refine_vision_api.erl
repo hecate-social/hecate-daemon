@@ -48,8 +48,6 @@ do_refine(VentureId, Params, Req) ->
 dispatch(Cmd, VentureId, Req) ->
     case maybe_refine_vision:dispatch(Cmd) of
         {ok, _Version, EventMaps} ->
-            %% INTERNAL: Emit to pg for projections (intra-daemon)
-            emit_to_pg(EventMaps),
             hecate_api_utils:json_ok(200, #{
                 venture_id => VentureId,
                 refined => true,
@@ -58,8 +56,3 @@ dispatch(Cmd, VentureId, Req) ->
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
-
-emit_to_pg(EventMaps) ->
-    lists:foreach(fun(E) ->
-        vision_refined_v1_to_pg:emit(E)
-    end, EventMaps).

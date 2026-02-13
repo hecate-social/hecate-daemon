@@ -48,10 +48,6 @@ create_venture(Name, Brief, InitiatedBy, Req) ->
 dispatch(Cmd, Req) ->
     case maybe_initiate_venture:dispatch(Cmd) of
         {ok, Version, EventMaps} ->
-            %% INTERNAL: Emit to pg for projections (intra-daemon)
-            emit_to_pg(EventMaps),
-            %% EXTERNAL: Emit to mesh for other agents (WAN)
-            emit_to_mesh(EventMaps),
             %% Return full venture data for TUI compatibility
             VentureId = initiate_venture_v1:get_venture_id(Cmd),
             Status = evoq_bit_flags:set(0, ?VL_INITIATED),
@@ -70,11 +66,3 @@ dispatch(Cmd, Req) ->
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
-
-emit_to_pg(EventMaps) ->
-    lists:foreach(fun(E) ->
-        venture_initiated_v1_to_pg:emit(E)
-    end, EventMaps).
-
-emit_to_mesh(EventMaps) ->
-    lists:foreach(fun(E) -> venture_initiated_v1_to_mesh:emit(E) end, EventMaps).

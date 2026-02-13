@@ -18,7 +18,6 @@ handle_post(Req0, _State) ->
         {ok, Cmd} ->
             case maybe_complete_discovery:dispatch(Cmd) of
                 {ok, Version, Events} ->
-                    lists:foreach(fun(E) -> discovery_completed_v1_to_pg:emit(E) end, Events),
                     hecate_api_utils:json_reply(200, #{
                         venture_id => VentureId,
                         completed => true,

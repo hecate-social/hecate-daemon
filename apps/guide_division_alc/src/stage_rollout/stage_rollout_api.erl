@@ -10,5 +10,5 @@ do_stage(DI, P, Req) ->
     case stage_rollout_v1:new(CP) of {ok, Cmd} -> dispatch(Cmd, Req); {error, R} -> hecate_api_utils:bad_request(R, Req) end.
 dispatch(Cmd, Req) ->
     case maybe_stage_rollout:dispatch(Cmd) of
-        {ok, _, EM} -> lists:foreach(fun(E) -> rollout_staged_v1_to_pg:emit(E) end, EM), hecate_api_utils:json_ok(201, #{division_id => stage_rollout_v1:get_division_id(Cmd), stage_id => stage_rollout_v1:get_stage_id(Cmd), events => EM}, Req);
+        {ok, _, EM} -> hecate_api_utils:json_ok(201, #{division_id => stage_rollout_v1:get_division_id(Cmd), stage_id => stage_rollout_v1:get_stage_id(Cmd), events => EM}, Req);
         {error, R} -> hecate_api_utils:bad_request(R, Req) end.

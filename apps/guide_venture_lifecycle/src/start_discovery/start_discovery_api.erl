@@ -18,10 +18,6 @@ handle_post(Req0, _State) ->
         {ok, Cmd} ->
             case maybe_start_discovery:dispatch(Cmd) of
                 {ok, Version, Events} ->
-                    lists:foreach(fun(E) ->
-                        discovery_started_v1_to_pg:emit(E),
-                        discovery_started_v1_to_mesh:emit(E)
-                    end, Events),
                     Body = #{
                         venture_id => VentureId,
                         version => Version,

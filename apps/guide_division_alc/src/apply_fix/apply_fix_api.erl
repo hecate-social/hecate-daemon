@@ -10,5 +10,5 @@ do_apply_fix(DI, P, Req) ->
     case apply_fix_v1:new(CP) of {ok, Cmd} -> dispatch(Cmd, Req); {error, R} -> hecate_api_utils:bad_request(R, Req) end.
 dispatch(Cmd, Req) ->
     case maybe_apply_fix:dispatch(Cmd) of
-        {ok, _, EM} -> lists:foreach(fun(E) -> fix_applied_v1_to_pg:emit(E) end, EM), hecate_api_utils:json_ok(201, #{division_id => apply_fix_v1:get_division_id(Cmd), fix_id => apply_fix_v1:get_fix_id(Cmd), events => EM}, Req);
+        {ok, _, EM} -> hecate_api_utils:json_ok(201, #{division_id => apply_fix_v1:get_division_id(Cmd), fix_id => apply_fix_v1:get_fix_id(Cmd), events => EM}, Req);
         {error, R} -> hecate_api_utils:bad_request(R, Req) end.
