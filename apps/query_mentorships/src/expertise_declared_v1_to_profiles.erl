@@ -5,7 +5,7 @@
 
 -spec project(map()) -> ok | {error, term()}.
 project(#{agent_id := AId, domains := Domains} = E) ->
-    DomainsJson = jsx:encode(Domains),
+    DomainsJson = iolist_to_binary(json:encode(Domains)),
     DeclaredAt = maps:get(declared_at, E, erlang:system_time(millisecond)),
     Sql = "INSERT OR REPLACE INTO mentor_profiles "
           "(agent_id, domains, status, declared_at) "

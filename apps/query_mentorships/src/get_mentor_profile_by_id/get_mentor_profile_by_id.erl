@@ -22,7 +22,7 @@ row_to_map([AgentId, DomainsJson, Status, DeclaredAt]) ->
     Domains = case DomainsJson of
         undefined -> [];
         null -> [];
-        Bin when is_binary(Bin) -> jsx:decode(Bin, [return_maps]);
+        Bin when is_binary(Bin) -> json:decode(Bin);
         _ -> []
     end,
     #{

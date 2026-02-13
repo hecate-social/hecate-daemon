@@ -66,7 +66,7 @@ proj_declared() ->
     ?assertEqual(<<"agent-001">>, AgentId),
     ?assertEqual(1, Status),
     ?assertEqual(1000, DeclaredAt),
-    DecodedDomains = jsx:decode(DomainsJson, [return_maps]),
+    DecodedDomains = json:decode(DomainsJson),
     ?assertEqual([<<"erlang">>, <<"elixir">>], DecodedDomains).
 
 proj_withdrawn() ->

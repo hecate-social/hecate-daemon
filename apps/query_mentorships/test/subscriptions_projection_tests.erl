@@ -19,7 +19,7 @@ projection_test_() ->
                 fun proj_subscribed/0},
             {"mentor_unsubscribed sets UNSUBSCRIBED bit on status",
                 fun proj_unsubscribed/0},
-            {"roundtrip: project then get_subscriptions_page",
+            {"roundtrip: project then get_mentor_subscriptions_page",
                 fun roundtrip/0}
         ]
     }.
@@ -101,7 +101,7 @@ roundtrip() ->
         mentor_id => <<"mentor-rt2">>,
         subscribed_at => 2000
     }),
-    {ok, Results} = get_subscriptions_page:execute(<<"agent-rt">>),
+    {ok, Results} = get_mentor_subscriptions_page:execute(<<"agent-rt">>),
     ?assertEqual(2, length(Results)),
     Ids = [maps:get(mentor_id, R) || R <- Results],
     ?assert(lists:member(<<"mentor-rt1">>, Ids)),

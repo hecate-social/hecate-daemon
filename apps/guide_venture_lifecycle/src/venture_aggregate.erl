@@ -34,7 +34,16 @@
     discovery_started_at   :: non_neg_integer() | undefined,
     discovery_paused_at    :: non_neg_integer() | undefined,
     discovery_completed_at :: non_neg_integer() | undefined,
-    discovery_pause_reason :: binary() | undefined
+    discovery_pause_reason :: binary() | undefined,
+    %% Big Picture Event Storming
+    storm_number = 0           :: non_neg_integer(),
+    storm_phase = undefined    :: atom(),
+    storm_started_at           :: non_neg_integer() | undefined,
+    storm_shelved_at           :: non_neg_integer() | undefined,
+    event_stickies = #{}       :: #{binary() => map()},
+    event_stacks = #{}         :: #{binary() => map()},
+    event_clusters = #{}       :: #{binary() => map()},
+    fact_arrows = #{}          :: #{binary() => map()}
 }).
 
 -type state() :: #venture_state{}.
@@ -80,6 +89,24 @@ execute(#venture_state{status = S} = State, Payload) when S band ?VL_INITIATED =
         <<"resume_discovery">>   -> execute_resume_discovery(Payload, State);
         <<"complete_discovery">> -> execute_complete_discovery(Payload, State);
         <<"archive_venture">>    -> execute_archive_venture(Payload, State);
+        %% Big Picture Event Storming
+        <<"start_big_picture_storm">>   -> execute_start_storm(Payload, State);
+        <<"post_event_sticky">>         -> execute_post_sticky(Payload, State);
+        <<"pull_event_sticky">>         -> execute_pull_sticky(Payload, State);
+        <<"stack_event_sticky">>        -> execute_stack_sticky(Payload, State);
+        <<"unstack_event_sticky">>      -> execute_unstack_sticky(Payload, State);
+        <<"groom_event_stack">>         -> execute_groom_stack(Payload, State);
+        <<"cluster_event_sticky">>      -> execute_cluster_sticky(Payload, State);
+        <<"uncluster_event_sticky">>    -> execute_uncluster_sticky(Payload, State);
+        <<"dissolve_event_cluster">>    -> execute_dissolve_cluster(Payload, State);
+        <<"name_event_cluster">>        -> execute_name_cluster(Payload, State);
+        <<"draw_fact_arrow">>           -> execute_draw_arrow(Payload, State);
+        <<"erase_fact_arrow">>          -> execute_erase_arrow(Payload, State);
+        <<"promote_event_cluster">>     -> execute_promote_cluster(Payload, State);
+        <<"advance_storm_phase">>       -> execute_advance_phase(Payload, State);
+        <<"shelve_big_picture_storm">>  -> execute_shelve_storm(Payload, State);
+        <<"resume_big_picture_storm">>  -> execute_resume_storm(Payload, State);
+        <<"archive_big_picture_storm">> -> execute_archive_storm(Payload, State);
         _ -> {error, unknown_command}
     end;
 
@@ -161,6 +188,138 @@ execute_archive_venture(Payload, _State) ->
     {ok, Cmd} = archive_venture_v1:from_map(Payload),
     convert_events(maybe_archive_venture:handle(Cmd), fun venture_archived_v1:to_map/1).
 
+%% --- Big Picture Event Storming command handlers ---
+
+execute_start_storm(Payload, #venture_state{status = S}) ->
+    case {S band ?VL_DISCOVERING, S band ?VL_STORMING} of
+        {0, _} -> {error, discovery_not_active};
+        {_, V} when V =/= 0 -> {error, storm_already_active};
+        _ ->
+            {ok, Cmd} = start_big_picture_storm_v1:from_map(Payload),
+            convert_events(maybe_start_big_picture_storm:handle(Cmd), fun big_picture_storm_started_v1:to_map/1)
+    end.
+
+execute_post_sticky(Payload, #venture_state{status = S, storm_number = SN}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = post_event_sticky_v1:from_map(Payload),
+        Context = #{storm_number => SN},
+        convert_events(maybe_post_event_sticky:handle(Cmd, Context), fun event_sticky_posted_v1:to_map/1)
+    end).
+
+execute_pull_sticky(Payload, #venture_state{status = S, event_stickies = Stickies}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = pull_event_sticky_v1:from_map(Payload),
+        Context = #{event_stickies => Stickies},
+        convert_events(maybe_pull_event_sticky:handle(Cmd, Context), fun event_sticky_pulled_v1:to_map/1)
+    end).
+
+execute_stack_sticky(Payload, #venture_state{status = S, event_stickies = Stickies, event_stacks = Stacks}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = stack_event_sticky_v1:from_map(Payload),
+        Context = #{event_stickies => Stickies, event_stacks => Stacks},
+        maybe_stack_event_sticky:handle(Cmd, Context)
+    end).
+
+execute_unstack_sticky(Payload, #venture_state{status = S, event_stickies = Stickies}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = unstack_event_sticky_v1:from_map(Payload),
+        Context = #{event_stickies => Stickies},
+        convert_events(maybe_unstack_event_sticky:handle(Cmd, Context), fun event_sticky_unstacked_v1:to_map/1)
+    end).
+
+execute_groom_stack(Payload, #venture_state{status = S, event_stickies = Stickies, event_stacks = Stacks}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = groom_event_stack_v1:from_map(Payload),
+        Context = #{event_stickies => Stickies, event_stacks => Stacks},
+        convert_events(maybe_groom_event_stack:handle(Cmd, Context), fun event_stack_groomed_v1:to_map/1)
+    end).
+
+execute_cluster_sticky(Payload, #venture_state{status = S, event_stickies = Stickies, event_clusters = Clusters}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = cluster_event_sticky_v1:from_map(Payload),
+        Context = #{event_stickies => Stickies, event_clusters => Clusters},
+        maybe_cluster_event_sticky:handle(Cmd, Context)
+    end).
+
+execute_uncluster_sticky(Payload, #venture_state{status = S, event_stickies = Stickies}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = uncluster_event_sticky_v1:from_map(Payload),
+        Context = #{event_stickies => Stickies},
+        maybe_uncluster_event_sticky:handle(Cmd, Context)
+    end).
+
+execute_dissolve_cluster(Payload, #venture_state{status = S, event_clusters = Clusters}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = dissolve_event_cluster_v1:from_map(Payload),
+        Context = #{event_clusters => Clusters},
+        maybe_dissolve_event_cluster:handle(Cmd, Context)
+    end).
+
+execute_name_cluster(Payload, #venture_state{status = S, event_clusters = Clusters}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = name_event_cluster_v1:from_map(Payload),
+        Context = #{event_clusters => Clusters},
+        maybe_name_event_cluster:handle(Cmd, Context)
+    end).
+
+execute_draw_arrow(Payload, #venture_state{status = S, event_clusters = Clusters, fact_arrows = Arrows}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = draw_fact_arrow_v1:from_map(Payload),
+        Context = #{event_clusters => Clusters, fact_arrows => Arrows},
+        maybe_draw_fact_arrow:handle(Cmd, Context)
+    end).
+
+execute_erase_arrow(Payload, #venture_state{status = S, fact_arrows = Arrows}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = erase_fact_arrow_v1:from_map(Payload),
+        Context = #{fact_arrows => Arrows},
+        maybe_erase_fact_arrow:handle(Cmd, Context)
+    end).
+
+execute_promote_cluster(Payload, #venture_state{status = S, event_clusters = Clusters}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = promote_event_cluster_v1:from_map(Payload),
+        Context = #{event_clusters => Clusters},
+        maybe_promote_event_cluster:handle(Cmd, Context)
+    end).
+
+execute_advance_phase(Payload, #venture_state{status = S, storm_phase = Phase}) ->
+    require_storming(S, fun() ->
+        {ok, Cmd} = advance_storm_phase_v1:from_map(Payload),
+        Context = #{storm_phase => Phase},
+        convert_events(maybe_advance_storm_phase:handle(Cmd, Context), fun storm_phase_advanced_v1:to_map/1)
+    end).
+
+execute_shelve_storm(Payload, #venture_state{status = S}) ->
+    case S band ?VL_STORMING of
+        0 -> {error, storm_not_active};
+        _ ->
+            {ok, Cmd} = shelve_big_picture_storm_v1:from_map(Payload),
+            convert_events(maybe_shelve_big_picture_storm:handle(Cmd), fun big_picture_storm_shelved_v1:to_map/1)
+    end.
+
+execute_resume_storm(Payload, #venture_state{status = S}) ->
+    case S band ?VL_STORM_SHELVED of
+        0 -> {error, storm_not_shelved};
+        _ ->
+            {ok, Cmd} = resume_big_picture_storm_v1:from_map(Payload),
+            convert_events(maybe_resume_big_picture_storm:handle(Cmd), fun big_picture_storm_resumed_v1:to_map/1)
+    end.
+
+execute_archive_storm(Payload, #venture_state{status = S}) ->
+    case S band ?VL_STORMING bor S band ?VL_STORM_SHELVED of
+        0 -> {error, no_storm_to_archive};
+        _ ->
+            {ok, Cmd} = archive_big_picture_storm_v1:from_map(Payload),
+            convert_events(maybe_archive_big_picture_storm:handle(Cmd), fun big_picture_storm_archived_v1:to_map/1)
+    end.
+
+require_storming(S, Fun) ->
+    case S band ?VL_STORMING of
+        0 -> {error, storm_not_active};
+        _ -> Fun()
+    end.
+
 %% --- Apply ---
 %% NOTE: evoq calls apply(State, Event) - State FIRST!
 
@@ -193,6 +352,46 @@ apply_event(#{event_type := <<"discovery_completed_v1">>} = E, S)       -> apply
 %% Archive
 apply_event(#{<<"event_type">> := <<"venture_archived_v1">>} = _E, S) -> apply_archived(S);
 apply_event(#{event_type := <<"venture_archived_v1">>} = _E, S)       -> apply_archived(S);
+
+%% Big Picture Event Storming events
+apply_event(#{<<"event_type">> := <<"big_picture_storm_started_v1">>} = E, S)  -> apply_storm_started(E, S);
+apply_event(#{event_type := <<"big_picture_storm_started_v1">>} = E, S)        -> apply_storm_started(E, S);
+apply_event(#{<<"event_type">> := <<"event_sticky_posted_v1">>} = E, S)        -> apply_sticky_posted(E, S);
+apply_event(#{event_type := <<"event_sticky_posted_v1">>} = E, S)              -> apply_sticky_posted(E, S);
+apply_event(#{<<"event_type">> := <<"event_sticky_pulled_v1">>} = E, S)        -> apply_sticky_pulled(E, S);
+apply_event(#{event_type := <<"event_sticky_pulled_v1">>} = E, S)              -> apply_sticky_pulled(E, S);
+apply_event(#{<<"event_type">> := <<"event_stack_emerged_v1">>} = E, S)        -> apply_stack_emerged(E, S);
+apply_event(#{event_type := <<"event_stack_emerged_v1">>} = E, S)              -> apply_stack_emerged(E, S);
+apply_event(#{<<"event_type">> := <<"event_sticky_stacked_v1">>} = E, S)       -> apply_sticky_stacked(E, S);
+apply_event(#{event_type := <<"event_sticky_stacked_v1">>} = E, S)             -> apply_sticky_stacked(E, S);
+apply_event(#{<<"event_type">> := <<"event_sticky_unstacked_v1">>} = E, S)     -> apply_sticky_unstacked(E, S);
+apply_event(#{event_type := <<"event_sticky_unstacked_v1">>} = E, S)           -> apply_sticky_unstacked(E, S);
+apply_event(#{<<"event_type">> := <<"event_stack_groomed_v1">>} = E, S)        -> apply_stack_groomed(E, S);
+apply_event(#{event_type := <<"event_stack_groomed_v1">>} = E, S)              -> apply_stack_groomed(E, S);
+apply_event(#{<<"event_type">> := <<"event_cluster_emerged_v1">>} = E, S)      -> apply_cluster_emerged(E, S);
+apply_event(#{event_type := <<"event_cluster_emerged_v1">>} = E, S)            -> apply_cluster_emerged(E, S);
+apply_event(#{<<"event_type">> := <<"event_sticky_clustered_v1">>} = E, S)     -> apply_sticky_clustered(E, S);
+apply_event(#{event_type := <<"event_sticky_clustered_v1">>} = E, S)           -> apply_sticky_clustered(E, S);
+apply_event(#{<<"event_type">> := <<"event_sticky_unclustered_v1">>} = E, S)   -> apply_sticky_unclustered(E, S);
+apply_event(#{event_type := <<"event_sticky_unclustered_v1">>} = E, S)         -> apply_sticky_unclustered(E, S);
+apply_event(#{<<"event_type">> := <<"event_cluster_dissolved_v1">>} = E, S)    -> apply_cluster_dissolved(E, S);
+apply_event(#{event_type := <<"event_cluster_dissolved_v1">>} = E, S)          -> apply_cluster_dissolved(E, S);
+apply_event(#{<<"event_type">> := <<"event_cluster_named_v1">>} = E, S)        -> apply_cluster_named(E, S);
+apply_event(#{event_type := <<"event_cluster_named_v1">>} = E, S)              -> apply_cluster_named(E, S);
+apply_event(#{<<"event_type">> := <<"fact_arrow_drawn_v1">>} = E, S)           -> apply_arrow_drawn(E, S);
+apply_event(#{event_type := <<"fact_arrow_drawn_v1">>} = E, S)                 -> apply_arrow_drawn(E, S);
+apply_event(#{<<"event_type">> := <<"fact_arrow_erased_v1">>} = E, S)          -> apply_arrow_erased(E, S);
+apply_event(#{event_type := <<"fact_arrow_erased_v1">>} = E, S)                -> apply_arrow_erased(E, S);
+apply_event(#{<<"event_type">> := <<"event_cluster_promoted_v1">>} = E, S)     -> apply_cluster_promoted(E, S);
+apply_event(#{event_type := <<"event_cluster_promoted_v1">>} = E, S)           -> apply_cluster_promoted(E, S);
+apply_event(#{<<"event_type">> := <<"storm_phase_advanced_v1">>} = E, S)       -> apply_phase_advanced(E, S);
+apply_event(#{event_type := <<"storm_phase_advanced_v1">>} = E, S)             -> apply_phase_advanced(E, S);
+apply_event(#{<<"event_type">> := <<"big_picture_storm_shelved_v1">>} = E, S)  -> apply_storm_shelved(E, S);
+apply_event(#{event_type := <<"big_picture_storm_shelved_v1">>} = E, S)        -> apply_storm_shelved(E, S);
+apply_event(#{<<"event_type">> := <<"big_picture_storm_resumed_v1">>} = _E, S) -> apply_storm_resumed(S);
+apply_event(#{event_type := <<"big_picture_storm_resumed_v1">>} = _E, S)       -> apply_storm_resumed(S);
+apply_event(#{<<"event_type">> := <<"big_picture_storm_archived_v1">>} = _E, S) -> apply_storm_archived(S);
+apply_event(#{event_type := <<"big_picture_storm_archived_v1">>} = _E, S)       -> apply_storm_archived(S);
 
 %% Unknown — ignore
 apply_event(_E, S) -> S.
@@ -264,6 +463,227 @@ apply_discovery_completed(E, #venture_state{status = Status} = State) ->
 
 apply_archived(#venture_state{status = Status} = State) ->
     State#venture_state{status = evoq_bit_flags:set(Status, ?VL_ARCHIVED)}.
+
+%% --- Big Picture Event Storming apply helpers ---
+
+apply_storm_started(E, #venture_state{status = Status, storm_number = N} = State) ->
+    NewN = N + 1,
+    State#venture_state{
+        status = evoq_bit_flags:set(Status, ?VL_STORMING),
+        storm_number = NewN,
+        storm_phase = storm,
+        storm_started_at = get_value(started_at, E),
+        storm_shelved_at = undefined,
+        event_stickies = #{},
+        event_stacks = #{},
+        event_clusters = #{},
+        fact_arrows = #{}
+    }.
+
+apply_sticky_posted(E, #venture_state{event_stickies = Stickies} = State) ->
+    StickyId = get_value(sticky_id, E),
+    Sticky = #{
+        text => get_value(text, E),
+        author => get_value(author, E, <<"user">>),
+        weight => 1,
+        stack_id => undefined,
+        cluster_id => undefined,
+        created_at => get_value(created_at, E)
+    },
+    State#venture_state{event_stickies = Stickies#{StickyId => Sticky}}.
+
+apply_sticky_pulled(E, #venture_state{event_stickies = Stickies} = State) ->
+    StickyId = get_value(sticky_id, E),
+    State#venture_state{event_stickies = maps:remove(StickyId, Stickies)}.
+
+apply_stack_emerged(E, #venture_state{event_stacks = Stacks} = State) ->
+    StackId = get_value(stack_id, E),
+    Stack = #{
+        color => get_value(color, E),
+        sticky_ids => []  %% stacked events populate this
+    },
+    State#venture_state{event_stacks = Stacks#{StackId => Stack}}.
+
+apply_sticky_stacked(E, #venture_state{event_stickies = Stickies, event_stacks = Stacks} = State) ->
+    StickyId = get_value(sticky_id, E),
+    StackId = get_value(stack_id, E),
+    Stickies1 = case maps:find(StickyId, Stickies) of
+        {ok, S} -> Stickies#{StickyId => S#{stack_id => StackId}};
+        error -> Stickies
+    end,
+    Stacks1 = case maps:find(StackId, Stacks) of
+        {ok, Stk} ->
+            Ids = maps:get(sticky_ids, Stk, []),
+            Stacks#{StackId => Stk#{sticky_ids => [StickyId | Ids]}};
+        error -> Stacks
+    end,
+    State#venture_state{event_stickies = Stickies1, event_stacks = Stacks1}.
+
+apply_sticky_unstacked(E, #venture_state{event_stickies = Stickies, event_stacks = Stacks} = State) ->
+    StickyId = get_value(sticky_id, E),
+    StackId = get_value(stack_id, E),
+    Stickies1 = case maps:find(StickyId, Stickies) of
+        {ok, S} -> Stickies#{StickyId => S#{stack_id => undefined}};
+        error -> Stickies
+    end,
+    Stacks1 = case maps:find(StackId, Stacks) of
+        {ok, Stk} ->
+            Ids = lists:delete(StickyId, maps:get(sticky_ids, Stk, [])),
+            Stacks#{StackId => Stk#{sticky_ids => Ids}};
+        error -> Stacks
+    end,
+    State#venture_state{event_stickies = Stickies1, event_stacks = Stacks1}.
+
+apply_stack_groomed(E, #venture_state{event_stickies = Stickies, event_stacks = Stacks} = State) ->
+    StackId = get_value(stack_id, E),
+    CanonicalId = get_value(canonical_sticky_id, E),
+    Weight = get_value(weight, E, 1),
+    AbsorbedIds = get_value(absorbed_sticky_ids, E, []),
+    %% Update canonical sticky weight and clear stack_id
+    Stickies1 = case maps:find(CanonicalId, Stickies) of
+        {ok, S} -> Stickies#{CanonicalId => S#{weight => Weight, stack_id => undefined}};
+        error -> Stickies
+    end,
+    %% Remove absorbed stickies
+    Stickies2 = lists:foldl(fun(Id, Acc) -> maps:remove(Id, Acc) end, Stickies1, AbsorbedIds),
+    %% Remove the stack
+    Stacks1 = maps:remove(StackId, Stacks),
+    State#venture_state{event_stickies = Stickies2, event_stacks = Stacks1}.
+
+apply_cluster_emerged(E, #venture_state{event_clusters = Clusters} = State) ->
+    ClusterId = get_value(cluster_id, E),
+    Cluster = #{
+        name => undefined,
+        color => get_value(color, E),
+        sticky_ids => [],  %% clustered events populate this
+        status => active
+    },
+    State#venture_state{event_clusters = Clusters#{ClusterId => Cluster}}.
+
+apply_sticky_clustered(E, #venture_state{event_stickies = Stickies, event_clusters = Clusters} = State) ->
+    StickyId = get_value(sticky_id, E),
+    ClusterId = get_value(cluster_id, E),
+    Stickies1 = case maps:find(StickyId, Stickies) of
+        {ok, S} -> Stickies#{StickyId => S#{cluster_id => ClusterId}};
+        error -> Stickies
+    end,
+    Clusters1 = case maps:find(ClusterId, Clusters) of
+        {ok, C} ->
+            Ids = maps:get(sticky_ids, C, []),
+            Clusters#{ClusterId => C#{sticky_ids => [StickyId | Ids]}};
+        error -> Clusters
+    end,
+    State#venture_state{event_stickies = Stickies1, event_clusters = Clusters1}.
+
+apply_sticky_unclustered(E, #venture_state{event_stickies = Stickies, event_clusters = Clusters} = State) ->
+    StickyId = get_value(sticky_id, E),
+    ClusterId = get_value(cluster_id, E),
+    Stickies1 = case maps:find(StickyId, Stickies) of
+        {ok, S} -> Stickies#{StickyId => S#{cluster_id => undefined}};
+        error -> Stickies
+    end,
+    Clusters1 = case maps:find(ClusterId, Clusters) of
+        {ok, C} ->
+            Ids = lists:delete(StickyId, maps:get(sticky_ids, C, [])),
+            Clusters#{ClusterId => C#{sticky_ids => Ids}};
+        error -> Clusters
+    end,
+    State#venture_state{event_stickies = Stickies1, event_clusters = Clusters1}.
+
+apply_cluster_dissolved(E, #venture_state{event_stickies = Stickies, event_clusters = Clusters} = State) ->
+    ClusterId = get_value(cluster_id, E),
+    %% Uncluster all stickies in this cluster
+    StickyIds = case maps:find(ClusterId, Clusters) of
+        {ok, C} -> maps:get(sticky_ids, C, []);
+        error -> []
+    end,
+    Stickies1 = lists:foldl(fun(Id, Acc) ->
+        case maps:find(Id, Acc) of
+            {ok, S} -> Acc#{Id => S#{cluster_id => undefined}};
+            error -> Acc
+        end
+    end, Stickies, StickyIds),
+    Clusters1 = case maps:find(ClusterId, Clusters) of
+        {ok, C2} -> Clusters#{ClusterId => C2#{status => dissolved, sticky_ids => []}};
+        error -> Clusters
+    end,
+    State#venture_state{event_stickies = Stickies1, event_clusters = Clusters1}.
+
+apply_cluster_named(E, #venture_state{event_clusters = Clusters} = State) ->
+    ClusterId = get_value(cluster_id, E),
+    Name = get_value(name, E),
+    Clusters1 = case maps:find(ClusterId, Clusters) of
+        {ok, C} -> Clusters#{ClusterId => C#{name => Name}};
+        error -> Clusters
+    end,
+    State#venture_state{event_clusters = Clusters1}.
+
+apply_arrow_drawn(E, #venture_state{fact_arrows = Arrows} = State) ->
+    ArrowId = get_value(arrow_id, E),
+    Arrow = #{
+        from_cluster => get_value(from_cluster, E),
+        to_cluster => get_value(to_cluster, E),
+        fact_name => get_value(fact_name, E)
+    },
+    State#venture_state{fact_arrows = Arrows#{ArrowId => Arrow}}.
+
+apply_arrow_erased(E, #venture_state{fact_arrows = Arrows} = State) ->
+    ArrowId = get_value(arrow_id, E),
+    State#venture_state{fact_arrows = maps:remove(ArrowId, Arrows)}.
+
+apply_cluster_promoted(E, #venture_state{event_clusters = Clusters} = State) ->
+    ClusterId = get_value(cluster_id, E),
+    Clusters1 = case maps:find(ClusterId, Clusters) of
+        {ok, C} -> Clusters#{ClusterId => C#{status => promoted}};
+        error -> Clusters
+    end,
+    State#venture_state{event_clusters = Clusters1}.
+
+apply_phase_advanced(E, State) ->
+    Phase = get_value(phase, E),
+    PhaseAtom = case Phase of
+        <<"storm">> -> storm;
+        <<"stack">> -> stack;
+        <<"groom">> -> groom;
+        <<"cluster">> -> cluster;
+        <<"name">> -> name;
+        <<"map">> -> map;
+        <<"promoted">> -> promoted;
+        _ -> undefined
+    end,
+    State#venture_state{storm_phase = PhaseAtom}.
+
+apply_storm_shelved(E, #venture_state{status = Status} = State) ->
+    S0 = evoq_bit_flags:unset(Status, ?VL_STORMING),
+    S1 = evoq_bit_flags:set(S0, ?VL_STORM_SHELVED),
+    State#venture_state{
+        status = S1,
+        storm_phase = shelved,
+        storm_shelved_at = get_value(shelved_at, E)
+    }.
+
+apply_storm_resumed(#venture_state{status = Status} = State) ->
+    S0 = evoq_bit_flags:unset(Status, ?VL_STORM_SHELVED),
+    S1 = evoq_bit_flags:set(S0, ?VL_STORMING),
+    State#venture_state{
+        status = S1,
+        storm_phase = storm,
+        storm_shelved_at = undefined
+    }.
+
+apply_storm_archived(#venture_state{status = Status} = State) ->
+    S0 = evoq_bit_flags:unset(Status, ?VL_STORMING),
+    S1 = evoq_bit_flags:unset(S0, ?VL_STORM_SHELVED),
+    State#venture_state{
+        status = S1,
+        storm_phase = undefined,
+        storm_started_at = undefined,
+        storm_shelved_at = undefined,
+        event_stickies = #{},
+        event_stacks = #{},
+        event_clusters = #{},
+        fact_arrows = #{}
+    }.
 
 %% --- Internal ---
 

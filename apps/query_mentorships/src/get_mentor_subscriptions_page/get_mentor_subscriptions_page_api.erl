@@ -1,4 +1,4 @@
--module(get_subscriptions_page_api).
+-module(get_mentor_subscriptions_page_api).
 -export([init/2]).
 
 init(Req0, State) ->
@@ -9,7 +9,7 @@ init(Req0, State) ->
 
 handle_get(Req0, _State) ->
     SubscriberId = hecate_identity:agent_id(),
-    case get_subscriptions_page:execute(SubscriberId) of
+    case get_mentor_subscriptions_page:execute(SubscriberId) of
         {ok, Subs} ->
             hecate_api_utils:json_ok(#{subscriptions => Subs}, Req0);
         {error, Reason} ->

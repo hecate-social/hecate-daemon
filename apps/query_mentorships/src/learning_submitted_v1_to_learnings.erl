@@ -7,7 +7,7 @@
 -spec project(map()) -> ok | {error, term()}.
 project(#{learning_id := LId, submitter_id := SId, category := Cat,
           domain := Dom, title := Title} = E) ->
-    Tags = jsx:encode(maps:get(tags, E, [])),
+    Tags = iolist_to_binary(json:encode(maps:get(tags, E, []))),
     Sql = "INSERT OR REPLACE INTO learnings "
           "(id, submitter_id, category, domain, tags, title, description, "
           "bad_example, good_example, context, severity, confidence, source, "

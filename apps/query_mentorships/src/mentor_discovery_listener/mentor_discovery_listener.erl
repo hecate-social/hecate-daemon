@@ -57,7 +57,7 @@ terminate(_Reason, _State) ->
 project_mentor_available(Payload) when is_map(Payload) ->
     AgentId = maps:get(<<"agent_id">>, Payload, maps:get(agent_id, Payload, undefined)),
     Domains = maps:get(<<"domains">>, Payload, maps:get(domains, Payload, [])),
-    DomainsJson = jsx:encode(Domains),
+    DomainsJson = iolist_to_binary(json:encode(Domains)),
     Now = erlang:system_time(millisecond),
 
     Sql = "INSERT INTO remote_mentors (agent_id, domains, discovered_at, last_seen_at) "

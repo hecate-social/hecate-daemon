@@ -53,7 +53,7 @@ project_remote_learning(Payload) when is_map(Payload) ->
     Category = maps:get(<<"category">>, Payload, maps:get(category, Payload, undefined)),
     Domain = maps:get(<<"domain">>, Payload, maps:get(domain, Payload, undefined)),
     Title = maps:get(<<"title">>, Payload, maps:get(title, Payload, undefined)),
-    LearningData = jsx:encode(Payload),
+    LearningData = iolist_to_binary(json:encode(Payload)),
     Now = erlang:system_time(millisecond),
 
     Sql = "INSERT OR IGNORE INTO remote_learnings "

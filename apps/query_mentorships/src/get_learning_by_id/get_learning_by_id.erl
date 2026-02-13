@@ -28,7 +28,7 @@ row_to_map([Id, SubmitterId, Category, Domain, TagsJson, Title,
     Tags = case TagsJson of
         undefined -> [];
         null -> [];
-        Bin when is_binary(Bin) -> jsx:decode(Bin, [return_maps]);
+        Bin when is_binary(Bin) -> json:decode(Bin);
         _ -> []
     end,
     #{

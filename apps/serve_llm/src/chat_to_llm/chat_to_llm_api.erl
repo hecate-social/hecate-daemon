@@ -115,19 +115,46 @@ stream_chunks(Req, Ref, State) ->
             end,
             Done = maps:get(<<"done">>, Chunk, false),
             StopReason = maps:get(<<"done_reason">>, Chunk, maps:get(<<"stop_reason">>, Chunk, undefined)),
-            Event = #{content => Content, done => Done},
 
-            %% Handle tool calls in chunk (OpenAI streaming format)
+            %% Accumulate OpenAI/Groq tool_call_deltas into State
+            NewState = case maps:get(<<"tool_call_deltas">>, Chunk, undefined) of
+                undefined -> State;
+                Deltas when is_list(Deltas) ->
+                    lists:foldl(fun accumulate_tool_delta/2, State, Deltas)
+            end,
+
+            %% On Done with accumulated tool calls, emit them
+            {Event, FinalState} = case Done of
+                true ->
+                    PendingCalls = maps:get(pending_tool_calls, NewState, #{}),
+                    case maps:size(PendingCalls) of
+                        0 ->
+                            {#{content => Content, done => Done}, NewState};
+                        _ ->
+                            %% Build complete tool calls from accumulated deltas
+                            ToolCalls = build_pending_tool_calls(PendingCalls),
+                            Msg = #{
+                                role => <<"assistant">>,
+                                content => Content,
+                                tool_calls => ToolCalls
+                            },
+                            {#{content => Content, done => false, message => Msg},
+                             maps:remove(pending_tool_calls, NewState)}
+                    end;
+                false ->
+                    {#{content => Content, done => Done}, NewState}
+            end,
+
+            %% Handle complete tool calls in chunk (Ollama sends all at once)
             Event1 = case maps:get(<<"tool_calls">>, Chunk, undefined) of
                 undefined -> Event;
-                ToolCalls when is_list(ToolCalls) ->
-                    %% Full tool calls (non-streaming or final)
-                    Msg = #{
+                ToolCalls2 when is_list(ToolCalls2) ->
+                    Msg2 = #{
                         role => <<"assistant">>,
                         content => Content,
-                        tool_calls => [format_tool_call(TC) || TC <- ToolCalls]
+                        tool_calls => [format_tool_call(TC) || TC <- ToolCalls2]
                     },
-                    Event#{message => Msg}
+                    Event#{message => Msg2}
             end,
 
             %% Add stop_reason if present
@@ -151,7 +178,25 @@ stream_chunks(Req, Ref, State) ->
             end,
             Data = iolist_to_binary(json:encode(EventWithUsage)),
             cowboy_req:stream_body(<<"data: ", Data/binary, "\n\n">>, nofin, Req),
-            stream_chunks(Req, Ref, State);
+
+            %% If we emitted accumulated tool calls, send a follow-up done event
+            case {Done, maps:is_key(message, Event)} of
+                {true, true} ->
+                    %% We emitted tool calls with done=false; now send the real done
+                    DoneEvent = #{
+                        content => <<>>, done => true,
+                        model => maps:get(<<"model">>, Chunk, <<>>),
+                        usage => #{
+                            prompt_tokens => maps:get(<<"prompt_eval_count">>, Chunk, 0),
+                            completion_tokens => maps:get(<<"eval_count">>, Chunk, 0)
+                        }
+                    },
+                    DoneData = iolist_to_binary(json:encode(DoneEvent)),
+                    cowboy_req:stream_body(<<"data: ", DoneData/binary, "\n\n">>, nofin, Req),
+                    stream_chunks(Req, Ref, FinalState);
+                _ ->
+                    stream_chunks(Req, Ref, FinalState)
+            end;
 
         %% Tool use start (Anthropic streaming)
         {llm_tool_use_start, Ref, ToolInfo} ->
@@ -246,12 +291,25 @@ build_chat_opts(Model, Params) ->
     end.
 
 %% @doc Format messages from JSON to internal format.
+%% Preserves tool_calls (assistant requesting tools) and tool_call_id (tool results).
 format_messages(Messages) ->
     lists:map(fun(M) ->
-        #{
+        Base = #{
             role => maps:get(<<"role">>, M, <<"user">>),
             content => maps:get(<<"content">>, M, <<>>)
-        }
+        },
+        %% Preserve tool_calls for assistant messages (needed for tool calling flow)
+        Base1 = case maps:get(<<"tool_calls">>, M, undefined) of
+            undefined -> Base;
+            [] -> Base;
+            ToolCalls -> Base#{tool_calls => ToolCalls}
+        end,
+        %% Preserve tool_call_id for tool result messages
+        case maps:get(<<"tool_call_id">>, M, undefined) of
+            undefined -> Base1;
+            <<>> -> Base1;
+            ToolCallId -> Base1#{tool_call_id => ToolCallId}
+        end
     end, Messages).
 
 %% @doc Format a tool call for JSON output.
@@ -268,3 +326,41 @@ format_tool_call(#{id := Id, name := Name, arguments := Args}) ->
     };
 format_tool_call(TC) ->
     TC.
+
+%% @doc Accumulate an OpenAI/Groq tool call delta into State.
+%% Deltas arrive incrementally: first with id+name, then arguments_delta chunks.
+accumulate_tool_delta(Delta, State) ->
+    Index = maps:get(<<"index">>, Delta, 0),
+    Pending = maps:get(pending_tool_calls, State, #{}),
+    Current = maps:get(Index, Pending, #{id => <<>>, name => <<>>, arguments => <<>>}),
+    %% Update id if present
+    C1 = case maps:get(<<"id">>, Delta, undefined) of
+        undefined -> Current;
+        Id -> Current#{id => Id}
+    end,
+    %% Update name if present
+    C2 = case maps:get(<<"name">>, Delta, undefined) of
+        undefined -> C1;
+        Name -> C1#{name => Name}
+    end,
+    %% Append arguments delta
+    C3 = case maps:get(<<"arguments_delta">>, Delta, undefined) of
+        undefined -> C2;
+        ArgsDelta ->
+            OldArgs = maps:get(arguments, C2, <<>>),
+            C2#{arguments => <<OldArgs/binary, ArgsDelta/binary>>}
+    end,
+    State#{pending_tool_calls => Pending#{Index => C3}}.
+
+%% @doc Build complete tool calls from accumulated pending deltas.
+build_pending_tool_calls(PendingMap) ->
+    Sorted = lists:sort(maps:to_list(PendingMap)),
+    [begin
+        Args = maps:get(arguments, TC, <<"{}">>),
+        DecodedArgs = try json:decode(Args) catch _:_ -> #{} end,
+        #{
+            id => maps:get(id, TC, <<>>),
+            name => maps:get(name, TC, <<>>),
+            arguments => DecodedArgs
+        }
+    end || {_Idx, TC} <- Sorted].

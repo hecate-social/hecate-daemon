@@ -1,7 +1,7 @@
 %%% @doc SQLite store for query_venture_lifecycle read models.
 %%%
-%%% Tables: ventures, discovered_divisions
-%%% Absorbs: query_ventures_store + query_discoveries_store
+%%% Tables: ventures, discovered_divisions, event_stickies,
+%%%          event_clusters, fact_arrows, storm_sessions
 %%% @end
 -module(query_venture_lifecycle_store).
 -behaviour(gen_server).
@@ -125,7 +125,56 @@ create_tables(Db) ->
             discovered_at INTEGER NOT NULL
         );",
         "CREATE INDEX IF NOT EXISTS idx_discovered_divisions_venture
-            ON discovered_divisions(venture_id);"
+            ON discovered_divisions(venture_id);",
+
+        "CREATE TABLE IF NOT EXISTS event_stickies (
+            sticky_id TEXT PRIMARY KEY,
+            venture_id TEXT NOT NULL,
+            storm_number INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            author TEXT DEFAULT 'user',
+            weight INTEGER DEFAULT 1,
+            stack_id TEXT,
+            cluster_id TEXT,
+            created_at INTEGER NOT NULL
+        );",
+
+        "CREATE TABLE IF NOT EXISTS event_clusters (
+            cluster_id TEXT PRIMARY KEY,
+            venture_id TEXT NOT NULL,
+            storm_number INTEGER NOT NULL,
+            name TEXT,
+            color TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
+            created_at INTEGER NOT NULL
+        );",
+
+        "CREATE TABLE IF NOT EXISTS fact_arrows (
+            arrow_id TEXT PRIMARY KEY,
+            venture_id TEXT NOT NULL,
+            storm_number INTEGER NOT NULL,
+            from_cluster TEXT NOT NULL,
+            to_cluster TEXT NOT NULL,
+            fact_name TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );",
+
+        "CREATE TABLE IF NOT EXISTS storm_sessions (
+            venture_id TEXT NOT NULL,
+            storm_number INTEGER NOT NULL,
+            phase TEXT DEFAULT 'storm',
+            started_at INTEGER NOT NULL,
+            shelved_at INTEGER,
+            completed_at INTEGER,
+            PRIMARY KEY (venture_id, storm_number)
+        );",
+
+        "CREATE INDEX IF NOT EXISTS idx_stickies_venture
+            ON event_stickies(venture_id, storm_number);",
+        "CREATE INDEX IF NOT EXISTS idx_clusters_venture
+            ON event_clusters(venture_id, storm_number);",
+        "CREATE INDEX IF NOT EXISTS idx_arrows_venture
+            ON fact_arrows(venture_id, storm_number);"
     ],
     lists:foreach(fun(Sql) -> ok = esqlite3:exec(Db, Sql) end, Stmts),
     ok.

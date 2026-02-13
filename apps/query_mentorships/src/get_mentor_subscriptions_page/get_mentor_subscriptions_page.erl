@@ -1,5 +1,5 @@
 %%% @doc Query: list active subscriptions for an agent
--module(get_subscriptions_page).
+-module(get_mentor_subscriptions_page).
 
 -export([execute/1]).
 

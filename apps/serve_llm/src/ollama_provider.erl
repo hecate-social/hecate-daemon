@@ -84,7 +84,7 @@ base_url(_) ->
 build_request(Model, Messages, Opts, Stream) ->
     Base = #{
         model => Model,
-        messages => Messages,
+        messages => [format_msg_for_ollama(M) || M <- Messages],
         stream => Stream,
         options => maps:get(options, Opts, #{})
     },
@@ -116,6 +116,40 @@ tool_to_ollama_schema(#{<<"name">> := Name, <<"description">> := Desc, <<"input_
             parameters => Schema
         }
     }.
+
+%% Convert a message to Ollama's expected format.
+%% Restores tool_calls from normalized {id, name, arguments} back to
+%% OpenAI format {id, type, function: {name, arguments_string}}.
+format_msg_for_ollama(#{tool_calls := ToolCalls} = Msg) when is_list(ToolCalls), ToolCalls =/= [] ->
+    OllamaCalls = [tool_call_to_ollama(TC) || TC <- ToolCalls],
+    Msg#{tool_calls => OllamaCalls};
+format_msg_for_ollama(Msg) ->
+    Msg.
+
+tool_call_to_ollama(TC) ->
+    Id = get_field(id, <<"id">>, TC, <<>>),
+    Name = get_field(name, <<"name">>, TC, <<>>),
+    Args = get_field(arguments, <<"arguments">>, TC, #{}),
+    %% Ollama expects arguments as a JSON object, not a string
+    ArgsMap = case is_binary(Args) of
+        true -> try json:decode(Args) catch _:_ -> #{} end;
+        false -> Args
+    end,
+    #{
+        id => Id,
+        type => <<"function">>,
+        function => #{
+            name => Name,
+            arguments => ArgsMap
+        }
+    }.
+
+%% Get a field by atom key first, then binary key fallback
+get_field(AtomKey, BinKey, Map, Default) ->
+    case maps:get(AtomKey, Map, undefined) of
+        undefined -> maps:get(BinKey, Map, Default);
+        Val -> Val
+    end.
 
 %% Normalize response to include tool_calls if present
 normalize_response(#{<<"message">> := Message} = Resp) ->

@@ -1,0 +1,425 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" width="1200" height="620">
+  <defs>
+    <!-- Arrowhead marker for phase transitions -->
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#b4befe"/>
+    </marker>
+    <!-- Arrowhead for fact arrows (teal) -->
+    <marker id="arrow-teal" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#94e2d5"/>
+    </marker>
+    <!-- Arrowhead for shelve/archive (muted) -->
+    <marker id="arrow-muted" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#6c7086"/>
+    </marker>
+    <!-- Arrowhead for promoted->division (green) -->
+    <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#a6e3a1"/>
+    </marker>
+    <!-- Drop shadow filter -->
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="112%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#11111b" flood-opacity="0.5"/>
+    </filter>
+    <!-- Glow for active phase -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="620" fill="#1e1e2e" rx="8"/>
+
+  <!-- Title -->
+  <text x="600" y="36" text-anchor="middle" fill="#cdd6f4" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="700" letter-spacing="0.5">Big Picture Event Storming  —  Phase Lifecycle</text>
+  <text x="600" y="56" text-anchor="middle" fill="#6c7086" font-family="system-ui, -apple-system, sans-serif" font-size="11">storm  ·  stack  ·  groom  ·  cluster  ·  name  ·  map  ·  promoted</text>
+
+  <!-- ================================================================== -->
+  <!-- PHASE 1: STORM                                                      -->
+  <!-- ================================================================== -->
+  <g transform="translate(32, 80)">
+    <!-- Phase background -->
+    <rect width="140" height="260" rx="8" fill="#313244" stroke="#45475a" stroke-width="1" filter="url(#shadow)"/>
+    <!-- Phase label -->
+    <rect x="0" y="0" width="140" height="28" rx="8" fill="#b4befe" opacity="0.15"/>
+    <rect x="0" y="14" width="140" height="14" fill="#313244"/>
+    <text x="70" y="19" text-anchor="middle" fill="#b4befe" font-family="system-ui, sans-serif" font-size="12" font-weight="700">STORM</text>
+
+    <!-- Description -->
+    <text x="70" y="46" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">post &amp; pull stickies</text>
+
+    <!-- Stickies (orange rectangles scattered) -->
+    <rect x="18" y="62" width="44" height="30" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="40" y="80" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Order</text>
+    <text x="40" y="88" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Placed</text>
+
+    <rect x="72" y="68" width="44" height="30" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="94" y="86" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Payment</text>
+    <text x="94" y="94" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Received</text>
+
+    <rect x="30" y="104" width="44" height="30" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="52" y="122" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">User</text>
+    <text x="52" y="130" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Registered</text>
+
+    <rect x="80" y="112" width="44" height="30" rx="3" fill="#fab387" opacity="0.85"/>
+    <text x="102" y="130" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Item</text>
+    <text x="102" y="138" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Shipped</text>
+
+    <rect x="24" y="148" width="44" height="30" rx="3" fill="#fab387" opacity="0.8"/>
+    <text x="46" y="166" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Invoice</text>
+    <text x="46" y="174" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Sent</text>
+
+    <rect x="74" y="155" width="44" height="30" rx="3" fill="#fab387" opacity="0.75"/>
+    <text x="96" y="173" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Order</text>
+    <text x="96" y="181" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Confirmed</text>
+
+    <!-- Operations -->
+    <text x="70" y="210" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">post_event_sticky</text>
+    <text x="70" y="222" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">pull_event_sticky</text>
+
+    <!-- Phase number -->
+    <circle cx="126" y="246" r="9" fill="#45475a"/>
+    <text x="126" y="250" text-anchor="middle" fill="#6c7086" font-family="system-ui, sans-serif" font-size="9" font-weight="700">1</text>
+  </g>
+
+  <!-- Phase transition arrow 1->2 -->
+  <line x1="176" y1="210" x2="194" y2="210" stroke="#b4befe" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ================================================================== -->
+  <!-- PHASE 2: STACK                                                      -->
+  <!-- ================================================================== -->
+  <g transform="translate(198, 80)">
+    <rect width="130" height="260" rx="8" fill="#313244" stroke="#45475a" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="130" height="28" rx="8" fill="#b4befe" opacity="0.15"/>
+    <rect x="0" y="14" width="130" height="14" fill="#313244"/>
+    <text x="65" y="19" text-anchor="middle" fill="#b4befe" font-family="system-ui, sans-serif" font-size="12" font-weight="700">STACK</text>
+
+    <text x="65" y="46" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">drag duplicates together</text>
+
+    <!-- Stack visualization: overlapping stickies with count badge -->
+    <!-- Stack 1 -->
+    <rect x="18" y="64" width="40" height="26" rx="3" fill="#fab387" opacity="0.4"/>
+    <rect x="21" y="61" width="40" height="26" rx="3" fill="#fab387" opacity="0.6"/>
+    <rect x="24" y="58" width="40" height="26" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="44" y="74" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Order</text>
+    <text x="44" y="82" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Placed</text>
+    <!-- Count badge -->
+    <circle cx="68" cy="60" r="9" fill="#f38ba8"/>
+    <text x="68" y="63" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">3</text>
+
+    <!-- Stack 2 -->
+    <rect x="18" y="108" width="40" height="26" rx="3" fill="#fab387" opacity="0.4"/>
+    <rect x="21" y="105" width="40" height="26" rx="3" fill="#fab387" opacity="0.6"/>
+    <rect x="24" y="102" width="40" height="26" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="44" y="118" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Payment</text>
+    <text x="44" y="126" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Received</text>
+    <circle cx="68" cy="104" r="9" fill="#f38ba8"/>
+    <text x="68" y="107" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">2</text>
+
+    <!-- Lone sticky -->
+    <rect x="28" y="148" width="40" height="26" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="48" y="164" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">User</text>
+    <text x="48" y="172" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Registered</text>
+
+    <text x="65" y="210" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">stack_event_sticky</text>
+    <text x="65" y="222" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">unstack_event_sticky</text>
+
+    <circle cx="116" y="246" r="9" fill="#45475a"/>
+    <text x="116" y="250" text-anchor="middle" fill="#6c7086" font-family="system-ui, sans-serif" font-size="9" font-weight="700">2</text>
+  </g>
+
+  <!-- Phase transition arrow 2->3 -->
+  <line x1="332" y1="210" x2="350" y2="210" stroke="#b4befe" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ================================================================== -->
+  <!-- PHASE 3: GROOM                                                      -->
+  <!-- ================================================================== -->
+  <g transform="translate(354, 80)">
+    <rect width="130" height="260" rx="8" fill="#313244" stroke="#45475a" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="130" height="28" rx="8" fill="#b4befe" opacity="0.15"/>
+    <rect x="0" y="14" width="130" height="14" fill="#313244"/>
+    <text x="65" y="19" text-anchor="middle" fill="#b4befe" font-family="system-ui, sans-serif" font-size="12" font-weight="700">GROOM</text>
+
+    <text x="65" y="46" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">pick canonical, merge</text>
+
+    <!-- Groomed sticky with weight badge (canonical picked, others absorbed) -->
+    <rect x="30" y="64" width="50" height="32" rx="3" fill="#fab387" opacity="0.9" stroke="#f9e2af" stroke-width="1.5"/>
+    <text x="55" y="82" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">Order</text>
+    <text x="55" y="91" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">Placed</text>
+    <!-- Weight badge -->
+    <rect x="83" y="60" width="26" height="14" rx="7" fill="#f9e2af"/>
+    <text x="96" y="70" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">w:3</text>
+
+    <!-- Another groomed sticky -->
+    <rect x="30" y="110" width="50" height="32" rx="3" fill="#fab387" opacity="0.9" stroke="#f9e2af" stroke-width="1.5"/>
+    <text x="55" y="128" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">Payment</text>
+    <text x="55" y="137" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">Received</text>
+    <rect x="83" y="106" width="26" height="14" rx="7" fill="#f9e2af"/>
+    <text x="96" y="116" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">w:2</text>
+
+    <!-- Absorbed stickies fading away -->
+    <rect x="30" y="156" width="50" height="32" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="55" y="174" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">User</text>
+    <text x="55" y="183" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">Registered</text>
+    <rect x="83" y="152" width="26" height="14" rx="7" fill="#f9e2af"/>
+    <text x="96" y="162" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="8" font-weight="700">w:1</text>
+
+    <text x="65" y="214" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">groom_event_stack</text>
+
+    <circle cx="116" y="246" r="9" fill="#45475a"/>
+    <text x="116" y="250" text-anchor="middle" fill="#6c7086" font-family="system-ui, sans-serif" font-size="9" font-weight="700">3</text>
+  </g>
+
+  <!-- Phase transition arrow 3->4 -->
+  <line x1="488" y1="210" x2="506" y2="210" stroke="#b4befe" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ================================================================== -->
+  <!-- PHASE 4: CLUSTER                                                    -->
+  <!-- ================================================================== -->
+  <g transform="translate(510, 80)">
+    <rect width="140" height="260" rx="8" fill="#313244" stroke="#45475a" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="140" height="28" rx="8" fill="#b4befe" opacity="0.15"/>
+    <rect x="0" y="14" width="140" height="14" fill="#313244"/>
+    <text x="70" y="19" text-anchor="middle" fill="#b4befe" font-family="system-ui, sans-serif" font-size="12" font-weight="700">CLUSTER</text>
+
+    <text x="70" y="46" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">group stickies into clusters</text>
+
+    <!-- Cluster 1 (blue rounded rect containing stickies) -->
+    <rect x="10" y="56" width="120" height="70" rx="10" fill="#89b4fa" opacity="0.12" stroke="#89b4fa" stroke-width="1.5" stroke-dasharray="4 2"/>
+    <rect x="18" y="64" width="42" height="24" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="39" y="79" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Order Placed</text>
+    <rect x="66" y="64" width="54" height="24" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="93" y="79" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Order Confirmed</text>
+    <rect x="30" y="96" width="54" height="24" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="57" y="111" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Item Shipped</text>
+
+    <!-- Cluster 2 -->
+    <rect x="10" y="136" width="120" height="56" rx="10" fill="#cba6f7" opacity="0.12" stroke="#cba6f7" stroke-width="1.5" stroke-dasharray="4 2"/>
+    <rect x="18" y="144" width="52" height="24" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="44" y="159" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Payment Recv</text>
+    <rect x="76" y="144" width="46" height="24" rx="3" fill="#fab387" opacity="0.9"/>
+    <text x="99" y="159" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="600">Invoice Sent</text>
+
+    <text x="70" y="218" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">cluster_event_sticky</text>
+    <text x="70" y="230" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">dissolve_event_cluster</text>
+
+    <circle cx="126" y="246" r="9" fill="#45475a"/>
+    <text x="126" y="250" text-anchor="middle" fill="#6c7086" font-family="system-ui, sans-serif" font-size="9" font-weight="700">4</text>
+  </g>
+
+  <!-- Phase transition arrow 4->5 -->
+  <line x1="654" y1="210" x2="672" y2="210" stroke="#b4befe" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ================================================================== -->
+  <!-- PHASE 5: NAME                                                       -->
+  <!-- ================================================================== -->
+  <g transform="translate(676, 80)">
+    <rect width="130" height="260" rx="8" fill="#313244" stroke="#45475a" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="130" height="28" rx="8" fill="#b4befe" opacity="0.15"/>
+    <rect x="0" y="14" width="130" height="14" fill="#313244"/>
+    <text x="65" y="19" text-anchor="middle" fill="#b4befe" font-family="system-ui, sans-serif" font-size="12" font-weight="700">NAME</text>
+
+    <text x="65" y="46" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">name bounded contexts</text>
+
+    <!-- Named cluster 1 -->
+    <rect x="10" y="56" width="110" height="66" rx="10" fill="#89b4fa" opacity="0.15" stroke="#89b4fa" stroke-width="1.5"/>
+    <text x="65" y="72" text-anchor="middle" fill="#89b4fa" font-family="system-ui, sans-serif" font-size="10" font-weight="700">Order Fulfillment</text>
+    <rect x="18" y="80" width="36" height="18" rx="2" fill="#fab387" opacity="0.7"/>
+    <rect x="58" y="80" width="36" height="18" rx="2" fill="#fab387" opacity="0.7"/>
+    <rect x="38" y="100" width="36" height="18" rx="2" fill="#fab387" opacity="0.7"/>
+
+    <!-- Named cluster 2 -->
+    <rect x="10" y="132" width="110" height="60" rx="10" fill="#cba6f7" opacity="0.15" stroke="#cba6f7" stroke-width="1.5"/>
+    <text x="65" y="148" text-anchor="middle" fill="#cba6f7" font-family="system-ui, sans-serif" font-size="10" font-weight="700">Billing</text>
+    <rect x="22" y="156" width="36" height="18" rx="2" fill="#fab387" opacity="0.7"/>
+    <rect x="64" y="156" width="36" height="18" rx="2" fill="#fab387" opacity="0.7"/>
+
+    <text x="65" y="218" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">name_event_cluster</text>
+
+    <circle cx="116" y="246" r="9" fill="#45475a"/>
+    <text x="116" y="250" text-anchor="middle" fill="#6c7086" font-family="system-ui, sans-serif" font-size="9" font-weight="700">5</text>
+  </g>
+
+  <!-- Phase transition arrow 5->6 -->
+  <line x1="810" y1="210" x2="828" y2="210" stroke="#b4befe" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ================================================================== -->
+  <!-- PHASE 6: MAP                                                        -->
+  <!-- ================================================================== -->
+  <g transform="translate(832, 80)">
+    <rect width="150" height="260" rx="8" fill="#313244" stroke="#45475a" stroke-width="1" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="150" height="28" rx="8" fill="#b4befe" opacity="0.15"/>
+    <rect x="0" y="14" width="150" height="14" fill="#313244"/>
+    <text x="75" y="19" text-anchor="middle" fill="#b4befe" font-family="system-ui, sans-serif" font-size="12" font-weight="700">MAP</text>
+
+    <text x="75" y="46" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">draw causal fact arrows</text>
+
+    <!-- Named cluster 1 with arrow going out -->
+    <rect x="12" y="62" width="126" height="56" rx="10" fill="#89b4fa" opacity="0.15" stroke="#89b4fa" stroke-width="1.5"/>
+    <text x="75" y="78" text-anchor="middle" fill="#89b4fa" font-family="system-ui, sans-serif" font-size="10" font-weight="700">Order Fulfillment</text>
+    <rect x="20" y="86" width="30" height="16" rx="2" fill="#fab387" opacity="0.7"/>
+    <rect x="54" y="86" width="30" height="16" rx="2" fill="#fab387" opacity="0.7"/>
+    <rect x="88" y="86" width="30" height="16" rx="2" fill="#fab387" opacity="0.7"/>
+
+    <!-- Fact arrow between clusters -->
+    <line x1="75" y1="120" x2="75" y2="140" stroke="#94e2d5" stroke-width="2" marker-end="url(#arrow-teal)"/>
+    <!-- Fact label -->
+    <rect x="82" y="124" width="58" height="14" rx="4" fill="#94e2d5" opacity="0.15"/>
+    <text x="111" y="134" text-anchor="middle" fill="#94e2d5" font-family="system-ui, sans-serif" font-size="8" font-weight="600">order_placed</text>
+
+    <!-- Named cluster 2 receiving arrow -->
+    <rect x="12" y="144" width="126" height="50" rx="10" fill="#cba6f7" opacity="0.15" stroke="#cba6f7" stroke-width="1.5"/>
+    <text x="75" y="160" text-anchor="middle" fill="#cba6f7" font-family="system-ui, sans-serif" font-size="10" font-weight="700">Billing</text>
+    <rect x="28" y="168" width="30" height="16" rx="2" fill="#fab387" opacity="0.7"/>
+    <rect x="64" y="168" width="30" height="16" rx="2" fill="#fab387" opacity="0.7"/>
+
+    <text x="75" y="218" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">draw_fact_arrow</text>
+    <text x="75" y="230" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">erase_fact_arrow</text>
+
+    <circle cx="136" y="246" r="9" fill="#45475a"/>
+    <text x="136" y="250" text-anchor="middle" fill="#6c7086" font-family="system-ui, sans-serif" font-size="9" font-weight="700">6</text>
+  </g>
+
+  <!-- Phase transition arrow 6->7 -->
+  <line x1="986" y1="210" x2="1004" y2="210" stroke="#b4befe" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ================================================================== -->
+  <!-- PHASE 7: PROMOTED                                                   -->
+  <!-- ================================================================== -->
+  <g transform="translate(1008, 80)">
+    <rect width="160" height="260" rx="8" fill="#313244" stroke="#a6e3a1" stroke-width="1.5" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="160" height="28" rx="8" fill="#a6e3a1" opacity="0.15"/>
+    <rect x="0" y="14" width="160" height="14" fill="#313244"/>
+    <text x="80" y="19" text-anchor="middle" fill="#a6e3a1" font-family="system-ui, sans-serif" font-size="12" font-weight="700">PROMOTED</text>
+
+    <text x="80" y="46" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">clusters become Divisions</text>
+
+    <!-- Promoted cluster 1 (solid green border, division badge) -->
+    <rect x="10" y="58" width="140" height="62" rx="10" fill="#a6e3a1" opacity="0.08" stroke="#a6e3a1" stroke-width="2"/>
+    <text x="80" y="76" text-anchor="middle" fill="#a6e3a1" font-family="system-ui, sans-serif" font-size="11" font-weight="700">Order Fulfillment</text>
+    <!-- Division badge -->
+    <rect x="25" y="84" width="110" height="18" rx="4" fill="#a6e3a1" opacity="0.15"/>
+    <text x="80" y="96" text-anchor="middle" fill="#a6e3a1" font-family="system-ui, sans-serif" font-size="8">division_identified_v1</text>
+    <!-- Arrow icon (promoted) -->
+    <text x="143" y="70" fill="#a6e3a1" font-family="system-ui, sans-serif" font-size="14">&#x2713;</text>
+
+    <!-- Promoted cluster 2 -->
+    <rect x="10" y="130" width="140" height="62" rx="10" fill="#a6e3a1" opacity="0.08" stroke="#a6e3a1" stroke-width="2"/>
+    <text x="80" y="148" text-anchor="middle" fill="#a6e3a1" font-family="system-ui, sans-serif" font-size="11" font-weight="700">Billing</text>
+    <rect x="25" y="156" width="110" height="18" rx="4" fill="#a6e3a1" opacity="0.15"/>
+    <text x="80" y="168" text-anchor="middle" fill="#a6e3a1" font-family="system-ui, sans-serif" font-size="8">division_identified_v1</text>
+    <text x="143" y="142" fill="#a6e3a1" font-family="system-ui, sans-serif" font-size="14">&#x2713;</text>
+
+    <text x="80" y="218" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">promote_event_cluster</text>
+
+    <circle cx="146" y="246" r="9" fill="#45475a"/>
+    <text x="146" y="250" text-anchor="middle" fill="#6c7086" font-family="system-ui, sans-serif" font-size="9" font-weight="700">7</text>
+  </g>
+
+  <!-- ================================================================== -->
+  <!-- SIDE BRANCHES: SHELVED and ARCHIVED                                 -->
+  <!-- ================================================================== -->
+
+  <!-- Shelved box (bottom left) -->
+  <g transform="translate(280, 400)">
+    <rect width="220" height="100" rx="8" fill="#313244" stroke="#f9e2af" stroke-width="1" stroke-dasharray="6 3" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="220" height="24" rx="8" fill="#f9e2af" opacity="0.1"/>
+    <rect x="0" y="12" width="220" height="12" fill="#313244"/>
+    <text x="110" y="17" text-anchor="middle" fill="#f9e2af" font-family="system-ui, sans-serif" font-size="12" font-weight="700">SHELVED</text>
+
+    <text x="110" y="44" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">Paused from any active phase.</text>
+    <text x="110" y="58" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">State preserved for later resumption.</text>
+
+    <text x="110" y="78" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">shelve_big_picture_storm  /  resume_big_picture_storm</text>
+
+    <!-- Pause icon -->
+    <rect x="192" y="38" width="6" height="16" rx="1" fill="#f9e2af" opacity="0.5"/>
+    <rect x="202" y="38" width="6" height="16" rx="1" fill="#f9e2af" opacity="0.5"/>
+  </g>
+
+  <!-- Archived box (bottom right) -->
+  <g transform="translate(700, 400)">
+    <rect width="220" height="100" rx="8" fill="#313244" stroke="#f38ba8" stroke-width="1" stroke-dasharray="6 3" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="220" height="24" rx="8" fill="#f38ba8" opacity="0.1"/>
+    <rect x="0" y="12" width="220" height="12" fill="#313244"/>
+    <text x="110" y="17" text-anchor="middle" fill="#f38ba8" font-family="system-ui, sans-serif" font-size="12" font-weight="700">ARCHIVED</text>
+
+    <text x="110" y="44" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">Terminal state. Storm data cleared.</text>
+    <text x="110" y="58" text-anchor="middle" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">All stickies, stacks, clusters, arrows removed.</text>
+
+    <text x="110" y="78" text-anchor="middle" fill="#585b70" font-family="system-ui, sans-serif" font-size="8" font-style="italic">archive_big_picture_storm</text>
+
+    <!-- X icon -->
+    <text x="200" y="55" fill="#f38ba8" font-family="system-ui, sans-serif" font-size="16" opacity="0.5">&#x2715;</text>
+  </g>
+
+  <!-- Arrow from main flow down to SHELVED -->
+  <!-- Downward arrow from middle of phase row -->
+  <path d="M 460 344 L 460 370 L 390 370 L 390 396" stroke="#f9e2af" stroke-width="1.5" fill="none" marker-end="url(#arrow-muted)" stroke-dasharray="4 2"/>
+  <text x="468" y="362" fill="#f9e2af" font-family="system-ui, sans-serif" font-size="8" opacity="0.7">from any active phase</text>
+
+  <!-- Arrow from SHELVED back up (resume) -->
+  <path d="M 340 400 L 340 375 L 270 375 L 270 344" stroke="#b4befe" stroke-width="1" fill="none" marker-end="url(#arrow)" stroke-dasharray="4 2" opacity="0.6"/>
+  <text x="254" y="370" fill="#b4befe" font-family="system-ui, sans-serif" font-size="7" opacity="0.7">resume</text>
+
+  <!-- Arrow from SHELVED to ARCHIVED -->
+  <line x1="504" y1="450" x2="696" y2="450" stroke="#6c7086" stroke-width="1" marker-end="url(#arrow-muted)" stroke-dasharray="4 2"/>
+
+  <!-- Arrow from main flow down to ARCHIVED -->
+  <path d="M 810 344 L 810 396" stroke="#f38ba8" stroke-width="1" fill="none" marker-end="url(#arrow-muted)" stroke-dasharray="4 2" opacity="0.6"/>
+  <text x="818" y="375" fill="#f38ba8" font-family="system-ui, sans-serif" font-size="8" opacity="0.7">from active or shelved</text>
+
+  <!-- ================================================================== -->
+  <!-- LEGEND                                                              -->
+  <!-- ================================================================== -->
+  <g transform="translate(32, 530)">
+    <rect width="1136" height="70" rx="6" fill="#313244" opacity="0.5"/>
+    <text x="20" y="20" fill="#6c7086" font-family="system-ui, sans-serif" font-size="10" font-weight="600">LEGEND</text>
+
+    <!-- Event Sticky -->
+    <rect x="20" y="32" width="24" height="16" rx="2" fill="#fab387" opacity="0.9"/>
+    <text x="50" y="44" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">Event Sticky</text>
+
+    <!-- Stack -->
+    <rect x="140" y="36" width="18" height="12" rx="2" fill="#fab387" opacity="0.4"/>
+    <rect x="143" y="33" width="18" height="12" rx="2" fill="#fab387" opacity="0.7"/>
+    <rect x="146" y="30" width="18" height="12" rx="2" fill="#fab387" opacity="0.9"/>
+    <circle cx="168" cy="32" r="6" fill="#f38ba8"/>
+    <text x="168" y="35" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="700">N</text>
+    <text x="182" y="44" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">Stack (count)</text>
+
+    <!-- Weight badge -->
+    <rect x="275" y="32" width="24" height="12" rx="6" fill="#f9e2af"/>
+    <text x="287" y="41" text-anchor="middle" fill="#1e1e2e" font-family="system-ui, sans-serif" font-size="7" font-weight="700">w:N</text>
+    <text x="306" y="44" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">Weight (groomed)</text>
+
+    <!-- Cluster -->
+    <rect x="420" y="30" width="36" height="20" rx="6" fill="#89b4fa" opacity="0.12" stroke="#89b4fa" stroke-width="1.5" stroke-dasharray="3 1"/>
+    <text x="462" y="44" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">Cluster (unnamed)</text>
+
+    <!-- Named Cluster -->
+    <rect x="580" y="30" width="36" height="20" rx="6" fill="#89b4fa" opacity="0.15" stroke="#89b4fa" stroke-width="1.5"/>
+    <text x="622" y="44" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">Cluster (named)</text>
+
+    <!-- Fact Arrow -->
+    <line x1="740" y1="40" x2="774" y2="40" stroke="#94e2d5" stroke-width="2" marker-end="url(#arrow-teal)"/>
+    <text x="788" y="44" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">Fact Arrow</text>
+
+    <!-- Promoted -->
+    <rect x="885" y="30" width="36" height="20" rx="6" fill="#a6e3a1" opacity="0.08" stroke="#a6e3a1" stroke-width="2"/>
+    <text x="885" y="43" fill="#a6e3a1" font-family="system-ui, sans-serif" font-size="11">&#x2713;</text>
+    <text x="928" y="44" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">Promoted (Division)</text>
+
+    <!-- Phase transition -->
+    <line x1="1060" y1="40" x2="1094" y2="40" stroke="#b4befe" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="1060" y="56" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="9">Phase transition</text>
+  </g>
+
+  <!-- ================================================================== -->
+  <!-- WATERMARK                                                           -->
+  <!-- ================================================================== -->
+  <text x="1170" y="614" text-anchor="end" fill="#45475a" font-family="system-ui, sans-serif" font-size="8">hecate-daemon / guide_venture_lifecycle</text>
+</svg>
