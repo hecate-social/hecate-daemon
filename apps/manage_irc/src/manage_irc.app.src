@@ -1,0 +1,16 @@
+{application, manage_irc, [
+    {description, "IRC channel lifecycle command service (P2P chat)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {manage_irc_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        evoq
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.
