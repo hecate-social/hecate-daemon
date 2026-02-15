@@ -1,0 +1,15 @@
+{application, query_snake_gladiators, [
+    {description, "Snake Gladiator training query service (Arcade Division)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_snake_gladiators_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        esqlite
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

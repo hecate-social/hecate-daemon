@@ -10,7 +10,7 @@
 
 -include("snake_duel.hrl").
 
--export([create_game/2, tick_game/1, spawn_food/2]).
+-export([create_game/2, tick_game/1, tick_step/3, spawn_food/2]).
 
 %%--------------------------------------------------------------------
 %% @doc Create initial game state for a match.
@@ -41,13 +41,24 @@ create_game(AF1, AF2) ->
 -spec tick_game(game_state()) -> game_state().
 tick_game(#game_state{status = Status} = State) when Status =/= running ->
     State;
-tick_game(#game_state{tick = Tick0, snake1 = S1_0, snake2 = S2_0,
+tick_game(#game_state{snake1 = S1_0, snake2 = S2_0,
                        food = Food, poison_apples = PA0} = State) ->
-    Tick = Tick0 + 1,
-
-    %% AI chooses directions
     Dir1 = snake_duel_ai:choose_direction(S1_0, S2_0, Food, PA0, player1),
     Dir2 = snake_duel_ai:choose_direction(S2_0, S1_0, Food, PA0, player2),
+    tick_step(State, Dir1, Dir2).
+
+%%--------------------------------------------------------------------
+%% @doc Advance game state by one tick with explicit directions.
+%% Unlike tick_game/1, callers supply directions instead of the
+%% heuristic AI. Poison drops remain heuristic-controlled.
+%% @end
+%%--------------------------------------------------------------------
+-spec tick_step(game_state(), direction(), direction()) -> game_state().
+tick_step(#game_state{status = Status} = State, _Dir1, _Dir2) when Status =/= running ->
+    State;
+tick_step(#game_state{tick = Tick0, snake1 = S1_0, snake2 = S2_0,
+                       food = Food, poison_apples = PA0} = State, Dir1, Dir2) ->
+    Tick = Tick0 + 1,
 
     %% Move snakes
     S1_1 = move_snake(S1_0, Dir1, Tick),
@@ -75,7 +86,7 @@ tick_game(#game_state{tick = Tick0, snake1 = S1_0, snake2 = S2_0,
             %% Check food consumption
             {S1_4, S2_4, Food1, FoodEaten} = check_food(S1_3, S2_3, Food, Tick),
 
-            %% AI decides poison drops
+            %% AI decides poison drops (heuristic-controlled even in tick_step)
             {S1_5, PA3} = maybe_drop_poison(S1_4, S2_4, PA2, player1, Tick),
             {S2_5, PA4} = maybe_drop_poison(S2_4, S1_5, PA3, player2, Tick),
 

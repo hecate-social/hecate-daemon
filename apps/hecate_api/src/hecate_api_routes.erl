@@ -32,7 +32,10 @@ routes() ->
         query_irc_routes:routes(),
         %% Arcade — Snake Duel
         run_snake_duel_routes:routes(),
-        query_snake_duel_routes:routes()
+        query_snake_duel_routes:routes(),
+        %% Arcade — Snake Gladiators
+        breed_snake_gladiators_routes:routes(),
+        query_snake_gladiators_routes:routes()
     ]).
 
 %% Routes owned by hecate_api itself (not domain apps).
