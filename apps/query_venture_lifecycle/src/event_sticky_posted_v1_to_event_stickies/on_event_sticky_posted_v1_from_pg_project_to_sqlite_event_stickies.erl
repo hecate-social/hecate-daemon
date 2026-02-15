@@ -20,7 +20,7 @@ init([]) ->
 
 handle_info({events, Events}, State) ->
     lists:foreach(fun(E) ->
-        case event_sticky_posted_v1_to_sqlite_event_stickies:project(E) of
+        case event_sticky_posted_v1_to_sqlite_event_stickies:project(projection_event:to_map(E)) of
             ok -> ok;
             {error, Reason} ->
                 logger:warning("[~s] projection failed: ~p", [?EVENT_TYPE, Reason])

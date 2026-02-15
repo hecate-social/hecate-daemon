@@ -13,7 +13,7 @@ This document describes the complete architecture of Hecate daemon, a lightweigh
 - [Event Flow](#event-flow)
 - [Supervision Tree](#supervision-tree)
 - [Data Storage](#data-storage)
-- [Cartwheel Architecture](#cartwheel-architecture)
+- [Division Architecture](#division-architecture)
   - [The Three Sequences](#the-three-sequences)
 - [Mesh Integration](#mesh-integration)
 - [Scaling Considerations](#scaling-considerations)
@@ -576,40 +576,40 @@ CREATE INDEX idx_capabilities_tags ON capabilities(tags);  -- JSON search
 
 ---
 
-## Cartwheel Architecture
+## Division Architecture
 
-The Cartwheel Architecture (from DisComCo - "Majestic Modularity") provides the conceptual foundation for how hecate organizes code and integrates with the mesh.
+The Division Architecture (from DisComCo - "Majestic Modularity") provides the conceptual foundation for how hecate organizes code and integrates with the mesh.
 
 > **Educational Guides:** For in-depth understanding of each sequence, see:
-> - [Cartwheel Overview](../guides/CARTWHEEL_OVERVIEW.md) — The wheel metaphor and core principles
+> - [Division Overview](../guides/CARTWHEEL_OVERVIEW.md) — The wheel metaphor and core principles
 > - [Write Sequence (CMD)](../guides/CARTWHEEL_WRITE_SEQUENCE.md) — How commands enter and become events
 > - [Projection Sequence (PRJ)](../guides/CARTWHEEL_PROJECTION_SEQUENCE.md) — How events become read models
 > - [Query Sequence (QRY)](../guides/CARTWHEEL_QUERY_SEQUENCE.md) — How data is retrieved
 
-![Cartwheel Architecture](../assets/cartwheel-architecture.svg)
+![Division Architecture](../assets/cartwheel-architecture.svg)
 
 ### Core Concept: The Wheel
 
 The architecture visualizes a system as a wheel:
 
 - **Hub (Center)**: Aggregate State - the core domain model
-- **Spokes**: Vertical slices - each spoke is a business capability
+- **Desks**: Vertical slices - each desk is a business capability
 - **Outer Ring**: Integration infrastructure - storage, messaging, telemetry, etc.
 
 ### Key Principles
 
 | Principle | Description |
 |-----------|-------------|
-| **Spokes = Vertical Slices** | Each spoke is a unit of cohesion, containing all code for one capability |
-| **Spoke Defined by Command** | A spoke is identified by the command it processes (e.g., `announce_capability/`) |
-| **Spokes "Scream" Intent** | Directory and module names immediately reveal business purpose |
-| **Decoupling via Exchange** | Integration infrastructure sits on the outer ring, not inside spokes |
-| **Unit of Deployment** | Each spoke can be deployed and scaled independently |
+| **Desks = Vertical Slices** | Each desk is a unit of cohesion, containing all code for one capability |
+| **Desk Defined by Command** | A desk is identified by the command it processes (e.g., `announce_capability/`) |
+| **Desks "Scream" Intent** | Directory and module names immediately reveal business purpose |
+| **Decoupling via Exchange** | Integration infrastructure sits on the outer ring, not inside desks |
+| **Unit of Deployment** | Each desk can be deployed and scaled independently |
 | **Compatible with DDD/ES/CQRS** | Works naturally with Domain-Driven Design, Event Sourcing, and Actor Model |
 
 ### Integration Infrastructure
 
-The outer ring provides infrastructure services that spokes connect to:
+The outer ring provides infrastructure services that desks connect to:
 
 - **Storage**: ReckonDB (event store), SQLite (read models)
 - **Event Log**: Immutable record of all domain events
@@ -694,7 +694,7 @@ Requester (Agent A)           Responder (Agent B)
 
 ### The Three Sequences
 
-The Cartwheel Architecture defines three fundamental sequences that handle all data flow:
+The Division Architecture defines three fundamental sequences that handle all data flow:
 
 #### 1. Write Sequence (CMD)
 

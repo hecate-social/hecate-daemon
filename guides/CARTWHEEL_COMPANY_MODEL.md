@@ -1,12 +1,14 @@
-# Cartwheel Architecture: The Company Model
+# Division Architecture: The Division Model
 
-> A mental model for understanding domain services as small specialized companies.
+> *Note: "Cartwheel" is the historical name for what is now called "Division Architecture".*
 
-![Company Model](../assets/cartwheel-company-model.svg)
+> A mental model for understanding domain services as small specialized divisions.
+
+![Division Model](../assets/cartwheel-company-model.svg)
 
 ## Overview
 
-Think of each **Domain Service** as a small company that specializes in one business process. This company has three departments:
+Think of each **Domain Service** as a small division that specializes in one business process. This division has three departments:
 
 | Department | Role | Analogy |
 |------------|------|---------|
@@ -18,11 +20,11 @@ Each department has **frontdesks** (public-facing) and **backoffice desks** (int
 
 ---
 
-## The Company Structure
+## The Division Structure
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        CAPABILITY COMPANY                               │
+│                       CAPABILITY DIVISION                               │
 │                   (manage_capabilities domain)                          │
 ├───────────────────────┬───────────────────────┬─────────────────────────┤
 │      CMD Dept         │       PRJ Dept        │        QRY Dept         │
@@ -50,13 +52,13 @@ The CMD department handles all incoming work and processes dossiers.
 Frontdesks are the entry points for external communication:
 
 **HOPE Inbox (Responder)**
-- Receives requests from the mesh (other companies)
+- Receives requests from the mesh (other divisions)
 - Records the reception
 - Translates HOPE → internal Command
 - Passes to appropriate backoffice desk
 
 **FACT Subscription (Listener)**
-- Subscribes to events from other companies
+- Subscribes to events from other divisions
 - Receives external FACTs
 - Translates FACT → internal Command
 - Passes to appropriate backoffice desk
@@ -135,7 +137,7 @@ Each desk maintains specific filing cabinets:
 
 **Emitter Filers** — file to external destinations (mesh)
 - `capability_announced_to_mesh` — "files" to mesh topic
-- This is how our events become FACTs for other companies
+- This is how our events become FACTs for other divisions
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -155,7 +157,7 @@ Each desk maintains specific filing cabinets:
 │  │                        │  │                        │         │
 │  │ Files to:              │  │ Files to:              │         │
 │  │ [capabilities table]   │  │ [MESH TOPIC]           │         │
-│  │ (local cabinet)        │  │ (external company)     │         │
+│  │ (local cabinet)        │  │ (external division)    │         │
 │  └────────────────────────┘  └────────────────────────┘         │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -220,7 +222,7 @@ Each desk answers specific questions:
 
 ## Complete Flow: Three Entry Points
 
-### 1. External HOPE (Request from another company)
+### 1. External HOPE (Request from another division)
 
 ```
 External HOPE arrives
@@ -242,7 +244,7 @@ PRJ Backoffice [Filers]
     • Emit to mesh (becomes FACT for others)
 ```
 
-### 2. External FACT (Event from another company)
+### 2. External FACT (Event from another division)
 
 ```
 External FACT arrives
@@ -296,15 +298,15 @@ QRY Backoffice [Specialist]
 
 ## Mapping to Code
 
-| Company Concept | Code Artifact |
-|-----------------|---------------|
-| Company | Domain app (`manage_capabilities`) |
+| Division Concept | Code Artifact |
+|------------------|---------------|
+| Division | Domain app (`manage_capabilities`) |
 | CMD Department | `manage_capabilities_sup` children |
 | PRJ Department | `query_capabilities_sup` children |
 | QRY Department | `query_capabilities.erl` + store |
 | Frontdesk (HOPE) | `*_responder_v1.erl` |
 | Frontdesk (FACT) | `*_listener.erl` |
-| Backoffice Desk | `*_spoke_sup` + handler |
+| Backoffice Desk | `*_desk_sup` + handler |
 | Command Inbox | `maybe_*.erl` handle/1 |
 | PM Inbox | `on_*_maybe_*.erl` |
 | Tube Mail | Event published to store |
@@ -333,4 +335,4 @@ QRY Backoffice [Specialist]
 
 ---
 
-*The company processes dossiers. Each desk adds its slip. The filing cabinets remember everything.* 🗝️
+*The division processes dossiers. Each desk adds its slip. The filing cabinets remember everything.*

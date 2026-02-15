@@ -36,6 +36,13 @@ init([]) ->
             restart => permanent,
             type => supervisor
         },
+        %% Projection: venture_repo_scaffolded_v1 -> ventures table
+        #{
+            id => venture_repo_scaffolded_v1_to_ventures_sup,
+            start => {venture_repo_scaffolded_v1_to_ventures_sup, start_link, []},
+            restart => permanent,
+            type => supervisor
+        },
         %% Projection: venture_archived_v1 -> ventures table
         #{
             id => venture_archived_v1_to_ventures_sup,

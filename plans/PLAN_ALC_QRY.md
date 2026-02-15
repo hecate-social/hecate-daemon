@@ -18,10 +18,10 @@ CREATE TABLE IF NOT EXISTS projects (
     finding_count INTEGER DEFAULT 0,
     term_count INTEGER DEFAULT 0,
     dossier_count INTEGER DEFAULT 0,
-    spoke_count INTEGER DEFAULT 0,
+    desk_count INTEGER DEFAULT 0,
     plan_approved INTEGER DEFAULT 0,
     skeleton_created INTEGER DEFAULT 0,
-    implemented_spoke_count INTEGER DEFAULT 0,
+    implemented_desk_count INTEGER DEFAULT 0,
     build_verified INTEGER DEFAULT 0,
     deployment_count INTEGER DEFAULT 0,
     active_incidents INTEGER DEFAULT 0,
@@ -76,22 +76,22 @@ CREATE TABLE IF NOT EXISTS dossier_designs (
 CREATE INDEX IF NOT EXISTS idx_dossiers_project ON dossier_designs(project_id);
 ```
 
-### spoke_inventory
+### desk_inventory
 
 ```sql
-CREATE TABLE IF NOT EXISTS spoke_inventory (
-    spoke_id TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS desk_inventory (
+    desk_id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
-    spoke_name TEXT NOT NULL,
-    spoke_type TEXT NOT NULL,
+    desk_name TEXT NOT NULL,
+    desk_type TEXT NOT NULL,
     priority TEXT DEFAULT 'p1',
     dossier_id TEXT,
     description TEXT,
     inventoried_at INTEGER,
     implemented INTEGER DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS idx_spokes_project ON spoke_inventory(project_id);
-CREATE INDEX IF NOT EXISTS idx_spokes_type ON spoke_inventory(spoke_type);
+CREATE INDEX IF NOT EXISTS idx_desks_project ON desk_inventory(project_id);
+CREATE INDEX IF NOT EXISTS idx_desks_type ON desk_inventory(desk_type);
 ```
 
 ### plans
@@ -115,8 +115,8 @@ CREATE INDEX IF NOT EXISTS idx_plans_project ON plans(project_id);
 CREATE TABLE IF NOT EXISTS implementations (
     implementation_id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
-    spoke_id TEXT,
-    spoke_name TEXT NOT NULL,
+    desk_id TEXT,
+    desk_name TEXT NOT NULL,
     commit_ref TEXT,
     implemented_at INTEGER
 );
@@ -187,7 +187,7 @@ All projections subscribe to `manage_alc_store` events via `query_alc_subscriber
 |-----------|-------------|--------------|--------|
 | `architecture_started_v1_to_projects` | `architecture_started_v1` | projects | UPDATE phase_started_at |
 | `dossier_defined_v1_to_dossiers` | `dossier_defined_v1` | dossier_designs | INSERT; UPDATE projects dossier_count |
-| `spoke_inventoried_v1_to_spokes` | `spoke_inventoried_v1` | spoke_inventory | INSERT; UPDATE projects spoke_count |
+| `desk_inventoried_v1_to_spokes` | `desk_inventoried_v1` | desk_inventory | INSERT; UPDATE projects desk_count |
 | `plan_drafted_v1_to_plans` | `plan_drafted_v1` | plans | INSERT |
 | `plan_approved_v1_to_plans` | `plan_approved_v1` | plans | UPDATE approved; UPDATE projects plan_approved |
 | `architecture_completed_v1_to_projects` | `architecture_completed_v1` | projects | UPDATE status |
@@ -198,7 +198,7 @@ All projections subscribe to `manage_alc_store` events via `query_alc_subscriber
 |-----------|-------------|--------------|--------|
 | `testing_started_v1_to_projects` | `testing_started_v1` | projects | UPDATE phase_started_at |
 | `skeleton_scaffolded_v1_to_projects` | `skeleton_scaffolded_v1` | projects | UPDATE skeleton_created |
-| `spoke_implemented_v1_to_implementations` | `spoke_implemented_v1` | implementations | INSERT; UPDATE projects implemented_spoke_count; UPDATE spoke_inventory implemented |
+| `desk_implemented_v1_to_implementations` | `desk_implemented_v1` | implementations | INSERT; UPDATE projects implemented_desk_count; UPDATE desk_inventory implemented |
 | `build_verified_v1_to_projects` | `build_verified_v1` | projects | UPDATE build_verified |
 | `testing_completed_v1_to_projects` | `testing_completed_v1` | projects | UPDATE status |
 
@@ -262,15 +262,15 @@ SELECT * FROM dossier_designs
   ORDER BY defined_at ASC
 ```
 
-### `list_spoke_inventory/`
+### `list_desk_inventory/`
 
 ```sql
-SELECT * FROM spoke_inventory
+SELECT * FROM desk_inventory
   WHERE project_id = ?
   ORDER BY priority ASC, inventoried_at ASC
 ```
 
-Optional filters: `spoke_type`, `implemented` (0 or 1)
+Optional filters: `desk_type`, `implemented` (0 or 1)
 
 ### `list_implementations/`
 
@@ -334,8 +334,8 @@ Optional filters: `status` (open=1, resolved=4), `severity`
 | POST | `/alc/projects/:project_id/architecture/start` | architecture_start | Start architecture |
 | POST | `/alc/projects/:project_id/architecture/dossiers` | architecture_dossier | Define a dossier |
 | GET | `/alc/projects/:project_id/architecture/dossiers` | architecture_list_dossiers | List dossier designs |
-| POST | `/alc/projects/:project_id/architecture/spokes` | architecture_spoke | Inventory a spoke |
-| GET | `/alc/projects/:project_id/architecture/spokes` | architecture_list_spokes | List spoke inventory |
+| POST | `/alc/projects/:project_id/architecture/desks` | architecture_desk | Inventory a desk |
+| GET | `/alc/projects/:project_id/architecture/desks` | architecture_list_desks | List desk inventory |
 | POST | `/alc/projects/:project_id/architecture/plan` | architecture_plan | Draft a plan |
 | POST | `/alc/projects/:project_id/architecture/approve` | architecture_approve | Approve plan |
 | POST | `/alc/projects/:project_id/architecture/complete` | architecture_complete | Complete architecture |
@@ -346,7 +346,7 @@ Optional filters: `status` (open=1, resolved=4), `severity`
 |--------|------|--------|-------------|
 | POST | `/alc/projects/:project_id/testing/start` | testing_start | Start testing |
 | POST | `/alc/projects/:project_id/testing/skeleton` | testing_skeleton | Record skeleton creation |
-| POST | `/alc/projects/:project_id/testing/implement` | testing_implement | Record spoke implementation |
+| POST | `/alc/projects/:project_id/testing/implement` | testing_implement | Record desk implementation |
 | GET | `/alc/projects/:project_id/testing/implementations` | testing_list | List implementations |
 | POST | `/alc/projects/:project_id/testing/verify` | testing_verify | Record build verification |
 | POST | `/alc/projects/:project_id/testing/complete` | testing_complete | Complete testing |
@@ -400,12 +400,12 @@ Commands for `hecate-tui` to integrate with the ALC daemon API.
 |---------|-------------|
 | `/architecture start` | Start architecture phase |
 | `/architecture dossier <name>` | Define a dossier (prompts for stream_pattern, description) |
-| `/architecture spoke <name>` | Inventory a spoke (prompts for type, priority, dossier) |
+| `/architecture desk <name>` | Inventory a desk (prompts for type, priority, dossier) |
 | `/architecture plan <ref>` | Draft plan reference |
 | `/architecture approve` | Approve the plan |
 | `/architecture complete` | Complete architecture (checks gate) |
 | `/architecture dossiers` | List dossier designs |
-| `/architecture spokes` | List spoke inventory |
+| `/architecture desks` | List desk inventory |
 
 ### Testing Commands (contextual — only when in TnI phase)
 
@@ -413,7 +413,7 @@ Commands for `hecate-tui` to integrate with the ALC daemon API.
 |---------|-------------|
 | `/testing start` | Start testing phase |
 | `/testing skeleton` | Record walking skeleton creation |
-| `/testing spoke <name>` | Record spoke implementation (prompts for commit_ref) |
+| `/testing desk <name>` | Record desk implementation (prompts for commit_ref) |
 | `/testing verify` | Record build verification |
 | `/testing complete` | Complete testing (checks gate) |
 | `/testing list` | List implementations |
@@ -466,13 +466,13 @@ apps/query_alc/
 │   ├── discovery_completed_v1_to_projects.erl
 │   ├── architecture_started_v1_to_projects.erl
 │   ├── dossier_defined_v1_to_dossiers.erl
-│   ├── spoke_inventoried_v1_to_spokes.erl
+│   ├── desk_inventoried_v1_to_spokes.erl
 │   ├── plan_drafted_v1_to_plans.erl
 │   ├── plan_approved_v1_to_plans.erl
 │   ├── architecture_completed_v1_to_projects.erl
 │   ├── testing_started_v1_to_projects.erl
 │   ├── skeleton_scaffolded_v1_to_projects.erl
-│   ├── spoke_implemented_v1_to_implementations.erl
+│   ├── desk_implemented_v1_to_implementations.erl
 │   ├── build_verified_v1_to_projects.erl
 │   ├── testing_completed_v1_to_projects.erl
 │   ├── deployment_started_v1_to_projects.erl
@@ -492,8 +492,8 @@ apps/query_alc/
 │   │   └── list_terms.erl
 │   ├── list_dossier_designs/
 │   │   └── list_dossier_designs.erl
-│   ├── list_spoke_inventory/
-│   │   └── list_spoke_inventory.erl
+│   ├── list_desk_inventory/
+│   │   └── list_desk_inventory.erl
 │   ├── list_implementations/
 │   │   └── list_implementations.erl
 │   ├── list_deployments/
@@ -516,7 +516,7 @@ apps/query_alc/
     "src/list_findings",
     "src/list_terms",
     "src/list_dossier_designs",
-    "src/list_spoke_inventory",
+    "src/list_desk_inventory",
     "src/list_implementations",
     "src/list_deployments",
     "src/list_incidents"

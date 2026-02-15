@@ -10,6 +10,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("guide_venture_lifecycle/include/venture_lifecycle_status.hrl").
+-include_lib("reckon_gater/include/esdb_gater_types.hrl").
 
 %% ===================================================================
 %% Test generators
@@ -30,7 +31,9 @@ projection_test_() ->
             {"roundtrip: project venture then query by id",      fun roundtrip_venture_by_id/0},
             {"roundtrip: project venture then query page",       fun roundtrip_venture_page/0},
             {"roundtrip: project divisions then query page",     fun roundtrip_divisions_page/0},
-            {"roundtrip: archived venture excluded from active", fun roundtrip_archived_not_active/0}
+            {"roundtrip: archived venture excluded from active", fun roundtrip_archived_not_active/0},
+            {"raw #event{} record crashes project/1 (the bug)", fun raw_record_crashes_project/0},
+            {"#event{} via projection_event:to_map projects correctly", fun record_via_to_map_projects/0}
         ]
     }.
 
@@ -260,3 +263,44 @@ roundtrip_archived_not_active() ->
         [<<"v-arch-1">>, ?VL_ARCHIVED]),
     Status = get_single_value(StatusRows),
     ?assert(Status band ?VL_ARCHIVED =/= 0).
+
+%% ===================================================================
+%% Bug proof: #event{} record vs flat map
+%% ===================================================================
+
+%% Helper: wrap business data in an #event{} record (as ReckonDB delivers)
+wrap_in_event_record(EventData) ->
+    #event{
+        event_id = <<"evt-bug-test">>,
+        event_type = <<"venture_initiated_v1">>,
+        stream_id = <<"venture_aggregate-v-record-1">>,
+        version = 0,
+        data = EventData,
+        metadata = #{},
+        timestamp = 1000,
+        epoch_us = 1000000
+    }.
+
+raw_record_crashes_project() ->
+    %% This proves the bug: passing an #event{} record to project/1
+    %% crashes with badarg because project/1 calls maps:find on a tuple.
+    EventData = initiated_event(<<"v-record-1">>),
+    EventRecord = wrap_in_event_record(EventData),
+    %% OTP 28+ raises {badmap, _} instead of badarg
+    ?assertError({badmap, _}, venture_initiated_v1_to_sqlite_ventures:project(EventRecord)).
+
+record_via_to_map_projects() ->
+    %% This proves the fix: projection_event:to_map/1 converts #event{}
+    %% to a flat map that project/1 can consume.
+    EventData = initiated_event(<<"v-record-2">>),
+    EventRecord = wrap_in_event_record(EventData),
+    FlatMap = projection_event:to_map(EventRecord),
+    ok = venture_initiated_v1_to_sqlite_ventures:project(FlatMap),
+    %% Verify it actually projected to SQLite
+    {ok, Rows} = query_venture_lifecycle_store:query(
+        "SELECT venture_id, name FROM ventures WHERE venture_id = ?1",
+        [<<"v-record-2">>]),
+    ?assertEqual(1, length(Rows)),
+    [[VId, Name]] = Rows,
+    ?assertEqual(<<"v-record-2">>, VId),
+    ?assertEqual(<<"Test Venture">>, Name).

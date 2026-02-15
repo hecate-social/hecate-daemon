@@ -266,7 +266,7 @@ I made TWO mistakes with listeners:
 1. **First mistake:** Created `hecate_mesh/src/listeners/` (horizontal) — FIXED by moving to domains
 2. **Second mistake:** Put listeners as loose files in domain `src/` — WRONG AGAIN
 
-**The truth:** Listeners are **slices/spokes**. A domain has many slices. Each slice gets its own directory.
+**The truth:** Listeners are **slices/desks**. A domain has many slices. Each slice gets its own directory.
 
 **Corrected structure:**
 ```
@@ -286,17 +286,17 @@ apps/manage_social/src/
 
 **Added to CLAUDE.md demon list:**
 - `listener.erl` loose in `src/` → "Listeners are SLICES. Create directories."
-- Domain sup → listener directly → "Listeners are spokes. Spoke supervises its workers."
+- Domain sup → listener directly → "Listeners are desks. Desk supervises its workers."
 
 **All 7 listeners moved to slice directories.**
 
 ---
 
-## 2026-02-02 PATTERN LEARNED: Every Spoke Has Its Own Supervisor
+## 2026-02-02 PATTERN LEARNED: Every Desk Has Its Own Supervisor
 
 **The goddess taught me:**
 
-> "EVERY SPOKE/SLICE will have its dedicated Spoke/Slice Supervisor!"
+> "EVERY DESK/SLICE will have its dedicated Desk/Slice Supervisor!"
 
 **This is WHY slices need directories** — they contain both:
 1. The supervisor (`*_sup.erl`)
@@ -305,11 +305,11 @@ apps/manage_social/src/
 **Supervision hierarchy (CORRECT):**
 ```
 Domain Supervisor (manage_social_sup)
-├── Spoke Supervisor (follower_events_listener_sup)
+├── Desk Supervisor (follower_events_listener_sup)
 │   └── follower_events_listener (worker)
-├── Spoke Supervisor (endorsement_events_listener_sup)
+├── Desk Supervisor (endorsement_events_listener_sup)
 │   └── endorsement_events_listener (worker)
-└── ... other spokes
+└── ... other desks
 ```
 
 **NOT:**
@@ -319,7 +319,7 @@ Domain Supervisor (manage_social_sup)
 └── endorsement_events_listener (worker)
 ```
 
-**Created 7 spoke supervisors:**
+**Created 7 desk supervisors:**
 - `follower_events_listener_sup.erl`
 - `endorsement_events_listener_sup.erl`
 - `subscriber_events_listener_sup.erl`
@@ -328,7 +328,7 @@ Domain Supervisor (manage_social_sup)
 - `remote_capabilities_listener_sup.erl`
 - `remote_identities_listener_sup.erl`
 
-**Updated 6 domain supervisors to start spoke supervisors (not workers directly).**
+**Updated 6 domain supervisors to start desk supervisors (not workers directly).**
 
 **Added to CLAUDE.md "GOOD PATTERNS" section.**
 
@@ -1374,7 +1374,7 @@ Socket path: `~/.config/hecate/connectors/{name}.sock`
 
 **Phase 1: Route Extraction + manage_connectors Domain**
 - `hecate_api_routes.erl` — single source of truth for all Cowboy routes
-- `apps/manage_connectors/` — full Cartwheel domain with 4 spokes
+- `apps/manage_connectors/` — full Division domain with 4 desks
 - `connector_aggregate.erl` — bit flag status (REGISTERED=1, ACTIVE=2, SUSPENDED=4, REVOKED=8)
 - ReckonDB store for connector events
 
@@ -1453,7 +1453,7 @@ Fixed 2 dialyzer warnings:
 
 ### Summary
 
-Completed the full refactoring of `serve_llm` to proper Cartwheel architecture with Process Managers for cross-domain integration.
+Completed the full refactoring of `serve_llm` to proper Division architecture with Process Managers for cross-domain integration.
 
 ### serve_llm Structure (Final)
 
@@ -1520,6 +1520,6 @@ apps/manage_capabilities/src/
 1. **No central dispatchers** — each emitter owns its topic
 2. **Process Managers for cross-domain** — loose coupling via event subscription
 3. **LLM capabilities ARE capabilities** — use existing infrastructure with `type = <<"llm">>`
-4. **Each responder in its slice** — Cartwheel architecture
+4. **Each responder in its slice** — Division architecture
 
 ---

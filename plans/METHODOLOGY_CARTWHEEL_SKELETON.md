@@ -1,8 +1,10 @@
-# Methodology: Cartwheel & Walking Skeleton
+# Methodology: Division & Walking Skeleton
+
+> **Note:** This file was originally named `METHODOLOGY_CARTWHEEL_SKELETON.md`. The filename is preserved to avoid breaking cross-references, but the content uses current terminology (Division/Desk).
 
 ## Status: DRAFT (2026-02-08)
 
-This document describes the Cartwheel architecture pattern and Walking Skeleton implementation approach used in the Hecate ecosystem.
+This document describes the Division architecture pattern and Walking Skeleton implementation approach used in the Hecate ecosystem.
 
 ---
 
@@ -10,7 +12,7 @@ This document describes the Cartwheel architecture pattern and Walking Skeleton 
 
 The Hecate development methodology combines two powerful patterns:
 
-1. **Cartwheel** - A bounded context organized as a hub with spokes (vertical slices)
+1. **Division** - A bounded context organized as a hub with desks (vertical slices)
 2. **Walking Skeleton** - Thin end-to-end implementation first, then flesh out
 
 Together, they ensure:
@@ -21,11 +23,11 @@ Together, they ensure:
 
 ---
 
-## The Cartwheel Pattern
+## The Division Pattern
 
 ### Concept
 
-A **Cartwheel** represents one bounded context as a hub-and-spoke structure:
+A **Division** represents one bounded context as a hub-and-desk structure:
 
 ```
                     ┌─────────┐
@@ -36,7 +38,7 @@ A **Cartwheel** represents one bounded context as a hub-and-spoke structure:
          │               │               │
          ▼               ▼               ▼
    ┌──────────┐   ┌──────────┐   ┌──────────┐
-   │  SPOKE   │   │  SPOKE   │   │  SPOKE   │
+   │  DESK    │   │  DESK    │   │  DESK    │
    │ (slice)  │   │ (slice)  │   │ (slice)  │
    └──────────┘   └──────────┘   └──────────┘
 ```
@@ -49,35 +51,35 @@ The **Hub** is the central coordinator:
 - Shared state and invariants
 - Entry point for the context
 
-### Spokes
+### Desks
 
-Each **Spoke** is a vertical slice:
+Each **Desk** is a vertical slice:
 - One command OR one query
 - All layers included (handler, events, projections)
 - Self-contained and independently testable
 - Connects to hub for coordination
 
-### Spoke Types
+### Desk Types
 
 | Type | Purpose | Produces |
 |------|---------|----------|
-| **Command Spoke** | Changes state | Events |
-| **Query Spoke** | Reads state | Data |
-| **Listener Spoke** | Reacts to external events | Commands |
-| **Emitter Spoke** | Publishes to external systems | Facts |
+| **Command Desk** | Changes state | Events |
+| **Query Desk** | Reads state | Data |
+| **Listener Desk** | Reacts to external events | Commands |
+| **Emitter Desk** | Publishes to external systems | Facts |
 
 ---
 
-## Cartwheel Anatomy
+## Division Anatomy
 
 ### Command Context Example
 
 ```
-CARTWHEEL: manage_capabilities
+DIVISION: manage_capabilities
 
 Hub: capability_aggregate
 
-Spokes:
+Desks:
 ├── announce_capability/     (Command)
 │   ├── announce_capability_v1.erl
 │   ├── capability_announced_v1.erl
@@ -99,11 +101,11 @@ Spokes:
 ### Query Context Example
 
 ```
-CARTWHEEL: query_capabilities
+DIVISION: query_capabilities
 
 Hub: capabilities_read_model
 
-Spokes:
+Desks:
 ├── find_capability/         (Query)
 │   └── find_capability.erl
 │
@@ -120,12 +122,12 @@ Spokes:
 
 ---
 
-## Spoke Structure
+## Desk Structure
 
-### Command Spoke
+### Command Desk
 
 ```
-spoke: record_interaction/
+desk: record_interaction/
 ├── record_interaction_v1.erl       # Command definition
 ├── interaction_recorded_v1.erl     # Event definition
 ├── maybe_record_interaction.erl    # Handler (business logic)
@@ -192,10 +194,10 @@ handle(#record_interaction_v1{} = Cmd, State) ->
     end.
 ```
 
-### Query Spoke
+### Query Desk
 
 ```
-spoke: find_capability/
+desk: find_capability/
 ├── find_capability.erl      # Query implementation
 └── find_capability_test.erl # Tests
 ```
@@ -244,12 +246,12 @@ A **Walking Skeleton** is the thinnest possible end-to-end implementation:
 
 ## Walking Skeleton Process
 
-### Step 1: Identify All Spokes
+### Step 1: Identify All Desks
 
 ```markdown
 # Skeleton Plan: geo_check
 
-## Spokes to Skeleton
+## Desks to Skeleton
 - [ ] check_ip (Command)
 - [ ] reload_config (Command)
 - [ ] get_status (Query)
@@ -260,7 +262,7 @@ A **Walking Skeleton** is the thinnest possible end-to-end implementation:
 - [ ] Status endpoint → get_status
 ```
 
-### Step 2: Implement Skeleton for Each Spoke
+### Step 2: Implement Skeleton for Each Desk
 
 **check_ip skeleton:**
 ```erlang
@@ -367,10 +369,10 @@ curl -X POST http://localhost:4444/api/geo/check -d '{"ip":"1.2.3.4"}'
 
 ## Templates
 
-### Cartwheel Template
+### Division Template
 
 ```markdown
-# Cartwheel: <context_name>
+# Division: <context_name>
 
 ## Context
 <One paragraph describing this bounded context and its responsibility>
@@ -380,9 +382,9 @@ curl -X POST http://localhost:4444/api/geo/check -d '{"ip":"1.2.3.4"}'
 - **Responsibility:** <what it coordinates>
 - **State:** <what state it maintains>
 
-## Spokes
+## Desks
 
-### Spoke: <name> (Command)
+### Desk: <name> (Command)
 - **Purpose:** <what this command does>
 - **Input:** <command fields>
 - **Output:** <success/error>
@@ -390,18 +392,18 @@ curl -X POST http://localhost:4444/api/geo/check -d '{"ip":"1.2.3.4"}'
 - **Handler:** <handler module>
 - **Invariants:** <business rules enforced>
 
-### Spoke: <name> (Query)
+### Desk: <name> (Query)
 - **Purpose:** <what data this retrieves>
 - **Input:** <query parameters>
 - **Output:** <data shape>
 - **Source:** <read model or projection>
 
-### Spoke: <name> (Listener)
+### Desk: <name> (Listener)
 - **Subscribes to:** <external event source>
 - **Produces:** <commands to dispatch>
 - **Handler:** <listener module>
 
-### Spoke: <name> (Emitter)
+### Desk: <name> (Emitter)
 - **Triggered by:** <domain events>
 - **Publishes to:** <external topic/channel>
 - **Format:** <fact structure>
@@ -412,8 +414,8 @@ curl -X POST http://localhost:4444/api/geo/check -d '{"ip":"1.2.3.4"}'
 
 ## Walking Skeleton
 
-| Spoke | Skeleton Behavior | Fleshed Out |
-|-------|-------------------|-------------|
+| Desk | Skeleton Behavior | Fleshed Out |
+|------|-------------------|-------------|
 | <name> | <minimal impl> | [ ] |
 
 ## Integration Points
@@ -430,18 +432,18 @@ curl -X POST http://localhost:4444/api/geo/check -d '{"ip":"1.2.3.4"}'
 ## Goal
 <What this skeleton proves>
 
-## Spokes
+## Desks
 
-| Spoke | Type | Skeleton Behavior |
-|-------|------|-------------------|
+| Desk | Type | Skeleton Behavior |
+|------|------|-------------------|
 | <name> | CMD | <hardcoded response> |
 | <name> | QRY | <static data> |
 
 ## Integration Points
-- [ ] <endpoint/interface> → <spoke> → <response>
+- [ ] <endpoint/interface> → <desk> → <response>
 
 ## Definition of Done
-- [ ] All spokes callable
+- [ ] All desks callable
 - [ ] End-to-end request works
 - [ ] Basic tests exist
 - [ ] Deployable to dev
@@ -454,8 +456,8 @@ curl -X POST http://localhost:4444/api/geo/check -d '{"ip":"1.2.3.4"}'
 - <performance optimization>
 
 ## Flesh-Out Order
-1. <highest value spoke first>
-2. <next spoke>
+1. <highest value desk first>
+2. <next desk>
 3. ...
 
 ## Skeleton Flags
@@ -474,12 +476,12 @@ Include `skeleton: true` in responses so consumers know this is not real:
 - **Skeleton first** - Resist the urge to implement fully before integrating
 - **Deploy immediately** - Skeleton should be in dev/staging from day 1
 - **Mark skeleton responses** - Include flags so testers know what's real
-- **One spoke at a time** - Flesh out completely before moving on
+- **One desk at a time** - Flesh out completely before moving on
 - **Test at skeleton level** - Basic tests prove wiring works
 
 ### Don't
 
-- **Don't skip spokes** - Every spoke needs a skeleton, even trivial ones
+- **Don't skip desks** - Every desk needs a skeleton, even trivial ones
 - **Don't over-engineer skeleton** - It's throwaway code
 - **Don't block on skeleton** - It's meant to unblock parallel work
 - **Don't remove skeleton flags early** - Keep until fully fleshed
@@ -489,7 +491,7 @@ Include `skeleton: true` in responses so consumers know this is not real:
 
 ## Example: Full Cycle
 
-### 1. Receive Torch Brief
+### 1. Receive Venture Brief
 ```
 "We need geo-restriction to block access from sanctioned countries"
 ```
@@ -504,14 +506,14 @@ Contexts: GEO_CHECK, ACCESS_CONTROL, CONFIG, AUDIT_LOG
 Start with: GEO_CHECK (foundation)
 ```
 
-### 4. AnP Designs Cartwheel
+### 4. AnP Designs Division
 ```
-Spokes: check_ip, reload_config, get_status
+Desks: check_ip, reload_config, get_status
 ```
 
 ### 5. TnI Implements Skeleton
 ```
-Day 1: All spokes return hardcoded/dummy values
+Day 1: All desks return hardcoded/dummy values
 Day 1: Deployed to dev
 Day 1: API endpoints wired up
 ```
@@ -527,7 +529,7 @@ Day 5: Full test coverage
 ### 7. DnO Deploys to Production
 ```
 Day 6: geo_check in production
-Day 7: Next Cartwheel begins (ACCESS_CONTROL)
+Day 7: Next Division begins (ACCESS_CONTROL)
 ```
 
 **Total: One week from brief to production.**

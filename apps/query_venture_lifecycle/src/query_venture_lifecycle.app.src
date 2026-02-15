@@ -8,6 +8,7 @@
         stdlib,
         esqlite,
         evoq,
+        shared,
         guide_venture_lifecycle
     ]},
     {env, []},

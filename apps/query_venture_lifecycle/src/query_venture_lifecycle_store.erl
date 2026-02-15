@@ -23,6 +23,7 @@ init([]) ->
     ok = esqlite3:exec(Db, "PRAGMA journal_mode=WAL;"),
     ok = esqlite3:exec(Db, "PRAGMA synchronous=NORMAL;"),
     ok = create_tables(Db),
+    ok = migrate_schema(Db),
     {ok, #state{db = Db}}.
 
 -spec init_schema() -> ok.
@@ -96,8 +97,26 @@ step_until_done(Stmt) ->
     case esqlite3:step(Stmt) of
         '$done' -> ok;
         {row, _} -> step_until_done(Stmt);
-        ok -> ok
+        ok -> ok;
+        {error, Code} ->
+            logger:error("[query_venture_lifecycle_store] SQLite step error: ~p", [Code]),
+            {error, Code}
     end.
+
+migrate_schema(Db) ->
+    %% Add columns that may be missing from existing databases.
+    %% SQLite ALTER TABLE ADD COLUMN is a no-op if column already exists
+    %% (returns error which we ignore).
+    Migrations = [
+        "ALTER TABLE ventures ADD COLUMN repo_path TEXT;"
+    ],
+    lists:foreach(fun(Sql) ->
+        case esqlite3:exec(Db, Sql) of
+            ok -> ok;
+            {error, _} -> ok  %% Column already exists
+        end
+    end, Migrations),
+    ok.
 
 create_tables(Db) ->
     Stmts = [
@@ -107,6 +126,7 @@ create_tables(Db) ->
             brief TEXT,
             status INTEGER NOT NULL DEFAULT 0,
             status_label TEXT DEFAULT 'New',
+            repo_path TEXT,
             repos TEXT,
             skills TEXT,
             context_map TEXT,

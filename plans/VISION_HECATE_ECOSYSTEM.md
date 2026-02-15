@@ -29,27 +29,27 @@ The multi-agent model reflects Hecate's three-bodied nature.
 
 ## Core Concepts
 
-### 1. Torch
+### 1. Venture
 
-**A Torch is an idea you're illuminating** - a business endeavor that manifests across multiple repositories.
+**A Venture is a business endeavor you're illuminating** - manifesting across multiple repositories.
 
 Not "a collection of repos" but "the thing I'm building" - represented as a dedicated repository that acts as the project's brain.
 
 ```
-~/work/github.com/hecate-social/macula-platform/    # THE TORCH
+~/work/github.com/hecate-social/macula-platform/    # THE VENTURE
 ├── VISION.md                 # Why does this exist?
 ├── CONTEXT_MAP.md            # Big picture
-├── torch.toml                # Repo references, config
+├── venture.toml              # Repo references, config
 ├── tasks/                    # Task artifacts (by ALC phase)
 ├── decisions/                # ADRs
 └── diagrams/                 # Architecture SVGs
 ```
 
-The Torch repo references code repos:
+The Venture repo references code repos:
 
 ```toml
-# torch.toml
-[torch]
+# venture.toml
+[venture]
 name = "macula-platform"
 description = "Macula mesh + Hecate AI development environment"
 
@@ -69,7 +69,7 @@ Opinionated directory layout:
 ~/work/
 ├── github.com/
 │   ├── hecate-social/
-│   │   ├── macula-platform/     # Torch repo
+│   │   ├── macula-platform/     # Venture repo
 │   │   ├── hecate-daemon/       # Code repo
 │   │   └── hecate-tui/          # Code repo
 │   └── macula-io/
@@ -144,7 +144,7 @@ DnA (Discovery & Analysis)
         ▼
 AnP (Architecture & Planning)
 ├── PATHWAY_*.md        - Which context first, why
-├── CARTWHEEL_*.md      - Spoke design per context
+├── DIVISION_*.md       - Desk design per context
 ├── ADR/                - Architecture Decision Records
 ├── PLAN_*.md           - Implementation plans
 ├── KANBAN.md           - Living task board
@@ -170,10 +170,10 @@ DnO (Deployment & Operations)
 
 ## The Hecate Workflow
 
-### Torch Ignition Pipeline
+### Venture Ignition Pipeline
 
 ```
-1. TORCH BRIEF (Human)
+1. VENTURE BRIEF (Human)
    └── 200-500 words: What? Why? For whom?
                 │
                 ▼
@@ -184,22 +184,22 @@ DnO (Deployment & Operations)
                 ▼
 3. PATHWAY SELECTION (Human decides)
    └── Choose ONE context from the crossroads
-   └── This becomes the first Cartwheel
+   └── This becomes the first Division
                 │
                 ▼
-4. CARTWHEEL DESIGN (Hecate-AnP)
-   └── Identify spokes (domain slices)
-   └── Output: CARTWHEEL_<context>.md
+4. DIVISION DESIGN (Hecate-AnP)
+   └── Identify desks (domain slices)
+   └── Output: DIVISION_<context>.md
                 │
                 ▼
 5. WALKING SKELETON (Hecate-TnI)
    └── Thin end-to-end implementation
-   └── One slice per spoke, barely functional
+   └── One slice per desk, barely functional
    └── Proves the architecture works
                 │
                 ▼
 6. FLESH OUT (Hecate-TnI, iterative)
-   └── Spoke by spoke, add real functionality
+   └── Desk by desk, add real functionality
    └── Human reviews, agents implement
                 │
                 ▼
@@ -208,10 +208,10 @@ DnO (Deployment & Operations)
    └── Iterate with real feedback
 ```
 
-### Torch Brief Template
+### Venture Brief Template
 
 ```markdown
-# Torch Brief: [Name]
+# Venture Brief: [Name]
 
 ## What
 [One paragraph: What are we building?]
@@ -252,26 +252,26 @@ Output of DnA iteration. Shows bounded contexts and their relationships.
 
 Human selects ONE context to start. This is the "crossroads decision" - Hecate illuminates the path chosen.
 
-### Cartwheel
+### Division
 
-One context = one Cartwheel = one process service.
+One context = one Division = one bounded context of software.
 
-A Cartwheel has spokes (domain slices):
+A Division has desks (domain slices):
 
 ```
-         CARTWHEEL: geo_check
+         DIVISION: geo_check
               │
     ┌─────────┼─────────┐
     │         │         │
     ▼         ▼         ▼
-  SPOKE     SPOKE     SPOKE
+  DESK      DESK      DESK
   (CMD)     (CMD)     (QRY)
 
   check_ip  reload    get_status
             _config
 ```
 
-Each spoke is a vertical slice with its own:
+Each desk is a vertical slice with its own:
 - Command/Query
 - Handler
 - Events (if command)
@@ -281,7 +281,7 @@ Each spoke is a vertical slice with its own:
 
 Thin end-to-end implementation:
 
-1. One minimal slice per spoke
+1. One minimal slice per desk
 2. Barely functional but complete path
 3. Proves architecture works
 4. Deploy to production immediately
@@ -299,7 +299,7 @@ Thin end-to-end implementation:
 | suggest | Detect + offer contextual suggestions (default) |
 | aggressive | Deep integration, language idioms, auto-actions |
 
-Configurable per torch and per repo.
+Configurable per venture and per repo.
 
 ### Git Integration
 
@@ -316,7 +316,7 @@ Agent negotiation model:
 - Proceed when consensus reached
 - Human can override with logged justification
 
-Configurable strictness per torch:
+Configurable strictness per venture:
 - strict: Must have artifacts
 - guided: Warns but allows
 - advisory: Suggests only
@@ -348,7 +348,7 @@ Agents are Erlang processes (actors):
 %% Spawn a TnI agent for a task
 {ok, Pid} = hecate_agent:spawn(tni, #{
     task => <<"geo-restriction">>,
-    torch => <<"macula-platform">>
+    venture => <<"macula-platform">>
 }).
 
 %% Agents communicate
@@ -364,19 +364,19 @@ Agents coordinate commits across repos:
 2. Verifies all tests pass
 3. Requests human approval
 4. Executes coordinated commit with linked IDs
-5. Manifests recorded in Torch repo
+5. Manifests recorded in Venture repo
 
 ---
 
 ## Commands Reference
 
-### Torch Management
+### Venture Management
 ```
-/torch                    # Show current torch
-/torch list               # List all torches
-/torch <name>             # Switch torch
-/torch new <name>         # Create new torch
-/torch templates          # Show available templates
+/venture                  # Show current venture
+/venture list             # List all ventures
+/venture <name>           # Switch venture
+/venture new <name>       # Create new venture
+/venture templates        # Show available templates
 ```
 
 ### Agent Management
@@ -416,46 +416,46 @@ Agents coordinate commits across repos:
 ```
 /status                   # Cross-repo git status
 /commit                   # Guided commit
-/commit --torch           # Coordinated cross-repo commit
+/commit --venture         # Coordinated cross-repo commit
 /push                     # Push and optionally PR
 /cycle                    # Show trunk-based cycle status
 ```
 
 ---
 
-## Torch as Event Stream
+## Venture as Event Stream
 
 ### The Core Insight
 
-**A Torch is not just a repository—it's an aggregate with an event stream.**
+**A Venture is not just a repository—it's an aggregate with an event stream.**
 
-Every significant action in a Torch's lifecycle is captured as an event. Artifacts (VISION.md, CONTEXT_MAP.md, etc.) become projections of these events, not primary sources.
+Every significant action in a Venture's lifecycle is captured as an event. Artifacts (VISION.md, CONTEXT_MAP.md, etc.) become projections of these events, not primary sources.
 
 ```
-TORCH AGGREGATE
+VENTURE AGGREGATE
 ├── State (current phase, active agents, task board)
 ├── Event Stream (complete history)
 └── Projections (artifacts, dashboards, reports)
 ```
 
-### Why Event Sourcing for Torches?
+### Why Event Sourcing for Ventures?
 
 1. **Complete History** - Every decision, every change, every agent action recorded
 2. **Time Travel** - "What did the context map look like before that refactor?"
 3. **Auditability** - Perfect record for compliance, learning, AI training
 4. **Mesh Distribution** - Events naturally distribute across the mesh
-5. **Multi-Agent Coordination** - Agents subscribe to Torch events, react appropriately
+5. **Multi-Agent Coordination** - Agents subscribe to Venture events, react appropriately
 
 ### Event Types by Phase
 
 #### Ignition Events
 ```erlang
-%% Torch lifecycle
-torch_ignited_v1          %% Torch created with initial brief
-torch_paused_v1           %% Work paused (human decision)
-torch_resumed_v1          %% Work resumed
-torch_completed_v1        %% Torch achieved its goal
-torch_archived_v1         %% Torch retired to history
+%% Venture lifecycle
+venture_initiated_v1      %% Venture created with initial brief
+venture_paused_v1         %% Work paused (human decision)
+venture_resumed_v1        %% Work resumed
+venture_completed_v1      %% Venture achieved its goal
+venture_archived_v1       %% Venture retired to history
 ```
 
 #### DnA Phase Events
@@ -473,7 +473,7 @@ requirements_captured_v1  %% Requirements documented
 ```erlang
 %% Architecture & Planning
 pathway_selected_v1       %% Human chose which context first
-cartwheel_designed_v1     %% Spoke structure defined
+division_designed_v1      %% Desk structure defined
 adr_recorded_v1           %% Architecture decision made
 plan_drafted_v1           %% Implementation plan created
 task_added_v1             %% Task added to kanban
@@ -484,8 +484,8 @@ task_estimated_v1         %% Story points assigned
 ```erlang
 %% Testing & Implementation
 skeleton_started_v1       %% Walking skeleton begun
-spoke_skeleton_complete_v1 %% One spoke wired up
-spoke_fleshed_out_v1      %% Spoke fully implemented
+desk_skeleton_complete_v1 %% One desk wired up
+desk_fleshed_out_v1       %% Desk fully implemented
 test_added_v1             %% Test coverage increased
 code_reviewed_v1          %% PR reviewed and approved
 ```
@@ -510,7 +510,7 @@ The litmus test: *"If a human did this work instead of an agent, would this even
 |-------|---------------|-----------|
 | `context_map_drafted_v1` | ✅ Yes | We'd record that a context map was drafted |
 | `agent_spawned_v1` | ❌ No | "Employee clocked in" isn't project history |
-| `spoke_tests_passed_v1` | ✅ Yes | We'd record that tests passed |
+| `desk_tests_passed_v1` | ✅ Yes | We'd record that tests passed |
 | `tokens_consumed_v1` | ❌ No | "Sarah drank 3 coffees" isn't project history |
 
 Agent lifecycle events (`agent_spawned`, `agent_retired`, `task_picked_up`) are **operational telemetry**, not domain events. They belong in a separate observability system.
@@ -522,7 +522,7 @@ Events project into multiple views:
 | Projection | Purpose | Updated By |
 |------------|---------|------------|
 | **Artifact Files** | VISION.md, CONTEXT_MAP.md, etc. | File writer on relevant events |
-| **TUI Dashboard** | Real-time Torch status | Live subscription |
+| **TUI Dashboard** | Real-time Venture status | Live subscription |
 | **Kanban Board** | Task tracking | task_* events |
 | **Progress Metrics** | Velocity, completion rate | Aggregate domain events |
 | **Audit Log** | Compliance record | All domain events |
@@ -533,7 +533,7 @@ Events project into multiple views:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     TORCH EVENT STREAM                       │
+│                   VENTURE EVENT STREAM                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
 │  Local (ReckonDB)                                            │
@@ -546,7 +546,7 @@ Events project into multiple views:
 │  ├── Cross-device sync                                       │
 │  └── Content-addressed for integrity                         │
 │                                                               │
-│  Torch Repo (Git)                                            │
+│  Venture Repo (Git)                                          │
 │  ├── Artifact projections (markdown files)                   │
 │  ├── Human-readable history                                  │
 │  └── Versioned snapshots                                     │
@@ -560,10 +560,10 @@ Events project into multiple views:
 Human: "We need geo-restriction for compliance"
         │
         ▼
-[torch_ignited_v1]
-├── torch_id: "macula-geo"
+[venture_initiated_v1]
+├── venture_id: "macula-geo"
 ├── brief: "Geo-restriction for compliance..."
-└── ignited_by: "human:rl"
+└── initiated_by: "human:rl"
         │
         ▼
 Projection: Creates ~/work/.../macula-geo/BRIEF.md
@@ -590,7 +590,7 @@ Projection: Updates CONTEXT_MAP.md
 └── approved_by: "human:rl"
         │
         ▼
-Torch complete! Full history preserved.
+Venture complete! Full history preserved.
 ```
 
 ### Benefits
@@ -611,7 +611,7 @@ The agent swarm uses a hybrid model: long-lived phase specialists for continuity
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         TORCH AGENT SWARM                            │
+│                       VENTURE AGENT SWARM                            │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                       │
 │  SPECIALISTS (Long-lived, one per phase)                             │
@@ -637,12 +637,12 @@ The agent swarm uses a hybrid model: long-lived phase specialists for continuity
 
 ### Specialists
 
-Four specialists spawn when the Torch ignites. They're long-lived and phase-aware:
+Four specialists spawn when the Venture initiates. They're long-lived and phase-aware:
 
 | Specialist | Responsibilities |
 |------------|------------------|
 | **DnA Specialist** | Research, context discovery, requirements gathering |
-| **AnP Specialist** | Architecture decisions, cartwheel design, planning |
+| **AnP Specialist** | Architecture decisions, division design, planning |
 | **TnI Specialist** | Implementation, testing, code review coordination |
 | **DnO Specialist** | Deployment, monitoring, incident response |
 
@@ -676,14 +676,14 @@ Generalists retire, specialist consolidates findings
 ### Pool Configuration
 
 ```toml
-# torch.toml or ~/.config/hecate-tui/config.toml
+# venture.toml or ~/.config/hecate-tui/config.toml
 [agents.pool]
 min_generalists = 0        # No idle generalists by default
 max_generalists = 8        # Hard cap on concurrent assistants
 idle_timeout = "5m"        # Retire idle generalists after 5 min
 
 [agents.specialists]
-spawn_on_ignition = true   # All 4 specialists spawn immediately
+spawn_on_initiation = true # All 4 specialists spawn immediately
 idle_allowed = true        # Specialists can idle (don't retire)
 ```
 
@@ -738,7 +738,7 @@ Aggregate telemetry into per-agent scorecards:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  AGENT SCORECARD: DnA-Specialist                             │
-│  Torch: macula-geo | Period: Last 7 days                    │
+│  Venture: macula-geo | Period: Last 7 days                   │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
 │  Tasks Completed:     12        Avg Duration:    8.3 min     │
@@ -851,14 +851,14 @@ markers = ["rebar.config", "apps/*/src/*_aggregate.erl"]
 confidence = "high"  # Auto-apply if markers found
 ```
 
-### Torch Configuration
+### Venture Configuration
 
 ```toml
-# torch.toml
-[torch]
+# venture.toml
+[venture]
 name = "macula-platform"
 
-# Default profile for all repos in this Torch
+# Default profile for all repos in this Venture
 default_profile = "erlang-cqrs"
 
 [repos."hecate-social/hecate-daemon"]
@@ -878,7 +878,7 @@ skills_add = ["hecate-tui-commands"]
 | Type | Location | Purpose |
 |------|----------|---------|
 | **Philosophy** | `philosophy/` | Mental models (DDD, vertical slicing) |
-| **Guides** | `guides/` | How-to knowledge (cartwheel sequences) |
+| **Guides** | `guides/` | How-to knowledge (division sequences) |
 | **Codegen** | `skills/codegen/` | Templates and patterns |
 | **Antipatterns** | `skills/` | What NOT to do |
 | **Language** | `skills/{lang}/` | Language-specific idioms |
@@ -946,7 +946,7 @@ All agents run on the local daemon where the TUI is connected:
          │
          │ (mesh for data sync only)
          ▼
-    Macula Mesh (Torch events, artifacts)
+    Macula Mesh (Venture events, artifacts)
 ```
 
 **Why local-only for v1:**
@@ -956,7 +956,7 @@ All agents run on the local daemon where the TUI is connected:
 - Proves the agent model before adding distribution complexity
 
 The mesh is still used for:
-- Torch event replication across devices
+- Venture event replication across devices
 - Artifact synchronization
 - Capability announcements (for future discovery)
 
@@ -965,7 +965,7 @@ The mesh is still used for:
 Evolution path when distribution is needed:
 
 ```toml
-# torch.toml (future)
+# venture.toml (future)
 [agents]
 default_placement = "local"  # Specialists and generalists local
 
@@ -982,7 +982,7 @@ tni_specialist = "beam03.lab"  # Has GPU for ML tests
 **Future capabilities:**
 - Generalist overflow to remote nodes when local capacity exceeded
 - Explicit placement for resource requirements (GPU, memory)
-- Torch homing for shared/team scenarios
+- Venture homing for shared/team scenarios
 - Capability-based auto-placement
 
 ---
@@ -996,7 +996,7 @@ Team collaboration follows a staged evolution:
 ```
 v1: SINGLE HUMAN                 v2: SEQUENTIAL HANDOFF           v3: ROLE-BASED
 ┌─────────────────┐              ┌─────────────────┐              ┌─────────────────┐
-│ Torch           │              │ Torch           │              │ Torch           │
+│ Venture         │              │ Venture         │              │ Venture         │
 │ └── Owner: rl   │      →       │ └── Owner: rl   │      →       │ └── Humans:     │
 │ └── Agents: 4+N │              │ └── Handoff Log │              │     ├── rl (own)│
 │                 │              │ └── Agents: 4+N │              │     ├── alice   │
@@ -1004,13 +1004,13 @@ v1: SINGLE HUMAN                 v2: SEQUENTIAL HANDOFF           v3: ROLE-BASED
                                                                   └─────────────────┘
 ```
 
-### v1: Single Human per Torch
+### v1: Single Human per Venture
 
-One human owns each Torch. Agents respond only to that human.
+One human owns each Venture. Agents respond only to that human.
 
 ```toml
-# torch.toml
-[torch]
+# venture.toml
+[venture]
 name = "macula-platform"
 owner = "rl"  # Only rl can interact with agents
 ```
@@ -1072,7 +1072,7 @@ SQLite stores telemetry locally by default. Optional Prometheus export for power
 │  ├── task_traces     - spans with parent relationships       │
 │  └── agent_logs      - structured logs with severity         │
 │                                                               │
-│  All records include: torch_id, agent_id, timestamp          │
+│  All records include: venture_id, agent_id, timestamp        │
 │                                                               │
 └─────────────────────────────────────────────────────────────┘
          │
@@ -1080,22 +1080,22 @@ SQLite stores telemetry locally by default. Optional Prometheus export for power
          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  Prometheus Export (:9090/metrics)                           │
-│  ├── hecate_tokens_total{torch, agent, model}                │
-│  ├── hecate_task_duration_seconds{torch, agent, phase}       │
-│  ├── hecate_tasks_completed_total{torch, agent}              │
-│  └── hecate_errors_total{torch, agent, type}                 │
+│  ├── hecate_tokens_total{venture, agent, model}              │
+│  ├── hecate_task_duration_seconds{venture, agent, phase}     │
+│  ├── hecate_tasks_completed_total{venture, agent}            │
+│  └── hecate_errors_total{venture, agent, type}               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Torch Attribution
+### Venture Attribution
 
-All telemetry is attributed to a Torch for cost tracking and analysis:
+All telemetry is attributed to a Venture for cost tracking and analysis:
 
 ```sql
 -- agent_metrics table
 CREATE TABLE agent_metrics (
     id INTEGER PRIMARY KEY,
-    torch_id TEXT NOT NULL,      -- Which Torch
+    venture_id TEXT NOT NULL,    -- Which Venture
     agent_id TEXT NOT NULL,      -- Which agent
     metric_name TEXT NOT NULL,   -- tokens_used, task_duration, etc.
     metric_value REAL NOT NULL,
@@ -1104,7 +1104,7 @@ CREATE TABLE agent_metrics (
 );
 
 -- Indexes for common queries
-CREATE INDEX idx_metrics_torch ON agent_metrics(torch_id, timestamp);
+CREATE INDEX idx_metrics_venture ON agent_metrics(venture_id, timestamp);
 CREATE INDEX idx_metrics_agent ON agent_metrics(agent_id, timestamp);
 ```
 
@@ -1125,18 +1125,18 @@ port = 9090
 ### TUI Commands
 
 ```
-/metrics                      # Summary across all Torches
-/metrics torch macula-geo     # Metrics for specific Torch
-/scorecard dna-specialist     # Agent scorecard
-/cost                         # LLM cost breakdown by Torch
-/cost macula-geo              # Cost for specific Torch
+/metrics                         # Summary across all Ventures
+/metrics venture macula-geo      # Metrics for specific Venture
+/scorecard dna-specialist        # Agent scorecard
+/cost                            # LLM cost breakdown by Venture
+/cost macula-geo                 # Cost for specific Venture
 ```
 
 ### Why This Approach
 
 1. **Works offline** - SQLite has no external dependencies
 2. **Zero config default** - Just works out of the box
-3. **Torch-attributed** - Every metric tied to a Torch for billing/analysis
+3. **Venture-attributed** - Every metric tied to a Venture for billing/analysis
 4. **Power user friendly** - Enable Prometheus for Grafana dashboards
 5. **Retention managed** - Auto-cleanup prevents unbounded growth
 
@@ -1235,7 +1235,7 @@ Every LLM call is attributed with full context for flexible analysis:
 ```sql
 CREATE TABLE llm_calls (
     id INTEGER PRIMARY KEY,
-    torch_id TEXT NOT NULL,
+    venture_id TEXT NOT NULL,
     agent_id TEXT NOT NULL,
     task_id TEXT,              -- NULL for non-task calls
     model TEXT NOT NULL,       -- claude-3-opus, ollama/llama3, etc.
@@ -1251,9 +1251,9 @@ CREATE TABLE llm_calls (
 Show summaries by default, drill down on demand:
 
 ```
-/cost                           # Torch-level summary (default)
+/cost                           # Venture-level summary (default)
 
-Torch                    Tokens        Cost (USD)
+Venture                  Tokens        Cost (USD)
 ─────────────────────────────────────────────────
 macula-geo               145,230       $4.35
 macula-platform          892,100       $26.76
@@ -1265,7 +1265,7 @@ Total (30 days)                        $38.15
 ```
 /cost macula-geo                # Agent breakdown
 
-Agent                    Tokens        Cost (USD)   % of Torch
+Agent                    Tokens        Cost (USD)   % of Venture
 ─────────────────────────────────────────────────────────────
 DnA-Specialist           45,000        $1.35        31%
 AnP-Specialist           62,000        $1.86        43%
@@ -1281,7 +1281,7 @@ Task                           Agent         Tokens    Cost
 ────────────────────────────────────────────────────────────
 Draft context map              DnA           12,000    $0.36
 Research geo_check context     DnA            8,500    $0.26
-Design geo_check cartwheel     AnP           18,000    $0.54
+Design geo_check division      AnP           18,000    $0.54
 ...
 ```
 
@@ -1317,18 +1317,18 @@ Pricing stored in config, updated as providers change:
 | Question | Command |
 |----------|---------|
 | What's my total spend? | `/cost` |
-| Which Torch costs most? | `/cost` |
-| Which phase is expensive? | `/cost {torch}` |
-| What tasks burn tokens? | `/cost {torch} --tasks` |
+| Which Venture costs most? | `/cost` |
+| Which phase is expensive? | `/cost {venture}` |
+| What tasks burn tokens? | `/cost {venture} --tasks` |
 | Should I use a cheaper model? | `/cost --by-model` |
-| Compare Torch efficiency | `/cost --per-task-avg` |
+| Compare Venture efficiency | `/cost --per-task-avg` |
 
 ### Why Full Attribution
 
 1. **Optimization** - Identify expensive tasks, switch models
-2. **Budgeting** - Set per-Torch or per-month limits
-3. **Comparison** - Which Torch is most efficient?
-4. **Billing** - If Torches have different funding sources
+2. **Budgeting** - Set per-Venture or per-month limits
+3. **Comparison** - Which Venture is most efficient?
+4. **Billing** - If Ventures have different funding sources
 5. **Learning** - Understand cost drivers over time
 
 ---
@@ -1345,10 +1345,10 @@ Pricing stored in config, updated as providers change:
 | Domain vs Telemetry | Domain events = business outcomes; Telemetry = operational metrics |
 | Skill System | Profiles + layered detection: auto-detect → profile → per-repo override |
 | Mesh Distribution | v1: Local-only; Future: Hybrid with overflow to remote nodes |
-| Team Collaboration | v1: Single human per Torch; v2: Sequential handoff; v3: Role-based |
-| Telemetry Infrastructure | SQLite embedded + optional Prometheus export; Torch-attributed |
+| Team Collaboration | v1: Single human per Venture; v2: Sequential handoff; v3: Role-based |
+| Telemetry Infrastructure | SQLite embedded + optional Prometheus export; Venture-attributed |
 | Human Feedback UX | Hybrid: approval-is-feedback + optional quick react (y/n/c) |
-| Cost Attribution | Full hierarchy (Torch→Agent→Task) + model-aware; progressive disclosure |
+| Cost Attribution | Full hierarchy (Venture→Agent→Task) + model-aware; progressive disclosure |
 
 ### Remaining
 
@@ -1356,7 +1356,7 @@ Pricing stored in config, updated as providers change:
 3. **Team Collaboration:** Multiple humans + shared agent pool?
 4. **Telemetry Infrastructure:** Prometheus vs custom vs hybrid?
 5. **Human Feedback UX:** How to make rating frictionless in TUI?
-6. **Cost Attribution:** How to allocate LLM costs across Torches/tasks?
+6. **Cost Attribution:** How to allocate LLM costs across Ventures/tasks?
 
 ---
 
@@ -1373,8 +1373,8 @@ Pricing stored in config, updated as providers change:
 
 ## Next Steps
 
-1. Complete Cartwheel and Walking Skeleton documentation
+1. Complete Division and Walking Skeleton documentation
 2. Prototype agent spawning in hecate-daemon
 3. Design TUI command center view
-4. Implement Torch repo structure
+4. Implement Venture repo structure
 5. Create skill profiles in hecate-agents

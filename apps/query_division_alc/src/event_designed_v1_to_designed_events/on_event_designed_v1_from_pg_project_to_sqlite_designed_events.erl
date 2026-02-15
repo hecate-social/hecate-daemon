@@ -19,7 +19,7 @@ init([]) ->
 
 handle_info({events, Events}, State) ->
     lists:foreach(fun(E) ->
-        case event_designed_v1_to_sqlite_designed_events:project(E) of
+        case event_designed_v1_to_sqlite_designed_events:project(projection_event:to_map(E)) of
             ok -> ok;
             {error, Reason} ->
                 logger:warning("[~s] projection failed: ~p", [?EVENT_TYPE, Reason])

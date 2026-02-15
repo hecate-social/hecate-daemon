@@ -5,11 +5,11 @@
 project(Event) ->
     ArrowId = get(arrow_id, Event),
     VentureId = get(venture_id, Event),
-    StormNumber = get(storm_number, Event),
+    StormNumber = get(storm_number, Event, 0),
     FromCluster = get(from_cluster, Event),
     ToCluster = get(to_cluster, Event),
     FactName = get(fact_name, Event),
-    CreatedAt = get(created_at, Event, erlang:system_time(millisecond)),
+    CreatedAt = get(drawn_at, Event, erlang:system_time(millisecond)),
     logger:info("[PROJECTION] ~s: projecting arrow ~s", [?MODULE, ArrowId]),
     Sql = "INSERT INTO fact_arrows "
           "(arrow_id, venture_id, storm_number, from_cluster, to_cluster, fact_name, created_at) "

@@ -1,4 +1,4 @@
-%%% @doc Spoke supervisor for remote_learning_listener
+%%% @doc Desk supervisor for remote_learning_listener
 -module(remote_learning_listener_sup).
 -behaviour(supervisor).
 

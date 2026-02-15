@@ -110,7 +110,7 @@ What does a "learning" contain?
 
 ---
 
-## CMD Spokes
+## CMD Desks
 
 ### submit_learning/
 
@@ -237,7 +237,7 @@ Agent subscribes to receive learnings from a mentor.
 
 ---
 
-## PRJ Spokes (Projections)
+## PRJ Desks (Projections)
 
 ### Local Read Models (SQLite)
 
@@ -302,7 +302,7 @@ CREATE TABLE remote_learnings (
 
 ---
 
-## QRY Spokes
+## QRY Desks
 
 ### find_learning/
 
@@ -416,14 +416,14 @@ When receiving a learning from a trusted mentor:
 ### Phase 1: Local Learning Store
 
 - [ ] Create `mentor_agents` app structure
-- [ ] Implement `submit_learning/` spoke
+- [ ] Implement `submit_learning/` desk
 - [ ] Implement basic projections
 - [ ] Local query capability
 
 ### Phase 2: Mentor Validation
 
-- [ ] Implement `validate_learning/` spoke
-- [ ] Implement `reject_learning/` spoke
+- [ ] Implement `validate_learning/` desk
+- [ ] Implement `reject_learning/` desk
 - [ ] Mentor status checks (tie to reputation)
 
 ### Phase 3: Mesh Publishing
@@ -434,14 +434,14 @@ When receiving a learning from a trusted mentor:
 
 ### Phase 4: Subscription Model
 
-- [ ] Implement `subscribe_to_mentor/` spoke
+- [ ] Implement `subscribe_to_mentor/` desk
 - [ ] Mentor discovery on mesh
 - [ ] Filtered learning propagation
 
 ### Phase 5: Endorsement & Disputes
 
-- [ ] Implement `endorse_learning/` spoke
-- [ ] Implement `dispute_learning/` spoke
+- [ ] Implement `endorse_learning/` desk
+- [ ] Implement `dispute_learning/` desk
 - [ ] Reputation impacts
 
 ---
@@ -456,7 +456,7 @@ apps/mentor_agents/
 │   ├── mentor_agents_store.erl
 │   │
 │   ├── submit_learning/
-│   │   ├── submit_learning_spoke_sup.erl
+│   │   ├── submit_learning_desk_sup.erl
 │   │   ├── submit_learning_v1.erl
 │   │   ├── learning_submitted_v1.erl
 │   │   ├── maybe_submit_learning.erl

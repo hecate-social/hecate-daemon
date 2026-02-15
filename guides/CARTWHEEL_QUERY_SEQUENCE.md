@@ -1,4 +1,6 @@
-# Cartwheel Architecture: Query Sequence (QRY)
+# Division Architecture: Query Sequence (QRY)
+
+> *Note: "Cartwheel" is the historical name for what is now called "Division Architecture".*
 
 > How data is retrieved — the read side of CQRS.
 

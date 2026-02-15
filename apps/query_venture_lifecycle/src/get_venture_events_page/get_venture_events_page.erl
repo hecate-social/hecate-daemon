@@ -2,6 +2,8 @@
 %%% Returns paginated events from the event store.
 -module(get_venture_events_page).
 
+-include_lib("evoq/include/evoq_types.hrl").
+
 -export([get/1, get/3]).
 
 -spec get(binary()) -> {ok, map()} | {error, term()}.
@@ -10,8 +12,7 @@ get(VentureId) ->
 
 -spec get(binary(), non_neg_integer(), pos_integer()) -> {ok, map()} | {error, term()}.
 get(VentureId, Offset, Limit) ->
-    StreamId = <<"venture_aggregate-", VentureId/binary>>,
-    case reckon_evoq_adapter:read(dev_studio_store, StreamId, Offset, Limit, forward) of
+    case reckon_evoq_adapter:read(dev_studio_store, VentureId, Offset, Limit, forward) of
         {ok, Events} ->
             FormattedEvents = [format_event(E) || E <- Events],
             {ok, #{
@@ -24,6 +25,13 @@ get(VentureId, Offset, Limit) ->
             {error, Reason}
     end.
 
+format_event(#evoq_event{event_type = Type, data = Data, version = Version, timestamp = Ts}) ->
+    #{
+        event_type => Type,
+        data => Data,
+        version => Version,
+        timestamp => Ts
+    };
 format_event(Event) when is_map(Event) ->
     #{
         event_type => maps:get(<<"event_type">>, Event, maps:get(event_type, Event, unknown)),

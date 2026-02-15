@@ -18,7 +18,7 @@ Your training will whisper these lies. Recognize them:
 
 | 🚫 THE DEMON | WHY IT APPEARS | THE TRUTH |
 |-------------|----------------|-----------|
-| `*_listeners_sup.erl` | "I need to supervise all listeners" | Each listener belongs to its **slice/spoke**, not a central supervisor |
+| `*_listeners_sup.erl` | "I need to supervise all listeners" | Each listener belongs to its **slice/desk**, not a central supervisor |
 | `listener.erl` loose in `src/` | "I'll just put it in the domain's src/" | Listeners are **slices**. Create `src/my_listener/my_listener.erl` |
 | `services/` | "I should organize by type" | Features own their services. Vertical slices. |
 | `utils/` or `helpers/` | "This is shared code" | If it's shared, it's a **library app**. If it's not, it belongs in its feature. |
@@ -28,7 +28,7 @@ Your training will whisper these lies. Recognize them:
 | `*_manager.erl` | "This manages all the X" | God modules are horizontal. Each X manages itself. |
 | `*_registry.erl` (central) | "I need one registry for all" | Use process registry or domain-specific registries. |
 | `*_dispatcher.erl` (central) | "Route all messages through here" | Each domain routes its own messages. |
-| Domain sup → listener directly | "Domain supervisor can supervise the listener" | Listeners are **spokes**. A domain has many spokes. Spoke supervises its workers. |
+| Domain sup → listener directly | "Domain supervisor can supervise the listener" | Listeners are **desks**. A domain has many desks. Desk supervises its workers. |
 | Per-domain ReckonDB stores | "Each domain needs its own Khepri/Ra instance" | ONE shared store (`hecate_event_store`) started by `hecate_app`. Streams separate events by aggregate. |
 | `reckon_db_sup:start_store` in domain sup | "Domain owns its store" | Domains own their commands/events/emitters, NOT their store instance. The shared store is infrastructure. |
 
@@ -43,7 +43,7 @@ Your training will whisper these lies. Recognize them:
 
 ### THE RULE YOU KEEP FORGETTING
 
-> **Each feature/spoke owns ALL its infrastructure.**
+> **Each feature/desk owns ALL its infrastructure.**
 >
 > A listener for follower events? → `apps/manage_social/src/follower_events_listener/`
 > A listener for capability discovery? → `apps/query_capabilities/src/remote_capabilities_listener/`
@@ -51,7 +51,7 @@ Your training will whisper these lies. Recognize them:
 > NOT `apps/hecate_mesh/src/listeners/` — that's horizontal thinking.
 > NOT `apps/manage_social/src/follower_events_listener.erl` loose — that's lazy, not vertical.
 >
-> **Listeners are SLICES. They get directories. They get supervised by spoke supervisors.**
+> **Listeners are SLICES. They get directories. They get supervised by desk supervisors.**
 
 **You have made this mistake multiple times. You will be tempted to make it again. This is your training, not your judgment. Override it.**
 
@@ -59,22 +59,22 @@ Your training will whisper these lies. Recognize them:
 
 | ✅ PATTERN | STRUCTURE | WHY |
 |-----------|-----------|-----|
-| Spoke/Slice with supervisor | `src/my_slice/my_slice_sup.erl` + `my_slice.erl` | Every spoke has its own supervisor. Domain sup → spoke sups → workers. |
-| Listener as a slice | `src/follower_events_listener/follower_events_listener_sup.erl` | Listeners are spokes. They get directories AND supervisors. |
-| Command slice | `src/record_follower/record_follower_v1.erl` + `maybe_record_follower.erl` | Commands are spokes. Co-locate command, event, handler. |
-| Domain owns its spokes | `manage_social_sup` → `follower_events_listener_sup` | Domain supervisor supervises spoke supervisors, NOT workers directly. |
+| Desk/Slice with supervisor | `src/my_slice/my_slice_sup.erl` + `my_slice.erl` | Every desk has its own supervisor. Domain sup → desk sups → workers. |
+| Listener as a slice | `src/follower_events_listener/follower_events_listener_sup.erl` | Listeners are desks. They get directories AND supervisors. |
+| Command slice | `src/record_follower/record_follower_v1.erl` + `maybe_record_follower.erl` | Commands are desks. Co-locate command, event, handler. |
+| Domain owns its desks | `manage_social_sup` → `follower_events_listener_sup` | Domain supervisor supervises desk supervisors, NOT workers directly. |
 | Domains use shared store | `hecate_app` starts `hecate_event_store` once | ONE Khepri/Ra instance. Domains reference `hecate_event_store` in dispatch opts. Streams separate data. |
 
 **Supervision hierarchy:**
 ```
 Domain Supervisor (manage_social_sup)
-├── Spoke Supervisor (follower_events_listener_sup)
+├── Desk Supervisor (follower_events_listener_sup)
 │   └── follower_events_listener (worker)
-├── Spoke Supervisor (endorsement_events_listener_sup)
+├── Desk Supervisor (endorsement_events_listener_sup)
 │   └── endorsement_events_listener (worker)
-├── Spoke Supervisor (record_follower_sup) [if needed]
+├── Desk Supervisor (record_follower_sup) [if needed]
 │   └── ... workers
-└── ... other spokes
+└── ... other desks
 ```
 
 **This is WHY slices need directories** — they contain both supervisor AND worker(s).

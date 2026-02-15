@@ -15,6 +15,14 @@ init(Req0, State) ->
 handle_post(Req0, _State) ->
     VentureId = cowboy_req:binding(venture_id, Req0),
     {ok, Body, Req1} = cowboy_req:read_body(Req0),
+    case Body of
+        <<>> ->
+            hecate_api_utils:json_error(400, <<"request body is required">>, Req1);
+        _ ->
+            handle_advance(VentureId, Body, Req1)
+    end.
+
+handle_advance(VentureId, Body, Req1) ->
     Params = json:decode(Body),
     TargetPhase = maps:get(<<"target_phase">>, Params, undefined),
     case TargetPhase of

@@ -21,7 +21,7 @@
 **Completed:**
 - **Phase 1: Route Extraction + manage_connectors Domain**
   - Extracted 60+ route dispatch table from `hecate_api_app.erl` into `hecate_api_routes.erl`
-  - Created full `apps/manage_connectors/` domain with 4 spokes:
+  - Created full `apps/manage_connectors/` domain with 4 desks:
     - `register_connector/` — command, event, handler (computes socket path)
     - `revoke_connector/` — command, event, handler
     - `activate_connector/` — command, event, handler
@@ -97,7 +97,7 @@
 **Status:** Complete
 
 **Completed:**
-- Refactored `serve_llm` to proper Cartwheel architecture:
+- Refactored `serve_llm` to proper Division architecture:
   - `detect_llms/` — polls Ollama, emits detection events
   - `chat_to_llm/` — handles chat requests with responder
   - `list_available_llms/` — handles list requests with responder
@@ -234,7 +234,7 @@
 **Status:** Active
 
 **Completed:**
-- Created Cartwheel Architecture educational guides (4 files)
+- Created Division Architecture educational guides (4 files)
 - Created animated SVG diagrams (5 files)
 - Created initial `PLAN_MESH_INTEGRATION_REFACTOR.md`
 - Read QUEUE.md and APPRENTICE_INSTRUCTIONS.md

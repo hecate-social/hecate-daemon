@@ -1,4 +1,4 @@
-%%% @doc Spoke supervisor for mentor_discovery_listener
+%%% @doc Desk supervisor for mentor_discovery_listener
 -module(mentor_discovery_listener_sup).
 -behaviour(supervisor).
 

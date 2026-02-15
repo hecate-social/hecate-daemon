@@ -9,11 +9,13 @@
 
 handle(Cmd) -> handle(Cmd, #{}).
 
-handle(Cmd, _Context) ->
+handle(Cmd, Context) ->
     case draw_fact_arrow_v1:validate(Cmd) of
         ok ->
+            StormNumber = maps:get(storm_number, Context, 0),
             Event = fact_arrow_drawn_v1:new(#{
                 venture_id => draw_fact_arrow_v1:get_venture_id(Cmd),
+                storm_number => StormNumber,
                 from_cluster => draw_fact_arrow_v1:get_from_cluster(Cmd),
                 to_cluster => draw_fact_arrow_v1:get_to_cluster(Cmd),
                 fact_name => draw_fact_arrow_v1:get_fact_name(Cmd)

@@ -1,6 +1,6 @@
 # CODEGEN.md — Deterministic Code Generation Templates
 
-_Strict templates for generating Cartwheel architecture code. No AI creativity needed._
+_Strict templates for generating Division architecture code. No AI creativity needed._
 
 **Target:** Erlang/OTP with `reckon_evoq`
 
@@ -13,7 +13,7 @@ Templates use these placeholders:
 | Variable          | Example                | Description                    |
 | ----------------- | ---------------------- | ------------------------------ |
 | `{domain}`        | `manage_capabilities`  | Domain app name                |
-| `{command}`       | `announce_capability`  | Command/spoke name (verb_noun) |
+| `{command}`       | `announce_capability`  | Command/desk name (verb_noun)  |
 | `{event}`         | `capability_announced` | Event name (noun_past_verb)    |
 | `{read_store}`    | `capabilities`         | Read model read_store name     |
 | `{query}`         | `find_capability`      | Query name                     |
@@ -32,8 +32,8 @@ apps/{domain}/
 │   ├── {domain}_sup.erl
 │   ├── {domain}_store.erl              # ReckonDB instance
 │   │
-│   └── {command}/                      # SPOKE directory
-│       ├── {command}_spoke_sup.erl
+│   └── {command}/                      # DESK directory
+│       ├── {command}_desk_sup.erl
 │       ├── {command}_v1.erl
 │       ├── {event}_v1.erl
 │       ├── maybe_{command}.erl
@@ -53,7 +53,7 @@ apps/query_{domain_noun}/
 │   ├── query_{domain_noun}_sup.erl
 │   ├── query_{domain_noun}_store.erl   # SQLite instance
 │   │
-│   └── {event}_to_{read_store}/             # PRJ SPOKE directory
+│   └── {event}_to_{read_store}/             # PRJ DESK directory
 │       ├── {event}_to_{read_store}_sup.erl
 │       └── {event}_to_{read_store}.erl
 │
@@ -67,7 +67,7 @@ apps/query_{domain_noun}/
 └── src/
     ├── query_{domain_noun}.erl         # Provider (public API)
     │
-    └── {query}/                        # QRY SPOKE directory
+    └── {query}/                        # QRY DESK directory
         └── {query}.erl
 ```
 
@@ -108,18 +108,18 @@ init([]) ->
         %   start => {{domain}_store, start_link, []},
         %   type => worker},
 
-        %% Spokes (ADD SPOKE SUPERVISORS HERE)
-        #{id => {command}_spoke_sup,
-          start => {{command}_spoke_sup, start_link, []},
+        %% Desks (ADD DESK SUPERVISORS HERE)
+        #{id => {command}_desk_sup,
+          start => {{command}_desk_sup, start_link, []},
           type => supervisor}
     ],
     {ok, {#{strategy => one_for_one, intensity => 5, period => 10}, Children}}.
 ```
 
-### {command}\_spoke_sup.erl
+### {command}\_desk_sup.erl
 
 ```erlang
--module({command}_spoke_sup).
+-module({command}_desk_sup).
 -behaviour(supervisor).
 
 -export([start_link/0, init/1]).
@@ -129,12 +129,12 @@ start_link() ->
 
 init([]) ->
     Children = [
-        %% Frontdesk: HOPE responder
+        %% Front desk: HOPE responder
         #{id => {command}_responder_v1,
           start => {{command}_responder_v1, start_link, []},
           type => worker},
 
-        %% Backoffice: Emitter (PRJ filer to mesh)
+        %% Back office: Emitter (PRJ filer to mesh)
         #{id => {event}_to_mesh,
           start => {{event}_to_mesh, start_link, []},
           type => worker}
@@ -550,7 +550,7 @@ init([]) ->
           start => {query_{domain_noun}_store, start_link, []},
           type => worker},
 
-        %% PRJ Spokes (ADD PROJECTION SUPERVISORS HERE)
+        %% PRJ Desks (ADD PROJECTION SUPERVISORS HERE)
         #{id => {event}_to_{read_store}_sup,
           start => {{event}_to_{read_store}_sup, start_link, []},
           type => supervisor}
@@ -706,7 +706,7 @@ row_to_result(Row) ->
     {reckon_evoq, {git, "https://github.com/reckon-db-org/reckon_evoq.git", {branch, "main"}}}
 ]}.
 
-%% Include spoke directories
+%% Include desk directories
 {src_dirs, [
     "src",
     "src/{command1}",
@@ -720,22 +720,22 @@ row_to_result(Row) ->
 
 ## Generation Checklist
 
-### New CMD Spoke
+### New CMD Desk
 
 Given: `domain=manage_capabilities`, `command=announce_capability`, `event=capability_announced`
 
 Generate:
 
-- [ ] `src/announce_capability/announce_capability_spoke_sup.erl`
+- [ ] `src/announce_capability/announce_capability_desk_sup.erl`
 - [ ] `src/announce_capability/announce_capability_v1.erl`
 - [ ] `src/announce_capability/capability_announced_v1.erl`
 - [ ] `src/announce_capability/maybe_announce_capability.erl`
 - [ ] `src/announce_capability/announce_capability_responder_v1.erl`
 - [ ] `src/announce_capability/capability_announced_to_mesh.erl`
-- [ ] Update `manage_capabilities_sup.erl` to include spoke supervisor
+- [ ] Update `manage_capabilities_sup.erl` to include desk supervisor
 - [ ] Update `rebar.config` src_dirs
 
-### New PRJ Spoke
+### New PRJ Desk
 
 Given: `event=capability_announced`, `read_store=capabilities`
 
@@ -743,7 +743,7 @@ Generate:
 
 - [ ] `src/capability_announced_to_capabilities/capability_announced_to_capabilities_sup.erl`
 - [ ] `src/capability_announced_to_capabilities/capability_announced_to_capabilities.erl`
-- [ ] Update `query_capabilities_sup.erl` to include spoke supervisor
+- [ ] Update `query_capabilities_sup.erl` to include desk supervisor
 - [ ] Update `rebar.config` src_dirs
 
 ### New Policy/PM
@@ -753,7 +753,7 @@ Given: `trigger_event=llm_model_detected`, `command=announce_capability`
 Generate:
 
 - [ ] `src/announce_capability/on_llm_model_detected_maybe_announce_capability.erl`
-- [ ] Update `announce_capability_spoke_sup.erl` to include PM worker
+- [ ] Update `announce_capability_desk_sup.erl` to include PM worker
 
 ---
 
@@ -763,8 +763,8 @@ Generate:
 | ---------- | ---------------------------- | ------------------------------------------- |
 | Domain app | `{verb}_{noun}`              | `manage_capabilities`                       |
 | Query app  | `query_{noun}`               | `query_capabilities`                        |
-| Spoke dir  | `{command}/`                 | `announce_capability/`                      |
-| Spoke sup  | `{command}_spoke_sup`        | `announce_capability_spoke_sup`             |
+| Desk dir   | `{command}/`                 | `announce_capability/`                      |
+| Desk sup   | `{command}_desk_sup`         | `announce_capability_desk_sup`              |
 | Command    | `{command}_v1`               | `announce_capability_v1`                    |
 | Event      | `{noun}_{past_verb}_v1`      | `capability_announced_v1`                   |
 | Handler    | `maybe_{command}`            | `maybe_announce_capability`                 |
@@ -776,4 +776,4 @@ Generate:
 
 ---
 
-_Templates are deterministic. Fill in variables. Generate code. No creativity required._ 🗝️
+_Templates are deterministic. Fill in variables. Generate code. No creativity required._

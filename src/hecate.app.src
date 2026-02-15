@@ -22,12 +22,15 @@
     reckon_evoq,
 
     %% Mesh infrastructure (MUST start before domain apps with listeners)
-    hecate_mesh,
+    hecate_mesh
 
-    %% Node lifecycle (consolidated from 11 apps)
-    guide_node_lifecycle,
-    query_node_lifecycle
-    %% Note: hecate_api depends on hecate, not the other way around
+    %% NOTE: Domain apps (guide_*, query_*) are NOT listed here.
+    %% hecate_app:start/2 creates the event stores (hecate_event_store,
+    %% dev_studio_store). Domain apps subscribe to these stores in their
+    %% init/1 callbacks. If domain apps are listed as hecate deps, OTP
+    %% starts them BEFORE hecate_app:start/2 runs → subscriptions silently
+    %% fail because the store worker pool doesn't exist yet.
+    %% Domain apps are started by the release config AFTER hecate.
    ]},
   {env, [
     {api_port, 4444},

@@ -4,7 +4,7 @@
 
 **Created:** 2026-02-08
 **Updated:** 2026-02-08
-**Goal:** End-to-end thin slice proving the Torch → Cartwheel → Agent architecture
+**Goal:** End-to-end thin slice proving the Venture → Division → Agent architecture
 
 ---
 
@@ -13,15 +13,15 @@
 The walking skeleton implements a minimal but architecturally complete path through:
 
 ```
-Torch (business endeavor)
-├── initiates Cartwheel (bounded context)
+Venture (business endeavor)
+├── discovers Division (bounded context)
 ├── spawns Agent (DnA Specialist)
 └── tracks Telemetry (cost/metrics)
 ```
 
 **Skeleton scope:**
-- One hardcoded Torch
-- One Cartwheel (the Torch's first context)
+- One hardcoded Venture
+- One Division (the Venture's first context)
 - One Agent (DnA Specialist only)
 - Basic telemetry (token counting)
 
@@ -34,14 +34,14 @@ Torch (business endeavor)
 │                         DAEMON APPS                                  │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                       │
-│  manage_torches (NEW)                                                │
-│  ├── Torch aggregate                                                 │
-│  ├── Events: torch_initiated_v1, cartwheel_activated_v1             │
-│  └── Links to: manage_cartwheels                                     │
+│  setup_venture (NEW)                                                 │
+│  ├── Venture aggregate                                               │
+│  ├── Events: venture_initiated_v1, division_discovered_v1            │
+│  └── Links to: division ALC processes                                │
 │                                                                       │
-│  manage_cartwheels (RENAME from manage_alc)                          │
-│  ├── Cartwheel aggregate (existing ALC structure + torch_id)         │
-│  ├── Events: cartwheel_initiated_v1, + existing phase events         │
+│  design_division (RENAME from manage_alc)                            │
+│  ├── Division aggregate (existing ALC structure + venture_id)        │
+│  ├── Events: division_initiated_v1, + existing phase events          │
 │  └── Full phase lifecycle (DnA → AnP → TnI → DnO)                    │
 │                                                                       │
 │  manage_agents (NEW)                                                 │
@@ -52,10 +52,10 @@ Torch (business endeavor)
 │  hecate_telemetry (NEW)                                              │
 │  ├── SQLite storage for metrics                                      │
 │  ├── LLM call instrumentation                                        │
-│  └── Cost tracking per Torch                                         │
+│  └── Cost tracking per Venture                                       │
 │                                                                       │
 │  hecate_api (MODIFY)                                                 │
-│  └── Add routes: /torch, /cartwheel, /agents, /telemetry, /cost     │
+│  └── Add routes: /venture, /division, /agents, /telemetry, /cost    │
 │                                                                       │
 │  serve_llm (KEEP)                                                    │
 │  └── Existing LLM provider routing                                   │
@@ -68,110 +68,110 @@ Torch (business endeavor)
 
 ---
 
-## Phase 1: Rename manage_alc → manage_cartwheels
+## Phase 1: Rename manage_alc → design_division
 
 ### Files to Rename
 
 | Old Path | New Path |
 |----------|----------|
-| `apps/manage_alc/` | `apps/manage_cartwheels/` |
-| `src/manage_alc.app.src` | `src/manage_cartwheels.app.src` |
-| `src/manage_alc_app.erl` | `src/manage_cartwheels_app.erl` |
-| `src/manage_alc_sup.erl` | `src/manage_cartwheels_sup.erl` |
-| `src/alc_aggregate.erl` | `src/cartwheel_aggregate.erl` |
+| `apps/manage_alc/` | `apps/design_division/` |
+| `src/manage_alc.app.src` | `src/design_division.app.src` |
+| `src/manage_alc_app.erl` | `src/design_division_app.erl` |
+| `src/manage_alc_sup.erl` | `src/design_division_sup.erl` |
+| `src/alc_aggregate.erl` | `src/division_aggregate.erl` |
 
 ### Code Changes
 
 1. **Rename module declarations** in all `.erl` files
-2. **Add `torch_id`** to cartwheel aggregate state:
+2. **Add `venture_id`** to division aggregate state:
    ```erlang
-   -record(cartwheel_state, {
-       cartwheel_id :: binary() | undefined,
-       torch_id :: binary() | undefined,      %% NEW
+   -record(division_state, {
+       division_id :: binary() | undefined,
+       venture_id :: binary() | undefined,      %% NEW
        context_name :: binary() | undefined,  %% NEW (was project_name)
        %% ... rest of existing fields
    }).
    ```
-3. **Rename first event**: `project_initiated_v1` → `cartwheel_initiated_v1`
-4. **Update all event types** to include `torch_id` in payload
+3. **Rename first event**: `project_initiated_v1` → `division_initiated_v1`
+4. **Update all event types** to include `venture_id` in payload
 5. **Update rebar.config** dependencies referencing manage_alc
 
 ### Query Side
 
 | Old Path | New Path |
 |----------|----------|
-| `apps/query_alc/` | `apps/query_cartwheels/` |
+| `apps/query_alc/` | `apps/query_divisions/` |
 
 Same pattern: rename app, modules, update projections.
 
 ---
 
-## Phase 2: Create manage_torches
+## Phase 2: Create setup_venture
 
 ### Directory Structure
 
 ```
-apps/manage_torches/
+apps/setup_venture/
 ├── src/
-│   ├── manage_torches.app.src
-│   ├── manage_torches_app.erl
-│   ├── manage_torches_sup.erl
-│   ├── torch_aggregate.erl
-│   ├── initiate_torch/
-│   │   ├── initiate_torch_v1.erl        # Command
-│   │   ├── torch_initiated_v1.erl       # Event
-│   │   └── maybe_initiate_torch.erl     # Handler
-│   └── activate_cartwheel/
-│       ├── activate_cartwheel_v1.erl    # Command
-│       ├── cartwheel_activated_v1.erl   # Event
-│       └── maybe_activate_cartwheel.erl # Handler
+│   ├── setup_venture.app.src
+│   ├── setup_venture_app.erl
+│   ├── setup_venture_sup.erl
+│   ├── venture_aggregate.erl
+│   ├── initiate_venture/
+│   │   ├── initiate_venture_v1.erl        # Command
+│   │   ├── venture_initiated_v1.erl       # Event
+│   │   └── maybe_initiate_venture.erl     # Handler
+│   └── discover_division/
+│       ├── discover_division_v1.erl       # Command
+│       ├── division_discovered_v1.erl     # Event
+│       └── maybe_discover_division.erl    # Handler
 └── rebar.config
 
-apps/query_torches/
+apps/query_ventures/
 ├── src/
-│   ├── query_torches.app.src
-│   ├── query_torches_app.erl
-│   ├── query_torches_sup.erl
-│   ├── query_torches_store.erl         # SQLite read model
-│   ├── torch_initiated_v1_to_torches.erl  # Projection
-│   ├── cartwheel_activated_v1_to_torches.erl  # Updates active cartwheel
-│   ├── find_torch.erl                  # Query by ID
-│   └── list_torches.erl                # List all
+│   ├── query_ventures.app.src
+│   ├── query_ventures_app.erl
+│   ├── query_ventures_sup.erl
+│   ├── query_ventures_store.erl           # SQLite read model
+│   ├── venture_initiated_v1_to_ventures.erl  # Projection
+│   ├── division_discovered_v1_to_ventures.erl  # Updates active division
+│   ├── find_venture.erl                   # Query by ID
+│   └── list_ventures.erl                  # List all
 └── rebar.config
 ```
 
-### Torch Aggregate State
+### Venture Aggregate State
 
 ```erlang
--record(torch_state, {
-    torch_id :: binary() | undefined,
+-record(venture_state, {
+    venture_id :: binary() | undefined,
     name :: binary() | undefined,
     brief :: binary() | undefined,
     status :: non_neg_integer(),           %% Bit flags
     repos :: [map()] | undefined,          %% Skeleton: empty list
     skills :: [binary()] | undefined,      %% Skeleton: hardcoded
     context_map :: [binary()] | undefined, %% List of context names
-    active_cartwheel_id :: binary() | undefined,
+    active_division_id :: binary() | undefined,
     initiated_at :: non_neg_integer() | undefined,
     initiated_by :: binary() | undefined
 }).
 
 %% Status flags
--define(INITIATED,          1).   %% Torch initiated
--define(DNA_ACTIVE,         2).   %% In DnA phase (Torch-level)
+-define(INITIATED,          1).   %% Venture initiated
+-define(DNA_ACTIVE,         2).   %% In DnA phase (Venture-level)
 -define(DNA_COMPLETE,       4).   %% Context map drafted
--define(IMPLEMENTING,       8).   %% Working on cartwheels
--define(COMPLETED,         16).   %% All cartwheels done
+-define(IMPLEMENTING,       8).   %% Working on divisions
+-define(COMPLETED,         16).   %% All divisions done
 ```
 
 ### Events
 
-**torch_initiated_v1**
+**venture_initiated_v1**
 ```erlang
 #{
-    event_type => <<"torch_initiated_v1">>,
+    event_type => <<"venture_initiated_v1">>,
     data => #{
-        torch_id => binary(),
+        venture_id => binary(),
         name => binary(),
         brief => binary(),
         initiated_by => binary(),
@@ -180,15 +180,15 @@ apps/query_torches/
 }
 ```
 
-**cartwheel_activated_v1**
+**division_discovered_v1**
 ```erlang
 #{
-    event_type => <<"cartwheel_activated_v1">>,
+    event_type => <<"division_discovered_v1">>,
     data => #{
-        torch_id => binary(),
-        cartwheel_id => binary(),
+        venture_id => binary(),
+        division_id => binary(),
         context_name => binary(),
-        activated_at => integer()
+        discovered_at => integer()
     }
 }
 ```
@@ -222,7 +222,7 @@ apps/manage_agents/
 ```erlang
 -record(agent_state, {
     agent_id :: binary() | undefined,
-    torch_id :: binary() | undefined,
+    venture_id :: binary() | undefined,
     agent_type :: specialist | generalist,
     role :: dna | anp | tni | dno | undefined,  %% For specialists
     status :: non_neg_integer(),
@@ -273,8 +273,8 @@ apps/hecate_telemetry/
 -- LLM call tracking with full attribution hierarchy
 CREATE TABLE llm_calls (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    torch_id TEXT NOT NULL,
-    cartwheel_id TEXT,          -- NULL during Torch-level work (DnA discovery)
+    venture_id TEXT NOT NULL,
+    division_id TEXT,           -- NULL during Venture-level work (DnA discovery)
     agent_id TEXT,              -- NULL for direct user LLM calls
     task_id TEXT,               -- NULL for ad-hoc calls
     model TEXT NOT NULL,
@@ -284,15 +284,15 @@ CREATE TABLE llm_calls (
     timestamp INTEGER NOT NULL
 );
 
-CREATE INDEX idx_llm_calls_torch ON llm_calls(torch_id, timestamp);
-CREATE INDEX idx_llm_calls_cartwheel ON llm_calls(cartwheel_id, timestamp);
+CREATE INDEX idx_llm_calls_venture ON llm_calls(venture_id, timestamp);
+CREATE INDEX idx_llm_calls_division ON llm_calls(division_id, timestamp);
 CREATE INDEX idx_llm_calls_agent ON llm_calls(agent_id, timestamp);
 CREATE INDEX idx_llm_calls_task ON llm_calls(task_id, timestamp);
 
 -- Agent metrics (future)
 CREATE TABLE agent_metrics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    torch_id TEXT NOT NULL,
+    venture_id TEXT NOT NULL,
     agent_id TEXT NOT NULL,
     metric_name TEXT NOT NULL,
     metric_value REAL NOT NULL,
@@ -300,14 +300,14 @@ CREATE TABLE agent_metrics (
     timestamp INTEGER NOT NULL
 );
 
-CREATE INDEX idx_metrics_torch ON agent_metrics(torch_id, timestamp);
+CREATE INDEX idx_metrics_venture ON agent_metrics(venture_id, timestamp);
 ```
 
 ### Skeleton Scope
 
 - SQLite database creation
 - `record_llm_call/1` function for instrumentation
-- Basic query functions: `get_cost_by_torch/1`, `get_total_cost/0`
+- Basic query functions: `get_cost_by_venture/1`, `get_total_cost/0`
 
 Defer:
 - Prometheus export
@@ -322,20 +322,20 @@ Defer:
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
-| GET | `/api/torch` | `hecate_api_torch` | Get current Torch |
-| POST | `/api/torch/initiate` | `hecate_api_torch` | Initiate new Torch |
-| GET | `/api/cartwheel` | `hecate_api_cartwheel` | Get active Cartwheel |
-| GET | `/api/cartwheel/:id` | `hecate_api_cartwheel` | Get specific Cartwheel |
+| GET | `/api/venture` | `hecate_api_venture` | Get current Venture |
+| POST | `/api/venture/initiate` | `hecate_api_venture` | Initiate new Venture |
+| GET | `/api/division` | `hecate_api_division` | Get active Division |
+| GET | `/api/division/:id` | `hecate_api_division` | Get specific Division |
 | GET | `/api/agents` | `hecate_api_agents` | List agents |
 | GET | `/api/agents/:id` | `hecate_api_agents` | Get agent status |
 | GET | `/api/telemetry/cost` | `hecate_api_telemetry` | Cost summary |
-| GET | `/api/telemetry/cost/:torch_id` | `hecate_api_telemetry` | Cost by Torch |
-| GET | `/api/telemetry/cost/:torch_id/cartwheels` | `hecate_api_telemetry` | Cost by Cartwheel |
-| GET | `/api/telemetry/cost/:torch_id/agents` | `hecate_api_telemetry` | Cost by Agent |
+| GET | `/api/telemetry/cost/:venture_id` | `hecate_api_telemetry` | Cost by Venture |
+| GET | `/api/telemetry/cost/:venture_id/divisions` | `hecate_api_telemetry` | Cost by Division |
+| GET | `/api/telemetry/cost/:venture_id/agents` | `hecate_api_telemetry` | Cost by Agent |
 
 ### Skeleton Scope
 
-Implement all routes with basic functionality. Hardcode single Torch for skeleton.
+Implement all routes with basic functionality. Hardcode single Venture for skeleton.
 
 ---
 
@@ -345,8 +345,8 @@ Implement all routes with basic functionality. Hardcode single Torch for skeleto
 
 | Command | File | Description |
 |---------|------|-------------|
-| `/torch` | `torch.go` | Show current Torch, phase |
-| `/cartwheel` | `cartwheel.go` | Show active Cartwheel (alias: `/cw`) |
+| `/venture` | `venture.go` | Show current Venture, phase |
+| `/division` | `division.go` | Show active Division (alias: `/div`) |
 | `/agents` | `agents.go` | Show agent swarm status |
 | `/cost` | `cost.go` | Show LLM cost breakdown |
 
@@ -354,13 +354,13 @@ Implement all routes with basic functionality. Hardcode single Torch for skeleto
 
 | File | Changes |
 |------|---------|
-| `alc.go` | Rename to `cartwheel.go`, update commands |
-| `statusbar/statusbar.go` | Add Torch name, phase indicator, agent count |
+| `alc.go` | Rename to `division.go`, update commands |
+| `statusbar/statusbar.go` | Add Venture name, phase indicator, agent count |
 | `registry.go` | Register new commands |
 
 ### Skeleton Scope
 
-- `/torch` shows hardcoded Torch info
+- `/venture` shows hardcoded Venture info
 - `/agents` shows DnA Specialist status
 - `/cost` shows token counts from telemetry
 - Statusbar shows phase
@@ -371,51 +371,51 @@ Implement all routes with basic functionality. Hardcode single Torch for skeleto
 
 ### Integration Points
 
-1. **Torch → Cartwheel**
-   - `torch_initiated_v1` triggers automatic first Cartwheel creation
-   - Or: manual `activate_cartwheel_v1` command
+1. **Venture → Division**
+   - `venture_initiated_v1` triggers automatic first Division discovery
+   - Or: manual `discover_division_v1` command
 
-2. **Torch → Agent**
-   - `torch_initiated_v1` triggers DnA Specialist activation
-   - Process Manager: `on_torch_initiated_activate_dna_specialist/`
+2. **Venture → Agent**
+   - `venture_initiated_v1` triggers DnA Specialist activation
+   - Process Manager: `on_venture_initiated_activate_dna_specialist/`
 
 3. **LLM → Telemetry**
    - Instrument `serve_llm` to call `hecate_telemetry:record_llm_call/1`
-   - Pass torch_id through LLM call context
+   - Pass venture_id through LLM call context
 
 4. **TUI → Daemon**
-   - New client methods for Torch, Cartwheel, Agent, Telemetry endpoints
+   - New client methods for Venture, Division, Agent, Telemetry endpoints
 
 ---
 
 ## Implementation Order
 
-### Step 1: Rename (manage_alc → manage_cartwheels) ✅
+### Step 1: Rename (manage_alc → design_division) ✅
 - [x] Rename directories and files
 - [x] Update module names
-- [x] Add torch_id to aggregate
-- [x] Rename events (project → cartwheel)
-- [x] Update query_alc → query_cartwheels
+- [x] Add venture_id to aggregate
+- [x] Rename events (project → division)
+- [x] Update query_alc → query_divisions
 - [x] Update rebar.config dependencies
 - [x] Verify compilation
 
-### Step 2: Create manage_torches + query_torches ✅
-- [x] Create manage_torches app structure
-- [x] Implement torch_aggregate.erl
-- [x] Implement initiate_torch/ spoke
-- [x] Implement activate_cartwheel/ spoke
-- [x] Wire up manage_torches supervisor
-- [x] Create query_torches app structure
-- [x] Implement query_torches_store.erl (SQLite)
-- [x] Implement projections (torch_initiated, cartwheel_activated)
-- [x] Implement queries (find_torch, list_torches)
+### Step 2: Create setup_venture + query_ventures ✅
+- [x] Create setup_venture app structure
+- [x] Implement venture_aggregate.erl
+- [x] Implement initiate_venture/ desk
+- [x] Implement discover_division/ desk
+- [x] Wire up setup_venture supervisor
+- [x] Create query_ventures app structure
+- [x] Implement query_ventures_store.erl (SQLite)
+- [x] Implement projections (venture_initiated, division_discovered)
+- [x] Implement queries (find_venture, list_ventures)
 - [x] Add both to umbrella rebar.config
 - [x] Verify compilation
 
 ### Step 3: Create manage_agents (minimal) ✅
 - [x] Create app structure
 - [x] Implement agent_aggregate.erl (minimal)
-- [x] Implement activate_specialist/ spoke
+- [x] Implement activate_specialist/ desk
 - [x] Wire up supervisor
 - [x] Verify compilation
 
@@ -428,8 +428,8 @@ Implement all routes with basic functionality. Hardcode single Torch for skeleto
 - [x] Verify compilation
 
 ### Step 5: Update hecate_api ✅
-- [x] Add torch routes
-- [x] Add cartwheel routes
+- [x] Add venture routes
+- [x] Add division routes
 - [x] Add agent routes
 - [x] Add telemetry routes
 - [x] Update router
@@ -437,20 +437,20 @@ Implement all routes with basic functionality. Hardcode single Torch for skeleto
 
 ### Step 6: Instrument serve_llm ✅
 - [x] Add telemetry calls to LLM chat
-- [x] Pass torch_id through context (via Opts map)
+- [x] Pass venture_id through context (via Opts map)
 - [x] Verify telemetry recording
 
 ### Step 7: Update TUI ✅
-- [x] Add /torch command
-- [x] Rename /alc → /cartwheel
+- [x] Add /venture command
+- [x] Rename /alc → /division
 - [x] Add /agents command
 - [x] Add /cost command
-- [x] Update statusbar (torch context, phase badge, agent count)
+- [x] Update statusbar (venture context, phase badge, agent count)
 - [x] Update client for new endpoints
 - [x] Verify build
 
 ### Step 8: Integration Testing
-- [ ] Initiate Torch → Cartwheel created
+- [ ] Initiate Venture → Division discovered
 - [ ] DnA Specialist activated
 - [ ] LLM calls recorded to telemetry
 - [ ] /cost shows accurate data
@@ -462,12 +462,12 @@ Implement all routes with basic functionality. Hardcode single Torch for skeleto
 
 The skeleton is complete when:
 
-1. **TUI can initiate a Torch** → `/torch init "My Project"`
-2. **Cartwheel is created** → linked to Torch
+1. **TUI can initiate a Venture** → `/venture init "My Project"`
+2. **Division is discovered** → linked to Venture
 3. **DnA Specialist is activated** → shows in `/agents`
 4. **User can chat** → LLM calls work as before
 5. **Telemetry captures costs** → `/cost` shows token usage
-6. **Statusbar shows context** → Torch name, phase, agent indicator
+6. **Statusbar shows context** → Venture name, phase, agent indicator
 
 ---
 
@@ -479,8 +479,8 @@ The skeleton is complete when:
 - Mesh distribution
 - Human feedback (quick react)
 - Prometheus export
-- Multi-Torch support
-- torch.toml parsing
+- Multi-Venture support
+- venture.toml parsing
 
 ---
 
@@ -490,17 +490,17 @@ The skeleton is complete when:
 
 | App | Files |
 |-----|-------|
-| `manage_torches` | ~10 files (aggregate, 2 spokes, app/sup) |
-| `query_torches` | ~8 files (store, 2 projections, 2 queries, app/sup) |
-| `manage_agents` | ~7 files (aggregate, 1 spoke, app/sup) |
+| `setup_venture` | ~10 files (aggregate, 2 desks, app/sup) |
+| `query_ventures` | ~8 files (store, 2 projections, 2 queries, app/sup) |
+| `manage_agents` | ~7 files (aggregate, 1 desk, app/sup) |
 | `hecate_telemetry` | ~5 files (store, collector, schema, app/sup) |
 
 ### Rename
 
 | From | To |
 |------|-----|
-| `apps/manage_alc/` | `apps/manage_cartwheels/` |
-| `apps/query_alc/` | `apps/query_cartwheels/` |
+| `apps/manage_alc/` | `apps/design_division/` |
+| `apps/query_alc/` | `apps/query_divisions/` |
 
 ### Modify
 
@@ -515,7 +515,7 @@ The skeleton is complete when:
 ## Notes
 
 - **Event naming**: All aggregates start with `{aggregate}_initiated_v1`
-- **Torch ID**: Passed through all operations for attribution
+- **Venture ID**: Passed through all operations for attribution
 - **Skeleton = thin**: Minimal implementation, but correct structure
 - **No shortcuts**: Proper event sourcing, proper separation
 
@@ -524,5 +524,5 @@ The skeleton is complete when:
 ## References
 
 - `plans/VISION_HECATE_ECOSYSTEM.md` — Full ecosystem vision
-- `plans/METHODOLOGY_CARTWHEEL_SKELETON.md` — Cartwheel pattern
+- `plans/METHODOLOGY_CARTWHEEL_SKELETON.md` — Division pattern
 - `hecate-agents/skills/ANTIPATTERNS.md` — Rules to follow

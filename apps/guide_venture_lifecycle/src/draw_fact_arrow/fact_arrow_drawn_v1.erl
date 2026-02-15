@@ -8,6 +8,7 @@
 
 -record(fact_arrow_drawn_v1, {
     venture_id   :: binary(),
+    storm_number :: non_neg_integer(),
     arrow_id     :: binary(),
     from_cluster :: binary(),
     to_cluster   :: binary(),
@@ -25,6 +26,7 @@ new(#{venture_id := VentureId, from_cluster := FromCluster,
       to_cluster := ToCluster, fact_name := FactName} = Params) ->
     #fact_arrow_drawn_v1{
         venture_id = VentureId,
+        storm_number = maps:get(storm_number, Params, 0),
         arrow_id = maps:get(arrow_id, Params, generate_id(<<"arrow-">>)),
         from_cluster = FromCluster,
         to_cluster = ToCluster,
@@ -33,11 +35,13 @@ new(#{venture_id := VentureId, from_cluster := FromCluster,
     }.
 
 -spec to_map(fact_arrow_drawn_v1()) -> map().
-to_map(#fact_arrow_drawn_v1{venture_id = V, arrow_id = AI, from_cluster = FC,
-                             to_cluster = TC, fact_name = FN, drawn_at = DA}) ->
+to_map(#fact_arrow_drawn_v1{venture_id = V, storm_number = SN, arrow_id = AI,
+                             from_cluster = FC, to_cluster = TC, fact_name = FN,
+                             drawn_at = DA}) ->
     #{
         <<"event_type">> => <<"fact_arrow_drawn_v1">>,
         <<"venture_id">> => V,
+        <<"storm_number">> => SN,
         <<"arrow_id">> => AI,
         <<"from_cluster">> => FC,
         <<"to_cluster">> => TC,
@@ -53,6 +57,7 @@ from_map(Map) ->
         _ ->
             {ok, #fact_arrow_drawn_v1{
                 venture_id = VentureId,
+                storm_number = get_value(storm_number, Map, 0),
                 arrow_id = get_value(arrow_id, Map),
                 from_cluster = get_value(from_cluster, Map),
                 to_cluster = get_value(to_cluster, Map),

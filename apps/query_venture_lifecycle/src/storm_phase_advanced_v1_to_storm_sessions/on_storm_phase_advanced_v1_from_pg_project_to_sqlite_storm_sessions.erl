@@ -20,7 +20,7 @@ init([]) ->
 
 handle_info({events, Events}, State) ->
     lists:foreach(fun(E) ->
-        case storm_phase_advanced_v1_to_sqlite_storm_sessions:project(E) of
+        case storm_phase_advanced_v1_to_sqlite_storm_sessions:project(projection_event:to_map(E)) of
             ok -> ok;
             {error, Reason} ->
                 logger:warning("[~s] projection failed: ~p", [?EVENT_TYPE, Reason])

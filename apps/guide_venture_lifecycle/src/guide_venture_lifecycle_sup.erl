@@ -40,6 +40,11 @@ init([]) ->
           start => {venture_archived_v1_to_pg, start_link, []},
           restart => permanent, type => worker},
 
+        %% Scaffold
+        #{id => venture_repo_scaffolded_v1_to_pg,
+          start => {venture_repo_scaffolded_v1_to_pg, start_link, []},
+          restart => permanent, type => worker},
+
         %% Discovery
         #{id => discovery_started_v1_to_pg,
           start => {discovery_started_v1_to_pg, start_link, []},

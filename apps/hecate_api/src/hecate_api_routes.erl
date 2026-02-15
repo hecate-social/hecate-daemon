@@ -26,7 +26,13 @@ routes() ->
         mentor_llms_routes:routes(),
         query_mentorships_routes:routes(),
         %% LLM
-        serve_llm_routes:routes()
+        serve_llm_routes:routes(),
+        %% IRC (P2P chat)
+        manage_irc_routes:routes(),
+        query_irc_routes:routes(),
+        %% Arcade — Snake Duel
+        run_snake_duel_routes:routes(),
+        query_snake_duel_routes:routes()
     ]).
 
 %% Routes owned by hecate_api itself (not domain apps).
@@ -45,9 +51,9 @@ internal_routes() ->
         {"/api/agents", hecate_api_agents, [list]},
         {"/api/agents/:agent_id", hecate_api_agents, [get]},
         {"/api/telemetry/cost", hecate_api_telemetry, [total_cost]},
-        {"/api/telemetry/cost/:torch_id", hecate_api_telemetry, [cost_by_torch]},
-        {"/api/telemetry/cost/:torch_id/cartwheels", hecate_api_telemetry, [cost_by_cartwheel]},
-        {"/api/telemetry/cost/:torch_id/agents", hecate_api_telemetry, [cost_by_agent]},
+        {"/api/telemetry/cost/:venture_id", hecate_api_telemetry, [cost_by_venture]},
+        {"/api/telemetry/cost/:venture_id/divisions", hecate_api_telemetry, [cost_by_division]},
+        {"/api/telemetry/cost/:venture_id/agents", hecate_api_telemetry, [cost_by_agent]},
         {"/api/facts/stream", tui_facts_stream_api, []},
         {"/api/rpc/call", call_rpc_api, []}
     ].

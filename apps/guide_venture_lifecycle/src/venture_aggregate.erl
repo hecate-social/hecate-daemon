@@ -25,6 +25,7 @@
     name                :: binary() | undefined,
     brief               :: binary() | undefined,
     status = 0          :: non_neg_integer(),
+    repo_path           :: binary() | undefined,
     repos = []          :: [binary()],
     skills = []         :: [binary()],
     context_map = #{}   :: map(),
@@ -89,6 +90,8 @@ execute(#venture_state{status = S} = State, Payload) when S band ?VL_INITIATED =
         <<"resume_discovery">>   -> execute_resume_discovery(Payload, State);
         <<"complete_discovery">> -> execute_complete_discovery(Payload, State);
         <<"archive_venture">>    -> execute_archive_venture(Payload, State);
+        %% Scaffold
+        <<"scaffold_venture_repo">> -> execute_scaffold_venture_repo(Payload, State);
         %% Big Picture Event Storming
         <<"start_big_picture_storm">>   -> execute_start_storm(Payload, State);
         <<"post_event_sticky">>         -> execute_post_sticky(Payload, State);
@@ -188,6 +191,16 @@ execute_archive_venture(Payload, _State) ->
     {ok, Cmd} = archive_venture_v1:from_map(Payload),
     convert_events(maybe_archive_venture:handle(Cmd), fun venture_archived_v1:to_map/1).
 
+execute_scaffold_venture_repo(Payload, #venture_state{status = S}) ->
+    %% Guard: must be initiated, vision must not already be submitted
+    case S band ?VL_SUBMITTED of
+        0 ->
+            {ok, Cmd} = scaffold_venture_repo_v1:from_map(Payload),
+            convert_events(maybe_scaffold_venture_repo:handle(Cmd), fun venture_repo_scaffolded_v1:to_map/1);
+        _ ->
+            {error, vision_already_submitted}
+    end.
+
 %% --- Big Picture Event Storming command handlers ---
 
 execute_start_storm(Payload, #venture_state{status = S}) ->
@@ -262,10 +275,10 @@ execute_name_cluster(Payload, #venture_state{status = S, event_clusters = Cluste
         maybe_name_event_cluster:handle(Cmd, Context)
     end).
 
-execute_draw_arrow(Payload, #venture_state{status = S, event_clusters = Clusters, fact_arrows = Arrows}) ->
+execute_draw_arrow(Payload, #venture_state{status = S, storm_number = SN, event_clusters = Clusters, fact_arrows = Arrows}) ->
     require_storming(S, fun() ->
         {ok, Cmd} = draw_fact_arrow_v1:from_map(Payload),
-        Context = #{event_clusters => Clusters, fact_arrows => Arrows},
+        Context = #{storm_number => SN, event_clusters => Clusters, fact_arrows => Arrows},
         maybe_draw_fact_arrow:handle(Cmd, Context)
     end).
 
@@ -336,6 +349,8 @@ apply_event(#{<<"event_type">> := <<"vision_refined_v1">>} = E, S)   -> apply_vi
 apply_event(#{event_type := <<"vision_refined_v1">>} = E, S)         -> apply_vision_refined(E, S);
 apply_event(#{<<"event_type">> := <<"vision_submitted_v1">>} = E, S) -> apply_vision_submitted(E, S);
 apply_event(#{event_type := <<"vision_submitted_v1">>} = E, S)       -> apply_vision_submitted(E, S);
+apply_event(#{<<"event_type">> := <<"venture_repo_scaffolded_v1">>} = E, S) -> apply_repo_scaffolded(E, S);
+apply_event(#{event_type := <<"venture_repo_scaffolded_v1">>} = E, S)       -> apply_repo_scaffolded(E, S);
 
 %% Discovery events
 apply_event(#{<<"event_type">> := <<"discovery_started_v1">>} = E, S)   -> apply_discovery_started(E, S);
@@ -421,6 +436,19 @@ apply_vision_refined(E, #venture_state{status = Status} = State) ->
 apply_vision_submitted(_E, #venture_state{status = Status} = State) ->
     State#venture_state{status = evoq_bit_flags:set(Status, ?VL_SUBMITTED)}.
 
+apply_repo_scaffolded(E, #venture_state{status = Status} = State) ->
+    S0 = evoq_bit_flags:set(Status, ?VL_VISION_REFINED),
+    S1 = evoq_bit_flags:set(S0, ?VL_SUBMITTED),
+    Brief = get_value(brief, E),
+    State1 = case Brief of
+        undefined -> State;
+        _ -> State#venture_state{brief = Brief}
+    end,
+    State1#venture_state{
+        status = S1,
+        repo_path = get_value(repo_path, E)
+    }.
+
 apply_discovery_started(E, #venture_state{status = Status} = State) ->
     State#venture_state{
         status = evoq_bit_flags:set(Status, ?VL_DISCOVERING),
@@ -466,11 +494,11 @@ apply_archived(#venture_state{status = Status} = State) ->
 
 %% --- Big Picture Event Storming apply helpers ---
 
-apply_storm_started(E, #venture_state{status = Status, storm_number = N} = State) ->
-    NewN = N + 1,
+apply_storm_started(E, #venture_state{status = Status} = State) ->
+    SN = get_value(storm_number, E, 0),
     State#venture_state{
         status = evoq_bit_flags:set(Status, ?VL_STORMING),
-        storm_number = NewN,
+        storm_number = SN,
         storm_phase = storm,
         storm_started_at = get_value(started_at, E),
         storm_shelved_at = undefined,

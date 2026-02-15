@@ -8,6 +8,8 @@ routes() ->
         {"/api/ventures/initiate", initiate_venture_api, []},
         {"/api/ventures/:venture_id/vision/refine", refine_vision_api, []},
         {"/api/ventures/:venture_id/vision/submit", submit_vision_api, []},
+        %% Scaffold
+        {"/api/ventures/:venture_id/scaffold", scaffold_venture_repo_api, []},
         %% Discovery
         {"/api/ventures/:venture_id/discovery/start", start_discovery_api, []},
         {"/api/ventures/:venture_id/discovery/identify", identify_division_api, []},
