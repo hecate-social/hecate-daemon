@@ -101,6 +101,8 @@ stream_loop(Req, SState) ->
         {part_channel, ChannelId} ->
             pg:leave(?SCOPE, {irc_msg, ChannelId}, self()),
             NewChannels = maps:remove(ChannelId, SState#stream_state.channels),
+            %% Auto-close empty channels (mIRC semantics: channel dies when last user leaves)
+            maybe_close_empty_channel(ChannelId),
             PartMsg = to_json_binary(#{
                 <<"type">> => <<"parted">>,
                 <<"channel_id">> => ChannelId
@@ -264,4 +266,19 @@ ensure_pg_scope() ->
     case pg:start(?SCOPE) of
         {ok, _Pid} -> ok;
         {error, {already_started, _Pid}} -> ok
+    end.
+
+%% --- Auto-cleanup ---
+
+%% Close channel when the last member leaves (mIRC semantics).
+maybe_close_empty_channel(ChannelId) ->
+    case pg:get_members(?SCOPE, {irc_msg, ChannelId}) of
+        [] ->
+            logger:info("[stream_irc] Channel ~s is empty, closing", [ChannelId]),
+            case close_channel_v1:new(#{channel_id => ChannelId, closed_by => <<"auto">>}) of
+                {ok, Cmd} -> maybe_close_channel:dispatch(Cmd);
+                _ -> ok
+            end;
+        _ ->
+            ok
     end.

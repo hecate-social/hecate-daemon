@@ -20,7 +20,8 @@ init(Req0, State) ->
 handle_get(Req0, _State) ->
     ChannelId = cowboy_req:binding(channel_id, Req0),
     Pids = pg:get_members(?SCOPE, {irc_msg, ChannelId}),
-    Members = collect_member_info(Pids),
+    AllMembers = collect_member_info(Pids),
+    Members = dedup_by_node_id(AllMembers),
     hecate_api_utils:json_ok(#{channel_id => ChannelId, members => Members}, Req0).
 
 collect_member_info(Pids) ->
@@ -42,3 +43,10 @@ collect_replies(Ref, Remaining, Acc, Timeout) ->
     after Timeout ->
         Acc
     end.
+
+%% Multiple SSE handlers may exist for the same node (reconnects, HMR).
+%% Keep only one entry per node_id to avoid duplicate members.
+dedup_by_node_id(Members) ->
+    maps:values(lists:foldl(fun(#{<<"node_id">> := NodeId} = M, Acc) ->
+        Acc#{NodeId => M}
+    end, #{}, Members)).
