@@ -67,7 +67,12 @@ start_socket_listener(Path, Dispatch) ->
     %% Ranch supports Unix sockets via {ip, {local, Path}}
     case cowboy:start_clear(hecate_socket_listener,
             [{ip, {local, Path}}],
-            #{env => #{dispatch => Dispatch}}) of
+            #{env => #{dispatch => Dispatch},
+              %% SSE streams are long-lived; default idle_timeout (60s)
+              %% kills them because the client sends no data after the
+              %% initial request.  Setting infinity lets heartbeats
+              %% keep the connection alive instead.
+              idle_timeout => infinity}) of
         {ok, _} ->
             %% Set socket permissions for local access
             %% Note: 0666 allows any local user; use 0660 + hecate group for stricter security
