@@ -15,30 +15,56 @@ echo "=== Hecate Daemon Clean Restart ==="
 echo "Daemon dir: ${DAEMON_DIR}"
 echo ""
 
-# 1. Stop running daemon
+# 1. Stop running daemon (handle heart auto-restart storms)
 echo "[1/5] Stopping daemon..."
-if pgrep -f "beam.smp.*hecate" > /dev/null 2>&1; then
-    "${REL_DIR}/bin/hecate" stop 2>/dev/null || true
-    # Wait for process to die
-    for i in $(seq 1 10); do
-        if ! pgrep -f "beam.smp.*hecate" > /dev/null 2>&1; then
-            break
-        fi
-        sleep 1
-    done
-    # Force kill if still alive
-    if pgrep -f "beam.smp.*hecate" > /dev/null 2>&1; then
-        echo "  Force killing..."
-        pkill -9 -f "beam.smp.*hecate" || true
-        sleep 1
+"${REL_DIR}/bin/hecate" stop 2>/dev/null || true
+sleep 1
+
+# Kill order: heart FIRST (it respawns beam), then run_erl, then beam.
+# When daemon crash-loops, heart spawns many beam instances. Each heart
+# respawns beam on death. We must kill ALL hearts before touching beam,
+# then sweep up orphans until nothing remains.
+kill_hecate_procs() {
+    killall -9 heart 2>/dev/null || true
+    pkill -9 -f "heart.*hecate" 2>/dev/null || true
+    pkill -9 -f "run_erl.*hecate" 2>/dev/null || true
+    pkill -9 -f "hecate/bin/hecate" 2>/dev/null || true
+    pkill -9 -f "beam.*hecate" 2>/dev/null || true
+    killall -9 beam.smp 2>/dev/null || true
+    killall -9 run_erl 2>/dev/null || true
+}
+
+hecate_procs_alive() {
+    pgrep -f "beam.*hecate" > /dev/null 2>&1 ||
+    pgrep -f "heart.*hecate" > /dev/null 2>&1 ||
+    pgrep -f "run_erl.*hecate" > /dev/null 2>&1
+}
+
+MAX_ATTEMPTS=10
+for attempt in $(seq 1 "${MAX_ATTEMPTS}"); do
+    if ! hecate_procs_alive; then
+        break
     fi
-    echo "  Daemon stopped."
+    kill_hecate_procs
+    sleep 1
+    if [ "${attempt}" -gt 1 ]; then
+        echo "  Attempt ${attempt}/${MAX_ATTEMPTS}: sweeping orphan processes..."
+    fi
+done
+
+if hecate_procs_alive; then
+    echo "  ERROR: Could not kill all hecate processes after ${MAX_ATTEMPTS} attempts."
+    echo "  Remaining:"
+    pgrep -af "beam.*hecate" 2>/dev/null || true
+    pgrep -af "heart.*hecate" 2>/dev/null || true
+    exit 1
 else
-    echo "  No daemon running."
+    echo "  Daemon stopped."
 fi
 
-# Clean up socket
+# Clean up socket and stale pipes
 rm -f /run/hecate/daemon.sock
+rm -rf /tmp/erl_pipes/hecate@*
 
 # 2. Wipe data
 echo "[2/5] Wiping data..."
