@@ -24,6 +24,9 @@ init([]) ->
     Children = [
         #{id => training_proc_sup,
           start => {training_proc_sup, start_link, []},
+          restart => permanent, type => supervisor},
+        #{id => gladiator_duel_proc_sup,
+          start => {gladiator_duel_proc_sup, start_link, []},
           restart => permanent, type => supervisor}
     ],
 

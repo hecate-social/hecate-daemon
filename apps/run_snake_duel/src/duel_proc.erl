@@ -14,7 +14,7 @@
 
 -include("snake_duel.hrl").
 
--export([start_link/1, get_state/1]).
+-export([start_link/1, get_state/1, game_to_map/2]).
 -export([init/1, handle_info/2, handle_call/3, handle_cast/2, terminate/2]).
 
 -define(COUNTDOWN_MS, 800).

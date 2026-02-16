@@ -31,30 +31,55 @@ do_initiate(Params, Req) ->
     MaxGen = to_integer(hecate_api_utils:get_field(max_generations, Params), 100),
     OppAF = to_integer(hecate_api_utils:get_field(opponent_af, Params), 50),
     Episodes = to_integer(hecate_api_utils:get_field(episodes_per_eval, Params), 3),
+    SeedStableId = hecate_api_utils:get_field(seed_stable_id, Params),
 
     StableId = generate_stable_id(),
+
+    %% Load seed networks from champion if seed_stable_id is provided
+    SeedNetworks = load_seed_networks(SeedStableId),
 
     Config = #{
         stable_id => StableId,
         population_size => PopSize,
         max_generations => MaxGen,
         opponent_af => OppAF,
-        episodes_per_eval => Episodes
+        episodes_per_eval => Episodes,
+        seed_networks => SeedNetworks
     },
 
     case training_proc_sup:start_training(Config) of
         {ok, _Pid} ->
-            hecate_api_utils:json_ok(201, #{
+            Response = #{
                 stable_id => StableId,
                 population_size => PopSize,
                 max_generations => MaxGen,
                 opponent_af => OppAF,
                 episodes_per_eval => Episodes,
                 status => <<"training">>
-            }, Req);
+            },
+            Response1 = case SeedStableId of
+                undefined -> Response;
+                null -> Response;
+                _ -> Response#{seed_stable_id => SeedStableId}
+            end,
+            hecate_api_utils:json_ok(201, Response1, Req);
         {error, Reason} ->
             hecate_api_utils:json_error(500, Reason, Req)
     end.
+
+load_seed_networks(undefined) -> [];
+load_seed_networks(null) -> [];
+load_seed_networks(SeedStableId) when is_binary(SeedStableId) ->
+    case query_snake_gladiators_store:get_champion(SeedStableId) of
+        {ok, #{network_json := NetworkJson}} ->
+            NetworkData = json:decode(NetworkJson),
+            Network = network_evaluator:from_json(NetworkData),
+            [Network];
+        {error, _} ->
+            logger:warning("[gladiators] Seed stable ~s has no champion, using random", [SeedStableId]),
+            []
+    end;
+load_seed_networks(_) -> [].
 
 generate_stable_id() ->
     Bytes = crypto:strong_rand_bytes(8),
