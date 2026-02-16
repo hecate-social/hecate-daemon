@@ -82,19 +82,30 @@ start_socket_listener(Path, Dispatch) ->
             logger:warning("Failed to start Unix socket listener: ~p", [Reason])
     end.
 
-%% @private Get socket path from OS env (HECATE_SOCKET_PATH) or app config.
-%% OS env takes precedence for k3s deployments.
+%% @private Get socket path from OS env or $HOME/.hecate/.
+%% Priority:
+%%   1. HECATE_SOCKET_PATH env var (k3s sets this to /run/hecate/daemon.sock)
+%%   2. App config socket_path (sys.config)
+%%   3. $HOME/.hecate/daemon.sock (user-writable, multi-user safe)
 get_socket_path() ->
     case os:getenv("HECATE_SOCKET_PATH") of
         false ->
-            %% Fall back to app config
-            application:get_env(hecate_api, socket_path, undefined);
+            case application:get_env(hecate_api, socket_path) of
+                {ok, Path} when is_list(Path), Path =/= "" -> Path;
+                {ok, Path} when is_binary(Path), Path =/= <<>> -> binary_to_list(Path);
+                _ -> default_socket_path()
+            end;
         "" ->
-            %% Empty env var means disabled
             undefined;
         EnvPath ->
-            %% Return as string (list)
             EnvPath
+    end.
+
+%% @private Default socket in $HOME/.hecate/ (multi-user safe, no root needed).
+default_socket_path() ->
+    case os:getenv("HOME") of
+        false -> undefined;
+        Home -> filename:join([Home, ".hecate", "daemon.sock"])
     end.
 
 %% @private Ensure the socket directory exists with proper permissions.

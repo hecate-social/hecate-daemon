@@ -5,7 +5,7 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 RELEASE_DIR="${REPO_DIR}/_build/default/rel/hecate"
 RELEASE_DATA_DIR="${RELEASE_DIR}/data"
 REPO_DATA_DIR="${REPO_DIR}/data"
-SOCKET_PATH="/run/hecate/daemon.sock"
+SOCKET_PATH="${HOME}/.hecate/daemon.sock"
 PIPE_DIR="/tmp/erl_pipes/hecate@$(cat /etc/hostname 2>/dev/null || echo localhost)"
 LOG_DIR="${RELEASE_DIR}/log"
 NODE_NAME="hecate"
@@ -72,6 +72,9 @@ echo "==> Cleaning stale files..."
 rm -f "${SOCKET_PATH}"
 rm -rf "${PIPE_DIR}"
 rm -f "${LOG_DIR}"/erlang.log.*
+
+# Ensure socket directory exists (user home, no sudo needed)
+mkdir -p "$(dirname "${SOCKET_PATH}")"
 
 if [ "${CLEAN}" = true ]; then
     echo "==> Wiping ALL data (ReckonDB + SQLite)..."

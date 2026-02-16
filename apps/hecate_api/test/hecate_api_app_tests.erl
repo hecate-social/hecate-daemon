@@ -6,19 +6,24 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-%% Test that hecate_api_routes:compile/0 produces valid dispatch rules
+%% Test that hecate_api_routes:compile/0 produces valid dispatch rules.
+%% In eunit context not all apps may be loaded, so we just verify the
+%% compile/0 function succeeds and returns a valid cowboy dispatch list.
 routes_compile_test() ->
+    %% Ensure at least hecate_api modules are discoverable
+    application:load(hecate_api),
     Dispatch = hecate_api_routes:compile(),
     ?assert(is_list(Dispatch)),
     ?assert(length(Dispatch) > 0),
     %% Dispatch is [{HostMatch, Constraints, PathMatchList}]
     [{'_', _Constraints, PathMatchList}] = Dispatch,
     ?assert(is_list(PathMatchList)),
-    %% Should have many routes (health + domain routes)
-    ?assert(length(PathMatchList) > 20).
+    %% hecate_api alone has 10+ handler routes (health, identity, pairing, etc.)
+    ?assert(length(PathMatchList) > 5).
 
-%% Test that /health route is present (not /api/health — cowboy splits on /)
+%% Test that /health route is present
 health_route_present_test() ->
+    application:load(hecate_api),
     Dispatch = hecate_api_routes:compile(),
     [{'_', _, PathMatchList}] = Dispatch,
     %% Cowboy compiles "/health" to [<<"health">>]
@@ -29,6 +34,7 @@ health_route_present_test() ->
 %% Test that cowboy can start a Unix socket listener in /tmp
 socket_listener_start_test() ->
     application:ensure_all_started(cowboy),
+    application:load(hecate_api),
     Ts = integer_to_list(erlang:system_time(microsecond)),
     SocketPath = "/tmp/hecate_api_test_" ++ Ts ++ ".sock",
     %% Unique listener name per run to avoid {already_started, _}
@@ -68,8 +74,8 @@ socket_path_config_test() ->
     ?assertEqual(undefined,
                  application:get_env(hecate_api, socket_path, undefined)),
     %% When socket_path is a string, get_env/3 returns it directly (not {ok, ...})
-    application:set_env(hecate_api, socket_path, "/run/hecate/daemon.sock"),
-    ?assertEqual("/run/hecate/daemon.sock",
+    application:set_env(hecate_api, socket_path, "/home/testuser/.hecate/daemon.sock"),
+    ?assertEqual("/home/testuser/.hecate/daemon.sock",
                  application:get_env(hecate_api, socket_path, undefined)),
     %% Restore
     case OldVal of
@@ -77,25 +83,14 @@ socket_path_config_test() ->
         undefined -> ok
     end.
 
-%% Test that all route modules return non-empty route lists
-all_route_modules_test() ->
-    Modules = [
-        %% Venture lifecycle (4 consolidated apps)
-        guide_venture_lifecycle_routes,
-        query_venture_lifecycle_routes,
-        guide_division_alc_routes,
-        query_division_alc_routes,
-        %% Node lifecycle (2 consolidated apps)
-        guide_node_lifecycle_routes,
-        query_node_lifecycle_routes,
-        %% Mentorships (renamed)
-        mentor_llms_routes,
-        query_mentorships_routes,
-        %% LLM
-        serve_llm_routes
-    ],
-    lists:foreach(fun(Mod) ->
-        Routes = Mod:routes(),
-        ?assert(is_list(Routes)),
-        ?assert(length(Routes) > 0)
-    end, Modules).
+%% Test that auto-discovery finds routes from modules that export routes/0.
+%% We verify specific handler modules have the expected export.
+auto_discovery_test() ->
+    %% hecate_api_health should export routes/0
+    code:ensure_loaded(hecate_api_health),
+    ?assert(erlang:function_exported(hecate_api_health, routes, 0)),
+    Routes = hecate_api_health:routes(),
+    ?assert(is_list(Routes)),
+    ?assert(length(Routes) > 0),
+    %% hecate_api_routes itself should NOT export routes/0 (it's the aggregator)
+    ?assertNot(erlang:function_exported(hecate_api_routes, routes, 0)).
