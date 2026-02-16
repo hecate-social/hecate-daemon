@@ -40,3 +40,4 @@ data/
 
 # Local config
 *.local
+rebar3.crashdump
