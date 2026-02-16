@@ -29,10 +29,9 @@ projection_test_() ->
 %% ===================================================================
 
 setup() ->
-    ok = filelib:ensure_dir("data/dummy"),
-    file:delete("data/query_mentorships.db"),
-    file:delete("data/query_mentorships.db-wal"),
-    file:delete("data/query_mentorships.db-shm"),
+    file:delete(shared_paths:db_path("query_mentorships.db")),
+    file:delete(shared_paths:db_path("query_mentorships.db-wal")),
+    file:delete(shared_paths:db_path("query_mentorships.db-shm")),
     {ok, _} = application:ensure_all_started(esqlite),
     {ok, Pid} = query_mentorships_store:start_link(),
     query_mentorships_store:init_schema(),
@@ -40,9 +39,9 @@ setup() ->
 
 cleanup(Pid) ->
     gen_server:stop(Pid),
-    file:delete("data/query_mentorships.db"),
-    file:delete("data/query_mentorships.db-wal"),
-    file:delete("data/query_mentorships.db-shm"),
+    file:delete(shared_paths:db_path("query_mentorships.db")),
+    file:delete(shared_paths:db_path("query_mentorships.db-wal")),
+    file:delete(shared_paths:db_path("query_mentorships.db-shm")),
     ok.
 
 %% ===================================================================

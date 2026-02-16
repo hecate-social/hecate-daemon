@@ -86,9 +86,11 @@ start_evoq() ->
 %% Two stores: hecate_event_store (node infra) + dev_studio_store (venture lifecycle).
 start_event_store() ->
     logger:info("Starting shared event store (hecate_event_store)..."),
+    HecateDataDir = shared_paths:db_path("reckon/hecate"),
+    ok = filelib:ensure_path(HecateDataDir),
     HecateConfig = #store_config{
         store_id = hecate_event_store,
-        data_dir = "data/reckon/hecate",
+        data_dir = HecateDataDir,
         mode = single,
         writer_pool_size = 10,
         reader_pool_size = 10,
@@ -105,9 +107,11 @@ start_event_store() ->
 %% @private Start the dev_studio_store for venture lifecycle domains.
 start_dev_studio_store() ->
     logger:info("Starting dev studio event store (dev_studio_store)..."),
+    DevStudioDataDir = shared_paths:db_path("reckon/dev_studio"),
+    ok = filelib:ensure_path(DevStudioDataDir),
     DevStudioConfig = #store_config{
         store_id = dev_studio_store,
-        data_dir = "data/reckon/dev_studio",
+        data_dir = DevStudioDataDir,
         mode = single,
         writer_pool_size = 5,
         reader_pool_size = 5,

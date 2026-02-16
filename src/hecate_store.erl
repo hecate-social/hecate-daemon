@@ -68,10 +68,9 @@ get_events(Stream, Opts) ->
 %%%===================================================================
 
 init([]) ->
-    DataDir = get_data_dir(),
-    ok = filelib:ensure_dir(filename:join(DataDir, "dummy")),
-    DbPath = filename:join(DataDir, "hecate.db"),
-    
+    DbPath = shared_paths:db_path("hecate.db"),
+    ok = filelib:ensure_dir(DbPath),
+
     logger:info("Opening store at ~s", [DbPath]),
     {ok, Db} = esqlite3:open(DbPath),
     
@@ -137,17 +136,6 @@ terminate(_Reason, #state{db = Db}) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-get_data_dir() ->
-    case application:get_env(hecate, data_dir) of
-        {ok, Dir} -> expand_path(Dir);
-        undefined -> expand_path("~/.hecate")
-    end.
-
-expand_path("~/" ++ Rest) ->
-    filename:join(os:getenv("HOME"), Rest);
-expand_path(Path) ->
-    Path.
 
 init_schema(Db) ->
     %% Key-value store

@@ -26,8 +26,8 @@ query(Sql) -> query(Sql, []).
 query(Sql, Params) -> gen_server:call(?MODULE, {query, Sql, Params}).
 
 init([]) ->
-    DbPath = get_db_path(),
-    filelib:ensure_dir(DbPath),
+    DbPath = shared_paths:db_path("query_node_lifecycle.db"),
+    ok = filelib:ensure_dir(DbPath),
     {ok, Db} = esqlite3:open(DbPath),
     ok = create_tables(Db),
     {ok, #state{db = Db}}.
@@ -62,10 +62,6 @@ terminate(_Reason, #state{db = Db}) ->
 %% ===================================================================
 %% Internal
 %% ===================================================================
-
-get_db_path() ->
-    DataDir = application:get_env(hecate, data_dir, "/tmp/hecate"),
-    filename:join([DataDir, "query_node_lifecycle.db"]).
 
 create_tables(Db) ->
     ok = esqlite3:exec(Db, "PRAGMA journal_mode=WAL"),

@@ -12,8 +12,6 @@
     db :: term()
 }).
 
--define(DB_PATH, "data/hecate_telemetry.db").
-
 %%------------------------------------------------------------------------------
 %% API
 %%------------------------------------------------------------------------------
@@ -65,8 +63,9 @@ list_calls_by_venture(VentureId, Opts) ->
 %%------------------------------------------------------------------------------
 
 init([]) ->
-    filelib:ensure_dir(?DB_PATH),
-    {ok, Db} = esqlite3:open(?DB_PATH),
+    DbPath = shared_paths:db_path("hecate_telemetry.db"),
+    ok = filelib:ensure_dir(DbPath),
+    {ok, Db} = esqlite3:open(DbPath),
     {ok, #state{db = Db}}.
 
 handle_call(init_schema, _From, #state{db = Db} = State) ->

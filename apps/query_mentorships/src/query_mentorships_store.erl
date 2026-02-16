@@ -7,14 +7,13 @@
 
 -record(state, {db :: reference()}).
 
--define(DB_PATH, "data/query_mentorships.db").
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    filelib:ensure_dir(?DB_PATH),
-    {ok, Db} = esqlite3:open(?DB_PATH),
+    DbPath = shared_paths:db_path("query_mentorships.db"),
+    ok = filelib:ensure_dir(DbPath),
+    {ok, Db} = esqlite3:open(DbPath),
     ok = esqlite3:exec(Db, "PRAGMA journal_mode=WAL;"),
     ok = esqlite3:exec(Db, "PRAGMA synchronous=NORMAL;"),
     {ok, #state{db = Db}}.
