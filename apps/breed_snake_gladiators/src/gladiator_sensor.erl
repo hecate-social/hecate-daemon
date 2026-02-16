@@ -1,16 +1,19 @@
-%%% @doc Sensor for snake gladiator — reads game state into 22 floats.
+%%% @doc Sensor for snake gladiator — reads game state into 26 floats.
 %%%
 %%% Inputs (all normalized ~[-1, 1]):
 %%%   1-2:   Relative food position (dx, dy) / grid_dim
 %%%   3-4:   Relative opponent head (dx, dy) / grid_dim
-%%%   5-8:   Danger in 4 directions (1.0 if wall/body adjacent, 0.0 otherwise)
+%%%   5-8:   Danger in 4 directions (1.0 if wall/body/wall_tile adjacent, 0.0 otherwise)
 %%%   9:     Own score / 20.0
 %%%   10:    Opponent score / 20.0
 %%%   11-14: Current direction one-hot [up, down, left, right]
-%%%   15-16: Distance to nearest wall (horizontal, vertical) normalized
+%%%   15-16: Distance to nearest boundary wall (horizontal, vertical) normalized
 %%%   17-18: Body length relative (own/20, opponent/20)
 %%%   19-20: Nearest poison apple direction (dx, dy) / grid_dim (0,0 if none)
 %%%   21-22: Look-ahead danger 2 cells (current dir, perpendicular right)
+%%%   23-24: Nearest wall tile direction (dx, dy) / grid_dim (0,0 if none)
+%%%   25:    Own wall count on field / 5.0
+%%%   26:    Can drop tail (1.0 if body >= 6, else 0.0)
 %%% @end
 -module(gladiator_sensor).
 -behaviour(agent_sensor).
@@ -29,7 +32,7 @@ input_count() -> ?GLADIATOR_INPUTS.
 -spec read(map(), map()) -> [float()].
 read(_AgentState, #{game := Game}) ->
     #game_state{snake1 = S1, snake2 = S2, food = Food,
-                poison_apples = PA} = Game,
+                poison_apples = PA, walls = Walls} = Game,
     #snake{body = [H1 | _] = Body1, direction = Dir1,
            score = Score1} = S1,
     #snake{body = [H2 | _] = Body2, score = Score2} = S2,
@@ -40,10 +43,11 @@ read(_AgentState, #{game := Game}) ->
     %% 3-4: Relative opponent head
     {OppDx, OppDy} = relative_pos(H1, H2),
 
-    %% 5-8: Danger in 4 directions (immediate adjacency)
+    %% 5-8: Danger in 4 directions (immediate adjacency, includes wall tiles)
     AllBodies = Body1 ++ Body2,
     PoisonPositions = [P#poison_apple.pos || P <- PA],
-    Obstacles = sets:from_list(AllBodies ++ PoisonPositions),
+    WallPositions = [W#wall_tile.pos || W <- Walls],
+    Obstacles = sets:from_list(AllBodies ++ PoisonPositions ++ WallPositions),
     DangerUp    = danger(H1, up, Obstacles),
     DangerDown  = danger(H1, down, Obstacles),
     DangerLeft  = danger(H1, left, Obstacles),
@@ -56,7 +60,7 @@ read(_AgentState, #{game := Game}) ->
     %% 11-14: Direction one-hot
     {DirUp, DirDown, DirLeft, DirRight} = direction_one_hot(Dir1),
 
-    %% 15-16: Distance to nearest wall (normalized 0..1)
+    %% 15-16: Distance to nearest boundary wall (normalized 0..1)
     {WallH, WallV} = wall_distances(H1),
 
     %% 17-18: Body length relative (normalized by 20)
@@ -71,6 +75,15 @@ read(_AgentState, #{game := Game}) ->
     PerpDir = perpendicular_right(Dir1),
     Danger2Perp = danger_at_distance(H1, PerpDir, 2, Obstacles),
 
+    %% 23-24: Nearest wall tile direction (0,0 if none)
+    {WallTileDx, WallTileDy} = nearest_wall_tile_dir(H1, Walls),
+
+    %% 25: Own wall count on field / 5.0
+    OwnWallCount = length([1 || #wall_tile{owner = player1} <- Walls]) / 5.0,
+
+    %% 26: Can drop tail (1.0 if body >= 6, else 0.0)
+    CanDrop = case length(Body1) >= 6 of true -> 1.0; false -> 0.0 end,
+
     [FoodDx, FoodDy,
      OppDx, OppDy,
      DangerUp, DangerDown, DangerLeft, DangerRight,
@@ -79,7 +92,9 @@ read(_AgentState, #{game := Game}) ->
      WallH, WallV,
      BodyLen1, BodyLen2,
      PoisonDx, PoisonDy,
-     Danger2Forward, Danger2Perp].
+     Danger2Forward, Danger2Perp,
+     WallTileDx, WallTileDy,
+     OwnWallCount, CanDrop].
 
 %%--------------------------------------------------------------------
 %% Internal
@@ -128,6 +143,15 @@ nearest_poison_dir({Hx, Hy} = _Head, PoisonApples) ->
                  #poison_apple{pos = {Px, Py} = P} <- PoisonApples],
     {_MinDist, {Px, Py}} = lists:min(Distances),
     {(Px - Hx) / ?GRID_WIDTH, (Py - Hy) / ?GRID_HEIGHT}.
+
+%% Direction of nearest wall tile (0,0 if none).
+nearest_wall_tile_dir(_Head, []) ->
+    {0.0, 0.0};
+nearest_wall_tile_dir({Hx, Hy} = _Head, Walls) ->
+    Distances = [{abs(Wx - Hx) + abs(Wy - Hy), W} ||
+                 #wall_tile{pos = {Wx, Wy} = W} <- Walls],
+    {_MinDist, {Wx, Wy}} = lists:min(Distances),
+    {(Wx - Hx) / ?GRID_WIDTH, (Wy - Hy) / ?GRID_HEIGHT}.
 
 %% Check if position N steps in direction Dir hits an obstacle.
 danger_at_distance(Pos, Dir, N, Obstacles) ->

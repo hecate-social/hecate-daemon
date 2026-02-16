@@ -57,14 +57,22 @@ tick(AgentState, EnvState) ->
     {ok, AgentState, EnvState}.
 
 -spec apply_action(term(), map(), map()) -> {ok, map(), map()}.
-apply_action(GladiatorDir, AgentState, #{game := Game} = EnvState) ->
-    %% Opponent uses heuristic AI
-    #game_state{snake2 = S2, snake1 = S1,
-                food = Food, poison_apples = PA} = Game,
-    OpponentDir = snake_duel_ai:choose_direction(S2, S1, Food, PA, player2),
+apply_action({GladiatorDir, GladiatorDrop}, AgentState, EnvState) ->
+    apply_action_impl(GladiatorDir, GladiatorDrop, AgentState, EnvState);
+apply_action(GladiatorDir, AgentState, EnvState) when is_atom(GladiatorDir) ->
+    %% Backward compat: bare atom direction (no drop)
+    apply_action_impl(GladiatorDir, false, AgentState, EnvState).
 
-    %% Advance game: gladiator = player1 (Dir1), opponent = player2 (Dir2)
-    Game1 = snake_duel_engine:tick_step(Game, GladiatorDir, OpponentDir),
+apply_action_impl(GladiatorDir, GladiatorDrop, AgentState, #{game := Game} = EnvState) ->
+    %% Opponent uses heuristic AI (wall-aware)
+    #game_state{snake2 = S2, snake1 = S1,
+                food = Food, poison_apples = PA, walls = Walls} = Game,
+    OpponentDir = snake_duel_ai:choose_direction(S2, S1, Food, PA, Walls, player2),
+    OpponentDrop = snake_duel_ai:should_drop_wall(S2, S1, Walls, player2),
+
+    %% Advance game with explicit actions
+    Actions = #{drop_tail_1 => GladiatorDrop, drop_tail_2 => OpponentDrop},
+    Game1 = snake_duel_engine:tick_step(Game, GladiatorDir, OpponentDir, Actions),
 
     %% Track food proximity delta
     PrevDist = maps:get(prev_food_dist, EnvState),
@@ -83,12 +91,31 @@ apply_action(GladiatorDir, AgentState, #{game := Game} = EnvState) ->
         _ -> Revisited + 1
     end,
 
+    %% Track wall kills (opponent died from wall tile collision)
+    PrevWallKills = maps:get(wall_kills, EnvState, 0),
+    WallKills = case Game1#game_state.status of
+        finished ->
+            case Game1#game_state.winner of
+                player1 ->
+                    %% Check if opponent hit a wall tile
+                    [OppHead | _] = (Game1#game_state.snake2)#snake.body,
+                    WallPositions = sets:from_list([W#wall_tile.pos || W <- Game1#game_state.walls]),
+                    case sets:is_element(OppHead, WallPositions) of
+                        true -> PrevWallKills + 1;
+                        false -> PrevWallKills
+                    end;
+                _ -> PrevWallKills
+            end;
+        _ -> PrevWallKills
+    end,
+
     EnvState1 = EnvState#{
         game := Game1,
         food_proximity_delta := AccDelta,
         prev_food_dist := CurrDist,
         positions_visited := Visited#{HeadPos => VisitCount + 1},
-        positions_revisited := NewRevisited
+        positions_revisited := NewRevisited,
+        wall_kills => WallKills
     },
     {ok, AgentState, EnvState1}.
 
@@ -114,6 +141,7 @@ extract_metrics(_AgentState, #{game := Game} = EnvState) ->
         opponent_crashed => OpponentCrashed,
         positions_revisited => maps:get(positions_revisited, EnvState),
         opponent_score => S2#snake.score,
+        wall_kills => maps:get(wall_kills, EnvState, 0),
         fitness_weights => maps:get(fitness_weights, EnvState, ?DEFAULT_FITNESS_WEIGHTS)
     }.
 

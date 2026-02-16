@@ -174,6 +174,7 @@ game_to_map(MatchId, #game_state{} = G) ->
         snake2 => snake_to_map(G#game_state.snake2),
         food => point_to_list(G#game_state.food),
         poison_apples => [poison_to_map(P) || P <- G#game_state.poison_apples],
+        walls => [wall_to_map(W) || W <- G#game_state.walls],
         status => G#game_state.status,
         winner => G#game_state.winner,
         tick => G#game_state.tick,
@@ -194,5 +195,10 @@ event_to_map(#game_event{} = E) ->
 
 poison_to_map(#poison_apple{} = P) ->
     #{pos => point_to_list(P#poison_apple.pos), owner => P#poison_apple.owner}.
+
+wall_to_map(#wall_tile{} = W) ->
+    #{pos => point_to_list(W#wall_tile.pos),
+      owner => W#wall_tile.owner,
+      ttl => W#wall_tile.ttl}.
 
 point_to_list({X, Y}) -> [X, Y].

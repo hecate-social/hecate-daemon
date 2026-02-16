@@ -10,21 +10,31 @@
 
 -include("snake_duel.hrl").
 
--export([choose_direction/5, should_drop_poison/4]).
+-export([choose_direction/5, choose_direction/6, should_drop_poison/4, should_drop_wall/4]).
 
 -define(DIRECTIONS, [up, down, left, right]).
 
 %%--------------------------------------------------------------------
-%% @doc Choose the best direction for a snake.
-%% Filters out reverse direction, scores all valid options, returns best.
+%% @doc Choose the best direction for a snake (backward compat, no walls).
 %% @end
 %%--------------------------------------------------------------------
 -spec choose_direction(snake(), snake(), point(), [poison_apple()], player_tag()) ->
     direction().
-choose_direction(#snake{direction = CurDir} = Snake, Opponent, Food, PoisonApples, OwnTag) ->
+choose_direction(Snake, Opponent, Food, PoisonApples, OwnTag) ->
+    choose_direction(Snake, Opponent, Food, PoisonApples, [], OwnTag).
+
+%%--------------------------------------------------------------------
+%% @doc Choose the best direction for a snake, with wall awareness.
+%% Filters out reverse direction, scores all valid options, returns best.
+%% @end
+%%--------------------------------------------------------------------
+-spec choose_direction(snake(), snake(), point(), [poison_apple()], [wall_tile()], player_tag()) ->
+    direction().
+choose_direction(#snake{direction = CurDir} = Snake, Opponent, Food, PoisonApples, Walls, OwnTag) ->
     Opposite = opposite(CurDir),
     ValidDirs = [D || D <- ?DIRECTIONS, D =/= Opposite],
-    Obstacles = build_obstacle_set(tl(Snake#snake.body), Opponent#snake.body),
+    WallPositions = [W#wall_tile.pos || W <- Walls],
+    Obstacles = build_obstacle_set(tl(Snake#snake.body), Opponent#snake.body ++ WallPositions),
     OwnPoisons = poison_set(PoisonApples, OwnTag, same),
     OppPoisons = poison_set(PoisonApples, OwnTag, other),
 
@@ -66,6 +76,34 @@ should_drop_poison(#snake{score = Score, body = Body, asshole_factor = AF}, Oppo
                         true -> false;
                         false -> rand:uniform() < BaseChance + ProxBonus
                     end
+            end
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Decide whether to drop a wall tile (tail segment) this tick.
+%% Requires AF >= 30, body >= 6, max 3 own walls on field.
+%% @end
+%%--------------------------------------------------------------------
+-spec should_drop_wall(snake(), snake(), [wall_tile()], player_tag()) ->
+    boolean().
+should_drop_wall(#snake{body = Body, asshole_factor = AF}, Opponent, Walls, OwnTag) ->
+    case AF < 30 orelse length(Body) < 6 of
+        true -> false;
+        false ->
+            OwnCount = length([1 || #wall_tile{owner = O} <- Walls, O =:= OwnTag]),
+            case OwnCount >= 3 of
+                true -> false;
+                false ->
+                    AFn = AF / 100,
+                    BaseChance = AFn * 0.02,
+                    OppHead = hd(Opponent#snake.body),
+                    Tail = lists:last(Body),
+                    Dist = manhattan(Tail, OppHead),
+                    ProxBonus = case Dist < 6 of
+                        true -> AFn * 0.015;
+                        false -> 0
+                    end,
+                    rand:uniform() < BaseChance + ProxBonus
             end
     end.
 

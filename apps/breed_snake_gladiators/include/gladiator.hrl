@@ -2,22 +2,32 @@
 -ifndef(GLADIATOR_HRL).
 -define(GLADIATOR_HRL, true).
 
-%% Neural network topology: 22 inputs, [24, 12] hidden, 4 outputs
+%% Neural network topology: 26 inputs, [28, 14] hidden, 5 outputs
 %% Inputs:
 %%   1-2:   Relative food position (dx, dy) / grid_dim
 %%   3-4:   Relative opponent head (dx, dy) / grid_dim
-%%   5-8:   Danger in 4 directions (1.0 if wall/body adjacent, 0.0 otherwise)
+%%   5-8:   Danger in 4 directions (1.0 if wall/body/wall_tile adjacent, 0.0 otherwise)
 %%   9:     Own score / 20.0
 %%   10:    Opponent score / 20.0
 %%   11-14: Current direction one-hot [up, down, left, right]
-%%   15-16: Distance to nearest wall (horizontal, vertical) normalized
+%%   15-16: Distance to nearest boundary wall (horizontal, vertical) normalized
 %%   17-18: Body length relative (own/20, opponent/20)
 %%   19-20: Nearest poison apple direction (dx, dy) / grid_dim (0,0 if none)
 %%   21-22: Look-ahead danger 2 cells (current dir, perpendicular right)
--define(GLADIATOR_INPUTS, 22).
--define(GLADIATOR_HIDDEN, [24, 12]).
--define(GLADIATOR_OUTPUTS, 4).
+%%   23-24: Nearest wall tile direction (dx, dy) / grid_dim (0,0 if none)
+%%   25:    Own wall count on field / 5.0
+%%   26:    Can drop tail (1.0 if body >= 6, else 0.0)
+%% Outputs:
+%%   1-4:   Direction [up, down, left, right]
+%%   5:     Drop tail signal (> 0.5 = drop)
+-define(GLADIATOR_INPUTS, 26).
+-define(GLADIATOR_HIDDEN, [28, 14]).
+-define(GLADIATOR_OUTPUTS, 5).
 -define(GLADIATOR_TOPOLOGY, {?GLADIATOR_INPUTS, ?GLADIATOR_HIDDEN, ?GLADIATOR_OUTPUTS}).
+
+%% Old topology (for backward compatibility detection)
+-define(GLADIATOR_INPUTS_V1, 22).
+-define(GLADIATOR_OUTPUTS_V1, 4).
 
 %% Training defaults
 -define(DEFAULT_POPULATION_SIZE, 50).
@@ -43,7 +53,8 @@
     draw_bonus        => 50.0,
     kill_bonus        => 100.0,
     proximity_weight  => 0.5,
-    circle_penalty    => -0.2
+    circle_penalty    => -0.2,
+    wall_kill_bonus   => 75.0
 }).
 
 %% Bounds: {Min, Max} per weight
@@ -54,7 +65,8 @@
     draw_bonus        => {0.0, 200.0},
     kill_bonus        => {0.0, 300.0},
     proximity_weight  => {0.0, 5.0},
-    circle_penalty    => {-2.0, 0.0}
+    circle_penalty    => {-2.0, 0.0},
+    wall_kill_bonus   => {0.0, 200.0}
 }).
 
 %% Impact factors for tuning cost calculation
@@ -62,6 +74,7 @@
     win_bonus         => 3.0,
     kill_bonus        => 2.5,
     food_weight       => 2.0,
+    wall_kill_bonus   => 2.0,
     draw_bonus        => 1.5,
     proximity_weight  => 1.0,
     survival_weight   => 1.0,

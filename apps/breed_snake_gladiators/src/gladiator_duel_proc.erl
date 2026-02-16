@@ -105,14 +105,17 @@ handle_info(game_tick, #gduel{game = Game0, match_id = MatchId,
     Context = #{game => Game0},
     Inputs = gladiator_sensor:read(#{player => player1}, Context),
     Outputs = network_evaluator:evaluate(Net, Inputs),
-    {ok, Dir1} = gladiator_actuator:act(Outputs, #{player => player1}, Context),
+    {ok, {Dir1, Drop1}} = gladiator_actuator:act(Outputs, #{player => player1}, Context),
 
-    %% Player 2 (heuristic AI)
-    #game_state{snake1 = S1, snake2 = S2, food = Food, poison_apples = PA} = Game0,
-    Dir2 = snake_duel_ai:choose_direction(S2, S1, Food, PA, player2),
+    %% Player 2 (heuristic AI) — wall-aware
+    #game_state{snake1 = S1, snake2 = S2, food = Food,
+                poison_apples = PA, walls = Walls} = Game0,
+    Dir2 = snake_duel_ai:choose_direction(S2, S1, Food, PA, Walls, player2),
+    Drop2 = snake_duel_ai:should_drop_wall(S2, S1, Walls, player2),
 
-    %% Advance game with explicit directions
-    Game1 = snake_duel_engine:tick_step(Game0, Dir1, Dir2),
+    %% Advance game with explicit directions and wall actions
+    Actions = #{drop_tail_1 => Drop1, drop_tail_2 => Drop2},
+    Game1 = snake_duel_engine:tick_step(Game0, Dir1, Dir2, Actions),
     broadcast(MatchId, Game1),
 
     case Game1#game_state.status of

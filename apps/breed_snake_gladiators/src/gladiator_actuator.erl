@@ -1,7 +1,9 @@
-%%% @doc Actuator for snake gladiator — converts 4 network outputs to direction.
+%%% @doc Actuator for snake gladiator — converts 5 network outputs to action.
 %%%
-%%% Takes argmax of [up, down, left, right] output values.
+%%% Takes argmax of first 4 outputs [up, down, left, right] for direction.
+%%% 5th output is drop-tail signal (> 0.5 = drop wall).
 %%% Filters reverse direction to prevent 180-degree turns.
+%%% Returns {Dir, DropTail} tuple.
 %%% @end
 -module(gladiator_actuator).
 -behaviour(agent_actuator).
@@ -21,14 +23,14 @@ output_count() -> ?GLADIATOR_OUTPUTS.
 act(Outputs, _AgentState, #{game := Game}) ->
     CurrentDir = (Game#game_state.snake1)#snake.direction,
     Reverse = reverse_dir(CurrentDir),
-    Dir = pick_direction(Outputs, Reverse),
-    {ok, Dir}.
+    {Dir, DropTail} = pick_action(Outputs, Reverse),
+    {ok, {Dir, DropTail}}.
 
 %%--------------------------------------------------------------------
 %% Internal
 %%--------------------------------------------------------------------
 
-pick_direction([Up, Down, Left, Right], Reverse) ->
+pick_action([Up, Down, Left, Right | DropRest], Reverse) ->
     Candidates = [
         {Up, up},
         {Down, down},
@@ -38,7 +40,12 @@ pick_direction([Up, Down, Left, Right], Reverse) ->
     %% Filter out the reverse direction, then take argmax
     Filtered = [{Val, Dir} || {Val, Dir} <- Candidates, Dir =/= Reverse],
     {_, BestDir} = lists:max(Filtered),
-    BestDir.
+    %% 5th output is drop-tail signal (> 0.5 = drop)
+    DropSignal = case DropRest of
+        [D | _] -> D > 0.5;
+        [] -> false
+    end,
+    {BestDir, DropSignal}.
 
 reverse_dir(up)    -> down;
 reverse_dir(down)  -> up;

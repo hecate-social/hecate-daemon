@@ -28,6 +28,7 @@ calculate_fitness(Metrics) ->
     KillB      = maps:get(kill_bonus, W, ?FITNESS_KILL_BONUS),
     ProximityW = maps:get(proximity_weight, W, ?FITNESS_PROXIMITY_WEIGHT),
     CircleP    = maps:get(circle_penalty, W, ?FITNESS_CIRCLE_PENALTY),
+    WallKillB  = maps:get(wall_kill_bonus, W, 75.0),
 
     Ticks = maps:get(ticks_survived, Metrics, 0),
     Food = maps:get(food_eaten, Metrics, 0),
@@ -35,6 +36,7 @@ calculate_fitness(Metrics) ->
     OpponentCrashed = maps:get(opponent_crashed, Metrics, false),
     ProximityDelta = maps:get(food_proximity_delta, Metrics, 0.0),
     Revisited = maps:get(positions_revisited, Metrics, 0),
+    WallKills = maps:get(wall_kills, Metrics, 0),
 
     SurvivalScore = Ticks * SurvivalW,
     FoodScore = Food * FoodW,
@@ -51,6 +53,9 @@ calculate_fitness(Metrics) ->
         false -> 0.0
     end,
 
+    %% Bonus for kills via wall tiles
+    WallKillScore = WallKills * WallKillB,
+
     %% Reward net movement toward food (positive delta = got closer)
     ProximityScore = ProximityDelta * ProximityW,
 
@@ -58,4 +63,4 @@ calculate_fitness(Metrics) ->
     CirclePenalty = Revisited * CircleP,
 
     max(0.0, SurvivalScore + FoodScore + WinScore + KillScore +
-             ProximityScore + CirclePenalty).
+             WallKillScore + ProximityScore + CirclePenalty).

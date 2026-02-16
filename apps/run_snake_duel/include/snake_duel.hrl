@@ -14,7 +14,7 @@
 -type point() :: {integer(), integer()}.
 
 -record(game_event, {
-    type  :: food | turn | collision | win | poison_drop | poison_eat,
+    type  :: food | turn | collision | win | poison_drop | poison_eat | wall_drop | wall_hit,
     value :: binary(),
     tick  :: non_neg_integer()
 }).
@@ -35,11 +35,22 @@
 }).
 -type poison_apple() :: #poison_apple{}.
 
+%% Wall tile — decaying fortification dropped from tail
+-define(WALL_TTL, 25).
+
+-record(wall_tile, {
+    pos   :: point(),
+    owner :: player_tag(),
+    ttl   :: non_neg_integer()
+}).
+-type wall_tile() :: #wall_tile{}.
+
 -record(game_state, {
     snake1        :: snake(),
     snake2        :: snake(),
     food          :: point(),
     poison_apples :: [poison_apple()],
+    walls = []    :: [wall_tile()],
     status        :: game_status(),
     winner = none :: player_tag() | draw | none,
     tick = 0      :: non_neg_integer(),

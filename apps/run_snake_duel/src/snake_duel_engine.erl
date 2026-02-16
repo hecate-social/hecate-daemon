@@ -10,7 +10,7 @@
 
 -include("snake_duel.hrl").
 
--export([create_game/2, tick_game/1, tick_step/3, spawn_food/2]).
+-export([create_game/2, tick_game/1, tick_step/3, tick_step/4, spawn_food/2, spawn_food/3]).
 
 %%--------------------------------------------------------------------
 %% @doc Create initial game state for a match.
@@ -42,10 +42,12 @@ create_game(AF1, AF2) ->
 tick_game(#game_state{status = Status} = State) when Status =/= running ->
     State;
 tick_game(#game_state{snake1 = S1_0, snake2 = S2_0,
-                       food = Food, poison_apples = PA0} = State) ->
-    Dir1 = snake_duel_ai:choose_direction(S1_0, S2_0, Food, PA0, player1),
-    Dir2 = snake_duel_ai:choose_direction(S2_0, S1_0, Food, PA0, player2),
-    tick_step(State, Dir1, Dir2).
+                       food = Food, poison_apples = PA0, walls = Walls} = State) ->
+    Dir1 = snake_duel_ai:choose_direction(S1_0, S2_0, Food, PA0, Walls, player1),
+    Dir2 = snake_duel_ai:choose_direction(S2_0, S1_0, Food, PA0, Walls, player2),
+    Drop1 = snake_duel_ai:should_drop_wall(S1_0, S2_0, Walls, player1),
+    Drop2 = snake_duel_ai:should_drop_wall(S2_0, S1_0, Walls, player2),
+    tick_step(State, Dir1, Dir2, #{drop_tail_1 => Drop1, drop_tail_2 => Drop2}).
 
 %%--------------------------------------------------------------------
 %% @doc Advance game state by one tick with explicit directions.
@@ -54,18 +56,33 @@ tick_game(#game_state{snake1 = S1_0, snake2 = S2_0,
 %% @end
 %%--------------------------------------------------------------------
 -spec tick_step(game_state(), direction(), direction()) -> game_state().
-tick_step(#game_state{status = Status} = State, _Dir1, _Dir2) when Status =/= running ->
+tick_step(State, Dir1, Dir2) ->
+    tick_step(State, Dir1, Dir2, #{}).
+
+%%--------------------------------------------------------------------
+%% @doc Advance game state with explicit directions and action flags.
+%% Actions map may contain:
+%%   drop_tail_1 => boolean() — player1 drops tail as wall
+%%   drop_tail_2 => boolean() — player2 drops tail as wall
+%% @end
+%%--------------------------------------------------------------------
+-spec tick_step(game_state(), direction(), direction(), map()) -> game_state().
+tick_step(#game_state{status = Status} = State, _Dir1, _Dir2, _Actions) when Status =/= running ->
     State;
 tick_step(#game_state{tick = Tick0, snake1 = S1_0, snake2 = S2_0,
-                       food = Food, poison_apples = PA0} = State, Dir1, Dir2) ->
+                       food = Food, poison_apples = PA0,
+                       walls = Walls0} = State, Dir1, Dir2, Actions) ->
     Tick = Tick0 + 1,
+
+    %% Decay walls (before movement)
+    Walls1 = decay_walls(Walls0),
 
     %% Move snakes
     S1_1 = move_snake(S1_0, Dir1, Tick),
     S2_1 = move_snake(S2_0, Dir2, Tick),
 
-    %% Check collisions
-    case check_collisions(S1_1, S2_1) of
+    %% Check collisions (includes wall tiles)
+    case check_collisions(S1_1, S2_1, Walls1) of
         {collision, Loser, Reason} ->
             {S1_2, S2_2} = add_collision_events(S1_1, S2_1, Loser, Reason, Tick),
             Winner = case Loser of
@@ -75,7 +92,7 @@ tick_step(#game_state{tick = Tick0, snake1 = S1_0, snake2 = S2_0,
             end,
             State#game_state{
                 snake1 = S1_2, snake2 = S2_2,
-                poison_apples = PA0, tick = Tick,
+                poison_apples = PA0, walls = Walls1, tick = Tick,
                 status = finished, winner = Winner
             };
         no_collision ->
@@ -90,15 +107,21 @@ tick_step(#game_state{tick = Tick0, snake1 = S1_0, snake2 = S2_0,
             {S1_5, PA3} = maybe_drop_poison(S1_4, S2_4, PA2, player1, Tick),
             {S2_5, PA4} = maybe_drop_poison(S2_4, S1_5, PA3, player2, Tick),
 
-            %% Spawn new food if eaten
+            %% Maybe drop tail as wall (from actions)
+            Drop1 = maps:get(drop_tail_1, Actions, false),
+            Drop2 = maps:get(drop_tail_2, Actions, false),
+            {S1_6, Walls2} = maybe_drop_tail(S1_5, Drop1, player1, Walls1, Tick),
+            {S2_6, Walls3} = maybe_drop_tail(S2_5, Drop2, player2, Walls2, Tick),
+
+            %% Spawn new food if eaten (avoid walls too)
             Food2 = case FoodEaten of
-                true -> spawn_food(S1_5#snake.body, S2_5#snake.body);
+                true -> spawn_food(S1_6#snake.body, S2_6#snake.body, Walls3);
                 false -> Food1
             end,
 
             State#game_state{
-                snake1 = S1_5, snake2 = S2_5,
-                food = Food2, poison_apples = PA4, tick = Tick
+                snake1 = S1_6, snake2 = S2_6,
+                food = Food2, poison_apples = PA4, walls = Walls3, tick = Tick
             }
     end.
 
@@ -108,7 +131,16 @@ tick_step(#game_state{tick = Tick0, snake1 = S1_0, snake2 = S2_0,
 %%--------------------------------------------------------------------
 -spec spawn_food([point()], [point()]) -> point().
 spawn_food(Body1, Body2) ->
-    Occupied = sets:from_list(Body1 ++ Body2),
+    spawn_food(Body1, Body2, []).
+
+%%--------------------------------------------------------------------
+%% @doc Spawn food avoiding snakes and wall tiles.
+%% @end
+%%--------------------------------------------------------------------
+-spec spawn_food([point()], [point()], [wall_tile()]) -> point().
+spawn_food(Body1, Body2, Walls) ->
+    WallPositions = [W#wall_tile.pos || W <- Walls],
+    Occupied = sets:from_list(Body1 ++ Body2 ++ WallPositions),
     spawn_food_loop(Occupied, 0).
 
 spawn_food_loop(_Occupied, 1000) ->
@@ -154,10 +186,10 @@ apply_direction({X, Y}, down)  -> {X, Y + 1};
 apply_direction({X, Y}, left)  -> {X - 1, Y};
 apply_direction({X, Y}, right) -> {X + 1, Y}.
 
--spec check_collisions(snake(), snake()) ->
+-spec check_collisions(snake(), snake(), [wall_tile()]) ->
     {collision, player_tag() | draw, binary()} | no_collision.
 check_collisions(#snake{body = [H1 | B1], score = Sc1},
-                 #snake{body = [H2 | B2], score = Sc2}) ->
+                 #snake{body = [H2 | B2], score = Sc2}, Walls) ->
     H1Wall = is_out_of_bounds(H1),
     H2Wall = is_out_of_bounds(H2),
 
@@ -165,28 +197,38 @@ check_collisions(#snake{body = [H1 | B1], score = Sc1},
     case H1 =:= H2 of
         true -> score_breaker(Sc1, Sc2, <<"Head-to-head collision">>);
         false ->
-            %% Both walls
+            %% Both walls (boundary)
             case {H1Wall, H2Wall} of
                 {true, true} -> score_breaker(Sc1, Sc2, <<"Both hit walls">>);
                 {true, false} -> {collision, player1, <<"Hit wall">>};
                 {false, true} -> {collision, player2, <<"Hit wall">>};
                 {false, false} ->
-                    %% Self collisions
-                    H1Self = hits_body(H1, B1),
-                    H2Self = hits_body(H2, B2),
-                    case {H1Self, H2Self} of
-                        {true, true} -> score_breaker(Sc1, Sc2, <<"Both self-collided">>);
-                        {true, false} -> {collision, player1, <<"Self collision">>};
-                        {false, true} -> {collision, player2, <<"Self collision">>};
+                    %% Wall tile collisions (after boundary, before self)
+                    WallPositions = sets:from_list([W#wall_tile.pos || W <- Walls]),
+                    H1WallTile = sets:is_element(H1, WallPositions),
+                    H2WallTile = sets:is_element(H2, WallPositions),
+                    case {H1WallTile, H2WallTile} of
+                        {true, true} -> score_breaker(Sc1, Sc2, <<"Both hit wall tiles">>);
+                        {true, false} -> {collision, player1, <<"Hit wall tile">>};
+                        {false, true} -> {collision, player2, <<"Hit wall tile">>};
                         {false, false} ->
-                            %% Opponent body collisions
-                            H1Opp = hits_body(H1, B2),
-                            H2Opp = hits_body(H2, B1),
-                            case {H1Opp, H2Opp} of
-                                {true, true} -> score_breaker(Sc1, Sc2, <<"Both hit opponent">>);
-                                {true, false} -> {collision, player1, <<"Hit opponent body">>};
-                                {false, true} -> {collision, player2, <<"Hit opponent body">>};
-                                {false, false} -> no_collision
+                            %% Self collisions
+                            H1Self = hits_body(H1, B1),
+                            H2Self = hits_body(H2, B2),
+                            case {H1Self, H2Self} of
+                                {true, true} -> score_breaker(Sc1, Sc2, <<"Both self-collided">>);
+                                {true, false} -> {collision, player1, <<"Self collision">>};
+                                {false, true} -> {collision, player2, <<"Self collision">>};
+                                {false, false} ->
+                                    %% Opponent body collisions
+                                    H1Opp = hits_body(H1, B2),
+                                    H2Opp = hits_body(H2, B1),
+                                    case {H1Opp, H2Opp} of
+                                        {true, true} -> score_breaker(Sc1, Sc2, <<"Both hit opponent">>);
+                                        {true, false} -> {collision, player1, <<"Hit opponent body">>};
+                                        {false, true} -> {collision, player2, <<"Hit opponent body">>};
+                                        {false, false} -> no_collision
+                                    end
                             end
                     end
             end
@@ -310,6 +352,40 @@ maybe_drop_poison(Snake, Opponent, PoisonApples, OwnTag, Tick) ->
             {Snake#snake{score = NewScore, body = NewBody, events = Events}, NewPA};
         false ->
             {Snake, PoisonApples}
+    end.
+
+%%--------------------------------------------------------------------
+%% Wall functions
+%%--------------------------------------------------------------------
+
+-spec decay_walls([wall_tile()]) -> [wall_tile()].
+decay_walls(Walls) ->
+    [W#wall_tile{ttl = W#wall_tile.ttl - 1} || W <- Walls, W#wall_tile.ttl > 1].
+
+-spec maybe_drop_tail(snake(), boolean(), player_tag(), [wall_tile()],
+                       non_neg_integer()) -> {snake(), [wall_tile()]}.
+maybe_drop_tail(Snake, false, _Tag, Walls, _Tick) ->
+    {Snake, Walls};
+maybe_drop_tail(#snake{body = Body} = Snake, true, _Tag, Walls, _Tick) when length(Body) < 6 ->
+    {Snake, Walls};
+maybe_drop_tail(#snake{body = Body, events = Events0} = Snake, true, Tag, Walls, Tick) ->
+    OwnWallCount = length([1 || #wall_tile{owner = O} <- Walls, O =:= Tag]),
+    case OwnWallCount >= 3 of
+        true ->
+            {Snake, Walls};
+        false ->
+            DropPos = lists:last(Body),
+            %% Don't drop on an existing wall tile
+            Occupied = sets:from_list([W#wall_tile.pos || W <- Walls]),
+            case sets:is_element(DropPos, Occupied) of
+                true ->
+                    {Snake, Walls};
+                false ->
+                    NewBody = lists:droplast(Body),
+                    NewWall = #wall_tile{pos = DropPos, owner = Tag, ttl = ?WALL_TTL},
+                    Events1 = add_event(Events0, wall_drop, <<"Dropped wall">>, Tick),
+                    {Snake#snake{body = NewBody, events = Events1}, [NewWall | Walls]}
+            end
     end.
 
 -spec add_event([game_event()], atom(), binary(), non_neg_integer()) -> [game_event()].
