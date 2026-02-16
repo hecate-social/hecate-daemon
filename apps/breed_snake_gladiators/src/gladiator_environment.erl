@@ -29,6 +29,7 @@ init(Config) ->
     OpponentAF = maps:get(opponent_af, Config, ?DEFAULT_OPPONENT_AF),
     MaxTicks = maps:get(max_ticks, Config, ?DEFAULT_MAX_TICKS),
     GladiatorAF = maps:get(gladiator_af, Config, 0),
+    FitnessWeights = maps:get(fitness_weights, Config, ?DEFAULT_FITNESS_WEIGHTS),
 
     Game0 = snake_duel_engine:create_game(GladiatorAF, OpponentAF),
     Game1 = Game0#game_state{status = running, countdown = 0},
@@ -37,6 +38,7 @@ init(Config) ->
         game => Game1,
         opponent_af => OpponentAF,
         max_ticks => MaxTicks,
+        fitness_weights => FitnessWeights,
         food_proximity_delta => 0.0,
         prev_food_dist => food_distance(Game1),
         positions_visited => #{},
@@ -111,7 +113,8 @@ extract_metrics(_AgentState, #{game := Game} = EnvState) ->
         food_proximity_delta => maps:get(food_proximity_delta, EnvState),
         opponent_crashed => OpponentCrashed,
         positions_revisited => maps:get(positions_revisited, EnvState),
-        opponent_score => S2#snake.score
+        opponent_score => S2#snake.score,
+        fitness_weights => maps:get(fitness_weights, EnvState, ?DEFAULT_FITNESS_WEIGHTS)
     }.
 
 %%--------------------------------------------------------------------

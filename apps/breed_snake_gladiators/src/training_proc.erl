@@ -80,10 +80,12 @@ init(#{stable_id := StableId} = Config) ->
     %% Environment config for headless training (with optional overrides)
     MaxTicks = maps:get(max_ticks, TrainingConfig, ?DEFAULT_MAX_TICKS),
     GladiatorAF = maps:get(gladiator_af, TrainingConfig, 0),
+    FitnessWeights = maps:get(fitness_weights, TrainingConfig, ?DEFAULT_FITNESS_WEIGHTS),
     EnvConfig = #{
         opponent_af => OppAF,
         max_ticks => MaxTicks,
-        gladiator_af => GladiatorAF
+        gladiator_af => GladiatorAF,
+        fitness_weights => FitnessWeights
     },
 
     %% Build neuro_config via agent_trainer, pass event_handler and seed networks
@@ -107,13 +109,19 @@ init(#{stable_id := StableId} = Config) ->
 
             %% Record stable in query store
             StartedAt = erlang:system_time(millisecond),
+            %% Encode fitness weights as JSON for storage (null if defaults)
+            FitnessWeightsJson = case FitnessWeights =:= ?DEFAULT_FITNESS_WEIGHTS of
+                true -> null;
+                false -> iolist_to_binary(json:encode(FitnessWeights))
+            end,
             query_snake_gladiators_store:record_stable(#{
                 stable_id => StableId,
                 population_size => PopSize,
                 max_generations => MaxGen,
                 opponent_af => OppAF,
                 episodes_per_eval => Episodes,
-                started_at => StartedAt
+                started_at => StartedAt,
+                fitness_weights => FitnessWeightsJson
             }),
 
             %% Start training

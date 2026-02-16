@@ -9,9 +9,11 @@
 %% Domain-specific write helpers
 -export([record_stable/1, update_stable_progress/1, complete_stable/1,
          record_champion/1, record_generation/1]).
+-export([promote_champion/1, update_hero_record/1]).
 
 %% Domain-specific read helpers
 -export([get_stables/0, get_stable_by_id/1, get_champion/1, get_training_history/1]).
+-export([get_heroes/0, get_hero/1]).
 
 -record(state, {db :: reference()}).
 
@@ -56,12 +58,13 @@ query(Sql, Params) ->
 -spec record_stable(map()) -> ok.
 record_stable(#{stable_id := StableId, population_size := PopSize,
                  max_generations := MaxGen, opponent_af := OppAF,
-                 episodes_per_eval := Episodes, started_at := StartedAt}) ->
+                 episodes_per_eval := Episodes, started_at := StartedAt} = Data) ->
+    FitnessWeights = maps:get(fitness_weights, Data, null),
     Sql = "INSERT INTO stables
            (stable_id, status, population_size, max_generations,
-            opponent_af, episodes_per_eval, started_at)
-           VALUES (?1, 'training', ?2, ?3, ?4, ?5, ?6)",
-    execute(Sql, [StableId, PopSize, MaxGen, OppAF, Episodes, StartedAt]).
+            opponent_af, episodes_per_eval, started_at, fitness_weights)
+           VALUES (?1, 'training', ?2, ?3, ?4, ?5, ?6, ?7)",
+    execute(Sql, [StableId, PopSize, MaxGen, OppAF, Episodes, StartedAt, FitnessWeights]).
 
 -spec update_stable_progress(map()) -> ok.
 update_stable_progress(#{stable_id := StableId, best_fitness := BestFit,
@@ -100,6 +103,23 @@ record_generation(#{stable_id := StableId, generation := Gen,
            VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
     execute(Sql, [StableId, Gen, Best, Avg, Worst, Now]).
 
+-spec promote_champion(map()) -> ok.
+promote_champion(#{hero_id := HeroId, name := Name, stable_id := StableId,
+                    network_json := NetJson, fitness := Fitness,
+                    generation := Gen, promoted_at := PromotedAt}) ->
+    Sql = "INSERT INTO heroes
+           (hero_id, name, network_json, fitness, origin_stable_id,
+            generation, wins, losses, draws, promoted_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 0, 0, ?7)",
+    execute(Sql, [HeroId, Name, NetJson, Fitness, Gen, StableId, PromotedAt]).
+
+-spec update_hero_record(map()) -> ok.
+update_hero_record(#{hero_id := HeroId, wins := Wins,
+                      losses := Losses, draws := Draws}) ->
+    Sql = "UPDATE heroes SET wins = ?1, losses = ?2, draws = ?3
+           WHERE hero_id = ?4",
+    execute(Sql, [Wins, Losses, Draws, HeroId]).
+
 %%--------------------------------------------------------------------
 %% Domain read helpers
 %%--------------------------------------------------------------------
@@ -109,7 +129,8 @@ get_stables() ->
     {ok, Rows} = query(
         "SELECT stable_id, status, population_size, max_generations,
                 opponent_af, episodes_per_eval, best_fitness,
-                generations_completed, started_at, completed_at
+                generations_completed, started_at, completed_at,
+                fitness_weights
          FROM stables ORDER BY started_at DESC"),
     {ok, [stable_row_to_map(R) || R <- Rows]}.
 
@@ -118,7 +139,8 @@ get_stable_by_id(StableId) ->
     {ok, Rows} = query(
         "SELECT stable_id, status, population_size, max_generations,
                 opponent_af, episodes_per_eval, best_fitness,
-                generations_completed, started_at, completed_at
+                generations_completed, started_at, completed_at,
+                fitness_weights
          FROM stables WHERE stable_id = ?1", [StableId]),
     case Rows of
         [Row] -> {ok, stable_row_to_map(Row)};
@@ -144,6 +166,25 @@ get_training_history(StableId) ->
          FROM generation_log WHERE stable_id = ?1
          ORDER BY generation ASC", [StableId]),
     {ok, [gen_row_to_map(R) || R <- Rows]}.
+
+-spec get_heroes() -> {ok, [map()]}.
+get_heroes() ->
+    {ok, Rows} = query(
+        "SELECT hero_id, name, network_json, fitness, origin_stable_id,
+                generation, wins, losses, draws, promoted_at
+         FROM heroes ORDER BY promoted_at DESC"),
+    {ok, [hero_row_to_map(R) || R <- Rows]}.
+
+-spec get_hero(binary()) -> {ok, map()} | {error, not_found}.
+get_hero(HeroId) ->
+    {ok, Rows} = query(
+        "SELECT hero_id, name, network_json, fitness, origin_stable_id,
+                generation, wins, losses, draws, promoted_at
+         FROM heroes WHERE hero_id = ?1", [HeroId]),
+    case Rows of
+        [Row] -> {ok, hero_row_to_map(Row)};
+        [] -> {error, not_found}
+    end.
 
 %%--------------------------------------------------------------------
 %% gen_server callbacks
@@ -216,7 +257,8 @@ create_tables(Db) ->
             best_fitness REAL NOT NULL DEFAULT 0.0,
             generations_completed INTEGER NOT NULL DEFAULT 0,
             started_at INTEGER NOT NULL,
-            completed_at INTEGER
+            completed_at INTEGER,
+            fitness_weights TEXT
         );",
         "CREATE TABLE IF NOT EXISTS champions (
             stable_id TEXT PRIMARY KEY,
@@ -238,18 +280,47 @@ create_tables(Db) ->
             timestamp INTEGER NOT NULL,
             UNIQUE(stable_id, generation)
         );",
+        "CREATE TABLE IF NOT EXISTS heroes (
+            hero_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            network_json TEXT NOT NULL,
+            fitness REAL NOT NULL,
+            origin_stable_id TEXT NOT NULL,
+            generation INTEGER NOT NULL,
+            wins INTEGER NOT NULL DEFAULT 0,
+            losses INTEGER NOT NULL DEFAULT 0,
+            draws INTEGER NOT NULL DEFAULT 0,
+            promoted_at INTEGER NOT NULL
+        );",
         "CREATE INDEX IF NOT EXISTS idx_stables_status ON stables(status);",
-        "CREATE INDEX IF NOT EXISTS idx_gen_log_stable ON generation_log(stable_id);"
+        "CREATE INDEX IF NOT EXISTS idx_gen_log_stable ON generation_log(stable_id);",
+        "CREATE INDEX IF NOT EXISTS idx_heroes_promoted ON heroes(promoted_at DESC);"
     ],
     lists:foreach(fun(Sql) -> ok = esqlite3:exec(Db, Sql) end, Stmts),
+    %% Migration: add fitness_weights column if missing (existing DBs)
+    migrate_add_column(Db, "stables", "fitness_weights", "TEXT"),
     ok.
+
+migrate_add_column(Db, Table, Column, Type) ->
+    Sql = "ALTER TABLE " ++ Table ++ " ADD COLUMN " ++ Column ++ " " ++ Type,
+    case esqlite3:exec(Db, Sql) of
+        ok -> ok;
+        {error, _} -> ok  %% Column already exists
+    end.
 
 %%--------------------------------------------------------------------
 %% Row mappers
 %%--------------------------------------------------------------------
 
 stable_row_to_map([StableId, Status, PopSize, MaxGen, OppAF, Episodes,
-                   BestFit, GenDone, StartedAt, CompletedAt]) ->
+                   BestFit, GenDone, StartedAt, CompletedAt, FitnessWeightsJson]) ->
+    FW = case FitnessWeightsJson of
+        null -> null;
+        undefined -> null;
+        <<>> -> null;
+        Bin when is_binary(Bin) -> json:decode(Bin);
+        _ -> null
+    end,
     #{stable_id => StableId,
       status => Status,
       population_size => PopSize,
@@ -259,7 +330,8 @@ stable_row_to_map([StableId, Status, PopSize, MaxGen, OppAF, Episodes,
       best_fitness => BestFit,
       generations_completed => GenDone,
       started_at => StartedAt,
-      completed_at => CompletedAt}.
+      completed_at => CompletedAt,
+      fitness_weights => FW}.
 
 champion_row_to_map([StableId, NetJson, Fitness, Gen,
                      Wins, Losses, Draws, ExportedAt]) ->
@@ -279,3 +351,16 @@ gen_row_to_map([StableId, Gen, Best, Avg, Worst, Timestamp]) ->
       avg_fitness => Avg,
       worst_fitness => Worst,
       timestamp => Timestamp}.
+
+hero_row_to_map([HeroId, Name, NetJson, Fitness, OriginStableId,
+                 Gen, Wins, Losses, Draws, PromotedAt]) ->
+    #{hero_id => HeroId,
+      name => Name,
+      network_json => NetJson,
+      fitness => Fitness,
+      origin_stable_id => OriginStableId,
+      generation => Gen,
+      wins => Wins,
+      losses => Losses,
+      draws => Draws,
+      promoted_at => PromotedAt}.

@@ -5,6 +5,8 @@
 %%% @end
 -module(initiate_stable_api).
 
+-include("gladiator.hrl").
+
 -export([init/2]).
 
 init(Req0, _State) ->
@@ -36,49 +38,67 @@ do_initiate(Params, Req) ->
     %% Optional per-stable training config overrides
     TrainingConfig = extract_training_config(Params),
 
-    StableId = generate_stable_id(),
+    %% Check tuning budget if fitness weights are present
+    case check_budget(TrainingConfig) of
+        {error, budget_exceeded} ->
+            hecate_api_utils:json_error(400, <<"Fitness tuning budget exceeded">>, Req);
+        ok ->
+            StableId = generate_stable_id(),
 
-    %% Load seed networks from champion if seed_stable_id is provided
-    SeedNetworks = load_seed_networks(SeedStableId),
+            %% Load seed networks from champion if seed_stable_id is provided
+            SeedNetworks = load_seed_networks(SeedStableId),
 
-    Config = #{
-        stable_id => StableId,
-        population_size => PopSize,
-        max_generations => MaxGen,
-        opponent_af => OppAF,
-        episodes_per_eval => Episodes,
-        seed_networks => SeedNetworks,
-        training_config => TrainingConfig
-    },
-
-    case training_proc_sup:start_training(Config) of
-        {ok, _Pid} ->
-            Response = #{
+            Config = #{
                 stable_id => StableId,
                 population_size => PopSize,
                 max_generations => MaxGen,
                 opponent_af => OppAF,
                 episodes_per_eval => Episodes,
-                status => <<"training">>
+                seed_networks => SeedNetworks,
+                training_config => TrainingConfig
             },
-            Response1 = case SeedStableId of
-                undefined -> Response;
-                null -> Response;
-                _ -> Response#{seed_stable_id => SeedStableId}
-            end,
-            Response2 = case map_size(TrainingConfig) of
-                0 -> Response1;
-                _ -> Response1#{training_config => TrainingConfig}
-            end,
-            hecate_api_utils:json_ok(201, Response2, Req);
-        {error, Reason} ->
-            hecate_api_utils:json_error(500, Reason, Req)
+
+            case training_proc_sup:start_training(Config) of
+                {ok, _Pid} ->
+                    Response = #{
+                        stable_id => StableId,
+                        population_size => PopSize,
+                        max_generations => MaxGen,
+                        opponent_af => OppAF,
+                        episodes_per_eval => Episodes,
+                        status => <<"training">>
+                    },
+                    Response1 = case SeedStableId of
+                        undefined -> Response;
+                        null -> Response;
+                        _ -> Response#{seed_stable_id => SeedStableId}
+                    end,
+                    Response2 = case map_size(TrainingConfig) of
+                        0 -> Response1;
+                        _ -> Response1#{training_config => TrainingConfig}
+                    end,
+                    hecate_api_utils:json_ok(201, Response2, Req);
+                {error, Reason} ->
+                    hecate_api_utils:json_error(500, Reason, Req)
+            end
+    end.
+
+check_budget(TrainingConfig) ->
+    case maps:get(fitness_weights, TrainingConfig, undefined) of
+        undefined -> ok;
+        Weights ->
+            case gladiator_fitness_config:within_budget(Weights, ?DEFAULT_TUNING_BUDGET) of
+                true -> ok;
+                false -> {error, budget_exceeded}
+            end
     end.
 
 %% Extract optional training config overrides from the request body.
 %% Supported keys:
 %%   max_ticks: max game ticks per episode (default 500)
 %%   gladiator_af: gladiator's asshole factor (default 0)
+%%   fitness_weights: map of weight overrides
+%%   fitness_preset: named preset (balanced, aggressive, forager, survivor, assassin)
 extract_training_config(Params) ->
     ConfigMap = hecate_api_utils:get_field(training_config, Params),
     case ConfigMap of
@@ -86,13 +106,58 @@ extract_training_config(Params) ->
         null -> #{};
         M when is_map(M) ->
             Fields = [{max_ticks, 500}, {gladiator_af, 0}],
-            maps:from_list([
+            Base = maps:from_list([
                 {K, to_integer(hecate_api_utils:get_field(K, M), Default)}
                 || {K, Default} <- Fields,
                    hecate_api_utils:get_field(K, M) =/= undefined
-            ]);
+            ]),
+            %% Handle fitness weights: preset or custom
+            WithWeights = extract_fitness_weights(M, Base),
+            WithWeights;
         _ -> #{}
     end.
+
+extract_fitness_weights(ConfigMap, Base) ->
+    Preset = hecate_api_utils:get_field(fitness_preset, ConfigMap),
+    UserWeights = hecate_api_utils:get_field(fitness_weights, ConfigMap),
+    Presets = gladiator_fitness_config:presets(),
+    RawWeights = case {Preset, UserWeights} of
+        {undefined, undefined} -> undefined;
+        {undefined, null} -> undefined;
+        {null, undefined} -> undefined;
+        {null, null} -> undefined;
+        {_, W} when is_map(W) -> atomize_weight_keys(W);
+        {P, _} when is_binary(P) ->
+            case maps:get(binary_to_existing_atom(P), Presets, undefined) of
+                undefined -> undefined;
+                PresetWeights -> PresetWeights
+            end;
+        _ -> undefined
+    end,
+    case RawWeights of
+        undefined -> Base;
+        _ ->
+            case gladiator_fitness_config:validate_weights(RawWeights) of
+                {ok, Validated} ->
+                    Base#{fitness_weights => Validated};
+                {error, _} ->
+                    Base
+            end
+    end.
+
+%% Convert binary keys to atoms for weight map (only known keys).
+atomize_weight_keys(Map) when is_map(Map) ->
+    Known = [survival_weight, food_weight, win_bonus, draw_bonus,
+             kill_bonus, proximity_weight, circle_penalty],
+    maps:from_list([
+        {K, to_float(maps:get(atom_to_binary(K), Map, undefined))}
+        || K <- Known,
+           maps:is_key(atom_to_binary(K), Map)
+    ]).
+
+to_float(V) when is_float(V) -> V;
+to_float(V) when is_integer(V) -> V + 0.0;
+to_float(_) -> 0.0.
 
 load_seed_networks(undefined) -> [];
 load_seed_networks(null) -> [];

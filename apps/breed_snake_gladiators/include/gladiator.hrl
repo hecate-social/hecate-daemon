@@ -35,6 +35,42 @@
 -define(FITNESS_PROXIMITY_WEIGHT, 0.5).    %% Bonus for getting closer to food
 -define(FITNESS_CIRCLE_PENALTY, -0.2).     %% Penalty per revisited position
 
+%% Default fitness weights (map form for configurable weights)
+-define(DEFAULT_FITNESS_WEIGHTS, #{
+    survival_weight   => 0.1,
+    food_weight       => 50.0,
+    win_bonus         => 200.0,
+    draw_bonus        => 50.0,
+    kill_bonus        => 100.0,
+    proximity_weight  => 0.5,
+    circle_penalty    => -0.2
+}).
+
+%% Bounds: {Min, Max} per weight
+-define(FITNESS_WEIGHT_BOUNDS, #{
+    survival_weight   => {0.0, 1.0},
+    food_weight       => {0.0, 200.0},
+    win_bonus         => {0.0, 500.0},
+    draw_bonus        => {0.0, 200.0},
+    kill_bonus        => {0.0, 300.0},
+    proximity_weight  => {0.0, 5.0},
+    circle_penalty    => {-2.0, 0.0}
+}).
+
+%% Impact factors for tuning cost calculation
+-define(FITNESS_WEIGHT_IMPACTS, #{
+    win_bonus         => 3.0,
+    kill_bonus        => 2.5,
+    food_weight       => 2.0,
+    draw_bonus        => 1.5,
+    proximity_weight  => 1.0,
+    survival_weight   => 1.0,
+    circle_penalty    => 0.5
+}).
+
+%% Tuning budget: max total deviation cost
+-define(DEFAULT_TUNING_BUDGET, 100.0).
+
 %% Direction output indices (0-based)
 -define(DIR_UP, 0).
 -define(DIR_DOWN, 1).

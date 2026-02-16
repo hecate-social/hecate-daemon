@@ -10,5 +10,8 @@ routes() ->
         {"/api/arcade/gladiators/stables/:stable_id/halt",        halt_training_api, []},
         {"/api/arcade/gladiators/stables/:stable_id/export",      export_champion_api, []},
         {"/api/arcade/gladiators/stables/:stable_id/stream",      stream_training_api, []},
-        {"/api/arcade/gladiators/stables/:stable_id/duel",        start_champion_duel_api, []}
+        {"/api/arcade/gladiators/stables/:stable_id/duel",        start_champion_duel_api, []},
+        {"/api/arcade/gladiators/heroes",                         heroes_api, []},
+        {"/api/arcade/gladiators/heroes/:hero_id",                hero_detail_api, []},
+        {"/api/arcade/gladiators/fitness/presets",                fitness_presets_api, []}
     ].
