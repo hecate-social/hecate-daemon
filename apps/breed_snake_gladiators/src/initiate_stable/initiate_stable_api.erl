@@ -167,8 +167,25 @@ load_seed_networks(SeedStableId) when is_binary(SeedStableId) ->
     case query_snake_gladiators_store:get_champion(SeedStableId) of
         {ok, #{network_json := NetworkJson}} ->
             NetworkData = json:decode(NetworkJson),
-            Network = network_evaluator:from_json(NetworkData),
-            [Network];
+            case network_evaluator:from_json(NetworkData) of
+                {ok, Network} ->
+                    %% Verify topology matches current input count.
+                    %% Old champions (e.g. 26 inputs) can't seed new 27-input populations.
+                    Topology = network_evaluator:get_topology(Network),
+                    [InputSize | _] = maps:get(layer_sizes, Topology),
+                    case InputSize =:= ?GLADIATOR_INPUTS of
+                        true ->
+                            [Network];
+                        false ->
+                            logger:warning("[gladiators] Seed stable ~s has ~p inputs "
+                                           "(expected ~p), topology mismatch — using random init",
+                                           [SeedStableId, InputSize, ?GLADIATOR_INPUTS]),
+                            []
+                    end;
+                {error, Reason} ->
+                    logger:warning("[gladiators] Seed stable ~s has invalid network: ~p, using random", [SeedStableId, Reason]),
+                    []
+            end;
         {error, _} ->
             logger:warning("[gladiators] Seed stable ~s has no champion, using random", [SeedStableId]),
             []

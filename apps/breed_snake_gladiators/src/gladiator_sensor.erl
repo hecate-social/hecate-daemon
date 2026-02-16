@@ -1,4 +1,4 @@
-%%% @doc Sensor for snake gladiator — reads game state into 26 floats.
+%%% @doc Sensor for snake gladiator — reads game state into 27 floats.
 %%%
 %%% Inputs (all normalized ~[-1, 1]):
 %%%   1-2:   Relative food position (dx, dy) / grid_dim
@@ -10,10 +10,10 @@
 %%%   15-16: Distance to nearest boundary wall (horizontal, vertical) normalized
 %%%   17-18: Body length relative (own/20, opponent/20)
 %%%   19-20: Nearest poison apple direction (dx, dy) / grid_dim (0,0 if none)
-%%%   21-22: Look-ahead danger 2 cells (current dir, perpendicular right)
-%%%   23-24: Nearest wall tile direction (dx, dy) / grid_dim (0,0 if none)
-%%%   25:    Own wall count on field / 5.0
-%%%   26:    Can drop tail (1.0 if body >= 6, else 0.0)
+%%%   21-23: Look-ahead danger 2 cells (current dir, perpendicular right, perpendicular left)
+%%%   24-25: Nearest wall tile direction (dx, dy) / grid_dim (0,0 if none)
+%%%   26:    Own wall count on field / 5.0
+%%%   27:    Can drop tail (1.0 if body >= 6, else 0.0)
 %%% @end
 -module(gladiator_sensor).
 -behaviour(agent_sensor).
@@ -70,18 +70,20 @@ read(_AgentState, #{game := Game}) ->
     %% 19-20: Nearest poison apple direction (0,0 if none)
     {PoisonDx, PoisonDy} = nearest_poison_dir(H1, PA),
 
-    %% 21-22: Look-ahead danger 2 cells deep
+    %% 21-23: Look-ahead danger 2 cells deep (forward, right, left)
     Danger2Forward = danger_at_distance(H1, Dir1, 2, Obstacles),
-    PerpDir = perpendicular_right(Dir1),
-    Danger2Perp = danger_at_distance(H1, PerpDir, 2, Obstacles),
+    PerpRightDir = perpendicular_right(Dir1),
+    Danger2PerpRight = danger_at_distance(H1, PerpRightDir, 2, Obstacles),
+    PerpLeftDir = perpendicular_left(Dir1),
+    Danger2PerpLeft = danger_at_distance(H1, PerpLeftDir, 2, Obstacles),
 
-    %% 23-24: Nearest wall tile direction (0,0 if none)
+    %% 24-25: Nearest wall tile direction (0,0 if none)
     {WallTileDx, WallTileDy} = nearest_wall_tile_dir(H1, Walls),
 
-    %% 25: Own wall count on field / 5.0
+    %% 26: Own wall count on field / 5.0
     OwnWallCount = length([1 || #wall_tile{owner = player1} <- Walls]) / 5.0,
 
-    %% 26: Can drop tail (1.0 if body >= 6, else 0.0)
+    %% 27: Can drop tail (1.0 if body >= 6, else 0.0)
     CanDrop = case length(Body1) >= 6 of true -> 1.0; false -> 0.0 end,
 
     [FoodDx, FoodDy,
@@ -92,7 +94,7 @@ read(_AgentState, #{game := Game}) ->
      WallH, WallV,
      BodyLen1, BodyLen2,
      PoisonDx, PoisonDy,
-     Danger2Forward, Danger2Perp,
+     Danger2Forward, Danger2PerpRight, Danger2PerpLeft,
      WallTileDx, WallTileDy,
      OwnWallCount, CanDrop].
 
@@ -169,3 +171,9 @@ perpendicular_right(up)    -> right;
 perpendicular_right(right) -> down;
 perpendicular_right(down)  -> left;
 perpendicular_right(left)  -> up.
+
+%% Perpendicular direction (90 degrees counter-clockwise).
+perpendicular_left(up)    -> left;
+perpendicular_left(left)  -> down;
+perpendicular_left(down)  -> right;
+perpendicular_left(right) -> up.

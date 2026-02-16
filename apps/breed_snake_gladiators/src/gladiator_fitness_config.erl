@@ -75,7 +75,7 @@ presets() ->
             draw_bonus        => 50.0,
             kill_bonus        => 250.0,
             proximity_weight  => 0.5,
-            circle_penalty    => -0.2
+            circle_penalty    => -0.5
         },
         forager => #{
             survival_weight   => 0.1,
@@ -84,7 +84,7 @@ presets() ->
             draw_bonus        => 50.0,
             kill_bonus        => 100.0,
             proximity_weight  => 3.0,
-            circle_penalty    => -0.2
+            circle_penalty    => -1.0
         },
         survivor => #{
             survival_weight   => 0.8,

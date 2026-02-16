@@ -88,13 +88,19 @@ init(#{stable_id := StableId} = Config) ->
         fitness_weights => FitnessWeights
     },
 
-    %% Build neuro_config via agent_trainer, pass event_handler and seed networks
+    %% Build neuro_config via agent_trainer, pass event_handler and seed networks.
+    %% Custom network factory: tanh hidden layers + linear output layer.
     {ok, NeuroConfig} = agent_trainer:to_neuro_config(Bridge, EnvConfig, #{
         population_size => PopSize,
         max_generations => MaxGen,
         episodes_per_eval => Episodes,
         event_handler => {?MODULE, self()},
-        seed_networks => SeedNetworks
+        seed_networks => SeedNetworks,
+        strategy_config => #{
+            strategy_params => #{
+                network_factory => gladiator_network_factory
+            }
+        }
     }),
 
     %% Start neuroevolution server
