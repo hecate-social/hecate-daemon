@@ -20,7 +20,9 @@
 %%% @end
 -module(chat_to_llm_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/llm/chat", ?MODULE, []}].
 
 %%% ===================================================================
 %%% Cowboy Handler

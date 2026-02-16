@@ -2,7 +2,9 @@
 %%% Closes an IRC channel.
 -module(close_channel_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/irc/channels/:channel_id/close", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

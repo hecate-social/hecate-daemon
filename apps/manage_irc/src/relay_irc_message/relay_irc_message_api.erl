@@ -6,7 +6,9 @@
 %%% @end
 -module(relay_irc_message_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/irc/channels/:channel_id/messages", ?MODULE, []}].
 
 -dialyzer({nowarn_function, [handle_post/2]}).
 

@@ -4,7 +4,9 @@
 %%% @end
 -module(identify_division_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/ventures/:venture_id/discovery/identify", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

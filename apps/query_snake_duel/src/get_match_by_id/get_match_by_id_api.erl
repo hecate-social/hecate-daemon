@@ -2,7 +2,9 @@
 %%% Returns a completed match result.
 -module(get_match_by_id_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/arcade/snake-duel/matches/:match_id/result", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

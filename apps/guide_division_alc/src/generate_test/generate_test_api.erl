@@ -1,6 +1,8 @@
 %%% @doc API handler: POST /api/divisions/:division_id/generate/tests
 -module(generate_test_api).
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/divisions/:division_id/generate/tests", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of <<"POST">> -> handle_post(Req0, State); _ -> hecate_api_utils:method_not_allowed(Req0) end.

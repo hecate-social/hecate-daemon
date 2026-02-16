@@ -5,7 +5,9 @@
 %%% @end
 -module(start_champion_duel_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/arcade/gladiators/stables/:stable_id/duel", ?MODULE, []}].
 
 init(Req0, _State) ->
     case cowboy_req:method(Req0) of

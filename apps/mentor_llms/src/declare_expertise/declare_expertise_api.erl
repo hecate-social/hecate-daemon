@@ -1,5 +1,7 @@
 -module(declare_expertise_api).
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/mentors/expertise", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

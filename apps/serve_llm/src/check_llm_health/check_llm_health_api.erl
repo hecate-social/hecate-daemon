@@ -5,7 +5,9 @@
 %%% @end
 -module(check_llm_health_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/llm/health", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

@@ -1,6 +1,8 @@
 %%% @doc API handler: GET /api/ventures/:venture_id/divisions
 -module(get_discovered_divisions_page_api).
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/ventures/:venture_id/divisions", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

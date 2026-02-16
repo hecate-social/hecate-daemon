@@ -1,6 +1,8 @@
 %%% @doc API handler: GET /api/node/capabilities/:mri
 -module(get_capability_by_mri_api).
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/node/capabilities/:mri", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

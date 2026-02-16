@@ -1,7 +1,9 @@
 %%% @doc API handler: GET /api/node/ucan/verify/:capability_id
 %%% Also supports: GET /api/node/ucan/verify?id=...
 -module(verify_ucan_api).
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/node/ucan/verify", ?MODULE, []}, {"/api/node/ucan/verify/:capability_id", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

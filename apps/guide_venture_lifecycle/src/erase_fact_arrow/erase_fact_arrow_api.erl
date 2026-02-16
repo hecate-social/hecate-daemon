@@ -4,7 +4,9 @@
 %%% @end
 -module(erase_fact_arrow_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/ventures/:venture_id/storm/fact/:arrow_id/erase", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

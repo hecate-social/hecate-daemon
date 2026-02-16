@@ -2,7 +2,9 @@
 %%% Halts a running training session.
 -module(halt_training_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/arcade/gladiators/stables/:stable_id/halt", ?MODULE, []}].
 
 init(Req0, _State) ->
     case cowboy_req:method(Req0) of

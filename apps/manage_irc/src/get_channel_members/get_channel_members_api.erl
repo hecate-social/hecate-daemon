@@ -6,7 +6,9 @@
 %%% @end
 -module(get_channel_members_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/irc/channels/:channel_id/members", ?MODULE, []}].
 
 -define(SCOPE, pg).
 -define(INFO_TIMEOUT_MS, 2000).

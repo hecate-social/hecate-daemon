@@ -14,7 +14,9 @@
 %%% @end
 -module(stream_irc_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/irc/stream", ?MODULE, []}].
 
 -define(SCOPE, pg).
 -define(STREAM_GROUP, irc_stream).

@@ -2,7 +2,9 @@
 %%% Returns recent match history, most recent first.
 -module(get_match_history_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/arcade/snake-duel/history", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

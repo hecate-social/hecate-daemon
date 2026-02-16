@@ -1,5 +1,7 @@
 -module(get_mentor_profile_by_id_api).
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/mentors/profiles/:agent_id", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

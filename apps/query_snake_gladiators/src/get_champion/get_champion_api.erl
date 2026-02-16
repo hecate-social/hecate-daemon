@@ -2,7 +2,9 @@
 %%% Returns the champion network for a completed stable.
 -module(get_champion_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/arcade/gladiators/stables/:stable_id/champion", ?MODULE, []}].
 
 init(Req0, _State) ->
     case cowboy_req:method(Req0) of

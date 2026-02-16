@@ -2,7 +2,9 @@
 %%% Returns a single stable by ID.
 -module(get_stable_by_id_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/arcade/gladiators/stables/:stable_id", ?MODULE, []}].
 
 init(Req0, _State) ->
     case cowboy_req:method(Req0) of

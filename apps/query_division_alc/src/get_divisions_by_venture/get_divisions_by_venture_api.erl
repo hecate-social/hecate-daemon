@@ -1,6 +1,8 @@
 %%% @doc API handler: GET /api/divisions/by-venture/:venture_id
 -module(get_divisions_by_venture_api).
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/divisions/by-venture/:venture_id", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

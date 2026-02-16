@@ -3,7 +3,9 @@
 %%% Returns the network JSON directly.
 -module(export_champion_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/arcade/gladiators/stables/:stable_id/export", ?MODULE, []}].
 
 init(Req0, _State) ->
     case cowboy_req:method(Req0) of

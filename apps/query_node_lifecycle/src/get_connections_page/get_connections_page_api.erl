@@ -1,6 +1,8 @@
 %%% @doc API handler: GET /api/node/mesh/connections
 -module(get_connections_page_api).
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/node/mesh/connections", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

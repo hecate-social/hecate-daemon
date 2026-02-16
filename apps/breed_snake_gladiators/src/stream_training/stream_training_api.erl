@@ -6,9 +6,11 @@
 %%% @end
 -module(stream_training_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
 
 -define(HEARTBEAT_MS, 15000).
+
+routes() -> [{"/api/arcade/gladiators/stables/:stable_id/stream", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

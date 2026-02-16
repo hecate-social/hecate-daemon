@@ -2,7 +2,9 @@
 %%% Returns generation-by-generation training history.
 -module(get_training_history_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/arcade/gladiators/stables/:stable_id/generations", ?MODULE, []}].
 
 init(Req0, _State) ->
     case cowboy_req:method(Req0) of

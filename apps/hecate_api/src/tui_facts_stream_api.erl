@@ -11,11 +11,13 @@
 %%% @end
 -module(tui_facts_stream_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
 
 -define(SCOPE, pg).
 -define(GROUP, tui_connections).
 -define(HEARTBEAT_MS, 30000).
+
+routes() -> [{"/api/facts/stream", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

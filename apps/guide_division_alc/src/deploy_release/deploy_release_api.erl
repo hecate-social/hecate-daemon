@@ -1,6 +1,9 @@
 %%% @doc API handler: POST /api/divisions/:division_id/deploy/releases
 -module(deploy_release_api).
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/divisions/:division_id/deploy/releases", ?MODULE, []}].
+
 init(Req0, State) -> case cowboy_req:method(Req0) of <<"POST">> -> handle_post(Req0, State); _ -> hecate_api_utils:method_not_allowed(Req0) end.
 handle_post(Req0, _State) ->
     DivisionId = cowboy_req:binding(division_id, Req0),

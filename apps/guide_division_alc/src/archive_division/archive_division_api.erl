@@ -1,7 +1,9 @@
 %%% @doc API handler: POST /api/divisions/:division_id/archive
 -module(archive_division_api).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/api/divisions/:division_id/archive", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
