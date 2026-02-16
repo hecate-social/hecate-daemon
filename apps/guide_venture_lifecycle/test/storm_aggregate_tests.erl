@@ -7,18 +7,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("guide_venture_lifecycle/include/venture_lifecycle_status.hrl").
-
-%% Copied from venture_aggregate.erl for test-side record access.
--record(venture_state, {
-    venture_id, name, brief, status, repos, skills, context_map,
-    discovered_divisions, initiated_at, initiated_by,
-    discovery_started_at, discovery_paused_at, discovery_completed_at,
-    discovery_pause_reason,
-    %% Big Picture Event Storming
-    storm_number = 0, storm_phase = undefined,
-    storm_started_at, storm_shelved_at,
-    event_stickies = #{}, event_stacks = #{}, event_clusters = #{}, fact_arrows = #{}
-}).
+-include_lib("guide_venture_lifecycle/include/venture_state.hrl").
 
 %% ===================================================================
 %% Test generators

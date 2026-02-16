@@ -33,6 +33,9 @@ do_initiate(Params, Req) ->
     Episodes = to_integer(hecate_api_utils:get_field(episodes_per_eval, Params), 3),
     SeedStableId = hecate_api_utils:get_field(seed_stable_id, Params),
 
+    %% Optional per-stable training config overrides
+    TrainingConfig = extract_training_config(Params),
+
     StableId = generate_stable_id(),
 
     %% Load seed networks from champion if seed_stable_id is provided
@@ -44,7 +47,8 @@ do_initiate(Params, Req) ->
         max_generations => MaxGen,
         opponent_af => OppAF,
         episodes_per_eval => Episodes,
-        seed_networks => SeedNetworks
+        seed_networks => SeedNetworks,
+        training_config => TrainingConfig
     },
 
     case training_proc_sup:start_training(Config) of
@@ -62,9 +66,32 @@ do_initiate(Params, Req) ->
                 null -> Response;
                 _ -> Response#{seed_stable_id => SeedStableId}
             end,
-            hecate_api_utils:json_ok(201, Response1, Req);
+            Response2 = case map_size(TrainingConfig) of
+                0 -> Response1;
+                _ -> Response1#{training_config => TrainingConfig}
+            end,
+            hecate_api_utils:json_ok(201, Response2, Req);
         {error, Reason} ->
             hecate_api_utils:json_error(500, Reason, Req)
+    end.
+
+%% Extract optional training config overrides from the request body.
+%% Supported keys:
+%%   max_ticks: max game ticks per episode (default 500)
+%%   gladiator_af: gladiator's asshole factor (default 0)
+extract_training_config(Params) ->
+    ConfigMap = hecate_api_utils:get_field(training_config, Params),
+    case ConfigMap of
+        undefined -> #{};
+        null -> #{};
+        M when is_map(M) ->
+            Fields = [{max_ticks, 500}, {gladiator_af, 0}],
+            maps:from_list([
+                {K, to_integer(hecate_api_utils:get_field(K, M), Default)}
+                || {K, Default} <- Fields,
+                   hecate_api_utils:get_field(K, M) =/= undefined
+            ]);
+        _ -> #{}
     end.
 
 load_seed_networks(undefined) -> [];

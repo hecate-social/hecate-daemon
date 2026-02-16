@@ -144,7 +144,7 @@ arrow_event(ArrowId, VentureId, StormNumber) ->
         from_cluster => <<"cluster-a">>,
         to_cluster => <<"cluster-b">>,
         fact_name => <<"OrderPlaced">>,
-        created_at => 3000
+        drawn_at => 3000
     }.
 
 storm_event(VentureId, StormNumber) ->

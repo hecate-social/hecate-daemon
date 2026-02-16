@@ -6,6 +6,11 @@
 %%%
 %%% The game advances in apply_action/3 via snake_duel_engine:tick_step/3.
 %%% tick/2 is a no-op since the game clock is driven by actions.
+%%%
+%%% Tracks additional metrics for enhanced fitness:
+%%%   - food_proximity_delta: cumulative change in distance to food
+%%%   - opponent_crashed: whether opponent hit a wall/body
+%%%   - positions_revisited: count of positions visited more than once
 %%% @end
 -module(gladiator_environment).
 -behaviour(agent_environment).
@@ -31,7 +36,11 @@ init(Config) ->
     EnvState = #{
         game => Game1,
         opponent_af => OpponentAF,
-        max_ticks => MaxTicks
+        max_ticks => MaxTicks,
+        food_proximity_delta => 0.0,
+        prev_food_dist => food_distance(Game1),
+        positions_visited => #{},
+        positions_revisited => 0
     },
     {ok, EnvState}.
 
@@ -54,19 +63,62 @@ apply_action(GladiatorDir, AgentState, #{game := Game} = EnvState) ->
 
     %% Advance game: gladiator = player1 (Dir1), opponent = player2 (Dir2)
     Game1 = snake_duel_engine:tick_step(Game, GladiatorDir, OpponentDir),
-    {ok, AgentState, EnvState#{game := Game1}}.
+
+    %% Track food proximity delta
+    PrevDist = maps:get(prev_food_dist, EnvState),
+    CurrDist = food_distance(Game1),
+    Delta = PrevDist - CurrDist, %% positive = got closer
+    AccDelta = maps:get(food_proximity_delta, EnvState) + Delta,
+
+    %% Track position revisiting (circle detection)
+    #game_state{snake1 = NewS1} = Game1,
+    [HeadPos | _] = NewS1#snake.body,
+    Visited = maps:get(positions_visited, EnvState),
+    VisitCount = maps:get(HeadPos, Visited, 0),
+    Revisited = maps:get(positions_revisited, EnvState),
+    NewRevisited = case VisitCount of
+        0 -> Revisited;
+        _ -> Revisited + 1
+    end,
+
+    EnvState1 = EnvState#{
+        game := Game1,
+        food_proximity_delta := AccDelta,
+        prev_food_dist := CurrDist,
+        positions_visited := Visited#{HeadPos => VisitCount + 1},
+        positions_revisited := NewRevisited
+    },
+    {ok, AgentState, EnvState1}.
 
 -spec is_terminal(map(), map()) -> boolean().
 is_terminal(_AgentState, #{game := Game, max_ticks := MaxTicks}) ->
     Game#game_state.status =:= finished orelse Game#game_state.tick >= MaxTicks.
 
 -spec extract_metrics(map(), map()) -> map().
-extract_metrics(_AgentState, #{game := Game}) ->
-    #game_state{snake1 = S1, status = Status, winner = Winner,
-                tick = Ticks} = Game,
+extract_metrics(_AgentState, #{game := Game} = EnvState) ->
+    #game_state{snake1 = S1, snake2 = S2, status = Status,
+                winner = Winner, tick = Ticks} = Game,
+
+    %% Determine if opponent crashed (hit wall/body, not timeout)
+    OpponentCrashed = (Winner =:= player1) andalso (Status =:= finished)
+        andalso (Ticks < maps:get(max_ticks, EnvState)),
+
     #{
         ticks_survived => Ticks,
         food_eaten => S1#snake.score,
         status => Status,
-        winner => Winner
+        winner => Winner,
+        food_proximity_delta => maps:get(food_proximity_delta, EnvState),
+        opponent_crashed => OpponentCrashed,
+        positions_revisited => maps:get(positions_revisited, EnvState),
+        opponent_score => S2#snake.score
     }.
+
+%%--------------------------------------------------------------------
+%% Internal
+%%--------------------------------------------------------------------
+
+%% Manhattan distance from snake1 head to food.
+food_distance(#game_state{snake1 = #snake{body = [{Hx, Hy} | _]},
+                          food = {Fx, Fy}}) ->
+    abs(Fx - Hx) + abs(Fy - Hy) + 0.0. %% + 0.0 forces float

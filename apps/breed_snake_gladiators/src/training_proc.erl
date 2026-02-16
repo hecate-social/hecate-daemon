@@ -66,6 +66,7 @@ init(#{stable_id := StableId} = Config) ->
     OppAF = maps:get(opponent_af, Config, ?DEFAULT_OPPONENT_AF),
     Episodes = maps:get(episodes_per_eval, Config, ?DEFAULT_EPISODES_PER_EVAL),
     SeedNetworks = maps:get(seed_networks, Config, []),
+    TrainingConfig = maps:get(training_config, Config, #{}),
 
     %% Build agent bridge
     {ok, Bridge} = agent_bridge:new(#{
@@ -76,11 +77,13 @@ init(#{stable_id := StableId} = Config) ->
         evaluator => gladiator_evaluator
     }),
 
-    %% Environment config for headless training
+    %% Environment config for headless training (with optional overrides)
+    MaxTicks = maps:get(max_ticks, TrainingConfig, ?DEFAULT_MAX_TICKS),
+    GladiatorAF = maps:get(gladiator_af, TrainingConfig, 0),
     EnvConfig = #{
         opponent_af => OppAF,
-        max_ticks => ?DEFAULT_MAX_TICKS,
-        gladiator_af => 0
+        max_ticks => MaxTicks,
+        gladiator_af => GladiatorAF
     },
 
     %% Build neuro_config via agent_trainer, pass event_handler and seed networks

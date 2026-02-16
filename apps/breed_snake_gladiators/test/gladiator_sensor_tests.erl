@@ -4,18 +4,18 @@
 -include("gladiator.hrl").
 
 input_count_test() ->
-    ?assertEqual(14, gladiator_sensor:input_count()).
+    ?assertEqual(?GLADIATOR_INPUTS, gladiator_sensor:input_count()).
 
 name_test() ->
     ?assertEqual(<<"gladiator_vision">>, gladiator_sensor:name()).
 
-read_returns_14_floats_test() ->
+read_returns_correct_count_test() ->
     Game = snake_duel_engine:create_game(0, 50),
     Game1 = Game#game_state{status = running, countdown = 0},
     AgentState = #{player => player1},
     EnvState = #{game => Game1},
     Inputs = gladiator_sensor:read(AgentState, EnvState),
-    ?assertEqual(14, length(Inputs)),
+    ?assertEqual(?GLADIATOR_INPUTS, length(Inputs)),
     %% All values should be numbers
     lists:foreach(fun(V) -> ?assert(is_number(V)) end, Inputs).
 
