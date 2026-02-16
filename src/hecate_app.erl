@@ -2,12 +2,17 @@
 %%% @doc Hecate application module.
 %%%
 %%% Starts the Hecate agent sidecar daemon.
-%%% Ensures ReckonDB (event store) and Evoq are started, then creates
-%%% TWO shared event stores:
-%%%   - hecate_event_store: node infrastructure domains
-%%%   - dev_studio_store: venture lifecycle (guide_venture_lifecycle,
-%%%     guide_division_alc, and their query services)
-%%% Streams within each store separate events by aggregate.
+%%%
+%%% Startup order is CRITICAL:
+%%% 1. Lifecycle files (daemon.pid, daemon.state = starting)
+%%% 2. Unix socket with minimal health-only dispatch (clients see ready:false)
+%%% 3. ReckonDB (embedded event store infrastructure)
+%%% 4. Evoq (CQRS framework)
+%%% 5. Shared event stores (hecate_event_store, dev_studio_store)
+%%% 6. hecate_sup (domain services)
+%%%
+%%% The socket becomes fully operational later when hecate_api_app
+%%% hot-swaps the full route table and sets state to `running`.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_app).
@@ -19,12 +24,6 @@
 
 %%--------------------------------------------------------------------
 %% @doc Start the Hecate application.
-%%
-%% Startup order is CRITICAL:
-%% 1. reckon_db (embedded event store infrastructure)
-%% 2. evoq (CQRS framework)
-%% 3. hecate_event_store (ONE shared store for all domains)
-%% 4. hecate_sup (domain services use the shared store)
 %% @end
 %%--------------------------------------------------------------------
 -spec start(StartType, StartArgs) -> {ok, Pid} | {error, Reason} when
@@ -33,9 +32,15 @@
     Pid :: pid(),
     Reason :: term().
 start(_StartType, _StartArgs) ->
-    logger:info("Starting Hecate 🗝️"),
+    logger:info("Starting Hecate"),
 
-    %% 1. Start ReckonDB infrastructure
+    %% 1. Write lifecycle files (daemon.pid + state = starting)
+    hecate_lifecycle:init(),
+
+    %% 2. Start socket with minimal health-only dispatch
+    start_early_socket(),
+
+    %% 3. Start ReckonDB infrastructure
     logger:info("Starting ReckonDB infrastructure..."),
     case application:ensure_all_started(reckon_db) of
         {ok, _ReckonApps} ->
@@ -44,6 +49,25 @@ start(_StartType, _StartArgs) ->
         {error, ReckonReason} ->
             logger:error("Failed to start ReckonDB: ~p", [ReckonReason]),
             {error, {reckon_db_start_failed, ReckonReason}}
+    end.
+
+%% @private Start the Unix socket with a minimal startup-health-only dispatch.
+%% This makes the socket available immediately so clients can poll health
+%% and see ready:false while domain apps are still booting.
+start_early_socket() ->
+    case hecate_socket:get_socket_path() of
+        undefined ->
+            logger:info("Socket path is undefined, skipping early socket");
+        Path ->
+            StartupDispatch = cowboy_router:compile([
+                {'_', [{"/health", hecate_api_startup_health, []}]}
+            ]),
+            case hecate_socket:start_listener(Path, StartupDispatch) of
+                ok ->
+                    logger:info("Early socket ready (health-only)");
+                {error, Reason} ->
+                    logger:warning("Early socket failed: ~p", [Reason])
+            end
     end.
 
 %% @private Start Evoq (CQRS framework)
@@ -119,10 +143,21 @@ start_hecate_sup() ->
 
 %%--------------------------------------------------------------------
 %% @doc Stop the Hecate application.
+%%
+%% Sets lifecycle state to stopping, stops the socket listener,
+%% cleans up the socket file and lifecycle files.
 %% @end
 %%--------------------------------------------------------------------
 -spec stop(State) -> ok when
     State :: term().
 stop(_State) ->
-    logger:info("Stopping Hecate 🗝️"),
+    logger:info("Stopping Hecate"),
+    hecate_lifecycle:set_state(stopping),
+    cowboy:stop_listener(hecate_socket_listener),
+    %% Clean up socket file
+    case hecate_socket:get_socket_path() of
+        undefined -> ok;
+        Path -> _ = file:delete(Path)
+    end,
+    hecate_lifecycle:cleanup(),
     ok.

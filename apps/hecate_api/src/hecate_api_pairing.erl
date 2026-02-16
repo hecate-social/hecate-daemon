@@ -9,7 +9,12 @@
 %%%-------------------------------------------------------------------
 -module(hecate_api_pairing).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() ->
+    [{"/api/pairing/start", ?MODULE, [start]},
+     {"/api/pairing/status", ?MODULE, [status]},
+     {"/api/pairing/cancel", ?MODULE, [cancel]}].
 
 init(Req0, [Action]) ->
     Method = cowboy_req:method(Req0),

@@ -4,11 +4,14 @@
 %%%-------------------------------------------------------------------
 -module(hecate_api_health).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() -> [{"/health", ?MODULE, []}].
 
 init(Req0, State) ->
     Response = #{
         status => <<"healthy">>,
+        ready => true,
         service => <<"hecate">>,
         version => <<"0.1.0">>,
         uptime_seconds => element(1, erlang:statistics(wall_clock)) div 1000,

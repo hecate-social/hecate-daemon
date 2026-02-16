@@ -4,7 +4,12 @@
 %%% and check specific IP addresses.
 -module(hecate_api_geo).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() ->
+    [{"/api/geo/status", ?MODULE, [status]},
+     {"/api/geo/reload", ?MODULE, [reload]},
+     {"/api/geo/check/:ip", ?MODULE, [check_ip]}].
 
 %% @doc Cowboy handler init - dispatch based on action
 init(Req0, [status]) ->

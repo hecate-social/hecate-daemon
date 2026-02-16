@@ -4,11 +4,15 @@
 %%%-------------------------------------------------------------------
 -module(hecate_api_identity).
 
--export([init/2]).
+-export([init/2, routes/0]).
 
 %% Routes:
 %% GET  /identity      -> get identity info
 %% POST /identity/init -> initialize identity
+
+routes() ->
+    [{"/api/identity", ?MODULE, []},
+     {"/api/identity/init", ?MODULE, [do_init]}].
 
 %% @doc Get pairing status, returning 'unknown' if pairing service unavailable.
 get_pairing_status_safe() ->

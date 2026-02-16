@@ -9,7 +9,13 @@
 %%% @end
 -module(hecate_api_telemetry).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() ->
+    [{"/api/telemetry/cost", ?MODULE, [total_cost]},
+     {"/api/telemetry/cost/:venture_id", ?MODULE, [cost_by_venture]},
+     {"/api/telemetry/cost/:venture_id/divisions", ?MODULE, [cost_by_division]},
+     {"/api/telemetry/cost/:venture_id/agents", ?MODULE, [cost_by_agent]}].
 
 %% Route: GET /api/telemetry/cost
 init(Req0, [total_cost]) ->

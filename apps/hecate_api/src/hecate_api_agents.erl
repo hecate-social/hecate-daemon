@@ -10,7 +10,11 @@
 %%% @end
 -module(hecate_api_agents).
 
--export([init/2]).
+-export([init/2, routes/0]).
+
+routes() ->
+    [{"/api/agents", ?MODULE, [list]},
+     {"/api/agents/:agent_id", ?MODULE, [get]}].
 
 %% Route: GET /api/agents
 init(Req0, [list]) ->
