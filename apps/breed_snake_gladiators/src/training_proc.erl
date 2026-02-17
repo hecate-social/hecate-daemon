@@ -306,28 +306,34 @@ terminate(_Reason, #training{stable_id = StableId, neuro_pid = NeuroPid}) ->
 %%--------------------------------------------------------------------
 
 extract_top_champions(NeuroPid, ChampionCount, Data) ->
-    Population = case neuroevolution_server:get_population(NeuroPid) of
-        {ok, Pop} -> Pop;
-        _ -> []
+    %% Use get_last_evaluated_population — it returns the population
+    %% sorted by fitness BEFORE the strategy resets non-elite fitness to 0.
+    Population = case neuroevolution_server:get_last_evaluated_population(NeuroPid) of
+        {ok, [_ | _] = Pop} -> Pop;
+        _ ->
+            %% Fallback to get_population (older library versions)
+            case neuroevolution_server:get_population(NeuroPid) of
+                {ok, Pop} -> Pop;
+                _ -> []
+            end
     end,
     %% Fallback: ensure the best individual from Data is included
     BestInd = maps:get(best_individual, Data, undefined),
     AllIndividuals = case BestInd of
         undefined -> Population;
         _ ->
-            %% Ensure best_individual is in population (may already be)
             BestId = BestInd#individual.id,
             case lists:any(fun(I) -> I#individual.id =:= BestId end, Population) of
                 true -> Population;
                 false -> [BestInd | Population]
             end
     end,
-    %% Sort by fitness descending, take top-N
+    %% Already sorted by fitness desc from get_last_evaluated_population,
+    %% but re-sort in case BestInd was prepended
     Sorted = lists:sort(fun(A, B) ->
         A#individual.fitness >= B#individual.fitness
     end, AllIndividuals),
     TopN = lists:sublist(Sorted, ChampionCount),
-    %% Assign ranks starting from 1
     lists:zip(lists:seq(1, length(TopN)), TopN).
 
 record_generation_stats(StableId, Gen, BestF, AvgF, WorstF) ->
