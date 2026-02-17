@@ -175,7 +175,7 @@ extract_fitness_weights(ConfigMap, Base) ->
 %% Convert binary keys to atoms for weight map (only known keys).
 atomize_weight_keys(Map) when is_map(Map) ->
     Known = [survival_weight, food_weight, win_bonus, draw_bonus,
-             kill_bonus, proximity_weight, circle_penalty],
+             kill_bonus, proximity_weight, circle_penalty, wall_kill_bonus],
     maps:from_list([
         {K, to_float(maps:get(atom_to_binary(K), Map, undefined))}
         || K <- Known,

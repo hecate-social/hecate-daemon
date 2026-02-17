@@ -74,6 +74,7 @@ presets() ->
             win_bonus         => 400.0,
             draw_bonus        => 50.0,
             kill_bonus        => 250.0,
+            wall_kill_bonus   => 150.0,
             proximity_weight  => 0.5,
             circle_penalty    => -0.5
         },
@@ -83,6 +84,7 @@ presets() ->
             win_bonus         => 50.0,
             draw_bonus        => 50.0,
             kill_bonus        => 100.0,
+            wall_kill_bonus   => 50.0,
             proximity_weight  => 3.0,
             circle_penalty    => -1.0
         },
@@ -92,6 +94,7 @@ presets() ->
             win_bonus         => 200.0,
             draw_bonus        => 50.0,
             kill_bonus        => 20.0,
+            wall_kill_bonus   => 75.0,
             proximity_weight  => 0.5,
             circle_penalty    => -1.5
         },
@@ -101,6 +104,7 @@ presets() ->
             win_bonus         => 500.0,
             draw_bonus        => 0.0,
             kill_bonus        => 300.0,
+            wall_kill_bonus   => 200.0,
             proximity_weight  => 0.0,
             circle_penalty    => 0.0
         }
