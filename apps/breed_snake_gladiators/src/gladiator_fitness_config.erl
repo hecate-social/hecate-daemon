@@ -107,6 +107,16 @@ presets() ->
             wall_kill_bonus   => 200.0,
             proximity_weight  => 0.0,
             circle_penalty    => 0.0
+        },
+        hybrid => #{
+            survival_weight   => 0.1,
+            food_weight       => 15.0,
+            win_bonus         => 500.0,
+            draw_bonus        => 25.0,
+            kill_bonus        => 250.0,
+            wall_kill_bonus   => 150.0,
+            proximity_weight  => 0.3,
+            circle_penalty    => -0.3
         }
     }.
 
