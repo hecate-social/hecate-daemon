@@ -1,4 +1,4 @@
-%%% @doc Sensor for snake gladiator — reads game state into 27 floats.
+%%% @doc Sensor for snake gladiator — reads game state into 31 floats.
 %%%
 %%% Inputs (all normalized ~[-1, 1]):
 %%%   1-2:   Relative food position (dx, dy) / grid_dim
@@ -14,6 +14,10 @@
 %%%   24-25: Nearest wall tile direction (dx, dy) / grid_dim (0,0 if none)
 %%%   26:    Own wall count on field / 5.0
 %%%   27:    Can drop tail (1.0 if body >= 6, else 0.0)
+%%%   28:    Own reachable space (flood fill cells / 50.0)
+%%%   29:    Opponent reachable space (flood fill cells / 50.0)
+%%%   30:    Space advantage (own - opp) / 50.0
+%%%   31:    Trapped indicator (1.0 if own reachable < 8 cells, else 0.0)
 %%% @end
 -module(gladiator_sensor).
 -behaviour(agent_sensor).
@@ -86,6 +90,14 @@ read(_AgentState, #{game := Game}) ->
     %% 27: Can drop tail (1.0 if body >= 6, else 0.0)
     CanDrop = case length(Body1) >= 6 of true -> 1.0; false -> 0.0 end,
 
+    %% 28-31: Reachable space sensors (BFS flood fill, max 50 cells)
+    OwnReachable = flood_fill(H1, Obstacles, ?FLOOD_FILL_MAX),
+    OppReachable = flood_fill(H2, Obstacles, ?FLOOD_FILL_MAX),
+    NormOwn = OwnReachable / ?FLOOD_FILL_MAX,
+    NormOpp = OppReachable / ?FLOOD_FILL_MAX,
+    SpaceAdvantage = (OwnReachable - OppReachable) / ?FLOOD_FILL_MAX,
+    Trapped = case OwnReachable < 8 of true -> 1.0; false -> 0.0 end,
+
     [FoodDx, FoodDy,
      OppDx, OppDy,
      DangerUp, DangerDown, DangerLeft, DangerRight,
@@ -96,7 +108,8 @@ read(_AgentState, #{game := Game}) ->
      PoisonDx, PoisonDy,
      Danger2Forward, Danger2PerpRight, Danger2PerpLeft,
      WallTileDx, WallTileDy,
-     OwnWallCount, CanDrop].
+     OwnWallCount, CanDrop,
+     NormOwn, NormOpp, SpaceAdvantage, Trapped].
 
 %%--------------------------------------------------------------------
 %% Internal
@@ -177,3 +190,37 @@ perpendicular_left(up)    -> left;
 perpendicular_left(left)  -> down;
 perpendicular_left(down)  -> right;
 perpendicular_left(right) -> up.
+
+%% BFS flood fill from a position, avoiding obstacles and grid boundaries.
+%% Returns number of reachable cells (capped at Max).
+%% Uses queue module for proper BFS and maps for O(1) visited lookup.
+flood_fill(Start, Obstacles, Max) ->
+    case is_dangerous(Start, Obstacles) of
+        true -> 0;
+        false -> flood_fill_bfs(queue:in(Start, queue:new()), #{Start => true}, Obstacles, 0, Max)
+    end.
+
+flood_fill_bfs(_Queue, _Visited, _Obstacles, Count, Max) when Count >= Max ->
+    Max;
+flood_fill_bfs(Queue, Visited, Obstacles, Count, Max) ->
+    case queue:out(Queue) of
+        {empty, _} -> Count;
+        {{value, Pos}, Queue1} ->
+            Neighbors = [step(Pos, D) || D <- [up, down, left, right]],
+            {Queue2, Visited2, Added} = lists:foldl(
+                fun(N, {QAcc, VAcc, AAcc}) ->
+                    case maps:is_key(N, VAcc) of
+                        true -> {QAcc, VAcc, AAcc};
+                        false ->
+                            case is_dangerous(N, Obstacles) of
+                                true -> {QAcc, VAcc#{N => true}, AAcc};
+                                false -> {queue:in(N, QAcc), VAcc#{N => true}, AAcc + 1}
+                            end
+                    end
+                end, {Queue1, Visited, 0}, Neighbors),
+            NewCount = Count + Added,
+            case NewCount >= Max of
+                true -> Max;
+                false -> flood_fill_bfs(Queue2, Visited2, Obstacles, NewCount, Max)
+            end
+    end.

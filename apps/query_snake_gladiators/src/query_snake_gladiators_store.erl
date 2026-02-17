@@ -62,13 +62,14 @@ record_stable(#{stable_id := StableId, population_size := PopSize,
     FitnessWeights = maps:get(fitness_weights, Data, null),
     ChampionCount = maps:get(champion_count, Data, 1),
     EnableLtc = case maps:get(enable_ltc, Data, false) of true -> 1; false -> 0 end,
+    EnableLcChain = case maps:get(enable_lc_chain, Data, false) of true -> 1; false -> 0 end,
     Sql = "INSERT INTO stables
            (stable_id, status, population_size, max_generations,
             opponent_af, episodes_per_eval, started_at, fitness_weights,
-            champion_count, enable_ltc)
-           VALUES (?1, 'training', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            champion_count, enable_ltc, enable_lc_chain)
+           VALUES (?1, 'training', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
     execute(Sql, [StableId, PopSize, MaxGen, OppAF, Episodes, StartedAt,
-                  FitnessWeights, ChampionCount, EnableLtc]).
+                  FitnessWeights, ChampionCount, EnableLtc, EnableLcChain]).
 
 -spec update_stable_progress(map()) -> ok.
 update_stable_progress(#{stable_id := StableId, best_fitness := BestFit,
@@ -150,7 +151,7 @@ get_stables() ->
         "SELECT stable_id, status, population_size, max_generations,
                 opponent_af, episodes_per_eval, best_fitness,
                 generations_completed, started_at, completed_at,
-                fitness_weights, champion_count, enable_ltc
+                fitness_weights, champion_count, enable_ltc, enable_lc_chain
          FROM stables ORDER BY started_at DESC"),
     {ok, [stable_row_to_map(R) || R <- Rows]}.
 
@@ -160,7 +161,7 @@ get_stable_by_id(StableId) ->
         "SELECT stable_id, status, population_size, max_generations,
                 opponent_af, episodes_per_eval, best_fitness,
                 generations_completed, started_at, completed_at,
-                fitness_weights, champion_count, enable_ltc
+                fitness_weights, champion_count, enable_ltc, enable_lc_chain
          FROM stables WHERE stable_id = ?1", [StableId]),
     case Rows of
         [Row] -> {ok, stable_row_to_map(Row)};
@@ -343,6 +344,7 @@ create_tables(Db) ->
     migrate_add_column(Db, "stables", "fitness_weights", "TEXT"),
     migrate_add_column(Db, "stables", "champion_count", "INTEGER DEFAULT 1"),
     migrate_add_column(Db, "stables", "enable_ltc", "INTEGER DEFAULT 0"),
+    migrate_add_column(Db, "stables", "enable_lc_chain", "INTEGER DEFAULT 0"),
     %% Migrate old champions table to champions_v2
     migrate_champions_to_v2(Db),
     ok.
@@ -382,7 +384,7 @@ coalesce_int(_, Default) -> Default.
 
 stable_row_to_map([StableId, Status, PopSize, MaxGen, OppAF, Episodes,
                    BestFit, GenDone, StartedAt, CompletedAt, FitnessWeightsJson,
-                   ChampionCount, EnableLtc]) ->
+                   ChampionCount, EnableLtc, EnableLcChain]) ->
     FW = case FitnessWeightsJson of
         null -> null;
         undefined -> null;
@@ -402,7 +404,8 @@ stable_row_to_map([StableId, Status, PopSize, MaxGen, OppAF, Episodes,
       completed_at => CompletedAt,
       fitness_weights => FW,
       champion_count => coalesce_int(ChampionCount, 1),
-      enable_ltc => coalesce_int(EnableLtc, 0) =:= 1}.
+      enable_ltc => coalesce_int(EnableLtc, 0) =:= 1,
+      enable_lc_chain => coalesce_int(EnableLcChain, 0) =:= 1}.
 
 champion_row_to_map([StableId, Rank, NetJson, Fitness, Gen,
                      Wins, Losses, Draws, ExportedAt]) ->

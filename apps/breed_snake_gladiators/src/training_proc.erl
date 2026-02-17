@@ -15,6 +15,7 @@
 -behaviour(gen_server).
 
 -include_lib("faber_neuroevolution/include/neuroevolution.hrl").
+-include_lib("faber_neuroevolution/include/lc_chain.hrl").
 -include("gladiator.hrl").
 
 -export([start_link/1, get_status/1, halt/1]).
@@ -70,6 +71,7 @@ init(#{stable_id := StableId} = Config) ->
     TrainingConfig = maps:get(training_config, Config, #{}),
     ChampionCount = maps:get(champion_count, Config, ?DEFAULT_CHAMPION_COUNT),
     EnableLtc = maps:get(enable_ltc, Config, ?DEFAULT_ENABLE_LTC),
+    EnableLcChain = maps:get(enable_lc_chain, Config, ?DEFAULT_ENABLE_LC_CHAIN),
 
     %% Build agent bridge
     {ok, Bridge} = agent_bridge:new(#{
@@ -97,6 +99,12 @@ init(#{stable_id := StableId} = Config) ->
         _ -> gladiator_network_factory
     end,
 
+    %% LC chain config: when enabled, use default LC chain parameters
+    LcChainConfig = case EnableLcChain of
+        true -> #lc_chain_config{};
+        _ -> undefined
+    end,
+
     %% Build neuro_config via agent_trainer, pass event_handler and seed networks.
     {ok, NeuroConfig} = agent_trainer:to_neuro_config(Bridge, EnvConfig, #{
         population_size => PopSize,
@@ -104,6 +112,7 @@ init(#{stable_id := StableId} = Config) ->
         episodes_per_eval => Episodes,
         event_handler => {?MODULE, self()},
         seed_networks => SeedNetworks,
+        lc_chain_config => LcChainConfig,
         strategy_config => #{
             strategy_params => #{
                 network_factory => NetworkFactory
@@ -137,7 +146,8 @@ init(#{stable_id := StableId} = Config) ->
                 started_at => StartedAt,
                 fitness_weights => FitnessWeightsJson,
                 champion_count => ChampionCount,
-                enable_ltc => EnableLtc
+                enable_ltc => EnableLtc,
+                enable_lc_chain => EnableLcChain
             }),
 
             %% Start training

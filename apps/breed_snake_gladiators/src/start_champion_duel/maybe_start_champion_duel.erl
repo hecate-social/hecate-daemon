@@ -3,9 +3,9 @@
 %%% Loads the champion from the query store, deserializes the network,
 %%% and starts a gladiator_duel_proc via the dynamic supervisor.
 %%%
-%%% Handles topology migration: old champions (22 inputs, 4 outputs)
-%%% are zero-padded to the current topology (26 inputs, 5 outputs).
-%%% Zero-padded champions will never drop tail (output ~0) — safe default.
+%%% Handles topology migration: old champions (22 or 27 inputs)
+%%% are zero-padded to the current topology (31 inputs, 5 outputs).
+%%% Zero-padded new inputs default to 0.0 — safe neutral value.
 %%% @end
 -module(maybe_start_champion_duel).
 
@@ -69,18 +69,35 @@ maybe_migrate_topology(#{<<"layers">> := Layers} = NetworkData) ->
     [#{<<"weights">> := W1} | _] = Layers,
     FirstRowLen = length(hd(W1)),
     case FirstRowLen of
-        ?GLADIATOR_INPUTS_V1 ->
-            logger:info("[gladiator_duel] Migrating champion from v1 topology "
-                        "(~p inputs) to v2 (~p inputs)",
-                        [?GLADIATOR_INPUTS_V1, ?GLADIATOR_INPUTS]),
-            migrate_layers(NetworkData);
         ?GLADIATOR_INPUTS ->
             NetworkData;
+        ?GLADIATOR_INPUTS_V2 ->
+            %% 27-input champion: zero-pad 4 new sensor inputs, keep hidden/output same
+            logger:info("[gladiator_duel] Migrating champion from v2 topology "
+                        "(~p inputs) to v3 (~p inputs)",
+                        [?GLADIATOR_INPUTS_V2, ?GLADIATOR_INPUTS]),
+            migrate_input_pad(NetworkData, ?GLADIATOR_INPUTS - ?GLADIATOR_INPUTS_V2);
+        ?GLADIATOR_INPUTS_V1 ->
+            logger:info("[gladiator_duel] Migrating champion from v1 topology "
+                        "(~p inputs) to current (~p inputs)",
+                        [?GLADIATOR_INPUTS_V1, ?GLADIATOR_INPUTS]),
+            migrate_layers(NetworkData);
         Other ->
             logger:warning("[gladiator_duel] Unknown topology input count: ~p, "
                            "proceeding without migration", [Other]),
             NetworkData
     end.
+
+%% Pad only the first layer with extra zero columns for new inputs.
+%% Hidden layers and output layer keep their topology unchanged.
+%% Works for any N extra inputs (e.g., v2→v3 adds 4 flood-fill sensors).
+migrate_input_pad(#{<<"layers">> := [L1 | Rest]} = NetworkData, ExtraCols) ->
+    #{<<"weights">> := W1} = L1,
+    W1Padded = [Row ++ lists:duplicate(ExtraCols, 0.0) || Row <- W1],
+    L1Padded = L1#{<<"weights">> := W1Padded},
+    NetworkData#{<<"layers">> := [L1Padded | Rest]};
+migrate_input_pad(NetworkData, _ExtraCols) ->
+    NetworkData.
 
 migrate_layers(#{<<"layers">> := [L1, L2, L3]} = NetworkData) ->
     #{<<"weights">> := W1, <<"biases">> := B1} = L1,

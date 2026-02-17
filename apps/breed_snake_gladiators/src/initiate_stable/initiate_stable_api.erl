@@ -43,8 +43,9 @@ do_initiate(Params, Req) ->
     %% Optional per-stable training config overrides
     TrainingConfig = extract_training_config(Params),
 
-    %% Extract enable_ltc from training_config
+    %% Extract enable_ltc and enable_lc_chain from training_config
     EnableLtc = extract_enable_ltc(TrainingConfig),
+    EnableLcChain = extract_enable_lc_chain(TrainingConfig),
 
     %% Check tuning budget if fitness weights are present
     case check_budget(TrainingConfig) of
@@ -65,7 +66,8 @@ do_initiate(Params, Req) ->
                 seed_networks => SeedNetworks,
                 training_config => TrainingConfig,
                 champion_count => ChampionCount,
-                enable_ltc => EnableLtc
+                enable_ltc => EnableLtc,
+                enable_lc_chain => EnableLcChain
             },
 
             case training_proc_sup:start_training(Config) of
@@ -78,6 +80,7 @@ do_initiate(Params, Req) ->
                         episodes_per_eval => Episodes,
                         champion_count => ChampionCount,
                         enable_ltc => EnableLtc,
+                        enable_lc_chain => EnableLcChain,
                         status => <<"training">>
                     },
                     Response1 = case SeedStableId of
@@ -129,8 +132,14 @@ extract_training_config(Params) ->
                 null -> Base;
                 V -> Base#{enable_ltc => V =:= true orelse V =:= <<"true">>}
             end,
+            %% Handle enable_lc_chain
+            Base2 = case hecate_api_utils:get_field(enable_lc_chain, M) of
+                undefined -> Base1;
+                null -> Base1;
+                V2 -> Base1#{enable_lc_chain => V2 =:= true orelse V2 =:= <<"true">>}
+            end,
             %% Handle fitness weights: preset or custom
-            WithWeights = extract_fitness_weights(M, Base1),
+            WithWeights = extract_fitness_weights(M, Base2),
             WithWeights;
         _ -> #{}
     end.
@@ -230,3 +239,11 @@ extract_enable_ltc(TrainingConfig) when is_map(TrainingConfig) ->
         _ -> false
     end;
 extract_enable_ltc(_) -> false.
+
+extract_enable_lc_chain(TrainingConfig) when is_map(TrainingConfig) ->
+    case maps:get(enable_lc_chain, TrainingConfig, undefined) of
+        true -> true;
+        <<"true">> -> true;
+        _ -> false
+    end;
+extract_enable_lc_chain(_) -> false.
