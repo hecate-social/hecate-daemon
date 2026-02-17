@@ -11,7 +11,7 @@
 
 -include("gladiator.hrl").
 
--export([handle/1]).
+-export([handle/1, maybe_migrate_topology/1]).
 
 -spec handle(term()) -> {ok, binary()} | {error, term()}.
 handle(Cmd) ->
