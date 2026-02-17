@@ -140,6 +140,7 @@ extract_metrics(_AgentState, #{game := Game} = EnvState) ->
         food_proximity_delta => maps:get(food_proximity_delta, EnvState),
         opponent_crashed => OpponentCrashed,
         positions_revisited => maps:get(positions_revisited, EnvState),
+        unique_positions => map_size(maps:get(positions_visited, EnvState)),
         opponent_score => S2#snake.score,
         wall_kills => maps:get(wall_kills, EnvState, 0),
         fitness_weights => maps:get(fitness_weights, EnvState, ?DEFAULT_FITNESS_WEIGHTS)

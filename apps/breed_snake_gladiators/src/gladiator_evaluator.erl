@@ -35,7 +35,7 @@ calculate_fitness(Metrics) ->
     Winner = maps:get(winner, Metrics, none),
     OpponentCrashed = maps:get(opponent_crashed, Metrics, false),
     ProximityDelta = maps:get(food_proximity_delta, Metrics, 0.0),
-    Revisited = maps:get(positions_revisited, Metrics, 0),
+    UniquePositions = maps:get(unique_positions, Metrics, max(1, Ticks)),
     WallKills = maps:get(wall_kills, Metrics, 0),
 
     SurvivalScore = Ticks * SurvivalW,
@@ -59,8 +59,16 @@ calculate_fitness(Metrics) ->
     %% Reward net movement toward food (positive delta = got closer)
     ProximityScore = ProximityDelta * ProximityW,
 
-    %% Penalize revisiting positions (going in circles)
-    CirclePenalty = Revisited * CircleP,
+    %% Circle penalty based on exploration ratio.
+    %% CircleRatio: 0.0 = all moves to new cells, 1.0 = stuck on same cell.
+    %% Scaled to [0, 100] range so it competes with (not dwarfs) food/win rewards.
+    %% Old approach counted raw revisits which grew unboundedly with game length,
+    %% overwhelming all positive signals on a finite grid.
+    CircleRatio = 1.0 - (UniquePositions / max(1.0, Ticks + 0.0)),
+    CirclePenalty = CircleRatio * 100.0 * CircleP,
 
-    max(0.0, SurvivalScore + FoodScore + WinScore + KillScore +
-             WallKillScore + ProximityScore + CirclePenalty).
+    %% No max(0.0, ...) clamp — negative fitness preserves gradient among
+    %% bad performers so evolution can distinguish "slightly circling" from
+    %% "wildly circling." Tournament selection handles negative values fine.
+    SurvivalScore + FoodScore + WinScore + KillScore +
+        WallKillScore + ProximityScore + CirclePenalty.
