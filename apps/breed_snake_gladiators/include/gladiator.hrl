@@ -36,6 +36,13 @@
 -define(DEFAULT_EPISODES_PER_EVAL, 3).
 -define(DEFAULT_MAX_TICKS, 500).
 
+%% Champion selection
+-define(DEFAULT_CHAMPION_COUNT, 3).
+-define(MAX_CHAMPION_COUNT, 10).
+
+%% LTC neurons
+-define(DEFAULT_ENABLE_LTC, false).
+
 %% Fitness weights
 -define(FITNESS_SURVIVAL_WEIGHT, 0.1).
 -define(FITNESS_FOOD_WEIGHT, 50.0).

@@ -18,8 +18,9 @@ handle(Cmd) ->
     StableId = start_champion_duel_v1:stable_id(Cmd),
     OppAF = start_champion_duel_v1:opponent_af(Cmd),
     TickMs = start_champion_duel_v1:tick_ms(Cmd),
+    Rank = start_champion_duel_v1:rank(Cmd),
 
-    case query_snake_gladiators_store:get_champion(StableId) of
+    case query_snake_gladiators_store:get_champion(StableId, Rank) of
         {ok, #{network_json := NetworkJson}} ->
             %% Deserialize champion network (with topology migration if needed)
             NetworkData0 = json:decode(NetworkJson),

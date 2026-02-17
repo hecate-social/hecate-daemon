@@ -36,9 +36,15 @@ do_initiate(Params, Req) ->
     OppAF = to_integer(hecate_api_utils:get_field(opponent_af, Params), 50),
     Episodes = to_integer(hecate_api_utils:get_field(episodes_per_eval, Params), 3),
     SeedStableId = hecate_api_utils:get_field(seed_stable_id, Params),
+    ChampionCount = clamp(to_integer(hecate_api_utils:get_field(champion_count, Params),
+                                     ?DEFAULT_CHAMPION_COUNT),
+                          1, ?MAX_CHAMPION_COUNT),
 
     %% Optional per-stable training config overrides
     TrainingConfig = extract_training_config(Params),
+
+    %% Extract enable_ltc from training_config
+    EnableLtc = extract_enable_ltc(TrainingConfig),
 
     %% Check tuning budget if fitness weights are present
     case check_budget(TrainingConfig) of
@@ -47,7 +53,7 @@ do_initiate(Params, Req) ->
         ok ->
             StableId = generate_stable_id(),
 
-            %% Load seed networks from champion if seed_stable_id is provided
+            %% Load seed networks from all champions if seed_stable_id is provided
             SeedNetworks = load_seed_networks(SeedStableId),
 
             Config = #{
@@ -57,7 +63,9 @@ do_initiate(Params, Req) ->
                 opponent_af => OppAF,
                 episodes_per_eval => Episodes,
                 seed_networks => SeedNetworks,
-                training_config => TrainingConfig
+                training_config => TrainingConfig,
+                champion_count => ChampionCount,
+                enable_ltc => EnableLtc
             },
 
             case training_proc_sup:start_training(Config) of
@@ -68,6 +76,8 @@ do_initiate(Params, Req) ->
                         max_generations => MaxGen,
                         opponent_af => OppAF,
                         episodes_per_eval => Episodes,
+                        champion_count => ChampionCount,
+                        enable_ltc => EnableLtc,
                         status => <<"training">>
                     },
                     Response1 = case SeedStableId of
@@ -113,8 +123,14 @@ extract_training_config(Params) ->
                 || {K, Default} <- Fields,
                    hecate_api_utils:get_field(K, M) =/= undefined
             ]),
+            %% Handle enable_ltc
+            Base1 = case hecate_api_utils:get_field(enable_ltc, M) of
+                undefined -> Base;
+                null -> Base;
+                V -> Base#{enable_ltc => V =:= true orelse V =:= <<"true">>}
+            end,
             %% Handle fitness weights: preset or custom
-            WithWeights = extract_fitness_weights(M, Base),
+            WithWeights = extract_fitness_weights(M, Base1),
             WithWeights;
         _ -> #{}
     end.
@@ -164,31 +180,31 @@ to_float(_) -> 0.0.
 load_seed_networks(undefined) -> [];
 load_seed_networks(null) -> [];
 load_seed_networks(SeedStableId) when is_binary(SeedStableId) ->
-    case query_snake_gladiators_store:get_champion(SeedStableId) of
-        {ok, #{network_json := NetworkJson}} ->
-            NetworkData = json:decode(NetworkJson),
-            case network_evaluator:from_json(NetworkData) of
-                {ok, Network} ->
-                    %% Verify topology matches current input count.
-                    %% Old champions (e.g. 26 inputs) can't seed new 27-input populations.
-                    Topology = network_evaluator:get_topology(Network),
-                    [InputSize | _] = maps:get(layer_sizes, Topology),
-                    case InputSize =:= ?GLADIATOR_INPUTS of
-                        true ->
-                            [Network];
-                        false ->
-                            logger:warning("[gladiators] Seed stable ~s has ~p inputs "
-                                           "(expected ~p), topology mismatch — using random init",
-                                           [SeedStableId, InputSize, ?GLADIATOR_INPUTS]),
-                            []
-                    end;
-                {error, Reason} ->
-                    logger:warning("[gladiators] Seed stable ~s has invalid network: ~p, using random", [SeedStableId, Reason]),
-                    []
-            end;
-        {error, _} ->
-            logger:warning("[gladiators] Seed stable ~s has no champion, using random", [SeedStableId]),
-            []
+    case query_snake_gladiators_store:get_champions(SeedStableId) of
+        {ok, []} ->
+            logger:warning("[gladiators] Seed stable ~s has no champions, using random", [SeedStableId]),
+            [];
+        {ok, Champions} ->
+            lists:filtermap(fun(#{network_json := NetworkJson}) ->
+                NetworkData = json:decode(NetworkJson),
+                case network_evaluator:from_json(NetworkData) of
+                    {ok, Network} ->
+                        Topology = network_evaluator:get_topology(Network),
+                        [InputSize | _] = maps:get(layer_sizes, Topology),
+                        case InputSize =:= ?GLADIATOR_INPUTS of
+                            true -> {true, Network};
+                            false ->
+                                logger:warning("[gladiators] Seed champion from ~s has ~p inputs "
+                                               "(expected ~p), skipping",
+                                               [SeedStableId, InputSize, ?GLADIATOR_INPUTS]),
+                                false
+                        end;
+                    {error, Reason} ->
+                        logger:warning("[gladiators] Seed champion from ~s has invalid network: ~p, skipping",
+                                       [SeedStableId, Reason]),
+                        false
+                end
+            end, Champions)
     end;
 load_seed_networks(_) -> [].
 
@@ -202,3 +218,15 @@ to_integer(V, _Default) when is_float(V) -> round(V);
 to_integer(V, _Default) when is_binary(V) ->
     try binary_to_integer(V) catch _:_ -> 0 end;
 to_integer(_, Default) -> Default.
+
+clamp(V, Min, _Max) when V < Min -> Min;
+clamp(V, _Min, Max) when V > Max -> Max;
+clamp(V, _Min, _Max) -> V.
+
+extract_enable_ltc(TrainingConfig) when is_map(TrainingConfig) ->
+    case maps:get(enable_ltc, TrainingConfig, undefined) of
+        true -> true;
+        <<"true">> -> true;
+        _ -> false
+    end;
+extract_enable_ltc(_) -> false.

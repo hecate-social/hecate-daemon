@@ -29,7 +29,8 @@
     best_fitness   :: float(),
     avg_fitness    :: float(),
     worst_fitness  :: float(),
-    started_at     :: non_neg_integer()
+    started_at     :: non_neg_integer(),
+    champion_count :: pos_integer()
 }).
 
 %%--------------------------------------------------------------------
@@ -67,6 +68,8 @@ init(#{stable_id := StableId} = Config) ->
     Episodes = maps:get(episodes_per_eval, Config, ?DEFAULT_EPISODES_PER_EVAL),
     SeedNetworks = maps:get(seed_networks, Config, []),
     TrainingConfig = maps:get(training_config, Config, #{}),
+    ChampionCount = maps:get(champion_count, Config, ?DEFAULT_CHAMPION_COUNT),
+    EnableLtc = maps:get(enable_ltc, Config, ?DEFAULT_ENABLE_LTC),
 
     %% Build agent bridge
     {ok, Bridge} = agent_bridge:new(#{
@@ -88,8 +91,13 @@ init(#{stable_id := StableId} = Config) ->
         fitness_weights => FitnessWeights
     },
 
+    %% Select network factory based on LTC setting
+    NetworkFactory = case EnableLtc of
+        true -> gladiator_network_factory_cfc;
+        _ -> gladiator_network_factory
+    end,
+
     %% Build neuro_config via agent_trainer, pass event_handler and seed networks.
-    %% Custom network factory: tanh hidden layers + linear output layer.
     {ok, NeuroConfig} = agent_trainer:to_neuro_config(Bridge, EnvConfig, #{
         population_size => PopSize,
         max_generations => MaxGen,
@@ -98,7 +106,7 @@ init(#{stable_id := StableId} = Config) ->
         seed_networks => SeedNetworks,
         strategy_config => #{
             strategy_params => #{
-                network_factory => gladiator_network_factory
+                network_factory => NetworkFactory
             }
         }
     }),
@@ -127,7 +135,9 @@ init(#{stable_id := StableId} = Config) ->
                 opponent_af => OppAF,
                 episodes_per_eval => Episodes,
                 started_at => StartedAt,
-                fitness_weights => FitnessWeightsJson
+                fitness_weights => FitnessWeightsJson,
+                champion_count => ChampionCount,
+                enable_ltc => EnableLtc
             }),
 
             %% Start training
@@ -155,7 +165,8 @@ init(#{stable_id := StableId} = Config) ->
                 best_fitness = 0.0,
                 avg_fitness = 0.0,
                 worst_fitness = 0.0,
-                started_at = StartedAt
+                started_at = StartedAt,
+                champion_count = ChampionCount
             }};
         {error, Reason} ->
             {stop, {neuro_start_failed, Reason}}
@@ -228,44 +239,50 @@ handle_info({neuro_event, {generation_complete, Data}},
         worst_fitness = WorstF
     }};
 
-%% Training completed — extract champion, record, stop
+%% Training completed — extract top-N champions from population, record, stop
 handle_info({neuro_event, {training_complete, Data}},
-            #training{stable_id = StableId} = State) ->
-    BestIndividual = maps:get(best_individual, Data),
+            #training{stable_id = StableId, neuro_pid = NeuroPid,
+                      champion_count = ChampionCount} = State) ->
     BestFitness = maps:get(best_fitness, Data, 0.0),
     Gen = maps:get(generation, Data, 0),
 
-    NetworkJson = iolist_to_binary(
-        json:encode(network_evaluator:to_json(BestIndividual#individual.network))),
-    Fitness = BestIndividual#individual.fitness,
-    ChampGen = BestIndividual#individual.generation_born,
+    %% Get full population and extract top-N champions
+    TopN = extract_top_champions(NeuroPid, ChampionCount, Data),
+    Champions = lists:map(fun({Rank, Ind}) ->
+        NetJson = iolist_to_binary(
+            json:encode(network_evaluator:to_json(Ind#individual.network))),
+        #{rank => Rank,
+          network_json => NetJson,
+          fitness => Ind#individual.fitness,
+          generation => Ind#individual.generation_born,
+          wins => maps:get(wins, Ind#individual.metrics, 0),
+          losses => maps:get(losses, Ind#individual.metrics, 0),
+          draws => maps:get(draws, Ind#individual.metrics, 0)}
+    end, TopN),
 
-    query_snake_gladiators_store:record_champion(#{
-        stable_id => StableId,
-        network_json => NetworkJson,
-        fitness => Fitness,
-        generation => ChampGen,
-        wins => maps:get(wins, BestIndividual#individual.metrics, 0),
-        losses => maps:get(losses, BestIndividual#individual.metrics, 0),
-        draws => maps:get(draws, BestIndividual#individual.metrics, 0)
-    }),
+    query_snake_gladiators_store:record_champions(StableId, Champions),
 
     query_snake_gladiators_store:complete_stable(#{
         stable_id => StableId,
         status => completed
     }),
 
+    TopFitness = case Champions of
+        [#{fitness := F} | _] -> F;
+        [] -> BestFitness
+    end,
+
     broadcast(StableId, #{
         stable_id => StableId,
         status => <<"completed">>,
         generation => Gen,
         best_fitness => BestFitness,
-        champion_fitness => Fitness,
+        champion_fitness => TopFitness,
         running => false
     }),
 
-    logger:info("[gladiator_training] Stable ~s completed, champion fitness=~.2f",
-                [StableId, Fitness]),
+    logger:info("[gladiator_training] Stable ~s completed, ~p champions, best fitness=~.2f",
+                [StableId, length(Champions), TopFitness]),
     {stop, normal, State};
 
 %% Ignore other neuro events (generation_started, evaluation_progress, etc.)
@@ -287,6 +304,31 @@ terminate(_Reason, #training{stable_id = StableId, neuro_pid = NeuroPid}) ->
 %%--------------------------------------------------------------------
 %% Internal
 %%--------------------------------------------------------------------
+
+extract_top_champions(NeuroPid, ChampionCount, Data) ->
+    Population = case neuroevolution_server:get_population(NeuroPid) of
+        {ok, Pop} -> Pop;
+        _ -> []
+    end,
+    %% Fallback: ensure the best individual from Data is included
+    BestInd = maps:get(best_individual, Data, undefined),
+    AllIndividuals = case BestInd of
+        undefined -> Population;
+        _ ->
+            %% Ensure best_individual is in population (may already be)
+            BestId = BestInd#individual.id,
+            case lists:any(fun(I) -> I#individual.id =:= BestId end, Population) of
+                true -> Population;
+                false -> [BestInd | Population]
+            end
+    end,
+    %% Sort by fitness descending, take top-N
+    Sorted = lists:sort(fun(A, B) ->
+        A#individual.fitness >= B#individual.fitness
+    end, AllIndividuals),
+    TopN = lists:sublist(Sorted, ChampionCount),
+    %% Assign ranks starting from 1
+    lists:zip(lists:seq(1, length(TopN)), TopN).
 
 record_generation_stats(StableId, Gen, BestF, AvgF, WorstF) ->
     try

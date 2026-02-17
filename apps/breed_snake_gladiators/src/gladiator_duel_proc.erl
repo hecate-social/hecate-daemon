@@ -50,8 +50,13 @@ init(#{match_id := MatchId, network := Network} = Config) ->
     OppAF = maps:get(opponent_af, Config, 50),
     TickMs = maps:get(tick_ms, Config, ?DEFAULT_TICK_MS),
 
-    %% Compile network for fast NIF evaluation
-    CompiledNet = network_evaluator:compile_for_nif(Network),
+    %% Compile network for fast NIF evaluation (standard networks only).
+    %% CfC networks skip NIF compilation — they use evaluate_with_state
+    %% which maintains internal state and isn't compatible with compiled refs.
+    CompiledNet = case network_evaluator:get_neuron_meta(Network) of
+        undefined -> network_evaluator:compile_for_nif(Network);
+        _CfcMeta -> network_evaluator:reset_internal_state(Network)
+    end,
 
     %% Create game: champion (P1, AF=0) vs heuristic (P2, AF=OppAF)
     Game0 = snake_duel_engine:create_game(0, OppAF),
@@ -102,9 +107,16 @@ handle_info(countdown_tick, #gduel{game = #game_state{countdown = N} = Game,
 handle_info(game_tick, #gduel{game = Game0, match_id = MatchId,
                                tick_ms = TickMs, network = Net} = State) ->
     %% Player 1 (champion): neural network evaluation
+    %% CfC networks use evaluate_with_state (returns updated network with new internal state)
+    %% Standard networks use evaluate (stateless)
     Context = #{game => Game0},
     Inputs = gladiator_sensor:read(#{player => player1}, Context),
-    Outputs = network_evaluator:evaluate(Net, Inputs),
+    {Outputs, UpdatedNet} = case network_evaluator:get_neuron_meta(Net) of
+        undefined ->
+            {network_evaluator:evaluate(Net, Inputs), Net};
+        _CfcMeta ->
+            network_evaluator:evaluate_with_state(Net, Inputs)
+    end,
     {ok, {Dir1, Drop1}} = gladiator_actuator:act(Outputs, #{player => player1}, Context),
 
     %% Player 2 (heuristic AI) — wall-aware
@@ -122,10 +134,10 @@ handle_info(game_tick, #gduel{game = Game0, match_id = MatchId,
         finished ->
             logger:info("[gladiator_duel] Match ~s finished, winner=~p",
                         [MatchId, Game1#game_state.winner]),
-            {stop, normal, State#gduel{game = Game1, timer = undefined}};
+            {stop, normal, State#gduel{game = Game1, network = UpdatedNet, timer = undefined}};
         _ ->
             Timer = erlang:send_after(TickMs, self(), game_tick),
-            {noreply, State#gduel{game = Game1, timer = Timer}}
+            {noreply, State#gduel{game = Game1, network = UpdatedNet, timer = Timer}}
     end;
 
 handle_info(_Msg, State) ->

@@ -21,11 +21,13 @@ handle_post(Req0) ->
         {ok, Params, Req1} ->
             OppAF = to_integer(hecate_api_utils:get_field(opponent_af, Params), 50),
             TickMs = to_integer(hecate_api_utils:get_field(tick_ms, Params), 100),
+            Rank = to_integer(hecate_api_utils:get_field(rank, Params), 1),
 
             Cmd = start_champion_duel_v1:new(#{
                 stable_id => StableId,
                 opponent_af => OppAF,
-                tick_ms => TickMs
+                tick_ms => TickMs,
+                rank => Rank
             }),
 
             case maybe_start_champion_duel:handle(Cmd) of

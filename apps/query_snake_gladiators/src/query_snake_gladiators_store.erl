@@ -8,11 +8,12 @@
 
 %% Domain-specific write helpers
 -export([record_stable/1, update_stable_progress/1, complete_stable/1,
-         record_champion/1, record_generation/1]).
+         record_champion/1, record_champions/2, record_generation/1]).
 -export([promote_champion/1, update_hero_record/1]).
 
 %% Domain-specific read helpers
--export([get_stables/0, get_stable_by_id/1, get_champion/1, get_training_history/1]).
+-export([get_stables/0, get_stable_by_id/1, get_champion/1, get_champion/2,
+         get_champions/1, get_training_history/1]).
 -export([get_heroes/0, get_hero/1]).
 
 -record(state, {db :: reference()}).
@@ -59,11 +60,15 @@ record_stable(#{stable_id := StableId, population_size := PopSize,
                  max_generations := MaxGen, opponent_af := OppAF,
                  episodes_per_eval := Episodes, started_at := StartedAt} = Data) ->
     FitnessWeights = maps:get(fitness_weights, Data, null),
+    ChampionCount = maps:get(champion_count, Data, 1),
+    EnableLtc = case maps:get(enable_ltc, Data, false) of true -> 1; false -> 0 end,
     Sql = "INSERT INTO stables
            (stable_id, status, population_size, max_generations,
-            opponent_af, episodes_per_eval, started_at, fitness_weights)
-           VALUES (?1, 'training', ?2, ?3, ?4, ?5, ?6, ?7)",
-    execute(Sql, [StableId, PopSize, MaxGen, OppAF, Episodes, StartedAt, FitnessWeights]).
+            opponent_af, episodes_per_eval, started_at, fitness_weights,
+            champion_count, enable_ltc)
+           VALUES (?1, 'training', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+    execute(Sql, [StableId, PopSize, MaxGen, OppAF, Episodes, StartedAt,
+                  FitnessWeights, ChampionCount, EnableLtc]).
 
 -spec update_stable_progress(map()) -> ok.
 update_stable_progress(#{stable_id := StableId, best_fitness := BestFit,
@@ -85,11 +90,27 @@ record_champion(#{stable_id := StableId, network_json := NetJson,
                    fitness := Fitness, generation := Gen,
                    wins := Wins, losses := Losses, draws := Draws}) ->
     Now = erlang:system_time(millisecond),
-    Sql = "INSERT OR REPLACE INTO champions
-           (stable_id, network_json, fitness, generation,
+    Sql = "INSERT OR REPLACE INTO champions_v2
+           (stable_id, rank, network_json, fitness, generation,
             wins, losses, draws, exported_at)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+           VALUES (?1, 1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
     execute(Sql, [StableId, NetJson, Fitness, Gen, Wins, Losses, Draws, Now]).
+
+-spec record_champions(binary(), [map()]) -> ok.
+record_champions(StableId, Champions) ->
+    Now = erlang:system_time(millisecond),
+    %% Delete existing champions for this stable, then insert new ones
+    execute("DELETE FROM champions_v2 WHERE stable_id = ?1", [StableId]),
+    lists:foreach(fun(#{rank := Rank, network_json := NetJson,
+                        fitness := Fitness, generation := Gen,
+                        wins := Wins, losses := Losses, draws := Draws}) ->
+        Sql = "INSERT INTO champions_v2
+               (stable_id, rank, network_json, fitness, generation,
+                wins, losses, draws, exported_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        execute(Sql, [StableId, Rank, NetJson, Fitness, Gen, Wins, Losses, Draws, Now])
+    end, Champions),
+    ok.
 
 -spec record_generation(map()) -> ok.
 record_generation(#{stable_id := StableId, generation := Gen,
@@ -129,7 +150,7 @@ get_stables() ->
         "SELECT stable_id, status, population_size, max_generations,
                 opponent_af, episodes_per_eval, best_fitness,
                 generations_completed, started_at, completed_at,
-                fitness_weights
+                fitness_weights, champion_count, enable_ltc
          FROM stables ORDER BY started_at DESC"),
     {ok, [stable_row_to_map(R) || R <- Rows]}.
 
@@ -139,7 +160,7 @@ get_stable_by_id(StableId) ->
         "SELECT stable_id, status, population_size, max_generations,
                 opponent_af, episodes_per_eval, best_fitness,
                 generations_completed, started_at, completed_at,
-                fitness_weights
+                fitness_weights, champion_count, enable_ltc
          FROM stables WHERE stable_id = ?1", [StableId]),
     case Rows of
         [Row] -> {ok, stable_row_to_map(Row)};
@@ -149,13 +170,33 @@ get_stable_by_id(StableId) ->
 -spec get_champion(binary()) -> {ok, map()} | {error, not_found}.
 get_champion(StableId) ->
     {ok, Rows} = query(
-        "SELECT stable_id, network_json, fitness, generation,
+        "SELECT stable_id, rank, network_json, fitness, generation,
                 wins, losses, draws, exported_at
-         FROM champions WHERE stable_id = ?1", [StableId]),
+         FROM champions_v2 WHERE stable_id = ?1 AND rank = 1", [StableId]),
     case Rows of
         [Row] -> {ok, champion_row_to_map(Row)};
         [] -> {error, not_found}
     end.
+
+-spec get_champion(binary(), pos_integer()) -> {ok, map()} | {error, not_found}.
+get_champion(StableId, Rank) ->
+    {ok, Rows} = query(
+        "SELECT stable_id, rank, network_json, fitness, generation,
+                wins, losses, draws, exported_at
+         FROM champions_v2 WHERE stable_id = ?1 AND rank = ?2", [StableId, Rank]),
+    case Rows of
+        [Row] -> {ok, champion_row_to_map(Row)};
+        [] -> {error, not_found}
+    end.
+
+-spec get_champions(binary()) -> {ok, [map()]}.
+get_champions(StableId) ->
+    {ok, Rows} = query(
+        "SELECT stable_id, rank, network_json, fitness, generation,
+                wins, losses, draws, exported_at
+         FROM champions_v2 WHERE stable_id = ?1
+         ORDER BY rank ASC", [StableId]),
+    {ok, [champion_row_to_map(R) || R <- Rows]}.
 
 -spec get_training_history(binary()) -> {ok, [map()]}.
 get_training_history(StableId) ->
@@ -259,15 +300,17 @@ create_tables(Db) ->
             completed_at INTEGER,
             fitness_weights TEXT
         );",
-        "CREATE TABLE IF NOT EXISTS champions (
-            stable_id TEXT PRIMARY KEY,
+        "CREATE TABLE IF NOT EXISTS champions_v2 (
+            stable_id TEXT NOT NULL,
+            rank INTEGER NOT NULL,
             network_json TEXT NOT NULL,
             fitness REAL NOT NULL,
             generation INTEGER NOT NULL,
             wins INTEGER NOT NULL DEFAULT 0,
             losses INTEGER NOT NULL DEFAULT 0,
             draws INTEGER NOT NULL DEFAULT 0,
-            exported_at INTEGER NOT NULL
+            exported_at INTEGER NOT NULL,
+            PRIMARY KEY (stable_id, rank)
         );",
         "CREATE TABLE IF NOT EXISTS generation_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -296,8 +339,12 @@ create_tables(Db) ->
         "CREATE INDEX IF NOT EXISTS idx_heroes_promoted ON heroes(promoted_at DESC);"
     ],
     lists:foreach(fun(Sql) -> ok = esqlite3:exec(Db, Sql) end, Stmts),
-    %% Migration: add fitness_weights column if missing (existing DBs)
+    %% Migrations for existing DBs
     migrate_add_column(Db, "stables", "fitness_weights", "TEXT"),
+    migrate_add_column(Db, "stables", "champion_count", "INTEGER DEFAULT 1"),
+    migrate_add_column(Db, "stables", "enable_ltc", "INTEGER DEFAULT 0"),
+    %% Migrate old champions table to champions_v2
+    migrate_champions_to_v2(Db),
     ok.
 
 migrate_add_column(Db, Table, Column, Type) ->
@@ -307,12 +354,35 @@ migrate_add_column(Db, Table, Column, Type) ->
         {error, _} -> ok  %% Column already exists
     end.
 
+migrate_champions_to_v2(Db) ->
+    %% If old champions table exists and has data, copy to champions_v2
+    case esqlite3:exec(Db, "SELECT name FROM sqlite_master WHERE type='table' AND name='champions'") of
+        ok ->
+            %% Table exists, try migrating
+            MigSql = "INSERT OR IGNORE INTO champions_v2
+                      (stable_id, rank, network_json, fitness, generation,
+                       wins, losses, draws, exported_at)
+                      SELECT stable_id, 1, network_json, fitness, generation,
+                             wins, losses, draws, exported_at
+                      FROM champions",
+            _ = esqlite3:exec(Db, MigSql),
+            ok;
+        {error, _} ->
+            ok
+    end.
+
+coalesce_int(null, Default) -> Default;
+coalesce_int(undefined, Default) -> Default;
+coalesce_int(V, _Default) when is_integer(V) -> V;
+coalesce_int(_, Default) -> Default.
+
 %%--------------------------------------------------------------------
 %% Row mappers
 %%--------------------------------------------------------------------
 
 stable_row_to_map([StableId, Status, PopSize, MaxGen, OppAF, Episodes,
-                   BestFit, GenDone, StartedAt, CompletedAt, FitnessWeightsJson]) ->
+                   BestFit, GenDone, StartedAt, CompletedAt, FitnessWeightsJson,
+                   ChampionCount, EnableLtc]) ->
     FW = case FitnessWeightsJson of
         null -> null;
         undefined -> null;
@@ -330,11 +400,14 @@ stable_row_to_map([StableId, Status, PopSize, MaxGen, OppAF, Episodes,
       generations_completed => GenDone,
       started_at => StartedAt,
       completed_at => CompletedAt,
-      fitness_weights => FW}.
+      fitness_weights => FW,
+      champion_count => coalesce_int(ChampionCount, 1),
+      enable_ltc => coalesce_int(EnableLtc, 0) =:= 1}.
 
-champion_row_to_map([StableId, NetJson, Fitness, Gen,
+champion_row_to_map([StableId, Rank, NetJson, Fitness, Gen,
                      Wins, Losses, Draws, ExportedAt]) ->
     #{stable_id => StableId,
+      rank => Rank,
       network_json => NetJson,
       fitness => Fitness,
       generation => Gen,
