@@ -115,7 +115,11 @@ init(#{stable_id := StableId} = Config) ->
         lc_chain_config => LcChainConfig,
         strategy_config => #{
             strategy_params => #{
-                network_factory => NetworkFactory
+                network_factory => NetworkFactory,
+                elite_count => max(2, PopSize div 20),
+                selection_ratio => 0.30,
+                stagnation_threshold => 10,
+                stagnation_max_boost => 1.5
             }
         }
     }),
