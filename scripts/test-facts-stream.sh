@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-SOCKET="${HOME}/.hecate/daemon.sock"
+SOCKET="${HOME}/.hecate/hecate-daemon/sockets/api.sock"
 CURL="curl --silent --unix-socket ${SOCKET}"
 BASE="http://localhost"
 OUTPUT="/tmp/hecate-facts-test-$$"

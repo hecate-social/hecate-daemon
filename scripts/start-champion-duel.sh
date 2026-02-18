@@ -4,7 +4,7 @@ set -euo pipefail
 # Start a champion duel match
 # Usage: ./scripts/start-champion-duel.sh <stable_id> [rank] [opponent_af] [tick_ms]
 
-SOCKET="${HECATE_SOCKET:-$HOME/.hecate/daemon.sock}"
+SOCKET="${HECATE_SOCKET:-$HOME/.hecate/hecate-daemon/sockets/api.sock}"
 STABLE_ID="${1:?Usage: $0 <stable_id> [rank] [opponent_af] [tick_ms]}"
 RANK="${2:-1}"
 OPP_AF="${3:-30}"

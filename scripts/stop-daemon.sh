@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PID_FILE="${HOME}/.hecate/daemon.pid"
+PID_FILE="${HOME}/.hecate/hecate-daemon/run/daemon.pid"
 
 if [ ! -f "${PID_FILE}" ]; then
     echo "No PID file found at ${PID_FILE}"

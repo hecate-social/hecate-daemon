@@ -4,7 +4,7 @@ set -euo pipefail
 # Start gladiator training with aggressive fitness weights (win-focused)
 # Usage: ./scripts/start-aggressive-training.sh [pop_size] [max_gen] [opp_af]
 
-SOCKET="${HECATE_SOCKET:-$HOME/.hecate/daemon.sock}"
+SOCKET="${HECATE_SOCKET:-$HOME/.hecate/hecate-daemon/sockets/api.sock}"
 POP_SIZE="${1:-100}"
 MAX_GEN="${2:-100}"
 OPP_AF="${3:-30}"

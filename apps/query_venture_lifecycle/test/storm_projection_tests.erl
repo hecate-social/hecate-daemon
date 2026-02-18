@@ -92,18 +92,18 @@ roundtrip_test_() ->
 
 setup() ->
     %% Delete any leftover DB to ensure fresh state
-    file:delete(shared_paths:db_path("query_venture_lifecycle.db")),
-    file:delete(shared_paths:db_path("query_venture_lifecycle.db-wal")),
-    file:delete(shared_paths:db_path("query_venture_lifecycle.db-shm")),
+    file:delete(shared_paths:sqlite_path("query_venture_lifecycle.db")),
+    file:delete(shared_paths:sqlite_path("query_venture_lifecycle.db-wal")),
+    file:delete(shared_paths:sqlite_path("query_venture_lifecycle.db-shm")),
     {ok, _} = application:ensure_all_started(esqlite),
     {ok, Pid} = query_venture_lifecycle_store:start_link(),
     Pid.
 
 cleanup(Pid) ->
     gen_server:stop(Pid),
-    file:delete(shared_paths:db_path("query_venture_lifecycle.db")),
-    file:delete(shared_paths:db_path("query_venture_lifecycle.db-wal")),
-    file:delete(shared_paths:db_path("query_venture_lifecycle.db-shm")),
+    file:delete(shared_paths:sqlite_path("query_venture_lifecycle.db")),
+    file:delete(shared_paths:sqlite_path("query_venture_lifecycle.db-wal")),
+    file:delete(shared_paths:sqlite_path("query_venture_lifecycle.db-shm")),
     ok.
 
 %% ===================================================================

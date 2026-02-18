@@ -63,7 +63,7 @@ else
 fi
 
 # Clean up socket and stale pipes
-rm -f ${HOME}/.hecate/daemon.sock
+rm -f ${HOME}/.hecate/hecate-daemon/sockets/api.sock
 rm -rf /tmp/erl_pipes/hecate@*
 
 # 2. Wipe data
@@ -111,17 +111,17 @@ echo "[5/5] Starting daemon..."
 # Wait for socket
 echo "  Waiting for socket..."
 for i in $(seq 1 15); do
-    if [ -S ${HOME}/.hecate/daemon.sock ]; then
+    if [ -S ${HOME}/.hecate/hecate-daemon/sockets/api.sock ]; then
         break
     fi
     sleep 1
 done
 
-if [ -S ${HOME}/.hecate/daemon.sock ]; then
+if [ -S ${HOME}/.hecate/hecate-daemon/sockets/api.sock ]; then
     echo ""
     echo "=== Daemon started ==="
-    curl -s --unix-socket ${HOME}/.hecate/daemon.sock http://localhost/health | python3 -m json.tool 2>/dev/null || \
-    curl -s --unix-socket ${HOME}/.hecate/daemon.sock http://localhost/health
+    curl -s --unix-socket ${HOME}/.hecate/hecate-daemon/sockets/api.sock http://localhost/health | python3 -m json.tool 2>/dev/null || \
+    curl -s --unix-socket ${HOME}/.hecate/hecate-daemon/sockets/api.sock http://localhost/health
     echo ""
 else
     echo "  WARNING: Socket not found after 15s. Check logs:"

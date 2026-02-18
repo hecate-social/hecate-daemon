@@ -1,8 +1,8 @@
 %%%-------------------------------------------------------------------
 %%% @doc Daemon lifecycle state file management.
 %%%
-%%% Writes daemon.pid and daemon.state files to ~/.hecate/ so that
-%%% TUI/web clients can distinguish between daemon states:
+%%% Writes daemon.pid and daemon.state files to the run/ subdirectory
+%%% so that TUI/web clients can distinguish between daemon states:
 %%%   - starting: socket up, domain apps not yet loaded
 %%%   - running: all domain apps booted, full routes available
 %%%   - stopping: clean shutdown in progress
@@ -12,7 +12,7 @@
 %%%-------------------------------------------------------------------
 -module(hecate_lifecycle).
 
--export([init/0, set_state/1, cleanup/0, hecate_dir/0]).
+-export([init/0, set_state/1, cleanup/0]).
 
 %%--------------------------------------------------------------------
 %% @doc Initialize lifecycle files. Writes daemon.pid and sets state
@@ -21,9 +21,8 @@
 %%--------------------------------------------------------------------
 -spec init() -> ok.
 init() ->
-    Dir = hecate_dir(),
-    filelib:ensure_dir(filename:join(Dir, "x")),
-    PidFile = filename:join(Dir, "daemon.pid"),
+    PidFile = shared_paths:run_path("daemon.pid"),
+    ok = filelib:ensure_dir(PidFile),
     ok = file:write_file(PidFile, os:getpid()),
     set_state(starting).
 
@@ -33,7 +32,7 @@ init() ->
 %%--------------------------------------------------------------------
 -spec set_state(starting | running | stopping) -> ok.
 set_state(State) when State =:= starting; State =:= running; State =:= stopping ->
-    File = filename:join(hecate_dir(), "daemon.state"),
+    File = shared_paths:run_path("daemon.state"),
     ok = file:write_file(File, atom_to_list(State)).
 
 %%--------------------------------------------------------------------
@@ -42,18 +41,6 @@ set_state(State) when State =:= starting; State =:= running; State =:= stopping 
 %%--------------------------------------------------------------------
 -spec cleanup() -> ok.
 cleanup() ->
-    Dir = hecate_dir(),
-    _ = file:delete(filename:join(Dir, "daemon.pid")),
-    _ = file:delete(filename:join(Dir, "daemon.state")),
+    _ = file:delete(shared_paths:run_path("daemon.pid")),
+    _ = file:delete(shared_paths:run_path("daemon.state")),
     ok.
-
-%%--------------------------------------------------------------------
-%% @doc Resolve the ~/.hecate/ directory path.
-%% @end
-%%--------------------------------------------------------------------
--spec hecate_dir() -> string().
-hecate_dir() ->
-    case os:getenv("HOME") of
-        false -> "/tmp/hecate";
-        Home -> filename:join(Home, ".hecate")
-    end.

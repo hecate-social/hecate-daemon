@@ -58,5 +58,5 @@ compute_socket_path(ConnectorId) ->
     filename:join([ConnectorsDir, SocketFile]).
 
 connectors_dir() ->
-    Default = filename:join([os:getenv("HOME"), ".config", "hecate", "connectors"]),
-    application:get_env(guide_node_lifecycle, connectors_dir, list_to_binary(Default)).
+    application:get_env(guide_node_lifecycle, connectors_dir,
+                        list_to_binary(shared_paths:connectors_dir())).

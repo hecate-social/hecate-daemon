@@ -27,7 +27,7 @@ cat > "$OUTPUT" << 'WRAPPER_HEAD'
 #
 set -euo pipefail
 
-HECATE_HOME="${HECATE_HOME:-$HOME/.hecate}"
+HECATE_HOME="${HECATE_HOME:-$HOME/.hecate/hecate-daemon}"
 HECATE_CACHE="$HECATE_HOME/runtime"
 MARKER="$HECATE_CACHE/.extracted"
 VERSION="0.1.0"

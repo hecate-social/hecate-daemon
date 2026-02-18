@@ -26,7 +26,7 @@ query(Sql) -> query(Sql, []).
 query(Sql, Params) -> gen_server:call(?MODULE, {query, Sql, Params}).
 
 init([]) ->
-    DbPath = shared_paths:db_path("query_node_lifecycle.db"),
+    DbPath = shared_paths:sqlite_path("query_node_lifecycle.db"),
     ok = filelib:ensure_dir(DbPath),
     {ok, Db} = esqlite3:open(DbPath),
     ok = create_tables(Db),

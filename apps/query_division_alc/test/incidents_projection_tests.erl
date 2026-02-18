@@ -26,18 +26,18 @@ projection_test_() ->
 %% ===================================================================
 
 setup() ->
-    file:delete(shared_paths:db_path("query_division_alc.db")),
-    file:delete(shared_paths:db_path("query_division_alc.db-wal")),
-    file:delete(shared_paths:db_path("query_division_alc.db-shm")),
+    file:delete(shared_paths:sqlite_path("query_division_alc.db")),
+    file:delete(shared_paths:sqlite_path("query_division_alc.db-wal")),
+    file:delete(shared_paths:sqlite_path("query_division_alc.db-shm")),
     {ok, _} = application:ensure_all_started(esqlite),
     {ok, Pid} = query_division_alc_store:start_link(),
     Pid.
 
 cleanup(Pid) ->
     gen_server:stop(Pid),
-    file:delete(shared_paths:db_path("query_division_alc.db")),
-    file:delete(shared_paths:db_path("query_division_alc.db-wal")),
-    file:delete(shared_paths:db_path("query_division_alc.db-shm")),
+    file:delete(shared_paths:sqlite_path("query_division_alc.db")),
+    file:delete(shared_paths:sqlite_path("query_division_alc.db-wal")),
+    file:delete(shared_paths:sqlite_path("query_division_alc.db-shm")),
     ok.
 
 %% ===================================================================

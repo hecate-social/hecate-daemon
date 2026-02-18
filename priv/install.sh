@@ -6,7 +6,7 @@ set -e
 
 REPO="macula-io/macula-hecate"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
-DATA_DIR="${DATA_DIR:-$HOME/.hecate}"
+DATA_DIR="${DATA_DIR:-$HOME/.hecate/hecate-daemon}"
 VERSION="${VERSION:-latest}"
 
 # Colors
@@ -173,7 +173,7 @@ print_next_steps() {
     echo "   curl http://localhost:4444/health"
     echo ""
     echo "4. View logs:"
-    echo "   tail -f ~/.hecate/logs/hecate.log"
+    echo "   tail -f ~/.hecate/hecate-daemon/logs/hecate.log"
     echo ""
     echo "Documentation: https://github.com/${REPO}"
     echo ""

@@ -68,7 +68,7 @@ get_events(Stream, Opts) ->
 %%%===================================================================
 
 init([]) ->
-    DbPath = shared_paths:db_path("hecate.db"),
+    DbPath = shared_paths:sqlite_path("hecate.db"),
     ok = filelib:ensure_dir(DbPath),
 
     logger:info("Opening store at ~s", [DbPath]),

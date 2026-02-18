@@ -14,7 +14,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    DbPath = shared_paths:db_path("query_snake_duel.db"),
+    DbPath = shared_paths:sqlite_path("query_snake_duel.db"),
     ok = filelib:ensure_dir(DbPath),
     {ok, Db} = esqlite3:open(DbPath),
     ok = esqlite3:exec(Db, "PRAGMA journal_mode=WAL;"),

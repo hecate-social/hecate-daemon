@@ -63,7 +63,7 @@ list_calls_by_venture(VentureId, Opts) ->
 %%------------------------------------------------------------------------------
 
 init([]) ->
-    DbPath = shared_paths:db_path("hecate_telemetry.db"),
+    DbPath = shared_paths:sqlite_path("hecate_telemetry.db"),
     ok = filelib:ensure_dir(DbPath),
     {ok, Db} = esqlite3:open(DbPath),
     {ok, #state{db = Db}}.

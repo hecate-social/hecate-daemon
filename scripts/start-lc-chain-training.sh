@@ -4,11 +4,11 @@ set -euo pipefail
 # Start gladiator training with LC chain (adaptive evolution) enabled
 # Usage: ./scripts/start-lc-chain-training.sh [pop_size] [max_gen] [opp_af] [episodes] [champion_count]
 
-SOCKET="${HECATE_SOCKET:-$HOME/.hecate/daemon.sock}"
-POP_SIZE="${1:-50}"
-MAX_GEN="${2:-30}"
-OPP_AF="${3:-30}"
-EPISODES="${4:-3}"
+SOCKET="${HECATE_SOCKET:-$HOME/.hecate/hecate-daemon/sockets/api.sock}"
+POP_SIZE="${1:-100}"
+MAX_GEN="${2:-100}"
+OPP_AF="${3:-50}"
+EPISODES="${4:-5}"
 CHAMPION_COUNT="${5:-3}"
 
 echo "Starting LC chain gladiator training..."

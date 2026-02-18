@@ -15,7 +15,7 @@
 %% Priority:
 %%   1. HECATE_SOCKET_PATH env var (k3s sets this to /run/hecate/daemon.sock)
 %%   2. App config socket_path (sys.config)
-%%   3. $HOME/.hecate/daemon.sock (user-writable, multi-user safe)
+%%   3. shared_paths:socket_path("api.sock")
 %% @end
 %%--------------------------------------------------------------------
 -spec get_socket_path() -> string() | undefined.
@@ -25,7 +25,7 @@ get_socket_path() ->
             case application:get_env(hecate_api, socket_path) of
                 {ok, Path} when is_list(Path), Path =/= "" -> Path;
                 {ok, Path} when is_binary(Path), Path =/= <<>> -> binary_to_list(Path);
-                _ -> default_socket_path()
+                _ -> shared_paths:socket_path("api.sock")
             end;
         "" ->
             undefined;
@@ -75,11 +75,4 @@ start_listener(Path, Dispatch) ->
             end;
         {error, Reason} ->
             {error, Reason}
-    end.
-
-%% @private Default socket in $HOME/.hecate/ (multi-user safe, no root needed).
-default_socket_path() ->
-    case os:getenv("HOME") of
-        false -> undefined;
-        Home -> filename:join([Home, ".hecate", "daemon.sock"])
     end.

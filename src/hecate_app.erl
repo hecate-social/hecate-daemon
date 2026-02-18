@@ -4,12 +4,13 @@
 %%% Starts the Hecate agent sidecar daemon.
 %%%
 %%% Startup order is CRITICAL:
-%%% 1. Lifecycle files (daemon.pid, daemon.state = starting)
-%%% 2. Unix socket with minimal health-only dispatch (clients see ready:false)
-%%% 3. ReckonDB (embedded event store infrastructure)
-%%% 4. Evoq (CQRS framework)
-%%% 5. Shared event stores (hecate_event_store, dev_studio_store)
-%%% 6. hecate_sup (domain services)
+%%% 1. Directory layout (ensure ~/.hecate/hecate-daemon/* exists)
+%%% 2. Lifecycle files (daemon.pid, daemon.state = starting)
+%%% 3. Unix socket with minimal health-only dispatch (clients see ready:false)
+%%% 4. ReckonDB (embedded event store infrastructure)
+%%% 5. Evoq (CQRS framework)
+%%% 6. Shared event stores (hecate_event_store, dev_studio_store)
+%%% 7. hecate_sup (domain services)
 %%%
 %%% The socket becomes fully operational later when hecate_api_app
 %%% hot-swaps the full route table and sets state to `running`.
@@ -34,13 +35,16 @@
 start(_StartType, _StartArgs) ->
     logger:info("Starting Hecate"),
 
-    %% 1. Write lifecycle files (daemon.pid + state = starting)
+    %% 1. Create namespaced directory layout
+    shared_paths:ensure_layout(),
+
+    %% 2. Write lifecycle files (daemon.pid + state = starting)
     hecate_lifecycle:init(),
 
-    %% 2. Start socket with minimal health-only dispatch
+    %% 3. Start socket with minimal health-only dispatch
     start_early_socket(),
 
-    %% 3. Start ReckonDB infrastructure
+    %% 4. Start ReckonDB infrastructure
     logger:info("Starting ReckonDB infrastructure..."),
     case application:ensure_all_started(reckon_db) of
         {ok, _ReckonApps} ->
@@ -86,7 +90,7 @@ start_evoq() ->
 %% Two stores: hecate_event_store (node infra) + dev_studio_store (venture lifecycle).
 start_event_store() ->
     logger:info("Starting shared event store (hecate_event_store)..."),
-    HecateDataDir = shared_paths:db_path("reckon/hecate"),
+    HecateDataDir = shared_paths:reckon_path("hecate"),
     ok = filelib:ensure_path(HecateDataDir),
     HecateConfig = #store_config{
         store_id = hecate_event_store,
@@ -107,7 +111,7 @@ start_event_store() ->
 %% @private Start the dev_studio_store for venture lifecycle domains.
 start_dev_studio_store() ->
     logger:info("Starting dev studio event store (dev_studio_store)..."),
-    DevStudioDataDir = shared_paths:db_path("reckon/dev_studio"),
+    DevStudioDataDir = shared_paths:reckon_path("dev_studio"),
     ok = filelib:ensure_path(DevStudioDataDir),
     DevStudioConfig = #store_config{
         store_id = dev_studio_store,

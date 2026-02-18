@@ -2,7 +2,7 @@
 # End-to-end test for Big Picture Event Storming lifecycle
 set -euo pipefail
 
-SOCK="${HOME}/.hecate/daemon.sock"
+SOCK="${HOME}/.hecate/hecate-daemon/sockets/api.sock"
 API="http://localhost"
 
 c() { curl -s --unix-socket "$SOCK" "$@"; }

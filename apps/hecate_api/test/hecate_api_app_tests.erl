@@ -60,7 +60,7 @@ socket_listener_start_test() ->
 %% Test that ensure_socket_dir logic works for /tmp paths
 ensure_socket_dir_test() ->
     TestDir = "/tmp/hecate_test_dir_" ++ integer_to_list(erlang:system_time(microsecond)),
-    TestPath = TestDir ++ "/daemon.sock",
+    TestPath = TestDir ++ "/api.sock",
     %% filelib:ensure_dir creates parent directories
     ?assertEqual(ok, filelib:ensure_dir(TestPath)),
     ?assert(filelib:is_dir(TestDir)),
@@ -74,8 +74,8 @@ socket_path_config_test() ->
     ?assertEqual(undefined,
                  application:get_env(hecate_api, socket_path, undefined)),
     %% When socket_path is a string, get_env/3 returns it directly (not {ok, ...})
-    application:set_env(hecate_api, socket_path, "/home/testuser/.hecate/daemon.sock"),
-    ?assertEqual("/home/testuser/.hecate/daemon.sock",
+    application:set_env(hecate_api, socket_path, "/home/testuser/.hecate/hecate-daemon/sockets/api.sock"),
+    ?assertEqual("/home/testuser/.hecate/hecate-daemon/sockets/api.sock",
                  application:get_env(hecate_api, socket_path, undefined)),
     %% Restore
     case OldVal of

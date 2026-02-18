@@ -29,9 +29,9 @@ projection_test_() ->
 %% ===================================================================
 
 setup() ->
-    file:delete(shared_paths:db_path("query_mentorships.db")),
-    file:delete(shared_paths:db_path("query_mentorships.db-wal")),
-    file:delete(shared_paths:db_path("query_mentorships.db-shm")),
+    file:delete(shared_paths:sqlite_path("query_mentorships.db")),
+    file:delete(shared_paths:sqlite_path("query_mentorships.db-wal")),
+    file:delete(shared_paths:sqlite_path("query_mentorships.db-shm")),
     {ok, _} = application:ensure_all_started(esqlite),
     {ok, Pid} = query_mentorships_store:start_link(),
     query_mentorships_store:init_schema(),
@@ -39,9 +39,9 @@ setup() ->
 
 cleanup(Pid) ->
     gen_server:stop(Pid),
-    file:delete(shared_paths:db_path("query_mentorships.db")),
-    file:delete(shared_paths:db_path("query_mentorships.db-wal")),
-    file:delete(shared_paths:db_path("query_mentorships.db-shm")),
+    file:delete(shared_paths:sqlite_path("query_mentorships.db")),
+    file:delete(shared_paths:sqlite_path("query_mentorships.db-wal")),
+    file:delete(shared_paths:sqlite_path("query_mentorships.db-shm")),
     ok.
 
 %% ===================================================================

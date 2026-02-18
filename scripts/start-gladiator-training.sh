@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SOCKET="${HECATE_SOCKET:-$HOME/.hecate/daemon.sock}"
+SOCKET="${HECATE_SOCKET:-$HOME/.hecate/hecate-daemon/sockets/api.sock}"
 POP_SIZE="${1:-50}"
 MAX_GEN="${2:-30}"
 OPP_AF="${3:-30}"

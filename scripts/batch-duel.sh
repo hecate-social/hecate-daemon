@@ -4,7 +4,7 @@ set -euo pipefail
 # Run N duels and report win rate
 # Usage: ./scripts/batch-duel.sh <stable_id> [count] [rank] [opponent_af] [tick_ms]
 
-SOCKET="${HECATE_SOCKET:-$HOME/.hecate/daemon.sock}"
+SOCKET="${HECATE_SOCKET:-$HOME/.hecate/hecate-daemon/sockets/api.sock}"
 STABLE_ID="${1:?Usage: $0 <stable_id> [count] [rank] [opponent_af] [tick_ms]}"
 COUNT="${2:-5}"
 RANK="${3:-1}"

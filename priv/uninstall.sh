@@ -4,7 +4,7 @@ set -e
 # macula-hecate uninstaller
 
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
-DATA_DIR="${DATA_DIR:-$HOME/.hecate}"
+DATA_DIR="${DATA_DIR:-$HOME/.hecate/hecate-daemon}"
 
 # Colors
 RED='\033[0;31m'

@@ -4,7 +4,7 @@ set -euo pipefail
 # Start gladiator training with LTC neurons enabled
 # Usage: ./scripts/start-ltc-training.sh [pop_size] [max_gen] [opp_af] [episodes] [champion_count]
 
-SOCKET="${HECATE_SOCKET:-$HOME/.hecate/daemon.sock}"
+SOCKET="${HECATE_SOCKET:-$HOME/.hecate/hecate-daemon/sockets/api.sock}"
 POP_SIZE="${1:-30}"
 MAX_GEN="${2:-10}"
 OPP_AF="${3:-30}"
