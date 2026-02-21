@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-02-21
+
+### Fixed
+- Upgrade reckon_db to 1.3.2 (supervised pg scope — fixes silent event delivery failure)
+
 ## [0.8.1] - 2026-02-18
 
 ### Fixed
