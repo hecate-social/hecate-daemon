@@ -15,6 +15,9 @@
 
 -export([
     base_dir/0,
+    hecate_home/0,
+    config_dir/0,
+    config_path/1,
     sqlite_dir/0,
     sqlite_path/1,
     reckon_dir/0,
@@ -35,6 +38,21 @@ base_dir() ->
         {ok, Dir} -> expand_path(Dir);
         undefined -> expand_path("~/.hecate/hecate-daemon")
     end.
+
+%% @doc Returns the hecate home directory (~/.hecate).
+-spec hecate_home() -> file:filename().
+hecate_home() ->
+    filename:dirname(base_dir()).
+
+%% @doc Returns the shared config directory (~/.hecate/config).
+-spec config_dir() -> file:filename().
+config_dir() ->
+    filename:join(hecate_home(), "config").
+
+%% @doc Returns the full path for a named config file.
+-spec config_path(string() | binary()) -> file:filename().
+config_path(Name) ->
+    filename:join(config_dir(), Name).
 
 %% @doc Returns the directory for SQLite database files.
 -spec sqlite_dir() -> file:filename().
@@ -90,7 +108,8 @@ ensure_layout() ->
         reckon_dir(),
         socket_dir(),
         run_dir(),
-        connectors_dir()
+        connectors_dir(),
+        config_dir()
     ],
     lists:foreach(fun(Dir) -> ok = filelib:ensure_path(Dir) end, Dirs).
 
