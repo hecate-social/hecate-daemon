@@ -1,0 +1,274 @@
+-module(settings_aggregate_tests).
+-include_lib("eunit/include/eunit.hrl").
+
+-include("settings_status.hrl").
+
+%% ===================================================================
+%% Execute tests
+%% ===================================================================
+
+initiate_happy_test() ->
+    State = settings_aggregate:initial_state(),
+    Payload = #{
+        command_type => initiate_settings,
+        linux_user => <<"rl">>,
+        hostname => <<"host00">>,
+        initiated_at => 1000
+    },
+    {ok, [Event]} = settings_aggregate:execute(State, Payload),
+    ?assertEqual(<<"settings_initiated_v1">>, maps:get(event_type, Event)),
+    ?assertEqual(<<"rl">>, maps:get(linux_user, Event)),
+    ?assertEqual(<<"host00">>, maps:get(hostname, Event)).
+
+initiate_already_test() ->
+    State0 = settings_aggregate:initial_state(),
+    Event = #{<<"event_type">> => <<"settings_initiated_v1">>,
+              <<"linux_user">> => <<"rl">>, <<"hostname">> => <<"host00">>,
+              <<"initiated_at">> => 1000},
+    State1 = settings_aggregate:apply_event(State0, Event),
+    Payload = #{command_type => initiate_settings, linux_user => <<"rl">>,
+                hostname => <<"host00">>, initiated_at => 2000},
+    ?assertEqual({error, already_initiated}, settings_aggregate:execute(State1, Payload)).
+
+pair_happy_test() ->
+    State = initiated_state(),
+    Payload = #{command_type => pair_node, github_user => <<"octocat">>,
+                realm => <<"io.macula">>, paired_at => 2000},
+    {ok, [Event]} = settings_aggregate:execute(State, Payload),
+    ?assertEqual(<<"node_paired_v1">>, maps:get(event_type, Event)),
+    ?assertEqual(<<"octocat">>, maps:get(github_user, Event)).
+
+pair_not_initiated_test() ->
+    State = settings_aggregate:initial_state(),
+    Payload = #{command_type => pair_node, github_user => <<"octocat">>,
+                realm => <<"io.macula">>, paired_at => 2000},
+    ?assertEqual({error, not_initiated}, settings_aggregate:execute(State, Payload)).
+
+pair_already_paired_test() ->
+    State = paired_state(),
+    Payload = #{command_type => pair_node, github_user => <<"other">>,
+                realm => <<"io.macula">>, paired_at => 3000},
+    ?assertEqual({error, already_paired}, settings_aggregate:execute(State, Payload)).
+
+unpair_happy_test() ->
+    State = paired_state(),
+    Payload = #{command_type => unpair_node, reason => <<"manual">>, unpaired_at => 3000},
+    {ok, [Event]} = settings_aggregate:execute(State, Payload),
+    ?assertEqual(<<"node_unpaired_v1">>, maps:get(event_type, Event)).
+
+unpair_not_paired_test() ->
+    State = initiated_state(),
+    Payload = #{command_type => unpair_node, reason => <<"manual">>, unpaired_at => 3000},
+    ?assertEqual({error, not_paired}, settings_aggregate:execute(State, Payload)).
+
+configure_api_key_happy_test() ->
+    State = initiated_state(),
+    Payload = #{command_type => configure_api_key, provider => <<"openai">>,
+                api_key => <<"sk-test123">>, label => <<"OpenAI">>,
+                configured_at => 2000},
+    {ok, [Event]} = settings_aggregate:execute(State, Payload),
+    ?assertEqual(<<"api_key_configured_v1">>, maps:get(event_type, Event)),
+    ?assertEqual(<<"openai">>, maps:get(provider, Event)).
+
+configure_api_key_not_initiated_test() ->
+    State = settings_aggregate:initial_state(),
+    Payload = #{command_type => configure_api_key, provider => <<"openai">>,
+                api_key => <<"sk-test123">>, configured_at => 2000},
+    ?assertEqual({error, not_initiated}, settings_aggregate:execute(State, Payload)).
+
+remove_api_key_happy_test() ->
+    State0 = initiated_state(),
+    %% First configure a key
+    ConfEvt = #{<<"event_type">> => <<"api_key_configured_v1">>,
+                <<"provider">> => <<"openai">>, <<"api_key">> => <<"sk-test">>,
+                <<"label">> => <<"OpenAI">>, <<"configured_at">> => 2000},
+    State1 = settings_aggregate:apply_event(State0, ConfEvt),
+    Payload = #{command_type => remove_api_key, provider => <<"openai">>,
+                removed_at => 3000},
+    {ok, [Event]} = settings_aggregate:execute(State1, Payload),
+    ?assertEqual(<<"api_key_removed_v1">>, maps:get(event_type, Event)).
+
+remove_api_key_not_found_test() ->
+    State = initiated_state(),
+    Payload = #{command_type => remove_api_key, provider => <<"nonexistent">>,
+                removed_at => 3000},
+    ?assertEqual({error, provider_not_found}, settings_aggregate:execute(State, Payload)).
+
+update_preferences_happy_test() ->
+    State = initiated_state(),
+    Payload = #{command_type => update_preferences,
+                preferences => #{<<"theme">> => <<"dark">>}, updated_at => 2000},
+    {ok, [Event]} = settings_aggregate:execute(State, Payload),
+    ?assertEqual(<<"preferences_updated_v1">>, maps:get(event_type, Event)).
+
+update_preferences_not_initiated_test() ->
+    State = settings_aggregate:initial_state(),
+    Payload = #{command_type => update_preferences,
+                preferences => #{<<"theme">> => <<"dark">>}, updated_at => 2000},
+    ?assertEqual({error, not_initiated}, settings_aggregate:execute(State, Payload)).
+
+unknown_command_test() ->
+    State = settings_aggregate:initial_state(),
+    ?assertEqual({error, unknown_command},
+                 settings_aggregate:execute(State, #{command_type => bogus})).
+
+%% ===================================================================
+%% Apply event tests
+%% ===================================================================
+
+apply_initiated_test() ->
+    State0 = settings_aggregate:initial_state(),
+    Event = #{event_type => <<"settings_initiated_v1">>,
+              linux_user => <<"rl">>, hostname => <<"host00">>,
+              initiated_at => 1000},
+    State1 = settings_aggregate:apply_event(State0, Event),
+    %% Verify via execute — pair should work now
+    Payload = #{command_type => pair_node, github_user => <<"user">>,
+                realm => <<"io.macula">>, paired_at => 2000},
+    {ok, _} = settings_aggregate:execute(State1, Payload).
+
+apply_paired_test() ->
+    State0 = initiated_state(),
+    Event = #{event_type => <<"node_paired_v1">>,
+              github_user => <<"octocat">>, realm => <<"io.macula">>,
+              paired_at => 2000},
+    State1 = settings_aggregate:apply_event(State0, Event),
+    %% Verify — pairing again should fail
+    Payload = #{command_type => pair_node, github_user => <<"x">>,
+                realm => <<"io.macula">>, paired_at => 3000},
+    ?assertEqual({error, already_paired}, settings_aggregate:execute(State1, Payload)).
+
+apply_unpaired_test() ->
+    State0 = paired_state(),
+    Event = #{event_type => <<"node_unpaired_v1">>,
+              reason => <<"manual">>, unpaired_at => 3000},
+    State1 = settings_aggregate:apply_event(State0, Event),
+    %% After unpairing, can pair again
+    Payload = #{command_type => pair_node, github_user => <<"new">>,
+                realm => <<"io.macula">>, paired_at => 4000},
+    {ok, _} = settings_aggregate:execute(State1, Payload).
+
+apply_api_key_configured_test() ->
+    State0 = initiated_state(),
+    Event = #{event_type => <<"api_key_configured_v1">>,
+              provider => <<"anthropic">>, api_key => <<"sk-ant">>,
+              label => <<"Anthropic">>, configured_at => 2000},
+    State1 = settings_aggregate:apply_event(State0, Event),
+    %% Can remove it now
+    Payload = #{command_type => remove_api_key, provider => <<"anthropic">>,
+                removed_at => 3000},
+    {ok, _} = settings_aggregate:execute(State1, Payload).
+
+apply_api_key_removed_test() ->
+    State0 = initiated_state(),
+    ConfEvt = #{event_type => <<"api_key_configured_v1">>,
+                provider => <<"openai">>, api_key => <<"sk">>,
+                label => <<"OpenAI">>, configured_at => 2000},
+    State1 = settings_aggregate:apply_event(State0, ConfEvt),
+    RemEvt = #{event_type => <<"api_key_removed_v1">>,
+               provider => <<"openai">>, removed_at => 3000},
+    State2 = settings_aggregate:apply_event(State1, RemEvt),
+    %% Can't remove again
+    Payload = #{command_type => remove_api_key, provider => <<"openai">>,
+                removed_at => 4000},
+    ?assertEqual({error, provider_not_found}, settings_aggregate:execute(State2, Payload)).
+
+apply_preferences_updated_test() ->
+    State0 = initiated_state(),
+    Evt1 = #{event_type => <<"preferences_updated_v1">>,
+             preferences => #{<<"theme">> => <<"dark">>}, updated_at => 2000},
+    State1 = settings_aggregate:apply_event(State0, Evt1),
+    Evt2 = #{event_type => <<"preferences_updated_v1">>,
+             preferences => #{<<"lang">> => <<"en">>}, updated_at => 3000},
+    State2 = settings_aggregate:apply_event(State1, Evt2),
+    %% Verify preferences merge: both theme and lang should exist
+    %% We can verify indirectly — update_preferences should still work
+    Payload = #{command_type => update_preferences,
+                preferences => #{<<"test">> => true}, updated_at => 4000},
+    {ok, _} = settings_aggregate:execute(State2, Payload).
+
+apply_unknown_event_test() ->
+    State0 = settings_aggregate:initial_state(),
+    Event = #{event_type => <<"bogus_event_v1">>, data => <<"foo">>},
+    State1 = settings_aggregate:apply_event(State0, Event),
+    ?assertEqual(State0, State1).
+
+apply_binary_keys_test() ->
+    State0 = settings_aggregate:initial_state(),
+    Event = #{<<"event_type">> => <<"settings_initiated_v1">>,
+              <<"linux_user">> => <<"rl">>, <<"hostname">> => <<"host00">>,
+              <<"initiated_at">> => 1000},
+    State1 = settings_aggregate:apply_event(State0, Event),
+    %% Should work with binary keys too
+    Payload = #{command_type => pair_node, github_user => <<"user">>,
+                realm => <<"io.macula">>, paired_at => 2000},
+    {ok, _} = settings_aggregate:execute(State1, Payload).
+
+%% ===================================================================
+%% Roundtrip tests
+%% ===================================================================
+
+roundtrip_initiate_pair_unpair_test() ->
+    S0 = settings_aggregate:initial_state(),
+    %% Initiate
+    {ok, [E1]} = settings_aggregate:execute(S0, #{command_type => initiate_settings,
+        linux_user => <<"rl">>, hostname => <<"host00">>, initiated_at => 1000}),
+    S1 = settings_aggregate:apply_event(S0, E1),
+    %% Pair
+    {ok, [E2]} = settings_aggregate:execute(S1, #{command_type => pair_node,
+        github_user => <<"octocat">>, realm => <<"io.macula">>, paired_at => 2000}),
+    S2 = settings_aggregate:apply_event(S1, E2),
+    %% Unpair
+    {ok, [E3]} = settings_aggregate:execute(S2, #{command_type => unpair_node,
+        reason => <<"reset">>, unpaired_at => 3000}),
+    S3 = settings_aggregate:apply_event(S2, E3),
+    %% Can pair again
+    {ok, _} = settings_aggregate:execute(S3, #{command_type => pair_node,
+        github_user => <<"other">>, realm => <<"io.macula">>, paired_at => 4000}).
+
+roundtrip_configure_remove_key_test() ->
+    S0 = initiated_state(),
+    %% Configure
+    {ok, [E1]} = settings_aggregate:execute(S0, #{command_type => configure_api_key,
+        provider => <<"openai">>, api_key => <<"sk-abc">>, label => <<"OpenAI">>,
+        configured_at => 2000}),
+    S1 = settings_aggregate:apply_event(S0, E1),
+    %% Remove
+    {ok, [E2]} = settings_aggregate:execute(S1, #{command_type => remove_api_key,
+        provider => <<"openai">>, removed_at => 3000}),
+    S2 = settings_aggregate:apply_event(S1, E2),
+    %% Can't remove again
+    ?assertEqual({error, provider_not_found},
+                 settings_aggregate:execute(S2, #{command_type => remove_api_key,
+                     provider => <<"openai">>, removed_at => 4000})).
+
+roundtrip_preferences_merge_test() ->
+    S0 = initiated_state(),
+    {ok, [E1]} = settings_aggregate:execute(S0, #{command_type => update_preferences,
+        preferences => #{<<"theme">> => <<"dark">>, <<"lang">> => <<"en">>},
+        updated_at => 2000}),
+    S1 = settings_aggregate:apply_event(S0, E1),
+    {ok, [E2]} = settings_aggregate:execute(S1, #{command_type => update_preferences,
+        preferences => #{<<"theme">> => <<"light">>}, updated_at => 3000}),
+    S2 = settings_aggregate:apply_event(S1, E2),
+    %% Still can update
+    {ok, _} = settings_aggregate:execute(S2, #{command_type => update_preferences,
+        preferences => #{<<"font">> => <<"mono">>}, updated_at => 4000}).
+
+%% ===================================================================
+%% Helpers
+%% ===================================================================
+
+initiated_state() ->
+    S0 = settings_aggregate:initial_state(),
+    Event = #{event_type => <<"settings_initiated_v1">>,
+              linux_user => <<"rl">>, hostname => <<"host00">>,
+              initiated_at => 1000},
+    settings_aggregate:apply_event(S0, Event).
+
+paired_state() ->
+    S0 = initiated_state(),
+    Event = #{event_type => <<"node_paired_v1">>,
+              github_user => <<"octocat">>, realm => <<"io.macula">>,
+              paired_at => 2000},
+    settings_aggregate:apply_event(S0, Event).

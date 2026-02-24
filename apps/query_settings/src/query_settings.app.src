@@ -1,0 +1,15 @@
+{application, query_settings, [
+    {description, "QRY service for settings: identity, api keys, preferences read endpoints"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_settings_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        project_settings
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

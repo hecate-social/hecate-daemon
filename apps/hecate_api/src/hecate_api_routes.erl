@@ -11,6 +11,7 @@
 %% All hecate OTP apps that may contain API handlers.
 -define(HECATE_APPS, [
     hecate_api,
+    guide_settings_lifecycle, query_settings,
     guide_venture_lifecycle, query_venture_lifecycle,
     guide_division_alc, query_division_alc,
     guide_node_lifecycle, query_node_lifecycle,

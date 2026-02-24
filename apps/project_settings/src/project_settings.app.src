@@ -1,0 +1,17 @@
+{application, project_settings, [
+    {description, "PRJ service for settings: SQLite store + 6 self-subscribing projections"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {project_settings_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        esqlite,
+        reckon_evoq,
+        guide_settings_lifecycle
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

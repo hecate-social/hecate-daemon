@@ -239,9 +239,12 @@ handle_pairing_confirmed(Data, State) ->
         session_id => State#state.session_id,
         org_identity => maps:get(org_identity, Data, undefined)
     }),
-    
+
+    %% Dispatch pair_node_v1 to settings aggregate
+    dispatch_pair_node(maps:get(org_identity, Data, undefined)),
+
     %% TODO: Trigger mesh reconnection with new credentials
-    
+
     {noreply, State#state{status = paired}}.
 
 -spec get_realm_url() -> binary().
@@ -264,6 +267,21 @@ get_agent_info() ->
 os_type_to_binary() ->
     {OsFamily, OsName} = os:type(),
     iolist_to_binary([atom_to_list(OsFamily), "/", atom_to_list(OsName)]).
+
+%% @private Dispatch pair_node_v1 command to settings aggregate.
+dispatch_pair_node(undefined) ->
+    ok;
+dispatch_pair_node(GithubUser) when is_binary(GithubUser), byte_size(GithubUser) > 0 ->
+    Now = erlang:system_time(millisecond),
+    Cmd = pair_node_v1:new(GithubUser, <<"io.macula">>, Now),
+    case maybe_pair_node:dispatch(Cmd) of
+        {ok, _Version, _Events} ->
+            logger:info("Dispatched pair_node_v1 for ~s", [GithubUser]);
+        {error, Reason} ->
+            logger:warning("Failed to dispatch pair_node_v1: ~p", [Reason])
+    end;
+dispatch_pair_node(_) ->
+    ok.
 
 -spec state_to_map(#state{}) -> map().
 state_to_map(#state{} = S) ->

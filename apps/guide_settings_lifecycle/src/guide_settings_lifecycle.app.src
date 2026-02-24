@@ -1,0 +1,17 @@
+{application, guide_settings_lifecycle, [
+    {description, "CMD service for settings lifecycle: identity, pairing, api keys, preferences"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_settings_lifecycle_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        reckon_db,
+        evoq,
+        reckon_evoq
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.
