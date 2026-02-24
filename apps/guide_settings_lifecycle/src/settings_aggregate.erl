@@ -1,7 +1,7 @@
 %%% @doc Aggregate for settings lifecycle.
 %%%
 %%% One singleton per daemon. Stream: settings-{linux_user}@{hostname}.
-%%% Manages: identity, pairing, api keys, preferences.
+%%% Manages: identity, pairing, preferences.
 -module(settings_aggregate).
 
 -include("settings_status.hrl").
@@ -15,7 +15,6 @@
     realm          :: binary() | undefined,
     paired         :: boolean(),
     paired_at      :: integer() | undefined,
-    api_keys       :: #{binary() => map()},
     preferences    :: map(),
     status         :: non_neg_integer(),
     initiated_at   :: integer() | undefined
@@ -33,7 +32,6 @@ initial_state() ->
         realm = undefined,
         paired = false,
         paired_at = undefined,
-        api_keys = #{},
         preferences = #{},
         status = 0,
         initiated_at = undefined
@@ -87,23 +85,6 @@ do_execute(unpair_node, State, Payload) ->
         _ -> maybe_unpair_node:handle_from_map(Payload)
     end;
 
-do_execute(configure_api_key, State, Payload) ->
-    case State#settings_state.status band ?SETTINGS_INITIATED of
-        0 -> {error, not_initiated};
-        _ -> maybe_configure_api_key:handle_from_map(Payload)
-    end;
-
-do_execute(remove_api_key, State, Payload) ->
-    case State#settings_state.status band ?SETTINGS_INITIATED of
-        0 -> {error, not_initiated};
-        _ ->
-            Provider = maps:get(provider, Payload, maps:get(<<"provider">>, Payload, undefined)),
-            case maps:is_key(Provider, State#settings_state.api_keys) of
-                true -> maybe_remove_api_key:handle_from_map(Payload);
-                false -> {error, provider_not_found}
-            end
-    end;
-
 do_execute(update_preferences, State, Payload) ->
     case State#settings_state.status band ?SETTINGS_INITIATED of
         0 -> {error, not_initiated};
@@ -141,23 +122,6 @@ do_apply(<<"node_unpaired_v1">>, State, _Event) ->
         paired = false,
         paired_at = undefined,
         status = State#settings_state.status band (bnot ?SETTINGS_PAIRED)
-    };
-
-do_apply(<<"api_key_configured_v1">>, State, Event) ->
-    Provider = get_field(<<"provider">>, provider, Event),
-    KeyData = #{
-        api_key => get_field(<<"api_key">>, api_key, Event),
-        label => get_field(<<"label">>, label, Event),
-        configured_at => get_field(<<"configured_at">>, configured_at, Event)
-    },
-    State#settings_state{
-        api_keys = maps:put(Provider, KeyData, State#settings_state.api_keys)
-    };
-
-do_apply(<<"api_key_removed_v1">>, State, Event) ->
-    Provider = get_field(<<"provider">>, provider, Event),
-    State#settings_state{
-        api_keys = maps:remove(Provider, State#settings_state.api_keys)
     };
 
 do_apply(<<"preferences_updated_v1">>, State, Event) ->

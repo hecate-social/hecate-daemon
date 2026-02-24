@@ -61,39 +61,6 @@ unpair_not_paired_test() ->
     Payload = #{command_type => unpair_node, reason => <<"manual">>, unpaired_at => 3000},
     ?assertEqual({error, not_paired}, settings_aggregate:execute(State, Payload)).
 
-configure_api_key_happy_test() ->
-    State = initiated_state(),
-    Payload = #{command_type => configure_api_key, provider => <<"openai">>,
-                api_key => <<"sk-test123">>, label => <<"OpenAI">>,
-                configured_at => 2000},
-    {ok, [Event]} = settings_aggregate:execute(State, Payload),
-    ?assertEqual(<<"api_key_configured_v1">>, maps:get(event_type, Event)),
-    ?assertEqual(<<"openai">>, maps:get(provider, Event)).
-
-configure_api_key_not_initiated_test() ->
-    State = settings_aggregate:initial_state(),
-    Payload = #{command_type => configure_api_key, provider => <<"openai">>,
-                api_key => <<"sk-test123">>, configured_at => 2000},
-    ?assertEqual({error, not_initiated}, settings_aggregate:execute(State, Payload)).
-
-remove_api_key_happy_test() ->
-    State0 = initiated_state(),
-    %% First configure a key
-    ConfEvt = #{<<"event_type">> => <<"api_key_configured_v1">>,
-                <<"provider">> => <<"openai">>, <<"api_key">> => <<"sk-test">>,
-                <<"label">> => <<"OpenAI">>, <<"configured_at">> => 2000},
-    State1 = settings_aggregate:apply_event(State0, ConfEvt),
-    Payload = #{command_type => remove_api_key, provider => <<"openai">>,
-                removed_at => 3000},
-    {ok, [Event]} = settings_aggregate:execute(State1, Payload),
-    ?assertEqual(<<"api_key_removed_v1">>, maps:get(event_type, Event)).
-
-remove_api_key_not_found_test() ->
-    State = initiated_state(),
-    Payload = #{command_type => remove_api_key, provider => <<"nonexistent">>,
-                removed_at => 3000},
-    ?assertEqual({error, provider_not_found}, settings_aggregate:execute(State, Payload)).
-
 update_preferences_happy_test() ->
     State = initiated_state(),
     Payload = #{command_type => update_preferences,
@@ -148,31 +115,6 @@ apply_unpaired_test() ->
                 realm => <<"io.macula">>, paired_at => 4000},
     {ok, _} = settings_aggregate:execute(State1, Payload).
 
-apply_api_key_configured_test() ->
-    State0 = initiated_state(),
-    Event = #{event_type => <<"api_key_configured_v1">>,
-              provider => <<"anthropic">>, api_key => <<"sk-ant">>,
-              label => <<"Anthropic">>, configured_at => 2000},
-    State1 = settings_aggregate:apply_event(State0, Event),
-    %% Can remove it now
-    Payload = #{command_type => remove_api_key, provider => <<"anthropic">>,
-                removed_at => 3000},
-    {ok, _} = settings_aggregate:execute(State1, Payload).
-
-apply_api_key_removed_test() ->
-    State0 = initiated_state(),
-    ConfEvt = #{event_type => <<"api_key_configured_v1">>,
-                provider => <<"openai">>, api_key => <<"sk">>,
-                label => <<"OpenAI">>, configured_at => 2000},
-    State1 = settings_aggregate:apply_event(State0, ConfEvt),
-    RemEvt = #{event_type => <<"api_key_removed_v1">>,
-               provider => <<"openai">>, removed_at => 3000},
-    State2 = settings_aggregate:apply_event(State1, RemEvt),
-    %% Can't remove again
-    Payload = #{command_type => remove_api_key, provider => <<"openai">>,
-                removed_at => 4000},
-    ?assertEqual({error, provider_not_found}, settings_aggregate:execute(State2, Payload)).
-
 apply_preferences_updated_test() ->
     State0 = initiated_state(),
     Evt1 = #{event_type => <<"preferences_updated_v1">>,
@@ -225,22 +167,6 @@ roundtrip_initiate_pair_unpair_test() ->
     %% Can pair again
     {ok, _} = settings_aggregate:execute(S3, #{command_type => pair_node,
         github_user => <<"other">>, realm => <<"io.macula">>, paired_at => 4000}).
-
-roundtrip_configure_remove_key_test() ->
-    S0 = initiated_state(),
-    %% Configure
-    {ok, [E1]} = settings_aggregate:execute(S0, #{command_type => configure_api_key,
-        provider => <<"openai">>, api_key => <<"sk-abc">>, label => <<"OpenAI">>,
-        configured_at => 2000}),
-    S1 = settings_aggregate:apply_event(S0, E1),
-    %% Remove
-    {ok, [E2]} = settings_aggregate:execute(S1, #{command_type => remove_api_key,
-        provider => <<"openai">>, removed_at => 3000}),
-    S2 = settings_aggregate:apply_event(S1, E2),
-    %% Can't remove again
-    ?assertEqual({error, provider_not_found},
-                 settings_aggregate:execute(S2, #{command_type => remove_api_key,
-                     provider => <<"openai">>, removed_at => 4000})).
 
 roundtrip_preferences_merge_test() ->
     S0 = initiated_state(),

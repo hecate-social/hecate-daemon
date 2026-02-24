@@ -1,6 +1,6 @@
 %%% @doc SQLite store for settings read models.
 %%%
-%%% Two tables: settings (singleton) and api_keys.
+%%% Single table: settings (singleton row).
 -module(project_settings_store).
 -behaviour(gen_server).
 
@@ -75,13 +75,6 @@ create_tables(Db) ->
         preferences TEXT NOT NULL DEFAULT '{}',
         status INTEGER NOT NULL DEFAULT 0,
         initiated_at INTEGER NOT NULL
-    )"),
-
-    ok = esqlite3:exec(Db, "CREATE TABLE IF NOT EXISTS api_keys (
-        provider TEXT PRIMARY KEY,
-        api_key TEXT NOT NULL,
-        label TEXT NOT NULL,
-        configured_at INTEGER NOT NULL
     )"),
 
     ok.

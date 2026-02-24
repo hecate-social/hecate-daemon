@@ -61,45 +61,6 @@ unpair_defaults_test() ->
     ?assertEqual(<<"manual">>, maps:get(reason, Event)).
 
 %% ===================================================================
-%% maybe_configure_api_key tests
-%% ===================================================================
-
-configure_valid_test() ->
-    Payload = #{provider => <<"openai">>, api_key => <<"sk-test123">>,
-                label => <<"OpenAI">>, configured_at => 2000},
-    {ok, [Event]} = maybe_configure_api_key:handle_from_map(Payload),
-    ?assertEqual(<<"api_key_configured_v1">>, maps:get(event_type, Event)),
-    ?assertEqual(<<"openai">>, maps:get(provider, Event)),
-    ?assertEqual(<<"sk-test123">>, maps:get(api_key, Event)).
-
-configure_empty_provider_test() ->
-    Payload = #{provider => <<>>, api_key => <<"sk-test">>,
-                configured_at => 2000},
-    ?assertEqual({error, provider_required},
-                 maybe_configure_api_key:handle_from_map(Payload)).
-
-configure_empty_api_key_test() ->
-    Payload = #{provider => <<"openai">>, api_key => <<>>,
-                configured_at => 2000},
-    ?assertEqual({error, api_key_required},
-                 maybe_configure_api_key:handle_from_map(Payload)).
-
-%% ===================================================================
-%% maybe_remove_api_key tests
-%% ===================================================================
-
-remove_valid_test() ->
-    Payload = #{provider => <<"openai">>, removed_at => 3000},
-    {ok, [Event]} = maybe_remove_api_key:handle_from_map(Payload),
-    ?assertEqual(<<"api_key_removed_v1">>, maps:get(event_type, Event)),
-    ?assertEqual(<<"openai">>, maps:get(provider, Event)).
-
-remove_empty_provider_test() ->
-    Payload = #{provider => <<>>, removed_at => 3000},
-    ?assertEqual({error, provider_required},
-                 maybe_remove_api_key:handle_from_map(Payload)).
-
-%% ===================================================================
 %% maybe_update_preferences tests
 %% ===================================================================
 
