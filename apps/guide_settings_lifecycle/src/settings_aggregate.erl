@@ -3,10 +3,15 @@
 %%% One singleton per daemon. Stream: settings-{linux_user}@{hostname}.
 %%% Manages: identity, pairing, preferences.
 -module(settings_aggregate).
+-behaviour(evoq_aggregate).
 
 -include("settings_status.hrl").
 
--export([init/1, initial_state/0, execute/2, apply/2, apply_event/2, stream_id/0]).
+%% Behaviour callbacks
+-export([init/1, execute/2, apply/2]).
+
+%% Internal / testing
+-export([initial_state/0, apply_event/2, stream_id/0]).
 
 -record(settings_state, {
     linux_user     :: binary() | undefined,

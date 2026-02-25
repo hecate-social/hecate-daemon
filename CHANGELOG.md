@@ -17,10 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.3] - 2026-02-25
 
 ### Fixed
-- `settings_aggregate` missing `apply/2` callback required by evoq — caused
-  `{undef, [{settings_aggregate,apply,...}]}` crash when applying events after
-  command execution. All other aggregates export both `apply/2` (evoq callback)
-  and `apply_event/2` (internal); settings_aggregate only had `apply_event/2`.
+- `settings_aggregate` missing `apply/2` callback and `-behaviour(evoq_aggregate).`
+  declaration — caused `{undef, [{settings_aggregate,apply,...}]}` crash when
+  applying events after command execution. The missing behaviour declaration
+  meant the compiler never warned about the missing callback. All other
+  aggregates correctly declare the behaviour.
 
 ## [0.10.2] - 2026-02-25
 
