@@ -18,19 +18,18 @@ handle_get(Req0, _State) ->
         {ok, [[LinuxUser, Hostname, GithubUser, HecateUserId, Realm,
                Paired, PairedAt, PrefsJson, Status, InitiatedAt]]} ->
             Prefs = try json:decode(PrefsJson) catch _:_ -> #{} end,
-            Settings = #{
+            Identity = #{
+                hecate_user_id => HecateUserId,
                 linux_user => LinuxUser,
                 hostname => Hostname,
                 github_user => GithubUser,
-                hecate_user_id => HecateUserId,
                 realm => Realm,
                 paired => Paired =:= 1,
                 paired_at => PairedAt,
-                preferences => Prefs,
-                status => Status,
-                initiated_at => InitiatedAt
+                initiated_at => InitiatedAt,
+                status => Status
             },
-            hecate_api_utils:json_ok(#{settings => Settings}, Req0);
+            hecate_api_utils:json_ok(#{identity => Identity, preferences => Prefs}, Req0);
         {ok, []} ->
             hecate_api_utils:json_error(404, <<"Settings not initialized">>, Req0);
         {error, Reason} ->
