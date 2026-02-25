@@ -20,7 +20,8 @@
         query_node_lifecycle,
         %% Mentorships (renamed)
         mentor_llms,
-        query_mentorships,
+        project_llm_mentorships,
+        query_llm_mentorships,
         %% LLM
         serve_llm,
         %% Telemetry

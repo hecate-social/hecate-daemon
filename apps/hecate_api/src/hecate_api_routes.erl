@@ -15,7 +15,7 @@
     guide_venture_lifecycle, query_venture_lifecycle,
     guide_division_alc, query_division_alc,
     guide_node_lifecycle, query_node_lifecycle,
-    mentor_llms, query_mentorships,
+    mentor_llms, project_llm_mentorships, query_llm_mentorships,
     serve_llm,
     manage_irc, query_irc,
     run_snake_duel, query_snake_duel,
