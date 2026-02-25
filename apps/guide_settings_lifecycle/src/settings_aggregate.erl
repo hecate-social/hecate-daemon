@@ -6,7 +6,7 @@
 
 -include("settings_status.hrl").
 
--export([initial_state/0, execute/2, apply_event/2, stream_id/0]).
+-export([init/1, initial_state/0, execute/2, apply_event/2, stream_id/0]).
 
 -record(settings_state, {
     linux_user     :: binary() | undefined,
@@ -23,6 +23,10 @@
 %% ===================================================================
 %% Evoq callbacks
 %% ===================================================================
+
+%% @doc Evoq callback: init/1 receives the aggregate ID (stream ID).
+init(_AggregateId) ->
+    {ok, initial_state()}.
 
 initial_state() ->
     #settings_state{

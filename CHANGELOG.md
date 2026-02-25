@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Needs a new query desk (e.g. `get_settings_history/`) that reads from the
   settings ReckonDB stream and returns the event log.
 
+## [0.10.2] - 2026-02-25
+
+### Fixed
+- `settings_aggregate` missing `init/1` callback required by evoq — caused
+  `{undef, [{settings_aggregate,init,...}]}` crash on every command dispatch,
+  preventing settings auto-initiation from completing
+
 ## [0.10.1] - 2026-02-25
 
 ### Fixed
