@@ -6,7 +6,7 @@
 
 -include("settings_status.hrl").
 
--export([init/1, initial_state/0, execute/2, apply_event/2, stream_id/0]).
+-export([init/1, initial_state/0, execute/2, apply/2, apply_event/2, stream_id/0]).
 
 -record(settings_state, {
     linux_user     :: binary() | undefined,
@@ -54,6 +54,10 @@ execute(State, #{command_type := CmdType} = Payload) ->
     do_execute(CmdType, State, Payload);
 execute(_State, _Unknown) ->
     {error, unknown_command}.
+
+%% @doc Evoq callback: apply/2 — State FIRST.
+apply(State, Event) ->
+    apply_event(State, Event).
 
 %% @doc Apply event to state.
 apply_event(State, #{<<"event_type">> := EventType} = Event) ->
