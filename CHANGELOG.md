@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-02-25
+
+### Added
+- License lifecycle domain (guide_license_lifecycle, project_licenses, query_licenses) — folded from hecate-app-appstored
+- Plugin lifecycle domain (guide_plugin_lifecycle, project_plugins, query_plugins) — folded from hecate-app-noded
+- Dedicated ReckonDB stores: licenses_store, plugins_store
+- `shared_paths:gitops_apps_dir/0` for plugin container provisioning
+
+### Removed
+- 12 ghost app directories extracted to standalone repos (Martha, IRC, Snake Duel, Snake Gladiators) or dead code (node/venture lifecycle)
+
+### Changed
+- License mesh publishing uses direct `hecate_mesh:publish/2` (removed appstored mesh proxy indirection)
+
 ## [0.8.2] - 2026-02-21
 
 ### Fixed
