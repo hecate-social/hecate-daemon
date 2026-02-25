@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Ideas
+- **Settings history widget** — expose the settings event stream as a timeline
+  on the settings page. A way to visualize our event-sourced nature: every
+  initiation, pairing, unpairing, and preference change shown chronologically.
+  Needs a new query desk (e.g. `get_settings_history/`) that reads from the
+  settings ReckonDB stream and returns the event log.
+
+## [0.10.0] - 2026-02-25
+
+### Added
+- `GET /api/node/identity` — returns MRI, Ed25519 public key, realm from `hecate_identity`
+- `POST /api/pairing/initiate` — starts OAuth pairing session via `hecate_pairing`
+- `GET /api/pairing/status` — polls current pairing session status
+- `POST /api/pairing/cancel` — cancels active pairing session
+- API handler tests for settings, node identity, and pairing endpoints (19 tests)
+
+### Changed
+- `GET /api/settings` response reshaped from flat `{settings: {...}}` to structured `{identity: {...}, preferences: {...}}`
+
 ## [0.9.2] - 2026-02-25
 
 ### Removed
