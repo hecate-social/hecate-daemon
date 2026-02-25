@@ -125,10 +125,56 @@ start_dev_studio_store() ->
     case start_store(DevStudioConfig) of
         ok ->
             logger:info("Dev studio event store ready"),
-            start_hecate_sup();
+            start_licenses_store();
         {error, Reason} ->
             logger:error("Failed to start dev_studio_store: ~p", [Reason]),
             {error, {dev_studio_store_start_failed, Reason}}
+    end.
+
+%% @private Start the licenses_store for license aggregate events.
+start_licenses_store() ->
+    logger:info("Starting licenses event store (licenses_store)..."),
+    LicensesDataDir = shared_paths:reckon_path("licenses"),
+    ok = filelib:ensure_path(LicensesDataDir),
+    LicensesConfig = #store_config{
+        store_id = licenses_store,
+        data_dir = LicensesDataDir,
+        mode = single,
+        writer_pool_size = 5,
+        reader_pool_size = 5,
+        gateway_pool_size = 2,
+        options = #{}
+    },
+    case start_store(LicensesConfig) of
+        ok ->
+            logger:info("Licenses event store ready"),
+            start_plugins_store();
+        {error, Reason} ->
+            logger:error("Failed to start licenses_store: ~p", [Reason]),
+            {error, {licenses_store_start_failed, Reason}}
+    end.
+
+%% @private Start the plugins_store for plugin lifecycle aggregate events.
+start_plugins_store() ->
+    logger:info("Starting plugins event store (plugins_store)..."),
+    PluginsDataDir = shared_paths:reckon_path("plugins"),
+    ok = filelib:ensure_path(PluginsDataDir),
+    PluginsConfig = #store_config{
+        store_id = plugins_store,
+        data_dir = PluginsDataDir,
+        mode = single,
+        writer_pool_size = 5,
+        reader_pool_size = 5,
+        gateway_pool_size = 2,
+        options = #{}
+    },
+    case start_store(PluginsConfig) of
+        ok ->
+            logger:info("Plugins event store ready"),
+            start_hecate_sup();
+        {error, Reason} ->
+            logger:error("Failed to start plugins_store: ~p", [Reason]),
+            {error, {plugins_store_start_failed, Reason}}
     end.
 
 %% @private Start a single ReckonDB store, handling already_started.

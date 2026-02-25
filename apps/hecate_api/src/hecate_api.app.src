@@ -10,20 +10,20 @@
         yamerl,
         %% hecate core (must start first for hecate_identity)
         hecate,
-        %% Venture lifecycle (4 consolidated apps)
-        guide_venture_lifecycle,
-        query_venture_lifecycle,
-        guide_division_alc,
-        query_division_alc,
-        %% Node lifecycle (2 consolidated apps — was 11 node ops apps)
-        guide_node_lifecycle,
-        query_node_lifecycle,
-        %% Mentorships (renamed)
+        %% Mentorships
         mentor_llms,
         project_llm_mentorships,
         query_llm_mentorships,
         %% LLM
         serve_llm,
+        %% License lifecycle (appstore)
+        guide_license_lifecycle,
+        project_licenses,
+        query_licenses,
+        %% Plugin lifecycle (node)
+        guide_plugin_lifecycle,
+        project_plugins,
+        query_plugins,
         %% Telemetry
         hecate_telemetry
     ]},

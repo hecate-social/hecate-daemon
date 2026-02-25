@@ -27,6 +27,7 @@
     run_dir/0,
     run_path/1,
     connectors_dir/0,
+    gitops_apps_dir/0,
     ensure_layout/0
 ]).
 
@@ -98,6 +99,11 @@ run_path(Name) ->
 -spec connectors_dir() -> file:filename().
 connectors_dir() ->
     filename:join(base_dir(), "connectors").
+
+%% @doc Returns the gitops apps directory (~/.hecate/gitops/apps).
+-spec gitops_apps_dir() -> file:filename().
+gitops_apps_dir() ->
+    filename:join([hecate_home(), "gitops", "apps"]).
 
 %% @doc Creates all subdirectories under base_dir().
 %% Idempotent - safe to call multiple times.

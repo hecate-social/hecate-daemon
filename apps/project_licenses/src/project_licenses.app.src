@@ -1,0 +1,18 @@
+{application, project_licenses, [
+    {description, "License projections (PRJ) - event subscriptions and read model writes"},
+    {vsn, "0.1.0"},
+    {registered, [project_licenses_sup, project_licenses_store]},
+    {mod, {project_licenses_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        esqlite,
+        evoq,
+        hecate,
+        guide_license_lifecycle
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

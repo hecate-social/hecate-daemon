@@ -12,14 +12,10 @@
 -define(HECATE_APPS, [
     hecate_api,
     guide_settings_lifecycle, query_settings,
-    guide_venture_lifecycle, query_venture_lifecycle,
-    guide_division_alc, query_division_alc,
-    guide_node_lifecycle, query_node_lifecycle,
     mentor_llms, project_llm_mentorships, query_llm_mentorships,
     serve_llm,
-    manage_irc, query_irc,
-    run_snake_duel, query_snake_duel,
-    breed_snake_gladiators, query_snake_gladiators
+    guide_license_lifecycle, project_licenses, query_licenses,
+    guide_plugin_lifecycle, project_plugins, query_plugins
 ]).
 
 -spec compile() -> cowboy_router:dispatch_rules().

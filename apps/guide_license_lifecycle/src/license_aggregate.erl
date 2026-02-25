@@ -1,0 +1,225 @@
+%%% @doc License aggregate.
+%%%
+%%% Stream: license-{seller_id}-{plugin_id} (seller) or license-{user_id}-{plugin_id} (buyer)
+%%% Store: licenses_store
+%%%
+%%% Lifecycle:
+%%%   Seller side:
+%%%   1. initiate_license (birth event - license_initiated_v1)
+%%%   2. announce_license (license_announced_v1)
+%%%   3. publish_license (license_published_v1)
+%%%
+%%%   Buyer side:
+%%%   4. buy_license (requires LIC_PUBLISHED - license_bought_v1)
+%%%   5. revoke_license
+%%%   6. archive_license (walking skeleton)
+%%% @end
+-module(license_aggregate).
+
+-behaviour(evoq_aggregate).
+
+-include("license_status.hrl").
+-include("license_state.hrl").
+
+-export([init/1, execute/2, apply/2]).
+-export([initial_state/0, apply_event/2]).
+-export([flag_map/0]).
+
+-type state() :: #license_state{}.
+-export_type([state/0]).
+
+-spec flag_map() -> evoq_bit_flags:flag_map().
+flag_map() -> ?LIC_FLAG_MAP.
+
+%% --- Callbacks ---
+
+-spec init(binary()) -> {ok, state()}.
+init(_AggregateId) ->
+    {ok, initial_state()}.
+
+-spec initial_state() -> state().
+initial_state() ->
+    #license_state{status = 0}.
+
+%% --- Execute ---
+%% NOTE: evoq calls execute(State, Payload) - State FIRST!
+
+-spec execute(state(), map()) -> {ok, [map()]} | {error, term()}.
+
+%% Fresh aggregate — only initiate_license allowed (seller birth)
+execute(#license_state{status = 0}, Payload) ->
+    case get_command_type(Payload) of
+        <<"initiate_license">> -> execute_initiate_license(Payload);
+        _ -> {error, license_not_initiated}
+    end;
+
+%% Archived — nothing allowed
+execute(#license_state{status = S}, _Payload) when S band ?LIC_ARCHIVED =/= 0 ->
+    {error, license_archived};
+
+%% Revoked — nothing allowed except archive
+execute(#license_state{status = S}, Payload) when S band ?LIC_REVOKED =/= 0 ->
+    case get_command_type(Payload) of
+        <<"archive_license">> -> execute_archive_license(Payload);
+        _ -> {error, license_revoked}
+    end;
+
+%% Licensed — route by command type (buyer operations)
+execute(#license_state{status = S}, Payload) when S band ?LIC_LICENSED =/= 0 ->
+    case get_command_type(Payload) of
+        <<"revoke_license">>  -> execute_revoke_license(Payload);
+        <<"archive_license">> -> execute_archive_license(Payload);
+        _ -> {error, unknown_command}
+    end;
+
+%% Published — buyer can buy, seller can archive
+execute(#license_state{status = S}, Payload) when S band ?LIC_PUBLISHED =/= 0 ->
+    case get_command_type(Payload) of
+        <<"buy_license">>     -> execute_buy_license(Payload);
+        <<"archive_license">> -> execute_archive_license(Payload);
+        _ -> {error, not_licensed}
+    end;
+
+%% Announced — seller can publish or archive
+execute(#license_state{status = S}, Payload) when S band ?LIC_ANNOUNCED =/= 0 ->
+    case get_command_type(Payload) of
+        <<"publish_license">>  -> execute_publish_license(Payload);
+        <<"archive_license">> -> execute_archive_license(Payload);
+        _ -> {error, not_published}
+    end;
+
+%% Initiated — seller can announce or archive
+execute(#license_state{status = S}, Payload) when S band ?LIC_INITIATED =/= 0 ->
+    case get_command_type(Payload) of
+        <<"announce_license">> -> execute_announce_license(Payload);
+        <<"archive_license">> -> execute_archive_license(Payload);
+        _ -> {error, not_announced}
+    end;
+
+execute(_State, _Payload) ->
+    {error, unknown_command}.
+
+%% --- Command handlers (seller side) ---
+
+execute_initiate_license(Payload) ->
+    {ok, Cmd} = initiate_license_v1:from_map(Payload),
+    convert_events(maybe_initiate_license:handle(Cmd), fun license_initiated_v1:to_map/1).
+
+execute_announce_license(Payload) ->
+    {ok, Cmd} = announce_license_v1:from_map(Payload),
+    convert_events(maybe_announce_license:handle(Cmd), fun license_announced_v1:to_map/1).
+
+execute_publish_license(Payload) ->
+    {ok, Cmd} = publish_license_v1:from_map(Payload),
+    convert_events(maybe_publish_license:handle(Cmd), fun license_published_v1:to_map/1).
+
+%% --- Command handlers (buyer side) ---
+
+execute_buy_license(Payload) ->
+    {ok, Cmd} = buy_license_v1:from_map(Payload),
+    convert_events(maybe_buy_license:handle(Cmd), fun license_bought_v1:to_map/1).
+
+execute_revoke_license(Payload) ->
+    {ok, Cmd} = revoke_license_v1:from_map(Payload),
+    convert_events(maybe_revoke_license:handle(Cmd), fun license_revoked_v1:to_map/1).
+
+execute_archive_license(Payload) ->
+    {ok, Cmd} = archive_license_v1:from_map(Payload),
+    convert_events(maybe_archive_license:handle(Cmd), fun license_archived_v1:to_map/1).
+
+%% --- Apply ---
+%% NOTE: evoq calls apply(State, Event) - State FIRST!
+
+-spec apply(state(), map()) -> state().
+apply(State, Event) ->
+    apply_event(Event, State).
+
+-spec apply_event(map(), state()) -> state().
+
+%% Seller-side events
+apply_event(#{<<"event_type">> := <<"license_initiated_v1">>} = E, S)  -> apply_initiated(E, S);
+apply_event(#{event_type := <<"license_initiated_v1">>} = E, S)        -> apply_initiated(E, S);
+apply_event(#{<<"event_type">> := <<"license_announced_v1">>} = E, S)  -> apply_announced(E, S);
+apply_event(#{event_type := <<"license_announced_v1">>} = E, S)        -> apply_announced(E, S);
+apply_event(#{<<"event_type">> := <<"license_published_v1">>} = E, S)  -> apply_published(E, S);
+apply_event(#{event_type := <<"license_published_v1">>} = E, S)        -> apply_published(E, S);
+
+%% Buyer-side events
+apply_event(#{<<"event_type">> := <<"license_bought_v1">>} = E, S)   -> apply_bought(E, S);
+apply_event(#{event_type := <<"license_bought_v1">>} = E, S)         -> apply_bought(E, S);
+apply_event(#{<<"event_type">> := <<"license_revoked_v1">>} = E, S)  -> apply_revoked(E, S);
+apply_event(#{event_type := <<"license_revoked_v1">>} = E, S)       -> apply_revoked(E, S);
+apply_event(#{<<"event_type">> := <<"license_archived_v1">>} = E, S) -> apply_archived(E, S);
+apply_event(#{event_type := <<"license_archived_v1">>} = E, S)     -> apply_archived(E, S);
+%% Unknown — ignore
+apply_event(_E, S) -> S.
+
+%% --- Apply helpers (seller side) ---
+
+apply_initiated(E, State) ->
+    State#license_state{
+        license_id = hecate_api_utils:get_field(license_id, E),
+        plugin_id = hecate_api_utils:get_field(plugin_id, E),
+        plugin_name = hecate_api_utils:get_field(plugin_name, E),
+        description = hecate_api_utils:get_field(description, E),
+        icon = hecate_api_utils:get_field(icon, E),
+        github_repo = hecate_api_utils:get_field(github_repo, E),
+        oci_image = hecate_api_utils:get_field(oci_image, E),
+        selling_formula = hecate_api_utils:get_field(selling_formula, E),
+        seller_id = hecate_api_utils:get_field(seller_id, E),
+        org = hecate_api_utils:get_field(org, E),
+        version = hecate_api_utils:get_field(version, E),
+        manifest_tag = hecate_api_utils:get_field(manifest_tag, E),
+        tags = hecate_api_utils:get_field(tags, E),
+        homepage = hecate_api_utils:get_field(homepage, E),
+        min_daemon_version = hecate_api_utils:get_field(min_daemon_version, E),
+        publisher_identity = hecate_api_utils:get_field(publisher_identity, E),
+        status = evoq_bit_flags:set(0, ?LIC_INITIATED),
+        initiated_at = hecate_api_utils:get_field(initiated_at, E)
+    }.
+
+apply_announced(E, #license_state{status = Status} = State) ->
+    State#license_state{
+        status = evoq_bit_flags:set(Status, ?LIC_ANNOUNCED),
+        announced_at = hecate_api_utils:get_field(announced_at, E)
+    }.
+
+apply_published(E, #license_state{status = Status} = State) ->
+    State#license_state{
+        status = evoq_bit_flags:set(Status, ?LIC_PUBLISHED),
+        published_at = hecate_api_utils:get_field(published_at, E)
+    }.
+
+%% --- Apply helpers (buyer side) ---
+
+apply_bought(E, #license_state{status = Status} = State) ->
+    State#license_state{
+        user_id = hecate_api_utils:get_field(user_id, E),
+        status = evoq_bit_flags:set(Status, ?LIC_LICENSED),
+        oci_image = hecate_api_utils:get_field(oci_image, E),
+        granted_at = hecate_api_utils:get_field(granted_at, E)
+    }.
+
+apply_revoked(E, #license_state{status = Status} = State) ->
+    State#license_state{
+        status = evoq_bit_flags:set(Status, ?LIC_REVOKED),
+        revoked_at = hecate_api_utils:get_field(revoked_at, E)
+    }.
+
+apply_archived(E, #license_state{status = Status} = State) ->
+    State#license_state{
+        status = evoq_bit_flags:set(Status, ?LIC_ARCHIVED),
+        archived_at = hecate_api_utils:get_field(archived_at, E)
+    }.
+
+%% --- Internal ---
+
+get_command_type(#{<<"command_type">> := T}) -> T;
+get_command_type(#{command_type := T}) when is_binary(T) -> T;
+get_command_type(#{command_type := T}) when is_atom(T) -> atom_to_binary(T);
+get_command_type(_) -> undefined.
+
+convert_events({ok, Events}, ToMapFn) ->
+    {ok, [ToMapFn(E) || E <- Events]};
+convert_events({error, _} = Err, _) ->
+    Err.
