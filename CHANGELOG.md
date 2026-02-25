@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Needs a new query desk (e.g. `get_settings_history/`) that reads from the
   settings ReckonDB stream and returns the event log.
 
+## [0.10.1] - 2026-02-25
+
+### Fixed
+- Settings auto-initiation timing race — replaced 500ms blind delay with
+  explicit wait for `settings_initiated_v1_to_settings` projection process,
+  ensuring the event is projected into SQLite before queries arrive
+- Health endpoint version was hardcoded at `0.1.0` — now reads from app vsn
+- Release version in `rebar.config` was stale at `0.9.2`
+
 ## [0.10.0] - 2026-02-25
 
 ### Added

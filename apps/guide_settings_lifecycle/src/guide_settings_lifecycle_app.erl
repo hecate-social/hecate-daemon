@@ -22,10 +22,11 @@ stop(_State) ->
 %% @doc Auto-initiate settings on daemon startup.
 %% Dispatches initiate_settings_v1 with detected linux_user + hostname.
 %% On restarts, the aggregate will reject with already_initiated — harmless.
+%% Waits for the settings projection to be subscribed before dispatching,
+%% so the event is guaranteed to be projected into SQLite.
 auto_initiate_settings() ->
     spawn(fun() ->
-        %% Small delay to allow event store subscriptions to settle
-        timer:sleep(500),
+        wait_for_projections(),
         User = list_to_binary(string:trim(os:cmd("whoami"), trailing, "\n")),
         Host = list_to_binary(string:trim(os:cmd("hostname -s"), trailing, "\n")),
         Now = erlang:system_time(millisecond),
@@ -39,3 +40,21 @@ auto_initiate_settings() ->
                 logger:warning("Failed to auto-initiate settings: ~p", [Reason])
         end
     end).
+
+%% @doc Wait until the settings projection process is alive and subscribed.
+%% Polls every 200ms up to 30 attempts (6 seconds max).
+wait_for_projections() ->
+    wait_for_projections(30).
+
+wait_for_projections(0) ->
+    logger:warning("Settings projections not ready after timeout — dispatching anyway");
+wait_for_projections(N) ->
+    case whereis(settings_initiated_v1_to_settings) of
+        Pid when is_pid(Pid) ->
+            %% Projection is alive — give it a moment to finish subscribing
+            timer:sleep(100),
+            ok;
+        undefined ->
+            timer:sleep(200),
+            wait_for_projections(N - 1)
+    end.
