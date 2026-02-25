@@ -16,7 +16,7 @@ start_link() ->
 
 init([]) ->
     {ok, SubId} = reckon_evoq_adapter:subscribe(
-        hecate_event_store, event_type, <<"node_paired_v1">>,
+        settings_store, event_type, <<"node_paired_v1">>,
         <<"prj_node_paired">>, #{start_from => 0, subscriber_pid => self()}
     ),
     {ok, #state{subscription_id = SubId}}.
@@ -36,7 +36,7 @@ handle_info(_Info, State) ->
 terminate(_Reason, #state{subscription_id = SubId}) ->
     case SubId of
         undefined -> ok;
-        _ -> reckon_evoq_adapter:unsubscribe(hecate_event_store, SubId)
+        _ -> reckon_evoq_adapter:unsubscribe(settings_store, SubId)
     end.
 
 %% Internal

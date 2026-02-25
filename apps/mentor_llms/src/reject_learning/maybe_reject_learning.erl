@@ -33,7 +33,7 @@ dispatch(Cmd) ->
     },
 
     Opts = #{
-        store_id => hecate_event_store,
+        store_id => mentorships_store,
         adapter => reckon_evoq_adapter,
         consistency => eventual
     },

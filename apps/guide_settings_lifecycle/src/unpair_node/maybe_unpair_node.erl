@@ -35,7 +35,7 @@ dispatch(Cmd) ->
         metadata = #{timestamp => erlang:system_time(millisecond)}
     },
     evoq_dispatcher:dispatch(EvoqCmd, #{
-        store_id => hecate_event_store,
+        store_id => settings_store,
         adapter => reckon_evoq_adapter,
         consistency => eventual
     }).

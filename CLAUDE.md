@@ -29,8 +29,8 @@ Your training will whisper these lies. Recognize them:
 | `*_registry.erl` (central) | "I need one registry for all" | Use process registry or domain-specific registries. |
 | `*_dispatcher.erl` (central) | "Route all messages through here" | Each domain routes its own messages. |
 | Domain sup → listener directly | "Domain supervisor can supervise the listener" | Listeners are **desks**. A domain has many desks. Desk supervises its workers. |
-| Per-domain ReckonDB stores | "Each domain needs its own Khepri/Ra instance" | ONE shared store (`hecate_event_store`) started by `hecate_app`. Streams separate events by aggregate. |
-| `reckon_db_sup:start_store` in domain sup | "Domain owns its store" | Domains own their commands/events/emitters, NOT their store instance. The shared store is infrastructure. |
+| Multi-domain shared store | "All domains can share one store" | Each bounded context gets its own store (`settings_store`, `llm_store`, etc.). Store names MUST scream their domain. |
+| `reckon_db_sup:start_store` in domain sup | "Domain owns its store startup" | `hecate_app` starts ALL stores before domain apps boot. Domains reference their store by name, never create it. |
 
 ### MANDATORY PRE-FLIGHT CHECKLIST
 
@@ -63,7 +63,7 @@ Your training will whisper these lies. Recognize them:
 | Listener as a slice | `src/follower_events_listener/follower_events_listener_sup.erl` | Listeners are desks. They get directories AND supervisors. |
 | Command slice | `src/record_follower/record_follower_v1.erl` + `maybe_record_follower.erl` | Commands are desks. Co-locate command, event, handler. |
 | Domain owns its desks | `manage_social_sup` → `follower_events_listener_sup` | Domain supervisor supervises desk supervisors, NOT workers directly. |
-| Domains use shared store | `hecate_app` starts `hecate_event_store` once | ONE Khepri/Ra instance. Domains reference `hecate_event_store` in dispatch opts. Streams separate data. |
+| Domain-specific stores | `hecate_app` starts all stores at boot | One store per bounded context. Each domain references its own store in dispatch opts. |
 
 **Supervision hierarchy:**
 ```
@@ -121,16 +121,26 @@ Macula Mesh
 
 Each domain follows strict CQRS separation:
 
-**Command Services (e.g., `manage_capabilities`):**
-- All command services share ONE ReckonDB instance (`hecate_event_store`)
-- Uses `reckon_evoq` for command dispatching with `store_id => hecate_event_store`
+**Command Services (e.g., `guide_settings_lifecycle`):**
+- Each bounded context has its own ReckonDB store (e.g., `settings_store`, `llm_store`)
+- Uses `reckon_evoq` for command dispatching with `store_id => {domain}_store`
 - Streams within the store separate events by aggregate type/id
 - Optionally can include projections (see note below)
 
-**Query Services (e.g., `query_capabilities`):**
-- Use `reckon_evoq` to subscribe to events from `hecate_event_store`
+**Domain Event Stores (created by `hecate_app.erl`):**
+
+| Store | Domain | Apps |
+|-------|--------|------|
+| `settings_store` | Identity, pairing, preferences | guide_settings_lifecycle, project_settings |
+| `llm_store` | LLM detection and status | serve_llm |
+| `mentorships_store` | Expertise and learning | mentor_llms, project_llm_mentorships |
+| `licenses_store` | Appstore license lifecycle | guide_license_lifecycle, project_licenses |
+| `plugins_store` | Plugin install/upgrade/remove | guide_plugin_lifecycle, project_plugins |
+
+**Query Services (e.g., `query_settings`):**
+- Use `reckon_evoq` to subscribe to events from their domain's store
 - Projections consume events and update SQLite read models
-- Subscribe to the shared store by event_type to receive relevant events
+- Subscribe to the domain store by event_type to receive relevant events
 
 **Architecture Note: Projections and Event Schemas**
 
@@ -201,8 +211,8 @@ For typical bounded contexts, the overhead (3 apps per domain) isn't justified.
 **Example Supervisor Pattern (Command Service):**
 
 ```erlang
-%% apps/manage_capabilities/src/manage_capabilities_sup.erl
-%% NOTE: No store creation here! hecate_app starts hecate_event_store.
+%% apps/guide_settings_lifecycle/src/guide_settings_lifecycle_sup.erl
+%% NOTE: No store creation here! hecate_app starts all domain stores.
 %% Domain supervisors only manage their emitters, process managers, etc.
 init([]) ->
     Children = [
@@ -221,9 +231,9 @@ init([]) ->
 **Example Dispatch Pattern:**
 
 ```erlang
-%% In maybe_announce_capability.erl
+%% In maybe_initiate_settings.erl
 Opts = #{
-    store_id => hecate_event_store,  %% Shared store — all domains use this
+    store_id => settings_store,  %% Domain-specific store
     adapter => reckon_evoq_adapter,
     consistency => eventual
 },

@@ -9,7 +9,7 @@
 %%% 3. Unix socket with minimal health-only dispatch (clients see ready:false)
 %%% 4. ReckonDB (embedded event store infrastructure)
 %%% 5. Evoq (CQRS framework)
-%%% 6. Shared event stores (hecate_event_store, dev_studio_store)
+%%% 6. Domain event stores (one per bounded context)
 %%% 7. hecate_sup (domain services)
 %%%
 %%% The socket becomes fully operational later when hecate_api_app
@@ -80,101 +80,43 @@ start_evoq() ->
     case application:ensure_all_started(evoq) of
         {ok, _EvoqApps} ->
             logger:info("Evoq started successfully"),
-            start_event_store();
+            start_event_stores();
         {error, EvoqReason} ->
             logger:error("Failed to start Evoq: ~p", [EvoqReason]),
             {error, {evoq_start_failed, EvoqReason}}
     end.
 
-%% @private Start the shared event stores.
-%% Two stores: hecate_event_store (node infra) + dev_studio_store (venture lifecycle).
-start_event_store() ->
-    logger:info("Starting shared event store (hecate_event_store)..."),
-    HecateDataDir = shared_paths:reckon_path("hecate"),
-    ok = filelib:ensure_path(HecateDataDir),
-    HecateConfig = #store_config{
-        store_id = hecate_event_store,
-        data_dir = HecateDataDir,
-        mode = single,
-        writer_pool_size = 10,
-        reader_pool_size = 10,
-        gateway_pool_size = 2,
-        options = #{}
-    },
-    case start_store(HecateConfig) of
-        ok -> start_dev_studio_store();
-        {error, Reason} ->
-            logger:error("Failed to start hecate_event_store: ~p", [Reason]),
-            {error, {event_store_start_failed, Reason}}
-    end.
+%% @private Start domain event stores (one per bounded context).
+start_event_stores() ->
+    Stores = [
+        {settings_store,    "settings",    "Settings (identity, pairing, preferences)"},
+        {llm_store,         "llm",         "LLM (detection, status reporting)"},
+        {mentorships_store, "mentorships", "Mentorships (expertise, learning)"},
+        {licenses_store,    "licenses",    "Licenses (appstore lifecycle)"},
+        {plugins_store,     "plugins",     "Plugins (install/upgrade/remove)"}
+    ],
+    start_stores(Stores).
 
-%% @private Start the dev_studio_store for venture lifecycle domains.
-start_dev_studio_store() ->
-    logger:info("Starting dev studio event store (dev_studio_store)..."),
-    DevStudioDataDir = shared_paths:reckon_path("dev_studio"),
-    ok = filelib:ensure_path(DevStudioDataDir),
-    DevStudioConfig = #store_config{
-        store_id = dev_studio_store,
-        data_dir = DevStudioDataDir,
+start_stores([]) ->
+    start_hecate_sup();
+start_stores([{StoreId, SubDir, Label} | Rest]) ->
+    logger:info("Starting ~s event store (~p)...", [Label, StoreId]),
+    DataDir = shared_paths:reckon_path(SubDir),
+    ok = filelib:ensure_path(DataDir),
+    Config = #store_config{
+        store_id = StoreId,
+        data_dir = DataDir,
         mode = single,
         writer_pool_size = 5,
         reader_pool_size = 5,
         gateway_pool_size = 2,
         options = #{}
     },
-    case start_store(DevStudioConfig) of
-        ok ->
-            logger:info("Dev studio event store ready"),
-            start_licenses_store();
+    case start_store(Config) of
+        ok -> start_stores(Rest);
         {error, Reason} ->
-            logger:error("Failed to start dev_studio_store: ~p", [Reason]),
-            {error, {dev_studio_store_start_failed, Reason}}
-    end.
-
-%% @private Start the licenses_store for license aggregate events.
-start_licenses_store() ->
-    logger:info("Starting licenses event store (licenses_store)..."),
-    LicensesDataDir = shared_paths:reckon_path("licenses"),
-    ok = filelib:ensure_path(LicensesDataDir),
-    LicensesConfig = #store_config{
-        store_id = licenses_store,
-        data_dir = LicensesDataDir,
-        mode = single,
-        writer_pool_size = 5,
-        reader_pool_size = 5,
-        gateway_pool_size = 2,
-        options = #{}
-    },
-    case start_store(LicensesConfig) of
-        ok ->
-            logger:info("Licenses event store ready"),
-            start_plugins_store();
-        {error, Reason} ->
-            logger:error("Failed to start licenses_store: ~p", [Reason]),
-            {error, {licenses_store_start_failed, Reason}}
-    end.
-
-%% @private Start the plugins_store for plugin lifecycle aggregate events.
-start_plugins_store() ->
-    logger:info("Starting plugins event store (plugins_store)..."),
-    PluginsDataDir = shared_paths:reckon_path("plugins"),
-    ok = filelib:ensure_path(PluginsDataDir),
-    PluginsConfig = #store_config{
-        store_id = plugins_store,
-        data_dir = PluginsDataDir,
-        mode = single,
-        writer_pool_size = 5,
-        reader_pool_size = 5,
-        gateway_pool_size = 2,
-        options = #{}
-    },
-    case start_store(PluginsConfig) of
-        ok ->
-            logger:info("Plugins event store ready"),
-            start_hecate_sup();
-        {error, Reason} ->
-            logger:error("Failed to start plugins_store: ~p", [Reason]),
-            {error, {plugins_store_start_failed, Reason}}
+            logger:error("Failed to start ~p: ~p", [StoreId, Reason]),
+            {error, {StoreId, Reason}}
     end.
 
 %% @private Start a single ReckonDB store, handling already_started.

@@ -17,7 +17,7 @@ start_link() ->
 
 init([]) ->
     {ok, SubId} = reckon_evoq_adapter:subscribe(
-        hecate_event_store,
+        mentorships_store,
         event_type,
         <<"learning_validated_v1">>,
         <<"mesh_learning_validated">>,
@@ -40,5 +40,5 @@ handle_info(_Info, State) ->
 terminate(_Reason, #state{subscription_id = SubId}) ->
     case SubId of
         undefined -> ok;
-        _ -> reckon_evoq_adapter:unsubscribe(hecate_event_store, SubId)
+        _ -> reckon_evoq_adapter:unsubscribe(mentorships_store, SubId)
     end.

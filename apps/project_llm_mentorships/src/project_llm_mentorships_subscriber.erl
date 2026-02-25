@@ -1,5 +1,5 @@
 %%% @doc Event subscriber for LLM mentorship projections.
-%%% Subscribes to hecate_event_store events and projects to SQLite.
+%%% Subscribes to mentorships_store events and projects to SQLite.
 -module(project_llm_mentorships_subscriber).
 -behaviour(gen_server).
 
@@ -35,7 +35,7 @@ start_link() ->
 init([]) ->
     SubIds = lists:filtermap(fun(EventType) ->
         case reckon_evoq_adapter:subscribe(
-            hecate_event_store,
+            mentorships_store,
             event_type,
             EventType,
             <<"project_llm_mentorships_subscriber_", EventType/binary>>,
@@ -66,7 +66,7 @@ handle_info(_Info, State) ->
 
 terminate(_Reason, #state{subscription_ids = SubIds}) ->
     lists:foreach(fun(SubId) ->
-        reckon_evoq_adapter:unsubscribe(hecate_event_store, SubId)
+        reckon_evoq_adapter:unsubscribe(mentorships_store, SubId)
     end, SubIds).
 
 %% Internal

@@ -1,6 +1,6 @@
 %%% @doc Report LLM Status
 %%% Periodically checks each known model's availability and emits
-%%% llm_status_reported_v1 events to hecate_event_store.
+%%% llm_status_reported_v1 events to llm_store.
 -module(report_llm_status).
 -behaviour(gen_server).
 
@@ -140,4 +140,4 @@ emit_status(ModelName, Status) ->
 
 store_event(EventType, EventData) ->
     Event = EventData#{event_type => EventType},
-    reckon_evoq_adapter:append(hecate_event_store, <<"llm_status">>, ?ANY_VERSION, [Event]).
+    reckon_evoq_adapter:append(llm_store, <<"llm_status">>, ?ANY_VERSION, [Event]).
