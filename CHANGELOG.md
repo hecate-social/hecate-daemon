@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-02-25
+
+### Removed
+- `hecate_api_agents` (stub returning empty lists)
+- `hecate_api_identity` (duplicate of `query_settings/get_identity_api`)
+- `hecate_api_pairing` (superseded by `guide_settings_lifecycle` handlers)
+- `auto_register_default_connector` dead code and `guide_node_lifecycle` config
+- `hecate_telemetry` app (broken — dissolved into `serve_llm`)
+
+### Changed
+- Moved geo API handler to `geo_check` app (`geo_check_api`)
+- Moved RPC call handler to `hecate_mesh` app (`call_rpc/call_rpc_api`)
+- Moved sidebar config to `guide_settings_lifecycle` app (`configure_sidebar/` desk)
+- Rebuilt LLM usage tracking as `serve_llm/track_llm_usage/` desk (llm_pricing, llm_usage_store, track_llm_usage_api)
+- Fixed `chat_to_llm` terminology: `torch_id`/`cartwheel_id` → `venture_id`/`division_id`
+- Replaced `io:format` with `logger` in `hecate_mesh` app
+- Removed `jsx` dep and legacy aliases from `hecate_mesh`
+- Stripped domain app dependencies from `hecate_api` (now infrastructure-only)
+
 ## [0.9.1] - 2026-02-25
 
 ### Changed
