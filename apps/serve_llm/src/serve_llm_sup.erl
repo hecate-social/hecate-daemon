@@ -17,6 +17,11 @@ init([]) ->
     },
 
     Children = [
+        %% llm_usage_store: SQLite store for LLM cost tracking
+        {llm_usage_store,
+            {llm_usage_store, start_link, []},
+            permanent, 5000, worker, [llm_usage_store]},
+
         %% manage_providers: provider registry (must start before detect_llms)
         {manage_providers,
             {manage_providers, start_link, []},

@@ -35,12 +35,11 @@ unsubscribe(SubRef) ->
 %% Callbacks
 
 init([]) ->
-    %% Read from hecate app config (not hecate_mesh)
     Realm = application:get_env(hecate, realm, <<"io.macula">>),
     Identity = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>),
     Bootstrap = application:get_env(hecate, bootstrap, [<<"boot.macula.io:443">>]),
-    %% Convert to binaries if strings
     BootstrapBins = [ensure_binary(B) || B <- Bootstrap],
+    logger:info("[hecate_mesh] Initializing mesh client (realm: ~s, identity: ~s)", [Realm, Identity]),
     self() ! connect,
     {ok, #state{
         client = undefined,
@@ -62,8 +61,6 @@ handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) -
 handle_call({subscribe, _Topic, _Callback}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
 handle_call({subscribe, Topic, CallbackPid}, _From, #state{client = Client, subscriptions = Subs} = State) ->
-    %% macula:subscribe expects a fun/1, not a pid
-    %% Wrap the pid in a function that sends mesh_fact messages
     CallbackFun = fun(EventData) ->
         CallbackPid ! {mesh_fact, Topic, EventData},
         ok
@@ -94,7 +91,7 @@ handle_info({reconnect, Delay}, State) ->
     connect_to_mesh(State);
 
 handle_info({'DOWN', _Ref, process, Pid, Reason}, #state{client = Pid} = State) ->
-    io:format("[hecate_mesh] Connection lost: ~p, reconnecting...~n", [Reason]),
+    logger:warning("[hecate_mesh] Connection lost: ~p, reconnecting...", [Reason]),
     self() ! {reconnect, 1000},
     {noreply, State#state{client = undefined, subscriptions = #{}}};
 
@@ -110,11 +107,11 @@ terminate(_Reason, #state{client = Client}) ->
 %% Internal
 
 connect_to_mesh(#state{realm = Realm, identity = Identity, bootstrap = Bootstrap} = State) ->
-    io:format("[hecate_mesh] Connecting to mesh (realm: ~s)...~n", [Realm]),
+    logger:info("[hecate_mesh] Connecting to mesh (realm: ~s)...", [Realm]),
     try_connect_to_bootstrap(Bootstrap, Realm, Identity, State).
 
 try_connect_to_bootstrap([], _Realm, _Identity, State) ->
-    io:format("[hecate_mesh] All bootstrap servers failed, retrying in 5s...~n"),
+    logger:warning("[hecate_mesh] All bootstrap servers failed, retrying in 5s..."),
     self() ! {reconnect, 5000},
     {noreply, State};
 try_connect_to_bootstrap([BootstrapUrl | Rest], Realm, Identity, State) ->
@@ -123,14 +120,14 @@ try_connect_to_bootstrap([BootstrapUrl | Rest], Realm, Identity, State) ->
         realm => Realm,
         identity => Identity
     },
-    io:format("[hecate_mesh] Trying bootstrap: ~s~n", [Url]),
+    logger:info("[hecate_mesh] Trying bootstrap: ~s", [Url]),
     case macula:connect(Url, Opts) of
         {ok, Client} ->
             erlang:monitor(process, Client),
-            io:format("[hecate_mesh] Connected to mesh via ~s~n", [Url]),
+            logger:info("[hecate_mesh] Connected to mesh via ~s", [Url]),
             {noreply, State#state{client = Client}};
         {error, Reason} ->
-            io:format("[hecate_mesh] Failed to connect to ~s: ~p~n", [Url, Reason]),
+            logger:warning("[hecate_mesh] Failed to connect to ~s: ~p", [Url, Reason]),
             try_connect_to_bootstrap(Rest, Realm, Identity, State)
     end.
 

@@ -18,8 +18,8 @@ routes_compile_test() ->
     %% Dispatch is [{HostMatch, Constraints, PathMatchList}]
     [{'_', _Constraints, PathMatchList}] = Dispatch,
     ?assert(is_list(PathMatchList)),
-    %% hecate_api alone has 10+ handler routes (health, identity, pairing, etc.)
-    ?assert(length(PathMatchList) > 5).
+    %% hecate_api retains infrastructure routes (health, startup_health, facts_stream)
+    ?assert(length(PathMatchList) > 0).
 
 %% Test that /health route is present
 health_route_present_test() ->

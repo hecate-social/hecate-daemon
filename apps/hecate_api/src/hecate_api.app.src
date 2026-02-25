@@ -7,25 +7,7 @@
         kernel,
         stdlib,
         cowboy,
-        yamerl,
-        %% hecate core (must start first for hecate_identity)
-        hecate,
-        %% Mentorships
-        mentor_llms,
-        project_llm_mentorships,
-        query_llm_mentorships,
-        %% LLM
-        serve_llm,
-        %% License lifecycle (appstore)
-        guide_license_lifecycle,
-        project_licenses,
-        query_licenses,
-        %% Plugin lifecycle (node)
-        guide_plugin_lifecycle,
-        project_plugins,
-        query_plugins,
-        %% Telemetry
-        hecate_telemetry
+        hecate
     ]},
     {env, [
         {http_port, 4444},

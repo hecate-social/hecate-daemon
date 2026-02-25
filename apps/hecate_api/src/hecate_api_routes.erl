@@ -11,6 +11,8 @@
 %% All hecate OTP apps that may contain API handlers.
 -define(HECATE_APPS, [
     hecate_api,
+    geo_check,
+    hecate_mesh,
     guide_settings_lifecycle, query_settings,
     mentor_llms, project_llm_mentorships, query_llm_mentorships,
     serve_llm,

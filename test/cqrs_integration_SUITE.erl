@@ -53,20 +53,6 @@ init_per_suite(Config) ->
     LibDir = filename:dirname(filename:dirname(SuiteDir)),
     ct:pal("Found lib dir: ~s", [LibDir]),
 
-    Apps = [
-        guide_node_lifecycle,
-        query_node_lifecycle
-    ],
-    lists:foreach(fun(App) ->
-        EbinDir = filename:join([LibDir, atom_to_list(App), "ebin"]),
-        ct:pal("Adding to code path: ~s", [EbinDir]),
-        case code:add_patha(EbinDir) of
-            true -> ok;
-            {error, Reason} ->
-                ct:pal("WARNING: Failed to add ~s: ~p", [EbinDir, Reason])
-        end
-    end, Apps),
-
     %% Ensure data directories exist
     DataDir = "/tmp/hecate_test_" ++ integer_to_list(erlang:system_time(millisecond)),
     ok = filelib:ensure_dir(DataDir ++ "/"),
@@ -84,12 +70,6 @@ init_per_suite(Config) ->
 
 init_per_group(cqrs_flows, Config) ->
     ct:pal("Initializing CQRS flows group..."),
-
-    %% Start the consolidated SQLite store for testing
-    {ok, _} = gen_server:start({local, query_node_lifecycle_store},
-                                query_node_lifecycle_store, [], []),
-
-    ct:pal("Stores started for group"),
     Config;
 
 init_per_group(_Group, Config) ->
@@ -97,10 +77,6 @@ init_per_group(_Group, Config) ->
 
 end_per_group(cqrs_flows, _Config) ->
     ct:pal("Cleaning up CQRS flows group..."),
-
-    catch gen_server:stop(query_node_lifecycle_store),
-
-    ct:pal("Stores stopped"),
     ok;
 
 end_per_group(_Group, _Config) ->

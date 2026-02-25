@@ -1,6 +1,9 @@
-%%% @doc Instrumentation module for collecting LLM telemetry.
-%%% Provides convenience functions for recording LLM calls and calculating costs.
--module(hecate_telemetry_collector).
+%%% @doc LLM pricing tables and cost calculation.
+%%%
+%%% Records LLM calls with automatic cost calculation based on model pricing.
+%%% Delegates storage to llm_usage_store.
+%%% @end
+-module(llm_pricing).
 
 -export([record_llm_call/1]).
 -export([calculate_cost/3]).
@@ -34,28 +37,19 @@
     default => {0.01, 0.03}
 }).
 
-%%------------------------------------------------------------------------------
-%% API
-%%------------------------------------------------------------------------------
-
 %% @doc Record an LLM call. Calculates cost if not provided.
-%% Required keys: torch_id, model, tokens_in, tokens_out
-%% Optional keys: cartwheel_id, agent_id, task_id, cost_usd
 -spec record_llm_call(map()) -> ok | {error, term()}.
 record_llm_call(Data) when is_map(Data) ->
     Model = maps:get(model, Data),
     TokensIn = maps:get(tokens_in, Data),
     TokensOut = maps:get(tokens_out, Data),
-
-    %% Calculate cost if not provided
     DataWithCost = case maps:is_key(cost_usd, Data) of
         true -> Data;
         false ->
             Cost = calculate_cost(Model, TokensIn, TokensOut),
             Data#{cost_usd => Cost}
     end,
-
-    hecate_telemetry_store:record_llm_call(DataWithCost).
+    llm_usage_store:record_llm_call(DataWithCost).
 
 %% @doc Calculate cost in USD for a given model and token counts.
 -spec calculate_cost(binary(), non_neg_integer(), non_neg_integer()) -> float().
@@ -66,36 +60,25 @@ calculate_cost(Model, TokensIn, TokensOut) ->
     InputCost + OutputCost.
 
 %% @doc Extract token counts from an LLM response.
-%% Handles different response formats from various providers.
 -spec extract_tokens(map()) -> {non_neg_integer(), non_neg_integer()}.
 extract_tokens(Response) when is_map(Response) ->
-    %% Try different common formats
     case maps:get(<<"usage">>, Response, undefined) of
         undefined ->
-            %% Try atom keys
             case maps:get(usage, Response, undefined) of
-                undefined ->
-                    %% No usage info available
-                    {0, 0};
-                Usage ->
-                    extract_from_usage(Usage)
+                undefined -> {0, 0};
+                Usage -> extract_from_usage(Usage)
             end;
         Usage ->
             extract_from_usage(Usage)
     end.
 
-%%------------------------------------------------------------------------------
-%% Internal functions
-%%------------------------------------------------------------------------------
+%%% Internal
 
 get_pricing(Model) when is_binary(Model) ->
-    %% Try exact match first
     case maps:get(Model, ?PRICING, undefined) of
         undefined ->
-            %% Try prefix matching for versioned models
             case find_pricing_by_prefix(Model) of
                 undefined ->
-                    %% Check if it's an Ollama model (local, free)
                     case is_ollama_model(Model) of
                         true -> {0.0, 0.0};
                         false -> maps:get(default, ?PRICING)
@@ -136,24 +119,11 @@ find_matching_prefix(Model, [{Prefix, Key} | Rest]) ->
     end.
 
 is_ollama_model(Model) ->
-    %% Ollama models typically don't have version suffixes like OpenAI/Anthropic
-    %% Common Ollama patterns: llama3, mistral, codellama, etc.
     OllamaPatterns = [
-        <<"llama">>,
-        <<"mistral">>,
-        <<"codellama">>,
-        <<"mixtral">>,
-        <<"phi">>,
-        <<"gemma">>,
-        <<"qwen">>,
-        <<"deepseek">>,
-        <<"starcoder">>,
-        <<"wizard">>,
-        <<"vicuna">>,
-        <<"orca">>,
-        <<"neural">>,
-        <<"dolphin">>,
-        <<"nous">>
+        <<"llama">>, <<"mistral">>, <<"codellama">>, <<"mixtral">>,
+        <<"phi">>, <<"gemma">>, <<"qwen">>, <<"deepseek">>,
+        <<"starcoder">>, <<"wizard">>, <<"vicuna">>, <<"orca">>,
+        <<"neural">>, <<"dolphin">>, <<"nous">>
     ],
     lists:any(fun(Pattern) ->
         case binary:match(string:lowercase(Model), Pattern) of
@@ -163,7 +133,6 @@ is_ollama_model(Model) ->
     end, OllamaPatterns).
 
 extract_from_usage(Usage) when is_map(Usage) ->
-    %% Handle both binary and atom keys
     PromptTokens = get_usage_field(Usage, [<<"prompt_tokens">>, prompt_tokens, <<"input_tokens">>, input_tokens]),
     CompletionTokens = get_usage_field(Usage, [<<"completion_tokens">>, completion_tokens, <<"output_tokens">>, output_tokens]),
     {PromptTokens, CompletionTokens}.
@@ -171,7 +140,6 @@ extract_from_usage(Usage) when is_map(Usage) ->
 get_usage_field(Usage, []) ->
     case maps:get(<<"total_tokens">>, Usage, maps:get(total_tokens, Usage, 0)) of
         Total when is_integer(Total), Total > 0 ->
-            %% If we only have total, assume 50/50 split (rough estimate)
             Total div 2;
         _ ->
             0
