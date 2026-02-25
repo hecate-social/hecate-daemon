@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-02-25
+
+### Changed
+- Split shared `hecate_event_store` into domain-specific stores: `settings_store`, `llm_store`, `mentorships_store`
+- Refactored `hecate_app.erl` store startup into single `start_stores/1` loop
+
+### Removed
+- `dev_studio_store` (dead — venture lifecycle moved to Martha)
+
 ## [0.9.0] - 2026-02-25
 
 ### Added
