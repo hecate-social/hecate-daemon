@@ -72,8 +72,17 @@ handle_sync_chat(Req0, Model, Messages, Params, _State) ->
             hecate_api_utils:json_ok(#{response => Response}, Req0);
         {error, {unknown_model, _}} ->
             hecate_api_utils:json_error(404, <<"Model not found in any provider">>, Req0);
+        {error, {http_error, 429, _Body}} ->
+            hecate_api_utils:json_error(429, <<"Rate limit exceeded — provider quota exhausted">>, Req0);
+        {error, {http_error, 401, _Body}} ->
+            hecate_api_utils:json_error(401, <<"Authentication failed — check API key">>, Req0);
+        {error, {http_error, 403, _Body}} ->
+            hecate_api_utils:json_error(403, <<"Access denied by provider">>, Req0);
         {error, {http_error, Code, _Body}} when Code >= 500 ->
             hecate_api_utils:json_error(503, <<"LLM backend unavailable">>, Req0);
+        {error, {http_error, Code, _Body}} ->
+            Msg = iolist_to_binary(io_lib:format("Provider returned HTTP ~B", [Code])),
+            hecate_api_utils:json_error(502, Msg, Req0);
         {error, Reason} ->
             hecate_api_utils:json_error(500, Reason, Req0)
     end.
