@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Needs a new query desk (e.g. `get_settings_history/`) that reads from the
   settings ReckonDB stream and returns the event log.
 
+## [0.11.2] - 2026-02-26
+
+### Fixed
+- **Container hostname/user detection** — inside a podman container,
+  `os:cmd("whoami")` returns `root` and `net_adm:localhost()` returns the
+  container hostname. New `shared_host` module checks `HECATE_HOSTNAME` and
+  `HECATE_USER` env vars first (set by systemd specifiers `%H`/`%u` in the
+  Quadlet container file), falling back to OS detection
+- **Pairing URL includes confirmation code** — pairing URL now appends
+  `?code={confirm_code}` so the realm page can auto-confirm without manual
+  code entry
+- **Agent info version hardcoded at 0.1.0** — now reads from app vsn
+
 ## [0.11.1] - 2026-02-26
 
 ### Fixed
@@ -287,7 +300,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/hecate-social/hecate-daemon/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/hecate-social/hecate-daemon/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/hecate-social/hecate-daemon/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/hecate-social/hecate-daemon/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/hecate-social/hecate-daemon/compare/v0.10.3...v0.11.0
 [0.10.3]: https://github.com/hecate-social/hecate-daemon/compare/v0.10.2...v0.10.3

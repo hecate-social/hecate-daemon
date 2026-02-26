@@ -49,8 +49,8 @@ initial_state() ->
 %% @doc Deterministic stream ID for this daemon's settings.
 -spec stream_id() -> binary().
 stream_id() ->
-    User = list_to_binary(string:trim(os:cmd("whoami"), trailing, "\n")),
-    Host = list_to_binary(net_adm:localhost()),
+    User = shared_host:user(),
+    Host = shared_host:hostname(),
     <<"settings-", User/binary, "@", Host/binary>>.
 
 %% @doc Execute command - routes to the correct handler.

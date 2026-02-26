@@ -175,7 +175,8 @@ create_pairing_session(PubKeyB64) ->
             {ok, #{
                 session_id => SessionId,
                 confirm_code => ConfirmCode,
-                pairing_url => <<RealmUrl/binary, "/pair/", SessionId/binary>>
+                pairing_url => <<RealmUrl/binary, "/pair/", SessionId/binary,
+                                  "?code=", ConfirmCode/binary>>
             }};
         {ok, Status, _RespHeaders, RespBody} ->
             logger:error("Failed to create pairing session: ~p ~s", [Status, RespBody]),
@@ -257,10 +258,11 @@ get_realm_url() ->
 
 -spec get_agent_info() -> map().
 get_agent_info() ->
+    {ok, Vsn} = application:get_key(hecate, vsn),
     #{
-        hostname => list_to_binary(net_adm:localhost()),
+        hostname => shared_host:hostname(),
         os => os_type_to_binary(),
-        version => <<"0.1.0">>
+        version => list_to_binary(Vsn)
     }.
 
 -spec os_type_to_binary() -> binary().

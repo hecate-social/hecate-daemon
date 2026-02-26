@@ -27,8 +27,8 @@ stop(_State) ->
 auto_initiate_settings() ->
     spawn(fun() ->
         wait_for_projections(),
-        User = list_to_binary(string:trim(os:cmd("whoami"), trailing, "\n")),
-        Host = list_to_binary(net_adm:localhost()),
+        User = shared_host:user(),
+        Host = shared_host:hostname(),
         Now = erlang:system_time(millisecond),
         Cmd = initiate_settings_v1:new(User, Host, Now),
         case maybe_initiate_settings:dispatch(Cmd) of
