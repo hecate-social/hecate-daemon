@@ -84,7 +84,6 @@ initialize(Opts) ->
 %%%===================================================================
 
 init([]) ->
-    %% Try to load existing identity
     State = case hecate_store:get(?BUCKET, <<"identity">>) of
         {ok, Identity} ->
             logger:info("Loaded identity: ~s", [maps:get(mri, Identity)]),
@@ -95,8 +94,7 @@ init([]) ->
                 private_key = maps:get(private_key, Identity)
             };
         not_found ->
-            logger:info("No identity found - run 'hecate init' to create one"),
-            #state{}
+            auto_initialize()
     end,
     {ok, State}.
 
@@ -182,6 +180,35 @@ terminate(_Reason, _State) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+auto_initialize() ->
+    logger:info("No identity found — generating on first boot"),
+    {PubKey, PrivKey} = generate_keypair(),
+    Realm = <<"io.macula">>,
+    Name = generate_name(),
+    Owner = <<"anonymous">>,
+    MRI = iolist_to_binary([
+        <<"mri:agent:">>, Realm, <<"/">>, Owner, <<"/">>, Name
+    ]),
+    Identity = #{
+        mri => MRI,
+        realm => Realm,
+        public_key => PubKey,
+        private_key => PrivKey,
+        created_at => erlang:system_time(second)
+    },
+    ok = hecate_store:put(?BUCKET, <<"identity">>, Identity),
+    ok = hecate_store:append_event(<<"identity">>, <<"identity_created">>, #{
+        mri => MRI,
+        realm => Realm
+    }),
+    logger:info("Created identity: ~s", [MRI]),
+    #state{
+        mri = MRI,
+        realm = Realm,
+        public_key = PubKey,
+        private_key = PrivKey
+    }.
 
 generate_keypair() ->
     {PubKey, PrivKey} = crypto:generate_key(eddsa, ed25519),

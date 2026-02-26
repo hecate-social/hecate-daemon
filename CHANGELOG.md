@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Needs a new query desk (e.g. `get_settings_history/`) that reads from the
   settings ReckonDB stream and returns the event log.
 
+## [0.11.1] - 2026-02-26
+
+### Fixed
+- **Node identity auto-initializes on first boot** — no more "Run `hecate init`"
+  message. The daemon generates an Ed25519 keypair and MRI automatically when
+  no existing identity is found, matching the existing `auto_initiate_settings`
+  pattern
+
 ## [0.11.0] - 2026-02-26
 
 ### Changed
@@ -279,7 +287,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/hecate-social/hecate-daemon/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/hecate-social/hecate-daemon/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/hecate-social/hecate-daemon/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/hecate-social/hecate-daemon/compare/v0.10.3...v0.11.0
 [0.10.3]: https://github.com/hecate-social/hecate-daemon/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/hecate-social/hecate-daemon/compare/v0.10.1...v0.10.2
