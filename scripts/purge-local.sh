@@ -54,8 +54,8 @@ info "Killing stale hecate processes..."
 # Kill heart first (it respawns beam)
 pkill -f 'heart.*hecate' 2>/dev/null && info "  killed heart" || true
 sleep 0.5
-# Kill beam/hecate processes
-pkill -f 'beam.*hecate' 2>/dev/null && info "  killed beam" || true
+# Kill beam/hecate processes (both containerized and local dev releases)
+pkill -9 -f 'beam.*hecate' 2>/dev/null && info "  killed beam" || true
 pkill -f 'run_erl.*hecate' 2>/dev/null && info "  killed run_erl" || true
 pkill -f 'epmd' 2>/dev/null && info "  killed epmd" || true
 
