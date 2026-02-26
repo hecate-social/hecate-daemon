@@ -35,30 +35,37 @@ setup() ->
     TempDir = "/tmp/hecate_ucan_test_" ++ integer_to_list(erlang:unique_integer([positive])),
     ok = filelib:ensure_dir(filename:join(TempDir, "dummy")),
     application:set_env(hecate, data_dir, TempDir),
-    
-    
+
     {ok, _} = application:ensure_all_started(esqlite),
     {ok, _} = application:ensure_all_started(jsx),
-    
-    %% Start dependencies
+
+    %% Ensure clean state — stop any leftover processes from previous test
+    catch gen_server:stop(hecate_ucan),
+    catch gen_server:stop(hecate_identity),
+    catch gen_server:stop(hecate_store),
+
     {ok, StorePid} = hecate_store:start_link(),
-    {ok, IdentityPid} = hecate_identity:start_link(),
-    
-    %% Initialize identity (required for UCAN signing)
-    ok = hecate_identity:initialize(#{
+
+    %% Pre-seed identity so hecate_identity loads it from store
+    %% instead of auto-generating a random MRI
+    {PubKey, PrivKey} = crypto:generate_key(eddsa, ed25519),
+    ok = hecate_store:put(<<"identity">>, <<"identity">>, #{
+        mri => <<"mri:agent:test.realm/test/ucan-test">>,
         realm => <<"test.realm">>,
-        owner => <<"test">>,
-        name => <<"ucan-test">>
+        public_key => PubKey,
+        private_key => PrivKey,
+        created_at => erlang:system_time(second)
     }),
-    
+
+    {ok, IdentityPid} = hecate_identity:start_link(),
     {ok, UcanPid} = hecate_ucan:start_link(),
-    
+
     {StorePid, IdentityPid, UcanPid, TempDir}.
 
-cleanup({StorePid, IdentityPid, UcanPid, TempDir}) ->
-    gen_server:stop(UcanPid),
-    gen_server:stop(IdentityPid),
-    gen_server:stop(StorePid),
+cleanup({_StorePid, _IdentityPid, _UcanPid, TempDir}) ->
+    catch gen_server:stop(hecate_ucan),
+    catch gen_server:stop(hecate_identity),
+    catch gen_server:stop(hecate_store),
     os:cmd("rm -rf " ++ TempDir),
     ok.
 
