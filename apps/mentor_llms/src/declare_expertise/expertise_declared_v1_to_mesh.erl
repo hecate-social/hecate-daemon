@@ -16,7 +16,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    {ok, SubId} = reckon_evoq_adapter:subscribe(
+    {ok, SubId} = evoq_subscriptions:subscribe(
         mentorships_store,
         event_type,
         <<"expertise_declared_v1">>,
@@ -31,8 +31,10 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({event, #evoq_event{data = EventData}}, State) ->
-    hecate_mesh_client:publish(<<"hecate.mentor.available">>, EventData),
+handle_info({events, Events}, State) ->
+    lists:foreach(fun(#evoq_event{data = EventData}) ->
+        hecate_mesh_client:publish(<<"hecate.mentor.available">>, EventData)
+    end, Events),
     {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -40,5 +42,5 @@ handle_info(_Info, State) ->
 terminate(_Reason, #state{subscription_id = SubId}) ->
     case SubId of
         undefined -> ok;
-        _ -> reckon_evoq_adapter:unsubscribe(mentorships_store, SubId)
+        _ -> evoq_subscriptions:unsubscribe(mentorships_store, SubId)
     end.

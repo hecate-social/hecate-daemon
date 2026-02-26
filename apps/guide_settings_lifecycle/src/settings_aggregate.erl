@@ -50,7 +50,7 @@ initial_state() ->
 -spec stream_id() -> binary().
 stream_id() ->
     User = list_to_binary(string:trim(os:cmd("whoami"), trailing, "\n")),
-    Host = list_to_binary(string:trim(os:cmd("hostname -s"), trailing, "\n")),
+    Host = list_to_binary(net_adm:localhost()),
     <<"settings-", User/binary, "@", Host/binary>>.
 
 %% @doc Execute command - routes to the correct handler.

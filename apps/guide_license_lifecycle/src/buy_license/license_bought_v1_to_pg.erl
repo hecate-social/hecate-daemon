@@ -14,7 +14,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    {ok, _} = reckon_evoq_adapter:subscribe(
+    {ok, _} = evoq_subscriptions:subscribe(
         ?STORE_ID, event_type, ?EVENT_TYPE, ?SUB_NAME,
         #{subscriber_pid => self()}),
     {ok, #{}}.

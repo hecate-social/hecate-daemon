@@ -14,6 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Needs a new query desk (e.g. `get_settings_history/`) that reads from the
   settings ReckonDB stream and returns the event log.
 
+## [0.11.0] - 2026-02-26
+
+### Changed
+- **Subscription architecture overhaul** — all 30 projections, emitters, and
+  process managers migrated from `reckon_evoq_adapter:subscribe/5` to
+  `evoq_subscriptions:subscribe/5` facade (evoq 1.4.0)
+- Upgrade evoq to 1.4.0 (new `evoq_subscriptions` facade module)
+- Upgrade reckon_evoq to 1.2.0 (subscription bridge: translates ReckonDB
+  `{events, [#event{}]}` into `{events, [#evoq_event{}]}`)
+- `projection_event:to_map/1` now handles both `#evoq_event{}` and `#event{}`
+  records (bridge sends evoq events)
+
+### Fixed
+- **Settings initiation broken on Arch Linux** — `os:cmd("hostname -s")` fails
+  when `hostname` binary doesn't exist, corrupting stream IDs and preventing
+  settings from being created. Replaced with `net_adm:localhost()` in both
+  `settings_aggregate:stream_id/0` and `guide_settings_lifecycle_app`
+- `project_llm_mentorships_subscriber` expected `{event, #evoq_event{}}` but
+  ReckonDB bridge sends `{events, [#evoq_event{}]}` — fixed message pattern
+  and event routing
+
 ## [0.10.3] - 2026-02-25
 
 ### Fixed
@@ -258,7 +279,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/hecate-social/hecate-daemon/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/hecate-social/hecate-daemon/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/hecate-social/hecate-daemon/compare/v0.10.3...v0.11.0
+[0.10.3]: https://github.com/hecate-social/hecate-daemon/compare/v0.10.2...v0.10.3
+[0.10.2]: https://github.com/hecate-social/hecate-daemon/compare/v0.10.1...v0.10.2
+[0.10.1]: https://github.com/hecate-social/hecate-daemon/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/hecate-social/hecate-daemon/compare/v0.9.2...v0.10.0
+[0.9.2]: https://github.com/hecate-social/hecate-daemon/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/hecate-social/hecate-daemon/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/hecate-social/hecate-daemon/compare/v0.8.2...v0.9.0
+[0.8.2]: https://github.com/hecate-social/hecate-daemon/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/hecate-social/hecate-daemon/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/hecate-social/hecate-daemon/compare/v0.7.4...v0.8.0
 [0.7.4]: https://github.com/hecate-social/hecate-daemon/compare/v0.7.3...v0.7.4

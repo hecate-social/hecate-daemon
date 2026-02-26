@@ -34,7 +34,7 @@ start_link() ->
 
 init([]) ->
     SubIds = lists:filtermap(fun(EventType) ->
-        case reckon_evoq_adapter:subscribe(
+        case evoq_subscriptions:subscribe(
             mentorships_store,
             event_type,
             EventType,
@@ -58,40 +58,42 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({event, #evoq_event{data = EventData} = _Event}, State) ->
-    NewState = project_event(EventData, State),
+handle_info({events, Events}, State) ->
+    NewState = lists:foldl(fun(#evoq_event{event_type = Type, data = Data}, Acc) ->
+        project_event(Type, Data, Acc)
+    end, State, Events),
     {noreply, NewState};
 handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(_Reason, #state{subscription_ids = SubIds}) ->
     lists:foreach(fun(SubId) ->
-        reckon_evoq_adapter:unsubscribe(mentorships_store, SubId)
+        evoq_subscriptions:unsubscribe(mentorships_store, SubId)
     end, SubIds).
 
 %% Internal
 
-project_event(#{event_type := <<"learning_submitted_v1">>} = E, State) ->
+project_event(<<"learning_submitted_v1">>, E, State) ->
     safe_project(fun() -> learning_submitted_v1_to_learnings:project(E) end, State);
-project_event(#{event_type := <<"learning_validated_v1">>} = E, State) ->
+project_event(<<"learning_validated_v1">>, E, State) ->
     safe_project(fun() -> learning_validated_v1_to_learnings:project(E) end, State);
-project_event(#{event_type := <<"learning_rejected_v1">>} = E, State) ->
+project_event(<<"learning_rejected_v1">>, E, State) ->
     safe_project(fun() -> learning_rejected_v1_to_learnings:project(E) end, State);
-project_event(#{event_type := <<"learning_endorsed_v1">>} = E, State) ->
+project_event(<<"learning_endorsed_v1">>, E, State) ->
     safe_project(fun() -> learning_endorsed_v1_to_learnings:project(E) end, State);
-project_event(#{event_type := <<"learning_disputed_v1">>} = E, State) ->
+project_event(<<"learning_disputed_v1">>, E, State) ->
     safe_project(fun() -> learning_disputed_v1_to_learnings:project(E) end, State);
-project_event(#{event_type := <<"learning_dispute_resolved_v1">>} = E, State) ->
+project_event(<<"learning_dispute_resolved_v1">>, E, State) ->
     safe_project(fun() -> learning_dispute_resolved_v1_to_learnings:project(E) end, State);
-project_event(#{event_type := <<"mentor_subscribed_v1">>} = E, State) ->
+project_event(<<"mentor_subscribed_v1">>, E, State) ->
     safe_project(fun() -> mentor_subscribed_v1_to_subscriptions:project(E) end, State);
-project_event(#{event_type := <<"mentor_unsubscribed_v1">>} = E, State) ->
+project_event(<<"mentor_unsubscribed_v1">>, E, State) ->
     safe_project(fun() -> mentor_unsubscribed_v1_to_subscriptions:project(E) end, State);
-project_event(#{event_type := <<"expertise_declared_v1">>} = E, State) ->
+project_event(<<"expertise_declared_v1">>, E, State) ->
     safe_project(fun() -> expertise_declared_v1_to_profiles:project(E) end, State);
-project_event(#{event_type := <<"expertise_withdrawn_v1">>} = E, State) ->
+project_event(<<"expertise_withdrawn_v1">>, E, State) ->
     safe_project(fun() -> expertise_withdrawn_v1_to_profiles:project(E) end, State);
-project_event(_Unknown, State) ->
+project_event(_Unknown, _E, State) ->
     State.
 
 safe_project(Fun, #state{event_count = EC, error_count = ErrC} = State) ->
