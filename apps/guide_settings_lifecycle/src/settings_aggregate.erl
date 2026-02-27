@@ -1,7 +1,8 @@
 %%% @doc Aggregate for settings lifecycle.
 %%%
 %%% One singleton per daemon. Stream: settings-{linux_user}@{hostname}.
-%%% Manages: identity, pairing, preferences.
+%%% Manages: identity, preferences.
+%%% Realm memberships are handled by guide_realm_memberships.
 -module(settings_aggregate).
 -behaviour(evoq_aggregate).
 
@@ -16,10 +17,6 @@
 -record(settings_state, {
     linux_user     :: binary() | undefined,
     hostname       :: binary() | undefined,
-    github_user    :: binary() | undefined,
-    realm          :: binary() | undefined,
-    paired         :: boolean(),
-    paired_at      :: integer() | undefined,
     preferences    :: map(),
     status         :: non_neg_integer(),
     initiated_at   :: integer() | undefined
@@ -29,7 +26,6 @@
 %% Evoq callbacks
 %% ===================================================================
 
-%% @doc Evoq callback: init/1 receives the aggregate ID (stream ID).
 init(_AggregateId) ->
     {ok, initial_state()}.
 
@@ -37,24 +33,18 @@ initial_state() ->
     #settings_state{
         linux_user = undefined,
         hostname = undefined,
-        github_user = undefined,
-        realm = undefined,
-        paired = false,
-        paired_at = undefined,
         preferences = #{},
         status = 0,
         initiated_at = undefined
     }.
 
-%% @doc Deterministic stream ID for this daemon's settings.
 -spec stream_id() -> binary().
 stream_id() ->
     User = shared_host:user(),
     Host = shared_host:hostname(),
     <<"settings-", User/binary, "@", Host/binary>>.
 
-%% @doc Execute command - routes to the correct handler.
-%% State comes FIRST (evoq convention).
+%% @doc Execute command — State FIRST (evoq convention).
 execute(State, #{command_type := CmdType} = Payload) ->
     do_execute(CmdType, State, Payload);
 execute(_State, _Unknown) ->
@@ -64,7 +54,6 @@ execute(_State, _Unknown) ->
 apply(State, Event) ->
     apply_event(State, Event).
 
-%% @doc Apply event to state.
 apply_event(State, #{<<"event_type">> := EventType} = Event) ->
     do_apply(EventType, State, Event);
 apply_event(State, #{event_type := EventType} = Event) ->
@@ -80,22 +69,6 @@ do_execute(initiate_settings, State, Payload) ->
     case State#settings_state.status band ?SETTINGS_INITIATED of
         0 -> maybe_initiate_settings:handle_from_map(Payload);
         _ -> {error, already_initiated}
-    end;
-
-do_execute(pair_node, State, Payload) ->
-    case State#settings_state.status band ?SETTINGS_INITIATED of
-        0 -> {error, not_initiated};
-        _ ->
-            case State#settings_state.status band ?SETTINGS_PAIRED of
-                0 -> maybe_pair_node:handle_from_map(Payload);
-                _ -> {error, already_paired}
-            end
-    end;
-
-do_execute(unpair_node, State, Payload) ->
-    case State#settings_state.status band ?SETTINGS_PAIRED of
-        0 -> {error, not_paired};
-        _ -> maybe_unpair_node:handle_from_map(Payload)
     end;
 
 do_execute(update_preferences, State, Payload) ->
@@ -119,24 +92,6 @@ do_apply(<<"settings_initiated_v1">>, State, Event) ->
         status = State#settings_state.status bor ?SETTINGS_INITIATED
     };
 
-do_apply(<<"node_paired_v1">>, State, Event) ->
-    State#settings_state{
-        github_user = get_field(<<"github_user">>, github_user, Event),
-        realm = get_field(<<"realm">>, realm, Event),
-        paired = true,
-        paired_at = get_field(<<"paired_at">>, paired_at, Event),
-        status = State#settings_state.status bor ?SETTINGS_PAIRED
-    };
-
-do_apply(<<"node_unpaired_v1">>, State, _Event) ->
-    State#settings_state{
-        github_user = undefined,
-        realm = undefined,
-        paired = false,
-        paired_at = undefined,
-        status = State#settings_state.status band (bnot ?SETTINGS_PAIRED)
-    };
-
 do_apply(<<"preferences_updated_v1">>, State, Event) ->
     NewPrefs = get_field(<<"preferences">>, preferences, Event),
     Merged = case is_map(NewPrefs) of
@@ -145,6 +100,12 @@ do_apply(<<"preferences_updated_v1">>, State, Event) ->
     end,
     State#settings_state{preferences = Merged};
 
+%% Ignore old pairing events from existing event stores (backward read compat)
+do_apply(<<"node_paired_v1">>, State, _Event) ->
+    State;
+do_apply(<<"node_unpaired_v1">>, State, _Event) ->
+    State;
+
 do_apply(_UnknownType, State, _Event) ->
     State.
 
@@ -152,6 +113,5 @@ do_apply(_UnknownType, State, _Event) ->
 %% Internal
 %% ===================================================================
 
-%% @doc Get field from event map, supporting both atom and binary keys.
 get_field(BinKey, AtomKey, Event) ->
     maps:get(BinKey, Event, maps:get(AtomKey, Event, undefined)).

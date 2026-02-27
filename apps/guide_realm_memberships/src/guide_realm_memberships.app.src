@@ -1,0 +1,17 @@
+{application, guide_realm_memberships, [
+    {description, "CMD service for realm membership lifecycle: initiate, confirm, revoke"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_realm_memberships_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        reckon_db,
+        evoq,
+        reckon_evoq
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

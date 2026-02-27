@@ -14,6 +14,7 @@
     geo_check,
     hecate_mesh,
     guide_settings_lifecycle, query_settings,
+    guide_realm_memberships, query_realm_memberships,
     mentor_llms, project_llm_mentorships, query_llm_mentorships,
     serve_llm,
     guide_license_lifecycle, project_licenses, query_licenses,

@@ -11,17 +11,14 @@ init(Req0, State) ->
     end.
 
 handle_get(Req0, _State) ->
-    Sql = "SELECT hecate_user_id, linux_user, hostname, github_user, realm, paired
+    Sql = "SELECT hecate_user_id, linux_user, hostname
            FROM settings WHERE id = 1",
     case project_settings_store:query(Sql) of
-        {ok, [[HecateUserId, LinuxUser, Hostname, GithubUser, Realm, Paired]]} ->
+        {ok, [{HecateUserId, LinuxUser, Hostname}]} ->
             Identity = #{
                 hecate_user_id => HecateUserId,
                 linux_user => LinuxUser,
-                hostname => Hostname,
-                github_user => GithubUser,
-                realm => Realm,
-                paired => Paired =:= 1
+                hostname => Hostname
             },
             hecate_api_utils:json_ok(#{identity => Identity}, Req0);
         {ok, []} ->

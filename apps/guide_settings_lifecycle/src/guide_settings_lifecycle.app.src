@@ -1,5 +1,5 @@
 {application, guide_settings_lifecycle, [
-    {description, "CMD service for settings lifecycle: identity, pairing, api keys, preferences"},
+    {description, "CMD service for settings lifecycle: identity, preferences"},
     {vsn, "0.1.0"},
     {registered, []},
     {mod, {guide_settings_lifecycle_app, []}},

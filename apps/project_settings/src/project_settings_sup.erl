@@ -1,6 +1,6 @@
 %%% @doc Supervisor for project_settings.
 %%%
-%%% Starts store first, then 4 self-subscribing projection workers.
+%%% Starts store first, then self-subscribing projection workers.
 -module(project_settings_sup).
 -behaviour(supervisor).
 
@@ -19,8 +19,6 @@ init([]) ->
 
         %% Projection workers (each subscribes to its own event type)
         worker(settings_initiated_v1_to_settings),
-        worker(node_paired_v1_to_settings),
-        worker(node_unpaired_v1_to_settings),
         worker(preferences_updated_v1_to_settings)
     ],
     {ok, {SupFlags, Children}}.

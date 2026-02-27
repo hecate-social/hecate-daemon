@@ -4,10 +4,10 @@
 %%% Supervision tree:
 %%% ```
 %%% hecate_sup (one_for_one)
-%%% ├── hecate_store      - SQLite persistence
-%%% ├── hecate_identity   - MRI + keypair
-%%% ├── hecate_pairing    - Device pairing flow
-%%% └── hecate_ucan       - UCAN wallet
+%%% ├── hecate_store         - SQLite persistence
+%%% ├── hecate_identity      - MRI + keypair
+%%% ├── hecate_realm_session - Realm join flow
+%%% └── hecate_ucan          - UCAN wallet
 %%% '''
 %%%
 %%% Note: hecate_mesh and hecate_api are now umbrella apps started
@@ -64,10 +64,10 @@ init([]) ->
             type => worker
         },
         
-        %% Device pairing
+        %% Realm join session
         #{
-            id => hecate_pairing,
-            start => {hecate_pairing, start_link, []},
+            id => hecate_realm_session,
+            start => {hecate_realm_session, start_link, []},
             restart => permanent,
             type => worker
         },

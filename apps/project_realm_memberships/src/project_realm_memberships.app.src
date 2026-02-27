@@ -1,0 +1,17 @@
+{application, project_realm_memberships, [
+    {description, "PRJ service for realm memberships: SQLite store + projections"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {project_realm_memberships_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        esqlite,
+        reckon_evoq,
+        guide_realm_memberships
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

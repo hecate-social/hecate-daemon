@@ -89,11 +89,12 @@ start_evoq() ->
 %% @private Start domain event stores (one per bounded context).
 start_event_stores() ->
     Stores = [
-        {settings_store,    "settings",    "Settings (identity, pairing, preferences)"},
-        {llm_store,         "llm",         "LLM (detection, status reporting)"},
-        {mentorships_store, "mentorships", "Mentorships (expertise, learning)"},
-        {licenses_store,    "licenses",    "Licenses (appstore lifecycle)"},
-        {plugins_store,     "plugins",     "Plugins (install/upgrade/remove)"}
+        {settings_store,            "settings",            "Settings (identity, preferences)"},
+        {realm_memberships_store,   "realm_memberships",   "Realm Memberships (join, confirm, revoke)"},
+        {llm_store,                 "llm",                 "LLM (detection, status reporting)"},
+        {mentorships_store,         "mentorships",         "Mentorships (expertise, learning)"},
+        {licenses_store,            "licenses",            "Licenses (appstore lifecycle)"},
+        {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"}
     ],
     start_stores(Stores).
 

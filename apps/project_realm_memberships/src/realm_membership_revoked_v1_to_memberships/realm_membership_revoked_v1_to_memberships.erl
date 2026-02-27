@@ -1,5 +1,5 @@
-%%% @doc Projection: settings_initiated_v1 -> settings table
--module(settings_initiated_v1_to_settings).
+%%% @doc Projection: realm_membership_revoked_v1 -> realm_memberships table
+-module(realm_membership_revoked_v1_to_memberships).
 -behaviour(gen_server).
 
 -export([start_link/0]).
@@ -16,8 +16,8 @@ start_link() ->
 
 init([]) ->
     {ok, SubId} = evoq_subscriptions:subscribe(
-        settings_store, event_type, <<"settings_initiated_v1">>,
-        <<"prj_settings_initiated">>, #{start_from => 0, subscriber_pid => self()}
+        realm_memberships_store, event_type, <<"realm_membership_revoked_v1">>,
+        <<"prj_rm_revoked">>, #{start_from => 0, subscriber_pid => self()}
     ),
     {ok, #state{subscription_id = SubId}}.
 
@@ -38,16 +38,15 @@ handle_info(_Info, State) ->
 terminate(_Reason, #state{subscription_id = SubId}) ->
     case SubId of
         undefined -> ok;
-        _ -> evoq_subscriptions:unsubscribe(settings_store, SubId)
+        _ -> evoq_subscriptions:unsubscribe(realm_memberships_store, SubId)
     end.
 
 %% Internal
 
 project(Data) ->
-    LinuxUser = maps:get(<<"linux_user">>, Data, maps:get(linux_user, Data, <<>>)),
-    Hostname = maps:get(<<"hostname">>, Data, maps:get(hostname, Data, <<>>)),
-    InitiatedAt = maps:get(<<"initiated_at">>, Data, maps:get(initiated_at, Data, 0)),
-    HecateUserId = <<LinuxUser/binary, "@", Hostname/binary>>,
-    Sql = "INSERT OR REPLACE INTO settings (id, linux_user, hostname, hecate_user_id, preferences, status, initiated_at)
-           VALUES (1, ?1, ?2, ?3, '{}', 1, ?4)",
-    project_settings_store:execute(Sql, [LinuxUser, Hostname, HecateUserId, InitiatedAt]).
+    MembershipId = maps:get(<<"membership_id">>, Data, maps:get(membership_id, Data, <<>>)),
+    RevokedAt = maps:get(<<"revoked_at">>, Data, maps:get(revoked_at, Data, 0)),
+    Sql = "UPDATE realm_memberships SET
+           status = 'revoked', revoked_at = ?1
+           WHERE membership_id = ?2",
+    project_realm_memberships_store:execute(Sql, [RevokedAt, MembershipId]).

@@ -27,40 +27,6 @@ initiate_empty_hostname_test() ->
                  maybe_initiate_settings:handle_from_map(Payload)).
 
 %% ===================================================================
-%% maybe_pair_node tests
-%% ===================================================================
-
-pair_valid_test() ->
-    Payload = #{github_user => <<"octocat">>, realm => <<"io.macula">>,
-                paired_at => 2000},
-    {ok, [Event]} = maybe_pair_node:handle_from_map(Payload),
-    ?assertEqual(<<"node_paired_v1">>, maps:get(event_type, Event)),
-    ?assertEqual(<<"octocat">>, maps:get(github_user, Event)).
-
-pair_empty_github_user_test() ->
-    Payload = #{github_user => <<>>, realm => <<"io.macula">>,
-                paired_at => 2000},
-    ?assertEqual({error, github_user_required},
-                 maybe_pair_node:handle_from_map(Payload)).
-
-%% ===================================================================
-%% maybe_unpair_node tests
-%% ===================================================================
-
-unpair_valid_test() ->
-    Payload = #{reason => <<"manual">>, unpaired_at => 3000},
-    {ok, [Event]} = maybe_unpair_node:handle_from_map(Payload),
-    ?assertEqual(<<"node_unpaired_v1">>, maps:get(event_type, Event)),
-    ?assertEqual(<<"manual">>, maps:get(reason, Event)).
-
-unpair_defaults_test() ->
-    %% Should use defaults for reason and unpaired_at
-    Payload = #{},
-    {ok, [Event]} = maybe_unpair_node:handle_from_map(Payload),
-    ?assertEqual(<<"node_unpaired_v1">>, maps:get(event_type, Event)),
-    ?assertEqual(<<"manual">>, maps:get(reason, Event)).
-
-%% ===================================================================
 %% maybe_update_preferences tests
 %% ===================================================================
 

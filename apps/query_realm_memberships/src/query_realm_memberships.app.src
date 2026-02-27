@@ -1,0 +1,15 @@
+{application, query_realm_memberships, [
+    {description, "QRY service for realm memberships: list and leave endpoints"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_realm_memberships_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        project_realm_memberships
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.
