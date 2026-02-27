@@ -125,8 +125,8 @@ rejects_non_get() ->
 includes_realm_memberships() ->
     mock_settings_row(<<"rl">>, <<"host00">>, <<"usr-1">>, <<"{}">>, 0, 1000),
     meck:expect(project_realm_memberships_store, query, fun(_Sql) ->
-        {ok, [{<<"mem-1">>, <<"io.macula">>, <<"https://macula.io">>,
-               <<"octocat">>, <<"github">>, 2000}]}
+        {ok, [[<<"mem-1">>, <<"io.macula">>, <<"https://macula.io">>,
+               <<"octocat">>, <<"github">>, 2000]]}
     end),
 
     {ok, _Req, _State} = get_settings_api:init(#{}, []),
@@ -148,5 +148,5 @@ includes_realm_memberships() ->
 
 mock_settings_row(LinuxUser, Hostname, HecateUserId, PrefsJson, Status, InitiatedAt) ->
     meck:expect(project_settings_store, query, fun(_Sql) ->
-        {ok, [{LinuxUser, Hostname, HecateUserId, PrefsJson, Status, InitiatedAt}]}
+        {ok, [[LinuxUser, Hostname, HecateUserId, PrefsJson, Status, InitiatedAt]]}
     end).

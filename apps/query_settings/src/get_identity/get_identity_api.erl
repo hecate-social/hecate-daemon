@@ -14,7 +14,7 @@ handle_get(Req0, _State) ->
     Sql = "SELECT hecate_user_id, linux_user, hostname
            FROM settings WHERE id = 1",
     case project_settings_store:query(Sql) of
-        {ok, [{HecateUserId, LinuxUser, Hostname}]} ->
+        {ok, [[HecateUserId, LinuxUser, Hostname]]} ->
             Identity = #{
                 hecate_user_id => HecateUserId,
                 linux_user => LinuxUser,

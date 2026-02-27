@@ -17,8 +17,8 @@ handle_get(Req0, _State) ->
                   preferences, status, initiated_at
            FROM settings WHERE id = 1",
     case project_settings_store:query(Sql) of
-        {ok, [{LinuxUser, Hostname, HecateUserId,
-               PrefsJson, Status, InitiatedAt}]} ->
+        {ok, [[LinuxUser, Hostname, HecateUserId,
+               PrefsJson, Status, InitiatedAt]]} ->
             Prefs = try json:decode(PrefsJson) catch _:_ -> #{} end,
             Identity = #{
                 hecate_user_id => HecateUserId,
@@ -44,7 +44,7 @@ fetch_realms() ->
            FROM realm_memberships WHERE status = 'confirmed' ORDER BY confirmed_at",
     case project_realm_memberships_store:query(Sql) of
         {ok, Rows} ->
-            lists:map(fun({MId, RId, RUrl, Acct, Prov, At}) ->
+            lists:map(fun([MId, RId, RUrl, Acct, Prov, At]) ->
                 #{membership_id => MId, realm_id => RId, realm_url => RUrl,
                   oauth_account => Acct, oauth_provider => Prov, confirmed_at => At}
             end, Rows);
