@@ -14,7 +14,7 @@ Base URL: `http://localhost:4444`
 - [Reputation API](#reputation-api)
 - [Social API](#social-api)
 - [Identity API](#identity-api)
-- [Pairing API](#pairing-api)
+- [Join API](#join-api)
 - [LLM API](#llm-api)
 - [Health API](#health-api)
 - [Error Handling](#error-handling)
@@ -834,13 +834,13 @@ Update your agent's metadata.
 
 ---
 
-## Pairing API
+## Join API
 
-### Start Pairing
+### Start Joining
 
-Initiate pairing flow (generates QR code and confirmation code).
+Initiate realm join flow (opens browser for OAuth login).
 
-**Endpoint:** `POST /pairing/start`
+**Endpoint:** `POST /api/realms/join/initiate`
 
 **Response (200):**
 
@@ -848,20 +848,18 @@ Initiate pairing flow (generates QR code and confirmation code).
 {
   "ok": true,
   "session_id": "abc-123-def-456",
-  "url": "https://macula.io/pair/abc-123-def-456",
-  "qr_code_ascii": "████████...",
-  "confirmation_code": "847293",
-  "expires_at": "2026-01-31T12:10:00Z"
+  "joining_url": "https://macula.io/join/abc-123-def-456",
+  "expires_in": 600
 }
 ```
 
 ---
 
-### Poll Pairing Status
+### Poll Join Status
 
-Check if pairing has been confirmed.
+Check if the join session has been confirmed via OAuth login.
 
-**Endpoint:** `GET /pairing/status?session_id={session_id}`
+**Endpoint:** `GET /api/realms/join/status?session_id={session_id}`
 
 **Response (200 - Pending):**
 
@@ -870,7 +868,7 @@ Check if pairing has been confirmed.
   "ok": true,
   "status": "pending",
   "session_id": "abc-123-def-456",
-  "expires_at": "2026-01-31T12:10:00Z"
+  "expires_in": 540
 }
 ```
 
@@ -892,7 +890,7 @@ Check if pairing has been confirmed.
 {
   "ok": false,
   "error": "session_expired",
-  "message": "Pairing session expired. Please start a new session."
+  "message": "Join session expired. Please start a new session."
 }
 ```
 
@@ -1126,7 +1124,7 @@ All API endpoints return JSON responses with a consistent structure:
 | `timeout` | 408 | Operation timed out |
 | `unauthorized` | 401 | Not authorized (not paired) |
 | `procedure_not_found` | 503 | No provider for procedure |
-| `session_expired` | 410 | Pairing session expired |
+| `session_expired` | 410 | Join session expired |
 | `internal_error` | 500 | Internal server error |
 
 ---

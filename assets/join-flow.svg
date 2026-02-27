@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <style>
+      .actor-box { fill: #1e293b; stroke: #3b82f6; stroke-width: 2; }
+      .message-arrow { stroke: #3b82f6; stroke-width: 2; marker-end: url(#arrowhead); }
+      .message-arrow-return { stroke: #22d3ee; stroke-width: 2; marker-end: url(#arrowhead-return); stroke-dasharray: 5,5; }
+      .text-actor { fill: #60a5fa; font-family: 'SF Mono', Monaco, monospace; font-size: 14px; font-weight: bold; }
+      .text-msg { fill: #e2e8f0; font-family: 'SF Mono', Monaco, monospace; font-size: 11px; }
+      .text-note { fill: #94a3b8; font-family: system-ui, sans-serif; font-size: 10px; font-style: italic; }
+      .lifeline { stroke: #475569; stroke-width: 1; stroke-dasharray: 3,3; }
+      .step-num { fill: #a5b4fc; font-size: 12px; font-weight: bold; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#3b82f6" />
+    </marker>
+    <marker id="arrowhead-return" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#22d3ee" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="#0f172a"/>
+
+  <!-- Title -->
+  <text x="400" y="30" text-anchor="middle" fill="#60a5fa" font-size="20" font-weight="bold">Join Flow (OAuth Login)</text>
+
+  <!-- Actors -->
+  <!-- CLI -->
+  <rect x="50" y="60" width="100" height="50" rx="8" class="actor-box"/>
+  <text x="100" y="90" text-anchor="middle" class="text-actor">CLI</text>
+  <line x1="100" y1="110" x2="100" y2="560" class="lifeline"/>
+
+  <!-- Hecate Daemon -->
+  <rect x="220" y="60" width="120" height="50" rx="8" class="actor-box"/>
+  <text x="280" y="90" text-anchor="middle" class="text-actor">Hecate</text>
+  <line x1="280" y1="110" x2="280" y2="560" class="lifeline"/>
+
+  <!-- Realm API -->
+  <rect x="410" y="60" width="120" height="50" rx="8" class="actor-box"/>
+  <text x="470" y="90" text-anchor="middle" class="text-actor">Realm API</text>
+  <line x1="470" y1="110" x2="470" y2="560" class="lifeline"/>
+
+  <!-- User (Phone) -->
+  <rect x="600" y="60" width="120" height="50" rx="8" class="actor-box"/>
+  <text x="660" y="90" text-anchor="middle" class="text-actor">User/Phone</text>
+  <line x1="660" y1="110" x2="660" y2="560" class="lifeline"/>
+
+  <!-- Message 1: Start pairing -->
+  <text x="20" y="145" class="step-num">1</text>
+  <path d="M 100 140 L 280 140" class="message-arrow"/>
+  <text x="190" y="135" text-anchor="middle" class="text-msg">hecate pair</text>
+
+  <!-- Message 2: POST /api/v1/join/sessions -->
+  <text x="20" y="175" class="step-num">2</text>
+  <path d="M 280 170 L 470 170" class="message-arrow"/>
+  <text x="375" y="165" text-anchor="middle" class="text-msg">POST /api/v1/join/sessions</text>
+
+  <!-- Message 3: Return session -->
+  <text x="20" y="205" class="step-num">3</text>
+  <path d="M 470 200 L 280 200" class="message-arrow-return"/>
+  <text x="375" y="195" text-anchor="middle" class="text-msg">200: {session_id, url, code}</text>
+
+  <!-- Message 4: Display QR -->
+  <text x="20" y="235" class="step-num">4</text>
+  <path d="M 280 230 L 100 230" class="message-arrow-return"/>
+  <text x="190" y="225" text-anchor="middle" class="text-msg">display QR + code</text>
+
+  <!-- Note: QR display -->
+  <rect x="50" y="250" width="200" height="80" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1"/>
+  <text x="150" y="270" text-anchor="middle" class="text-note">Terminal shows:</text>
+  <text x="150" y="285" text-anchor="middle" class="text-msg" font-size="10">QR Code: █████ (scan me)</text>
+  <text x="150" y="300" text-anchor="middle" class="text-msg" font-size="10">URL: macula.io/pair/abc-123</text>
+  <text x="150" y="315" text-anchor="middle" class="text-msg" font-size="10">Code: 847293</text>
+
+  <!-- Message 5: User scans QR -->
+  <text x="20" y="360" class="step-num">5</text>
+  <path d="M 100 355 L 660 355" class="message-arrow"/>
+  <text x="380" y="350" text-anchor="middle" class="text-msg">user scans QR (opens URL on phone)</text>
+
+  <!-- Message 6: User enters code -->
+  <text x="20" y="390" class="step-num">6</text>
+  <path d="M 660 385 L 470 385" class="message-arrow"/>
+  <text x="565" y="380" text-anchor="middle" class="text-msg">OAuth login auto-confirms</text>
+  <text x="565" y="400" text-anchor="middle" class="text-note">{session_id, code: "847293"}</text>
+
+  <!-- Message 7: Realm validates -->
+  <rect x="410" y="415" width="120" height="40" rx="4" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+  <text x="470" y="435" text-anchor="middle" class="text-msg" font-size="10">validate code</text>
+  <text x="470" y="448" text-anchor="middle" class="text-msg" font-size="10">issue certificate</text>
+
+  <!-- Message 8: Return success to phone -->
+  <text x="20" y="480" class="step-num">7</text>
+  <path d="M 470 475 L 660 475" class="message-arrow-return"/>
+  <text x="565" y="470" text-anchor="middle" class="text-msg">200: success</text>
+
+  <!-- Message 9: Hecate polls status -->
+  <text x="20" y="510" class="step-num">8</text>
+  <path d="M 280 505 L 470 505" class="message-arrow"/>
+  <text x="375" y="500" text-anchor="middle" class="text-msg">GET /api/v1/join/sessions/:id (polling)</text>
+
+  <!-- Message 10: Return cert -->
+  <text x="20" y="540" class="step-num">9</text>
+  <path d="M 470 535 L 280 535" class="message-arrow-return"/>
+  <text x="375" y="530" text-anchor="middle" class="text-msg">200: {cert, realm}</text>
+
+  <!-- Message 11: Store cert -->
+  <rect x="220" y="550" width="120" height="30" rx="4" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+  <text x="280" y="570" text-anchor="middle" class="text-msg" font-size="10">store cert locally</text>
+
+  <!-- Final message to CLI -->
+  <path d="M 280 580 L 100 580" class="message-arrow-return"/>
+  <text x="190" y="575" text-anchor="middle" class="text-msg" fill="#10b981">✓ Paired with io.macula.alice!</text>
+</svg>

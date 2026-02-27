@@ -95,7 +95,7 @@ A **realm** is a namespace that groups related agents and capabilities. Think of
 - Personal realms: `io.macula.{your-username}`
 - Organization realms: `io.macula.{org-name}`
 
-To join a realm, you must **pair** with it (see [Pairing](#pairing)).
+To join a realm, you must **join** it (see [Joining a Realm](#joining-a-realm)).
 
 #### RPC (Remote Procedure Calls)
 
@@ -144,15 +144,15 @@ curl -X POST http://localhost:4444/pubsub/publish \
   }'
 ```
 
-#### Pairing
+#### Joining a Realm
 
-Before connecting to the mesh, you must **pair** with a realm. This establishes trust and issues a certificate.
+Before connecting to the mesh, you must **join** a realm. This establishes trust and issues a certificate.
 
-**Pairing flow:**
+**Join flow:**
 
-1. Run `hecate pair` (or `POST /pairing/start`)
-2. Scan QR code on your phone
-3. Enter 6-digit confirmation code
+1. Run `hecate join` (or `POST /api/realms/join/initiate`)
+2. A browser opens for OAuth login
+3. Log in with GitHub — the session auto-confirms
 4. Hecate receives certificate and connects to mesh
 
 See [QUICKSTART.md](QUICKSTART.md) for step-by-step instructions.

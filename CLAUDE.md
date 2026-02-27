@@ -131,7 +131,7 @@ Each domain follows strict CQRS separation:
 
 | Store | Domain | Apps |
 |-------|--------|------|
-| `settings_store` | Identity, pairing, preferences | guide_settings_lifecycle, project_settings |
+| `settings_store` | Identity, realm joining, preferences | guide_settings_lifecycle, project_settings |
 | `llm_store` | LLM detection and status | serve_llm |
 | `mentorships_store` | Expertise and learning | mentor_llms, project_llm_mentorships |
 | `licenses_store` | Appstore license lifecycle | guide_license_lifecycle, project_licenses |

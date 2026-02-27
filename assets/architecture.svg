@@ -63,12 +63,12 @@
 
   <text x="480" y="118" text-anchor="middle" class="code">hecate_store</text>
   <text x="560" y="118" text-anchor="middle" class="code">hecate_identity</text>
-  <text x="650" y="118" text-anchor="middle" class="code">hecate_pairing</text>
+  <text x="650" y="118" text-anchor="middle" class="code">hecate_realm_session</text>
   <text x="730" y="118" text-anchor="middle" class="code">hecate_ucan</text>
 
   <text x="480" y="135" text-anchor="middle" class="small">SQLite</text>
   <text x="560" y="135" text-anchor="middle" class="small">MRI+Keys</text>
-  <text x="650" y="135" text-anchor="middle" class="small">QR Flow</text>
+  <text x="650" y="135" text-anchor="middle" class="small">OAuth Join</text>
   <text x="730" y="135" text-anchor="middle" class="small">Tokens</text>
 
   <!-- Mesh Layer -->

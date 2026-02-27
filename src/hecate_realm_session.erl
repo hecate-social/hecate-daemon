@@ -3,11 +3,11 @@
 %%%
 %%% Handles the OAuth-based realm join flow:
 %%% 1. Generate join session (local + remote)
-%%% 2. Display confirmation code
-%%% 3. Poll for confirmation
+%%% 2. Open browser for OAuth login
+%%% 3. Poll for confirmation (auto-confirmed on OAuth login)
 %%% 4. Receive credentials on success
 %%%
-%%% Replaces hecate_pairing — supports multiple realms and OAuth providers.
+%%% Supports multiple realms and OAuth providers.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_realm_session).
@@ -36,7 +36,6 @@
 -record(state, {
     status :: idle | joining | joined | failed,
     session_id :: binary() | undefined,
-    confirm_code :: binary() | undefined,
     joining_url :: binary() | undefined,
     expires_at :: integer() | undefined,
     realm_url :: binary() | undefined,
@@ -82,7 +81,6 @@ handle_call({start_joining, Opts}, _From, _State) ->
             NewState = #state{
                 status = joining,
                 session_id = maps:get(session_id, SessionData),
-                confirm_code = maps:get(confirm_code, SessionData),
                 joining_url = maps:get(joining_url, SessionData),
                 expires_at = erlang:system_time(second) + ?SESSION_TTL,
                 realm_url = RealmUrl,
@@ -166,7 +164,7 @@ do_start_joining(RealmUrl) ->
 
 -spec create_join_session(binary(), binary()) -> {ok, map()} | {error, term()}.
 create_join_session(RealmUrl, PubKeyB64) ->
-    Url = <<RealmUrl/binary, "/api/v1/pairing/sessions">>,
+    Url = <<RealmUrl/binary, "/api/v1/join/sessions">>,
 
     {ok, MRI} = hecate_identity:get_mri(),
 
@@ -182,12 +180,9 @@ create_join_session(RealmUrl, PubKeyB64) ->
         {ok, 201, _RespHeaders, RespBody} ->
             Data = json:decode(RespBody),
             SessionId = maps:get(<<"session_id">>, Data),
-            ConfirmCode = maps:get(<<"confirm_code">>, Data),
             {ok, #{
                 session_id => SessionId,
-                confirm_code => ConfirmCode,
-                joining_url => <<RealmUrl/binary, "/pair/", SessionId/binary,
-                                  "?code=", ConfirmCode/binary>>
+                joining_url => <<RealmUrl/binary, "/join/", SessionId/binary>>
             }};
         {ok, Status, _RespHeaders, RespBody} ->
             logger:error("Failed to create join session: ~p ~s", [Status, RespBody]),
@@ -199,7 +194,7 @@ create_join_session(RealmUrl, PubKeyB64) ->
 
 -spec poll_session(binary(), binary()) -> {ok, map()} | {error, term()}.
 poll_session(RealmUrl, SessionId) ->
-    Url = <<RealmUrl/binary, "/api/v1/pairing/sessions/", SessionId/binary>>,
+    Url = <<RealmUrl/binary, "/api/v1/join/sessions/", SessionId/binary>>,
 
     case hackney:request(get, Url, [], <<>>, [with_body]) of
         {ok, 200, _RespHeaders, RespBody} ->
@@ -317,7 +312,6 @@ state_to_map(#state{} = S) ->
     Map = #{
         status => S#state.status,
         session_id => S#state.session_id,
-        confirm_code => S#state.confirm_code,
         joining_url => S#state.joining_url
     },
     case S#state.expires_at of

@@ -3,7 +3,7 @@
 %%%
 %%% Usage:
 %%%   hecate init              Initialize identity
-%%%   hecate pair              Pair with Realm (QR code flow)
+%%%   hecate join              Join a Realm (OAuth flow)
 %%%   hecate status            Show current status
 %%%   hecate start             Start the daemon
 %%%   hecate stop              Stop the daemon
@@ -66,8 +66,8 @@ parse_args(["-h" | _]) ->
     {ok, {help, []}};
 parse_args(["init" | Rest]) ->
     {ok, {init, Rest}};
-parse_args(["pair" | Rest]) ->
-    {ok, {pair, Rest}};
+parse_args(["join" | Rest]) ->
+    {ok, {join, Rest}};
 parse_args(["status" | Rest]) ->
     {ok, {status, Rest}};
 parse_args(["start" | Rest]) ->
@@ -85,8 +85,8 @@ run_command(version, _) ->
     show_version();
 run_command(init, _Opts) ->
     cmd_init();
-run_command(pair, _Opts) ->
-    cmd_pair();
+run_command(join, _Opts) ->
+    cmd_join();
 run_command(status, Opts) ->
     cmd_status(lists:member("-w", Opts) orelse lists:member("--watch", Opts));
 run_command(start, _Opts) ->
@@ -113,7 +113,7 @@ cmd_init() ->
             print_kv("MRI", binary_to_list(MRI)),
             print_kv("Public Key", truncate_key(PubKey)),
             io:format("~n"),
-            print_info("Run 'hecate pair' to link with your Realm account");
+            print_info("Run 'hecate join' to link with your Realm account");
         {error, already_initialized} ->
             print_warning("Identity already exists"),
             {ok, MRI} = hecate_identity:get_mri(),
@@ -123,22 +123,21 @@ cmd_init() ->
             halt(1)
     end.
 
-cmd_pair() ->
-    print_header("Pairing with Realm"),
-    
+cmd_join() ->
+    print_header("Joining Realm"),
+
     ensure_started(),
-    
-    case hecate_pairing:start_pairing() of
-        {ok, #{session_id := _SessionId, 
-               confirm_code := Code, 
-               pairing_url := Url} = Data} ->
-            show_pairing_screen(Url, Code, Data);
+
+    case hecate_realm_session:start_joining(#{}) of
+        {ok, #{session_id := _SessionId,
+               joining_url := Url} = Data} ->
+            show_join_screen(Url, Data);
         {error, identity_not_initialized} ->
             print_error("Identity not initialized"),
             print_info("Run 'hecate init' first"),
             halt(1);
         {error, Reason} ->
-            print_error(io_lib:format("Failed to start pairing: ~p", [Reason])),
+            print_error(io_lib:format("Failed to start joining: ~p", [Reason])),
             halt(1)
     end.
 
@@ -161,34 +160,34 @@ cmd_stop() ->
     print_info("Use: _build/default/rel/hecate/bin/hecate stop").
 
 %%%===================================================================
-%%% Pairing Screen
+%%% Join Screen
 %%%===================================================================
 
-show_pairing_screen(Url, Code, _Data) ->
+show_join_screen(Url, _Data) ->
     %% Clear screen and hide cursor
     io:format("\e[2J\e[H\e[?25l"),
-    
+
     %% Generate QR code
     QrLines = generate_qr(Url),
-    
-    %% Print pairing box
-    print_pairing_box(QrLines, Url, Code),
-    
+
+    %% Print join box
+    print_join_box(QrLines, Url),
+
     %% Start polling loop
-    poll_pairing_status(Code),
-    
+    poll_join_status(),
+
     %% Show cursor again
     io:format("\e[?25h").
 
-print_pairing_box(QrLines, Url, Code) ->
+print_join_box(QrLines, Url) ->
     Width = 64,
-    
+
     %% Header
     io:format("~n"),
     print_box_line(top, Width),
-    print_box_content(Width, ?BOLD ++ ?CYAN ++ ?ICON_KEY ++ " Hecate Pairing" ++ ?RESET),
+    print_box_content(Width, ?BOLD ++ ?CYAN ++ ?ICON_KEY ++ " Join Realm" ++ ?RESET),
     print_box_separator(Width),
-    
+
     %% QR Code
     print_box_content(Width, ?DIM ++ "Scan with your phone:" ++ ?RESET),
     io:format("~s~n", [?VERTICAL]),
@@ -197,86 +196,72 @@ print_pairing_box(QrLines, Url, Code) ->
         io:format("~s ~s ~s~n", [?VERTICAL, Padded, ?VERTICAL])
     end, QrLines),
     io:format("~s~n", [?VERTICAL]),
-    
+
     %% URL
     print_box_content(Width, ?DIM ++ "Or visit:" ++ ?RESET),
     print_box_content(Width, ?CYAN ++ binary_to_list(Url) ++ ?RESET),
     io:format("~s~n", [?VERTICAL]),
-    
-    %% Confirmation code
-    print_box_separator(Width),
-    print_box_content(Width, "Enter this code:"),
-    io:format("~s~n", [?VERTICAL]),
-    print_box_content(Width, ?BOLD ++ ?YELLOW ++ "  " ++ format_code(Code) ++ "  " ++ ?RESET),
-    io:format("~s~n", [?VERTICAL]),
-    
+
     %% Footer
     print_box_separator(Width),
-    print_box_content(Width, ?DIM ++ ?ICON_WAIT ++ " Waiting for confirmation..." ++ ?RESET),
+    print_box_content(Width, ?DIM ++ ?ICON_WAIT ++ " Log in via the browser to join..." ++ ?RESET),
     print_box_line(bottom, Width),
     io:format("~n").
 
-format_code(Code) when is_binary(Code) ->
-    format_code(binary_to_list(Code));
-format_code([A,B,C,D,E,F]) ->
-    [A, $\s, B, $\s, C, $\s, $\s, D, $\s, E, $\s, F];
-format_code(Code) ->
-    Code.
-
-poll_pairing_status(Code) ->
+poll_join_status() ->
     timer:sleep(1000),
-    Status = hecate_pairing:get_status(),
+    Status = hecate_realm_session:get_status(),
     case maps:get(status, Status, idle) of
-        paired ->
-            show_pairing_success();
+        joined ->
+            show_join_success();
         failed ->
             Error = maps:get(error, Status, unknown),
-            show_pairing_failed(Error);
-        pairing ->
+            show_join_failed(Error);
+        joining ->
             %% Update countdown
             ExpiresIn = maps:get(expires_in, Status, 0),
-            update_countdown(ExpiresIn, Code),
-            poll_pairing_status(Code);
+            update_countdown(ExpiresIn),
+            poll_join_status();
         _ ->
-            show_pairing_failed(cancelled)
+            show_join_failed(cancelled)
     end.
 
-update_countdown(Seconds, _Code) ->
+update_countdown(Seconds) ->
     %% Move cursor to countdown line and update
     Mins = Seconds div 60,
     Secs = Seconds rem 60,
     TimeStr = io_lib:format("~2..0B:~2..0B", [Mins, Secs]),
-    
+
     %% Move up and update the waiting line
     io:format("\e[3A\r"),
-    io:format("~s ~s Waiting for confirmation... (~s remaining)     ~s~n", 
+    io:format("~s ~s Log in via the browser to join... (~s remaining)     ~s~n",
               [?VERTICAL, ?DIM ++ ?ICON_WAIT, TimeStr, ?RESET]),
     io:format("\e[2B").
 
-show_pairing_success() ->
+show_join_success() ->
     io:format("\e[2J\e[H"),
-    print_header(?GREEN ++ ?ICON_CHECK ++ " Paired Successfully!" ++ ?RESET),
+    print_header(?GREEN ++ ?ICON_CHECK ++ " Joined Realm!" ++ ?RESET),
     io:format("~n"),
-    
+
     %% Get the new identity info
     case hecate_store:get(<<"auth">>, <<"org_identity">>) of
         {ok, OrgId} ->
             print_kv("Organization", binary_to_list(OrgId));
         _ -> ok
     end,
-    
+
     io:format("~n"),
     print_success("Your agent is now connected to the Macula mesh"),
     print_info("Run 'hecate status' to see connection details"),
     io:format("~n").
 
--spec show_pairing_failed(term()) -> no_return().
-show_pairing_failed(Reason) ->
+-spec show_join_failed(term()) -> no_return().
+show_join_failed(Reason) ->
     io:format("\e[2J\e[H"),
-    print_header(?RED ++ ?ICON_CROSS ++ " Pairing Failed" ++ ?RESET),
+    print_header(?RED ++ ?ICON_CROSS ++ " Join Failed" ++ ?RESET),
     io:format("~n"),
     print_error(io_lib:format("Reason: ~p", [Reason])),
-    print_info("Run 'hecate pair' to try again"),
+    print_info("Run 'hecate join' to try again"),
     io:format("~n"),
     halt(1).
 
@@ -308,20 +293,19 @@ show_status_once() ->
     case hecate_store:get(<<"auth">>, <<"org_identity">>) of
         {ok, OrgId} ->
             print_kv("Organization", binary_to_list(OrgId)),
-            print_kv("Status", ?GREEN ++ ?ICON_CHECK ++ " Paired" ++ ?RESET);
+            print_kv("Status", ?GREEN ++ ?ICON_CHECK ++ " Joined" ++ ?RESET);
         _ ->
-            print_kv("Status", ?YELLOW ++ ?ICON_WAIT ++ " Not paired" ++ ?RESET)
+            print_kv("Status", ?YELLOW ++ ?ICON_WAIT ++ " Not joined" ++ ?RESET)
     end,
-    
+
     io:format("~n"),
-    
-    %% Pairing status
-    PairingStatus = hecate_pairing:get_status(),
-    case maps:get(status, PairingStatus, idle) of
-        pairing ->
-            print_section("Pairing"),
-            print_kv("Status", ?CYAN ++ "In progress" ++ ?RESET),
-            print_kv("Code", binary_to_list(maps:get(confirm_code, PairingStatus, <<"?">>)));
+
+    %% Join status
+    JoinStatus = hecate_realm_session:get_status(),
+    case maps:get(status, JoinStatus, idle) of
+        joining ->
+            print_section("Joining"),
+            print_kv("Status", ?CYAN ++ "In progress — log in via browser" ++ ?RESET);
         _ -> ok
     end,
     
@@ -478,7 +462,7 @@ show_usage() ->
     io:format("    hecate <command> [options]~n~n"),
     io:format("~sCOMMANDS:~s~n", [?BOLD, ?RESET]),
     io:format("    ~sinit~s       Initialize agent identity~n", [?CYAN, ?RESET]),
-    io:format("    ~spair~s       Pair with Realm (QR code flow)~n", [?CYAN, ?RESET]),
+    io:format("    ~sjoin~s       Join a Realm (OAuth flow)~n", [?CYAN, ?RESET]),
     io:format("    ~sstatus~s     Show current status (-w for watch mode)~n", [?CYAN, ?RESET]),
     io:format("    ~sstart~s      Start the daemon~n", [?CYAN, ?RESET]),
     io:format("    ~sstop~s       Stop the daemon~n", [?CYAN, ?RESET]),

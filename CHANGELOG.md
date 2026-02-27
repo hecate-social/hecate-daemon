@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Renamed pairing to joining** — all "pairing" terminology replaced with "joining
+  a realm". `hecate pair` CLI command is now `hecate join`. Confirm code removed —
+  OAuth login is sufficient proof of intent since the browser opens from the same
+  device. API endpoints changed from `/api/v1/pairing/sessions` to
+  `/api/v1/join/sessions`. `hecate_realm_session` state no longer carries
+  `confirm_code`.
+
 ### Ideas
 - **Settings history widget** — expose the settings event stream as a timeline
   on the settings page. A way to visualize our event-sourced nature: every
-  initiation, pairing, unpairing, and preference change shown chronologically.
+  initiation, realm joining, and preference change shown chronologically.
   Needs a new query desk (e.g. `get_settings_history/`) that reads from the
   settings ReckonDB stream and returns the event log.
 

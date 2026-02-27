@@ -60,8 +60,8 @@
   <line x1="400" y1="250" x2="430" y2="250" class="arrow" />
 
   <rect x="430" y="225" width="160" height="50" class="core-box" />
-  <text x="510" y="245" text-anchor="middle" class="component">hecate_pairing</text>
-  <text x="510" y="260" text-anchor="middle" class="detail">Device pairing state</text>
+  <text x="510" y="245" text-anchor="middle" class="component">hecate_realm_session</text>
+  <text x="510" y="260" text-anchor="middle" class="detail">Realm join session</text>
 
   <line x1="590" y1="250" x2="620" y2="250" class="arrow" />
 
@@ -149,7 +149,7 @@
   <text x="360" y="765" text-anchor="middle" class="detail">Cowboy on :4444</text>
 
   <text x="480" y="750" class="detail">REST API endpoints:</text>
-  <text x="480" y="765" class="detail">/identity /pairing /llm /health</text>
+  <text x="480" y="765" class="detail">/identity /realms/join /llm /health</text>
 
   <text x="50" y="805" class="detail">API starts last. All dependencies are running. System is ready.</text>
 
@@ -160,8 +160,8 @@
   <text x="50" y="870" class="component" font-weight="bold">1. Identity Init (if not already initialized):</text>
   <text x="70" y="888" class="detail">POST /identity/init -> Generate Ed25519 keypair -> Build MRI -> Store in SQLite</text>
 
-  <text x="50" y="912" class="component" font-weight="bold">2. Device Pairing (pairs with realm via TUI):</text>
-  <text x="70" y="930" class="detail">POST /pairing/start -> Create session on realm -> Display QR/code -> Poll for confirm</text>
+  <text x="50" y="912" class="component" font-weight="bold">2. Join Realm (joins realm via OAuth):</text>
+  <text x="70" y="930" class="detail">hecate join -> Create session on realm -> Open browser for OAuth -> Poll for confirm</text>
   <text x="70" y="945" class="detail">On confirm: Store refresh_token + org_identity + cert_pem</text>
 
   <text x="50" y="970" class="component" font-weight="bold">3. Capability Announcement (automatic on LLM detection):</text>

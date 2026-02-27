@@ -45,7 +45,7 @@ The top-level supervisor starts four permanent workers in order:
 hecate_sup (one_for_one, intensity=10, period=60)
 ├── hecate_store      SQLite at ~/.hecate/hecate.db
 ├── hecate_identity   MRI + Ed25519 keypair
-├── hecate_pairing    Device pairing state machine
+├── hecate_realm_session  Realm join session state machine
 └── hecate_ucan       UCAN capability wallet
 ```
 
@@ -55,7 +55,7 @@ hecate_sup (one_for_one, intensity=10, period=60)
 - If found: MRI, realm, and keypair loaded into memory
 - If not found: state stays uninitialized (user must call `POST /identity/init`)
 
-**hecate_pairing** starts in `idle` state, waiting for a pairing request.
+**hecate_realm_session** starts in `idle` state, waiting for a join request.
 
 **hecate_ucan** starts the UCAN capability wallet for authorization tokens.
 
@@ -184,23 +184,23 @@ The name is auto-generated as `hecate-{4 hex chars}` if not provided.
 
 **Source:** `src/hecate_identity.erl:123-160`
 
-### 2. Device Pairing
+### 2. Join Realm
 
-Pairs the daemon with a realm (e.g., macula.io) through a QR code flow:
+Joins the daemon with a realm (e.g., macula.io) through an OAuth login flow:
 
 ```bash
-curl -X POST http://localhost:4444/pairing/start
+hecate join
 ```
 
 Flow:
-1. Daemon sends public key + agent MRI to realm API (`POST /api/v1/pairing/sessions`)
-2. Realm returns `session_id` and `confirm_code`
-3. TUI displays QR code or confirmation code
-4. User confirms on realm web UI
+1. Daemon sends public key + agent MRI to realm API (`POST /api/v1/join/sessions`)
+2. Realm returns `session_id` and `join_url`
+3. Browser opens the join URL for OAuth login
+4. User logs in with GitHub — session auto-confirms on OAuth completion
 5. Daemon polls every 2 seconds until confirmed (10 minute TTL)
 6. On confirmation: stores `refresh_token`, `org_identity`, and `cert_pem`
 
-**Source:** `src/hecate_pairing.erl`
+**Source:** `src/hecate_realm_session.erl`
 
 ### 3. Capability Announcement (Automatic)
 

@@ -43,36 +43,34 @@ curl localhost:4444/health
 
 ---
 
-## Step 3: Pair with Realm (1 minute)
+## Step 3: Join a Realm (1 minute)
 
 ```bash
-curl -X POST localhost:4444/pairing/start
+hecate join
 ```
 
-You'll see:
+A browser window opens. You'll see in the terminal:
 ```
-╔══════════════════════════════════════════════════════════════╗
-║  🗝️  Hecate Pairing                                          ║
-╠══════════════════════════════════════════════════════════════╣
-║                                                              ║
-║  Scan this QR code or visit:                                 ║
-║  https://macula.io/pair/abc-123-def-456                      ║
-║                                                              ║
-║  Confirmation code:  847293                                  ║
-║                                                              ║
-║  Waiting for confirmation...                                 ║
-╚══════════════════════════════════════════════════════════════╝
+╭────────────────────────────────────────────────────────────────╮
+│              🗝️  Join Realm                                     │
+│────────────────────────────────────────────────────────────────│
+│            Scan with your phone:                               │
+│                                                                │
+│            Or visit:                                           │
+│   https://macula.io/join/abc-123-def-456                       │
+│                                                                │
+│────────────────────────────────────────────────────────────────│
+│   ◌ Log in via the browser to join...                          │
+╰────────────────────────────────────────────────────────────────╯
 ```
 
-**To complete pairing:**
-1. Open the URL on your phone or browser
-2. Sign in with GitHub
-3. Enter the 6-digit code
-4. Click "Confirm Pairing"
+**To complete joining:**
+1. Log in with GitHub in the browser window that opened
+2. The session auto-confirms on login
 
 After a few seconds:
 ```
-✓ Paired with io.macula.alice!
+✓ Joined Realm!
 ✓ Certificate issued
 ✓ Connected to mesh
 ```
@@ -221,12 +219,12 @@ curl -X POST localhost:4444/rpc/call \
 
 ## Troubleshooting
 
-**Pairing timed out?**
+**Join timed out?**
 - Sessions expire after 10 minutes
-- Restart: `curl -X POST localhost:4444/pairing/start`
+- Restart: `hecate join`
 
 **Capability not discoverable?**
-- Check pairing status: `curl localhost:4444/pairing/status`
+- Check status: `hecate status`
 - Ensure daemon is running: `hecate status`
 - Check mesh connectivity: `curl localhost:4444/mesh/status`
 
