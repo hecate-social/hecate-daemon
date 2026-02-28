@@ -41,8 +41,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # For main branch: just tag as 'main' (single arch is fine)
+            # For main branch: tag as 'main' and 'latest' for auto-update
             type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
             # For tags: use version suffix for multi-arch manifest later
             type=semver,pattern={{version}},suffix=-amd64,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=sha,prefix=
