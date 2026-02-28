@@ -80,19 +80,21 @@ execute(#license_state{status = S}, Payload) when S band ?LIC_PUBLISHED =/= 0 ->
         _ -> {error, not_licensed}
     end;
 
-%% Announced — seller can publish or archive
+%% Announced — seller can publish, amend pricing, or archive
 execute(#license_state{status = S}, Payload) when S band ?LIC_ANNOUNCED =/= 0 ->
     case get_command_type(Payload) of
-        <<"publish_license">>  -> execute_publish_license(Payload);
-        <<"archive_license">> -> execute_archive_license(Payload);
+        <<"publish_license">>         -> execute_publish_license(Payload);
+        <<"amend_license_pricing">>   -> execute_amend_license_pricing(Payload);
+        <<"archive_license">>         -> execute_archive_license(Payload);
         _ -> {error, not_published}
     end;
 
-%% Initiated — seller can announce or archive
+%% Initiated — seller can announce, amend pricing, or archive
 execute(#license_state{status = S}, Payload) when S band ?LIC_INITIATED =/= 0 ->
     case get_command_type(Payload) of
-        <<"announce_license">> -> execute_announce_license(Payload);
-        <<"archive_license">> -> execute_archive_license(Payload);
+        <<"announce_license">>        -> execute_announce_license(Payload);
+        <<"amend_license_pricing">>   -> execute_amend_license_pricing(Payload);
+        <<"archive_license">>         -> execute_archive_license(Payload);
         _ -> {error, not_announced}
     end;
 
@@ -127,6 +129,12 @@ execute_archive_license(Payload) ->
     {ok, Cmd} = archive_license_v1:from_map(Payload),
     convert_events(maybe_archive_license:handle(Cmd), fun license_archived_v1:to_map/1).
 
+%% --- Command handlers (pricing amendment) ---
+
+execute_amend_license_pricing(Payload) ->
+    {ok, Cmd} = amend_license_pricing_v1:from_map(Payload),
+    convert_events(maybe_amend_license_pricing:handle(Cmd), fun license_pricing_amended_v1:to_map/1).
+
 %% --- Apply ---
 %% NOTE: evoq calls apply(State, Event) - State FIRST!
 
@@ -143,6 +151,10 @@ apply_event(#{<<"event_type">> := <<"license_announced_v1">>} = E, S)  -> apply_
 apply_event(#{event_type := <<"license_announced_v1">>} = E, S)        -> apply_announced(E, S);
 apply_event(#{<<"event_type">> := <<"license_published_v1">>} = E, S)  -> apply_published(E, S);
 apply_event(#{event_type := <<"license_published_v1">>} = E, S)        -> apply_published(E, S);
+
+%% Pricing amendment events
+apply_event(#{<<"event_type">> := <<"license_pricing_amended_v1">>} = E, S) -> apply_pricing_amended(E, S);
+apply_event(#{event_type := <<"license_pricing_amended_v1">>} = E, S)       -> apply_pricing_amended(E, S);
 
 %% Buyer-side events
 apply_event(#{<<"event_type">> := <<"license_bought_v1">>} = E, S)   -> apply_bought(E, S);
@@ -195,6 +207,16 @@ apply_published(E, #license_state{status = Status} = State) ->
         published_at = hecate_api_utils:get_field(published_at, E)
     }.
 
+%% --- Apply helpers (pricing amendment) ---
+
+apply_pricing_amended(E, State) ->
+    S1 = maybe_set(selling_formula, hecate_api_utils:get_field(selling_formula, E), State),
+    S2 = maybe_set(license_type, hecate_api_utils:get_field(license_type, E), S1),
+    S3 = maybe_set(fee_cents, hecate_api_utils:get_field(fee_cents, E), S2),
+    S4 = maybe_set(fee_currency, hecate_api_utils:get_field(fee_currency, E), S3),
+    S5 = maybe_set(duration_days, hecate_api_utils:get_field(duration_days, E), S4),
+    maybe_set(node_limit, hecate_api_utils:get_field(node_limit, E), S5).
+
 %% --- Apply helpers (buyer side) ---
 
 apply_bought(E, #license_state{status = Status} = State) ->
@@ -228,3 +250,12 @@ convert_events({ok, Events}, ToMapFn) ->
     {ok, [ToMapFn(E) || E <- Events]};
 convert_events({error, _} = Err, _) ->
     Err.
+
+%% Selectively update a license_state field only when Value is not undefined.
+maybe_set(_Field, undefined, State) -> State;
+maybe_set(selling_formula, V, S) -> S#license_state{selling_formula = V};
+maybe_set(license_type, V, S)    -> S#license_state{license_type = V};
+maybe_set(fee_cents, V, S)       -> S#license_state{fee_cents = V};
+maybe_set(fee_currency, V, S)    -> S#license_state{fee_currency = V};
+maybe_set(duration_days, V, S)   -> S#license_state{duration_days = V};
+maybe_set(node_limit, V, S)      -> S#license_state{node_limit = V}.

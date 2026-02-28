@@ -253,6 +253,59 @@ initiate_sets_pricing_fields_test() ->
     ?assertEqual(0, S#license_state.duration_days),
     ?assertEqual(0, S#license_state.node_limit).
 
+%% ── Amend Pricing Tests ───────────────────────────────────────────────────
+
+make_amend_pricing_payload() ->
+    #{
+        <<"command_type">> => <<"amend_license_pricing">>,
+        <<"license_id">> => ?LICENSE_ID,
+        <<"license_type">> => <<"subscription">>,
+        <<"fee_cents">> => 999,
+        <<"fee_currency">> => <<"USD">>,
+        <<"duration_days">> => 30,
+        <<"node_limit">> => 5
+    }.
+
+amend_pricing_after_initiate_test() ->
+    {ok, S1, _} = execute_and_apply(fresh_state(), make_initiate_payload()),
+    {ok, S2, [Event]} = execute_and_apply(S1, make_amend_pricing_payload()),
+    ?assertEqual(<<"subscription">>, S2#license_state.license_type),
+    ?assertEqual(999, S2#license_state.fee_cents),
+    ?assertEqual(<<"license_pricing_amended_v1">>,
+                 maps:get(<<"event_type">>, Event)).
+
+amend_pricing_after_announce_test() ->
+    {ok, S1, _} = execute_and_apply(fresh_state(), make_initiate_payload()),
+    {ok, S2, _} = execute_and_apply(S1, make_announce_payload()),
+    {ok, S3, _} = execute_and_apply(S2, make_amend_pricing_payload()),
+    ?assertEqual(<<"subscription">>, S3#license_state.license_type),
+    ?assertEqual(999, S3#license_state.fee_cents).
+
+cannot_amend_pricing_after_publish_test() ->
+    {ok, S1, _} = execute_and_apply(fresh_state(), make_initiate_payload()),
+    {ok, S2, _} = execute_and_apply(S1, make_announce_payload()),
+    {ok, S3, _} = execute_and_apply(S2, make_publish_payload()),
+    Result = license_aggregate:execute(S3, make_amend_pricing_payload()),
+    ?assertEqual({error, not_licensed}, Result).
+
+amend_pricing_updates_state_test() ->
+    {ok, S1, _} = execute_and_apply(fresh_state(), make_initiate_payload()),
+    %% Amend only some fields
+    PartialAmend = #{
+        <<"command_type">> => <<"amend_license_pricing">>,
+        <<"license_id">> => ?LICENSE_ID,
+        <<"fee_cents">> => 499,
+        <<"fee_currency">> => <<"USD">>
+    },
+    {ok, S2, _} = execute_and_apply(S1, PartialAmend),
+    %% Amended fields updated
+    ?assertEqual(499, S2#license_state.fee_cents),
+    ?assertEqual(<<"USD">>, S2#license_state.fee_currency),
+    %% Non-amended fields preserved from initiate
+    ?assertEqual(<<"free">>, S2#license_state.license_type),
+    ?assertEqual(0, S2#license_state.duration_days),
+    ?assertEqual(0, S2#license_state.node_limit).
+
 archive_sets_archived_at_test() ->
     {ok, S1, _} = execute_and_apply(fresh_state(), make_initiate_payload()),
     {ok, S2, _} = execute_and_apply(S1, make_announce_payload()),
