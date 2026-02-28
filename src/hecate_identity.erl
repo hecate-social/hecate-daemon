@@ -101,7 +101,7 @@ init([]) ->
         not_found ->
             auto_initialize()
     end,
-    {ok, State}.
+    {ok, maybe_fix_anonymous_owner(State)}.
 
 handle_call(get_mri, _From, #state{mri = undefined} = State) ->
     {reply, not_initialized, State};
@@ -263,3 +263,53 @@ generate_name() ->
     %% Generate a random name like "hecate-a1b2"
     Suffix = binary:encode_hex(crypto:strong_rand_bytes(2)),
     iolist_to_binary([<<"hecate-">>, string:lowercase(Suffix)]).
+
+%% On startup, fix identities that joined a realm but still have "anonymous" owner.
+%% This handles the case where the realm was joined before the update_owner fix existed.
+maybe_fix_anonymous_owner(#state{mri = MRI} = State) when MRI =/= undefined ->
+    case parse_mri_owner(MRI) of
+        <<"anonymous">> ->
+            case resolve_owner_from_credentials() of
+                undefined ->
+                    State;
+                Owner ->
+                    NewMRI = replace_mri_owner(MRI, Owner),
+                    Identity = #{
+                        mri => NewMRI,
+                        realm => State#state.realm,
+                        public_key => State#state.public_key,
+                        private_key => State#state.private_key,
+                        created_at => erlang:system_time(second)
+                    },
+                    ok = hecate_store:put(?BUCKET, <<"identity">>, Identity),
+                    ok = hecate_store:append_event(<<"identity">>, <<"identity_owner_updated">>, #{
+                        old_mri => MRI, new_mri => NewMRI, owner => Owner,
+                        source => <<"startup_fixup">>
+                    }),
+                    logger:info("Fixed anonymous identity on startup: ~s -> ~s", [MRI, NewMRI]),
+                    State#state{mri = NewMRI}
+            end;
+        _ ->
+            State
+    end;
+maybe_fix_anonymous_owner(State) ->
+    State.
+
+%% Scan stored auth credentials for org_identity MRIs and extract the owner.
+resolve_owner_from_credentials() ->
+    Entries = hecate_store:list(<<"auth">>),
+    resolve_owner_from_entries(Entries).
+
+resolve_owner_from_entries([]) ->
+    undefined;
+resolve_owner_from_entries([{Key, Value} | Rest]) ->
+    case binary:match(Key, <<"org_identity:">>) of
+        {0, _} when is_binary(Value) ->
+            %% Value is like "mri:org:io.macula/rgfaber"
+            case binary:split(Value, <<"/">>, [global]) of
+                [_, Owner | _] when byte_size(Owner) > 0 -> Owner;
+                _ -> resolve_owner_from_entries(Rest)
+            end;
+        _ ->
+            resolve_owner_from_entries(Rest)
+    end.
