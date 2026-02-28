@@ -32,6 +32,11 @@ make_initiate_payload() ->
         <<"oci_image">> => <<"ghcr.io/hecate-social/hecate-traderd:0.1.0">>,
         <<"selling_formula">> => <<"free">>,
         <<"seller_id">> => ?SELLER_ID,
+        <<"license_type">> => <<"free">>,
+        <<"fee_cents">> => 0,
+        <<"fee_currency">> => <<"EUR">>,
+        <<"duration_days">> => 0,
+        <<"node_limit">> => 0,
         <<"org">> => <<"hecate-social">>,
         <<"version">> => <<"0.1.0">>,
         <<"manifest_tag">> => <<"v0.1.0">>,
@@ -239,6 +244,14 @@ initiate_sets_new_metadata_test() ->
     ?assertEqual(<<"https://hecate.social/plugins/trader">>, S#license_state.homepage),
     ?assertEqual(<<"0.8.0">>, S#license_state.min_daemon_version),
     ?assertEqual(<<"did:key:z6Mk...">>, S#license_state.publisher_identity).
+
+initiate_sets_pricing_fields_test() ->
+    {ok, S, _Events} = execute_and_apply(fresh_state(), make_initiate_payload()),
+    ?assertEqual(<<"free">>, S#license_state.license_type),
+    ?assertEqual(0, S#license_state.fee_cents),
+    ?assertEqual(<<"EUR">>, S#license_state.fee_currency),
+    ?assertEqual(0, S#license_state.duration_days),
+    ?assertEqual(0, S#license_state.node_limit).
 
 archive_sets_archived_at_test() ->
     {ok, S1, _} = execute_and_apply(fresh_state(), make_initiate_payload()),

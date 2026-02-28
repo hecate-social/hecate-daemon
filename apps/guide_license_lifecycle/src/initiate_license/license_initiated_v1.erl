@@ -8,6 +8,8 @@
          get_oci_image/1, get_selling_formula/1, get_seller_id/1,
          get_org/1, get_version/1, get_manifest_tag/1, get_tags/1,
          get_homepage/1, get_min_daemon_version/1, get_publisher_identity/1,
+         get_license_type/1, get_fee_cents/1, get_fee_currency/1,
+         get_duration_days/1, get_node_limit/1,
          get_initiated_at/1]).
 
 -record(license_initiated_v1, {
@@ -20,6 +22,11 @@
     oci_image       :: binary() | undefined,
     selling_formula :: binary() | undefined,
     seller_id       :: binary(),
+    license_type    :: binary() | undefined,
+    fee_cents       :: non_neg_integer() | undefined,
+    fee_currency    :: binary() | undefined,
+    duration_days   :: non_neg_integer() | undefined,
+    node_limit      :: non_neg_integer() | undefined,
     org             :: binary() | undefined,
     version         :: binary() | undefined,
     manifest_tag    :: binary() | undefined,
@@ -47,6 +54,11 @@ new(#{license_id := LicenseId, seller_id := SellerId, plugin_id := PluginId} = P
         oci_image = maps:get(oci_image, Params, undefined),
         selling_formula = maps:get(selling_formula, Params, undefined),
         seller_id = SellerId,
+        license_type = maps:get(license_type, Params, undefined),
+        fee_cents = maps:get(fee_cents, Params, undefined),
+        fee_currency = maps:get(fee_currency, Params, undefined),
+        duration_days = maps:get(duration_days, Params, undefined),
+        node_limit = maps:get(node_limit, Params, undefined),
         org = maps:get(org, Params, undefined),
         version = maps:get(version, Params, undefined),
         manifest_tag = maps:get(manifest_tag, Params, undefined),
@@ -70,6 +82,11 @@ to_map(#license_initiated_v1{} = E) ->
         <<"oci_image">> => E#license_initiated_v1.oci_image,
         <<"selling_formula">> => E#license_initiated_v1.selling_formula,
         <<"seller_id">> => E#license_initiated_v1.seller_id,
+        <<"license_type">> => E#license_initiated_v1.license_type,
+        <<"fee_cents">> => E#license_initiated_v1.fee_cents,
+        <<"fee_currency">> => E#license_initiated_v1.fee_currency,
+        <<"duration_days">> => E#license_initiated_v1.duration_days,
+        <<"node_limit">> => E#license_initiated_v1.node_limit,
         <<"org">> => E#license_initiated_v1.org,
         <<"version">> => E#license_initiated_v1.version,
         <<"manifest_tag">> => E#license_initiated_v1.manifest_tag,
@@ -100,6 +117,11 @@ from_map(Map) ->
                 oci_image = hecate_api_utils:get_field(oci_image, Map, undefined),
                 selling_formula = hecate_api_utils:get_field(selling_formula, Map, undefined),
                 seller_id = SellerId,
+                license_type = hecate_api_utils:get_field(license_type, Map, undefined),
+                fee_cents = hecate_api_utils:get_field(fee_cents, Map, undefined),
+                fee_currency = hecate_api_utils:get_field(fee_currency, Map, undefined),
+                duration_days = hecate_api_utils:get_field(duration_days, Map, undefined),
+                node_limit = hecate_api_utils:get_field(node_limit, Map, undefined),
                 org = hecate_api_utils:get_field(org, Map, undefined),
                 version = hecate_api_utils:get_field(version, Map, undefined),
                 manifest_tag = hecate_api_utils:get_field(manifest_tag, Map, undefined),
@@ -159,6 +181,21 @@ get_min_daemon_version(#license_initiated_v1{min_daemon_version = V}) -> V.
 
 -spec get_publisher_identity(license_initiated_v1()) -> binary() | undefined.
 get_publisher_identity(#license_initiated_v1{publisher_identity = V}) -> V.
+
+-spec get_license_type(license_initiated_v1()) -> binary() | undefined.
+get_license_type(#license_initiated_v1{license_type = V}) -> V.
+
+-spec get_fee_cents(license_initiated_v1()) -> non_neg_integer() | undefined.
+get_fee_cents(#license_initiated_v1{fee_cents = V}) -> V.
+
+-spec get_fee_currency(license_initiated_v1()) -> binary() | undefined.
+get_fee_currency(#license_initiated_v1{fee_currency = V}) -> V.
+
+-spec get_duration_days(license_initiated_v1()) -> non_neg_integer() | undefined.
+get_duration_days(#license_initiated_v1{duration_days = V}) -> V.
+
+-spec get_node_limit(license_initiated_v1()) -> non_neg_integer() | undefined.
+get_node_limit(#license_initiated_v1{node_limit = V}) -> V.
 
 -spec get_initiated_at(license_initiated_v1()) -> integer().
 get_initiated_at(#license_initiated_v1{initiated_at = V}) -> V.

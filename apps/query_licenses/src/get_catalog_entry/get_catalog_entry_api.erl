@@ -1,9 +1,9 @@
-%%% @doc API handler: GET /api/appstore/plugin/:id
+%%% @doc API handler: GET /api/appstore/catalog/:id
 %%%
-%%% Returns details for a single plugin, including license
+%%% Returns details for a single catalog entry, including license
 %%% and install status for the current user.
 %%% @end
--module(get_plugin_details_api).
+-module(get_catalog_entry_api).
 
 -export([init/2, routes/0]).
 
@@ -11,6 +11,7 @@
     plugin_id, license_id, name, org, version, description, icon,
     github_repo, oci_image, manifest_tag, tags, homepage,
     min_daemon_version, publisher_identity, selling_formula, seller_id,
+    license_type, fee_cents, fee_currency, duration_days, node_limit,
     announced_at, published_at, cataloged_at, refreshed_at,
     status, status_label, retracted
 ]).
@@ -25,6 +26,7 @@
     "SELECT plugin_id, license_id, name, org, version, description, icon, "
     "github_repo, oci_image, manifest_tag, tags, homepage, "
     "min_daemon_version, publisher_identity, selling_formula, seller_id, "
+    "license_type, fee_cents, fee_currency, duration_days, node_limit, "
     "announced_at, published_at, cataloged_at, refreshed_at, "
     "status, status_label, retracted "
     "FROM plugin_catalog WHERE plugin_id = ?1").
@@ -35,7 +37,7 @@
     "granted_at, installed_at, upgraded_at, revoked, revoked_at "
     "FROM licenses WHERE plugin_id = ?1 AND user_id = ?2 AND (status & 32) = 0").
 
-routes() -> [{"/api/appstore/plugin/:id", ?MODULE, []}].
+routes() -> [{"/api/appstore/catalog/:id", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

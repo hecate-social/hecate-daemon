@@ -10,7 +10,9 @@
 -define(CATALOG_COLUMNS, [
     plugin_id, name, org, version, description, icon,
     oci_image, manifest_tag, tags, homepage, min_daemon_version,
-    publisher_identity, published_at, cataloged_at, refreshed_at,
+    publisher_identity, selling_formula,
+    license_type, fee_cents, fee_currency, duration_days, node_limit,
+    published_at, cataloged_at, refreshed_at,
     status, retracted,
     license_id, installed, installed_version
 ]).
@@ -18,7 +20,9 @@
 -define(SQL, "SELECT "
     "c.plugin_id, c.name, c.org, c.version, c.description, c.icon, "
     "c.oci_image, c.manifest_tag, c.tags, c.homepage, c.min_daemon_version, "
-    "c.publisher_identity, c.published_at, c.cataloged_at, c.refreshed_at, "
+    "c.publisher_identity, c.selling_formula, "
+    "c.license_type, c.fee_cents, c.fee_currency, c.duration_days, c.node_limit, "
+    "c.published_at, c.cataloged_at, c.refreshed_at, "
     "c.status, c.retracted, "
     "l.license_id, l.installed, l.installed_version "
     "FROM plugin_catalog c "

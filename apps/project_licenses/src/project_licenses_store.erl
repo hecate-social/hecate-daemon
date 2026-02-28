@@ -105,6 +105,11 @@ create_tables(Db) ->
             oci_image          TEXT,
             selling_formula    TEXT,
             seller_id          TEXT,
+            license_type       TEXT,
+            fee_cents          INTEGER,
+            fee_currency       TEXT,
+            duration_days      INTEGER,
+            node_limit         INTEGER,
             org                TEXT,
             version            TEXT,
             manifest_tag       TEXT,
@@ -160,7 +165,12 @@ run_migrations(Db) ->
         "ALTER TABLE plugin_catalog ADD COLUMN publisher_identity TEXT",
         "ALTER TABLE plugin_catalog ADD COLUMN cataloged_at INTEGER",
         "ALTER TABLE plugin_catalog ADD COLUMN refreshed_at INTEGER",
-        "ALTER TABLE plugin_catalog ADD COLUMN retracted INTEGER NOT NULL DEFAULT 0"
+        "ALTER TABLE plugin_catalog ADD COLUMN retracted INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE plugin_catalog ADD COLUMN license_type TEXT",
+        "ALTER TABLE plugin_catalog ADD COLUMN fee_cents INTEGER",
+        "ALTER TABLE plugin_catalog ADD COLUMN fee_currency TEXT",
+        "ALTER TABLE plugin_catalog ADD COLUMN duration_days INTEGER",
+        "ALTER TABLE plugin_catalog ADD COLUMN node_limit INTEGER"
     ],
     LicenseAlters = [
         "ALTER TABLE licenses ADD COLUMN installed INTEGER NOT NULL DEFAULT 0",

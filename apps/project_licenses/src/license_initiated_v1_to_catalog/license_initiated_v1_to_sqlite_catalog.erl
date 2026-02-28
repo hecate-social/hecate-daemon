@@ -21,18 +21,27 @@ project(EventMap) ->
     Homepage = hecate_api_utils:get_field(homepage, EventMap),
     MinDaemonVersion = hecate_api_utils:get_field(min_daemon_version, EventMap),
     PublisherIdentity = hecate_api_utils:get_field(publisher_identity, EventMap),
+    LicenseType = hecate_api_utils:get_field(license_type, EventMap),
+    FeeCents = hecate_api_utils:get_field(fee_cents, EventMap),
+    FeeCurrency = hecate_api_utils:get_field(fee_currency, EventMap),
+    DurationDays = hecate_api_utils:get_field(duration_days, EventMap),
+    NodeLimit = hecate_api_utils:get_field(node_limit, EventMap),
     CatalogedAt = hecate_api_utils:get_field(initiated_at, EventMap),
 
     Sql = "INSERT OR REPLACE INTO plugin_catalog "
           "(plugin_id, license_id, name, description, icon, github_repo, "
           "oci_image, selling_formula, seller_id, "
+          "license_type, fee_cents, fee_currency, duration_days, node_limit, "
           "org, version, manifest_tag, tags, homepage, "
           "min_daemon_version, publisher_identity, cataloged_at, "
           "refreshed_at, retracted, status, status_label) "
           "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, "
-          "?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, NULL, 0, ?18, ?19)",
+          "?10, ?11, ?12, ?13, ?14, "
+          "?15, ?16, ?17, ?18, ?19, "
+          "?20, ?21, ?22, NULL, 0, ?23, ?24)",
     Params = [PluginId, LicenseId, Name, Description, Icon, GithubRepo,
               OciImage, SellingFormula, SellerId,
+              LicenseType, FeeCents, FeeCurrency, DurationDays, NodeLimit,
               Org, Version, ManifestTag, Tags, Homepage,
               MinDaemonVersion, PublisherIdentity, CatalogedAt,
               1, <<"Initiated">>],
