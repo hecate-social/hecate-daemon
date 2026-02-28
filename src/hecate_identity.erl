@@ -17,7 +17,8 @@
     sign/1,
     verify/2,
     is_initialized/0,
-    initialize/1
+    initialize/1,
+    update_owner/1
 ]).
 
 %% gen_server callbacks
@@ -78,6 +79,10 @@ is_initialized() ->
 -spec initialize(Opts :: map()) -> ok | {error, term()}.
 initialize(Opts) ->
     gen_server:call(?SERVER, {initialize, Opts}).
+
+-spec update_owner(binary()) -> ok | {error, term()}.
+update_owner(NewOwner) ->
+    gen_server:call(?SERVER, {update_owner, NewOwner}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -166,7 +171,32 @@ handle_call({initialize, Opts}, _From, #state{mri = undefined} = _State) ->
     {reply, ok, NewState};
 
 handle_call({initialize, _Opts}, _From, State) ->
-    {reply, {error, already_initialized}, State}.
+    {reply, {error, already_initialized}, State};
+
+handle_call({update_owner, NewOwner}, _From, #state{mri = MRI} = State) when MRI =/= undefined ->
+    case parse_mri_owner(MRI) of
+        <<"anonymous">> ->
+            NewMRI = replace_mri_owner(MRI, NewOwner),
+            Identity = #{
+                mri => NewMRI,
+                realm => State#state.realm,
+                public_key => State#state.public_key,
+                private_key => State#state.private_key,
+                created_at => erlang:system_time(second)
+            },
+            ok = hecate_store:put(?BUCKET, <<"identity">>, Identity),
+            ok = hecate_store:append_event(<<"identity">>, <<"identity_owner_updated">>, #{
+                old_mri => MRI,
+                new_mri => NewMRI,
+                owner => NewOwner
+            }),
+            logger:info("Updated identity owner: ~s -> ~s", [MRI, NewMRI]),
+            {reply, ok, State#state{mri = NewMRI}};
+        _ ->
+            {reply, {error, already_claimed}, State}
+    end;
+handle_call({update_owner, _}, _From, State) ->
+    {reply, {error, not_initialized}, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -213,6 +243,21 @@ auto_initialize() ->
 generate_keypair() ->
     {PubKey, PrivKey} = crypto:generate_key(eddsa, ed25519),
     {PubKey, PrivKey}.
+
+parse_mri_owner(MRI) ->
+    %% MRI format: mri:agent:realm/owner/name
+    case binary:split(MRI, <<"/">>, [global]) of
+        [_, Owner, _Name] -> Owner;
+        _ -> undefined
+    end.
+
+replace_mri_owner(MRI, NewOwner) ->
+    case binary:split(MRI, <<"/">>, [global]) of
+        [RealmPart, _OldOwner, Name] ->
+            <<RealmPart/binary, "/", NewOwner/binary, "/", Name/binary>>;
+        _ ->
+            MRI
+    end.
 
 generate_name() ->
     %% Generate a random name like "hecate-a1b2"

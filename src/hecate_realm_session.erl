@@ -31,7 +31,9 @@
 %% Suppress supertype warnings (returns specific maps, spec uses map())
 -dialyzer({nowarn_function, [do_start_joining/1, create_join_session/2, poll_session/2,
                              handle_join_confirmed/2, get_agent_info/0, state_to_map/1,
-                             dispatch_initiate_membership/1, dispatch_confirm_membership/3]}).
+                             dispatch_initiate_membership/1, dispatch_confirm_membership/4,
+                             resolve_oauth_account/1, extract_owner_from_mri/1,
+                             update_identity_owner/1]}).
 
 -record(state, {
     status :: idle | joining | joined | failed,
@@ -204,7 +206,9 @@ poll_session(RealmUrl, SessionId) ->
                 status => Status,
                 refresh_token => maps:get(<<"refresh_token">>, Data, undefined),
                 org_identity => maps:get(<<"org_identity">>, Data, undefined),
-                cert_pem => maps:get(<<"cert_pem">>, Data, undefined)
+                cert_pem => maps:get(<<"cert_pem">>, Data, undefined),
+                oauth_account => maps:get(<<"oauth_account">>, Data, undefined),
+                oauth_provider => maps:get(<<"oauth_provider">>, Data, undefined)
             }};
         {ok, 404, _RespHeaders, _RespBody} ->
             {ok, #{status => <<"expired">>}};
@@ -220,14 +224,19 @@ handle_join_confirmed(Data, #state{membership_id = MembershipId} = State) ->
     logger:info("Realm join confirmed!"),
 
     OrgIdentity = maps:get(org_identity, Data, undefined),
+    OAuthAccount = resolve_oauth_account(Data),
+    OAuthProvider = maps:get(oauth_provider, Data, <<"github">>),
 
     %% Store credentials keyed by membership ID
     store_credential(MembershipId, <<"refresh_token">>, maps:get(refresh_token, Data, undefined)),
     store_credential(MembershipId, <<"org_identity">>, OrgIdentity),
     store_credential(MembershipId, <<"cert_pem">>, maps:get(cert_pem, Data, undefined)),
 
+    %% Update node identity owner (anonymous -> actual username)
+    update_identity_owner(OAuthAccount),
+
     %% Dispatch confirm_realm_membership command
-    dispatch_confirm_membership(MembershipId, OrgIdentity, State#state.realm_url),
+    dispatch_confirm_membership(MembershipId, OAuthAccount, OAuthProvider, State#state.realm_url),
 
     {noreply, State#state{status = joined}}.
 
@@ -238,15 +247,14 @@ dispatch_initiate_membership(#{membership_id := MembershipId, realm_url := Realm
     Cmd = initiate_realm_membership_v1:new(MembershipId, RealmUrl, Now),
     maybe_initiate_realm_membership:dispatch(Cmd).
 
--spec dispatch_confirm_membership(binary(), binary() | undefined, binary() | undefined) -> ok.
-dispatch_confirm_membership(_MembershipId, undefined, _RealmUrl) ->
+-spec dispatch_confirm_membership(binary(), binary() | undefined, binary(), binary() | undefined) -> ok.
+dispatch_confirm_membership(_MembershipId, undefined, _Provider, _RealmUrl) ->
     ok;
-dispatch_confirm_membership(MembershipId, OAuthAccount, RealmUrl) when
+dispatch_confirm_membership(MembershipId, OAuthAccount, OAuthProvider, RealmUrl) when
     is_binary(OAuthAccount), byte_size(OAuthAccount) > 0 ->
     Now = erlang:system_time(millisecond),
-    %% Derive realm_id from realm_url (e.g. "https://macula.io" -> "io.macula")
     RealmId = derive_realm_id(RealmUrl),
-    Cmd = confirm_realm_membership_v1:new(MembershipId, RealmId, OAuthAccount, <<"github">>, Now),
+    Cmd = confirm_realm_membership_v1:new(MembershipId, RealmId, OAuthAccount, OAuthProvider, Now),
     case maybe_confirm_realm_membership:dispatch(Cmd) of
         {ok, _Version, _Events} ->
             logger:info("Dispatched confirm_realm_membership for ~s@~s", [OAuthAccount, RealmId]);
@@ -254,8 +262,33 @@ dispatch_confirm_membership(MembershipId, OAuthAccount, RealmUrl) when
             logger:warning("Failed to dispatch confirm_realm_membership: ~p", [Reason])
     end,
     ok;
-dispatch_confirm_membership(_, _, _) ->
+dispatch_confirm_membership(_, _, _, _) ->
     ok.
+
+resolve_oauth_account(Data) ->
+    case maps:get(oauth_account, Data, undefined) of
+        Account when is_binary(Account), byte_size(Account) > 0 -> Account;
+        _ -> extract_owner_from_mri(maps:get(org_identity, Data, undefined))
+    end.
+
+extract_owner_from_mri(undefined) -> undefined;
+extract_owner_from_mri(MRI) when is_binary(MRI) ->
+    %% "mri:org:io.macula/rgfaber" -> "rgfaber"
+    case binary:split(MRI, <<"/">>, [global]) of
+        [_, Owner | _] -> Owner;
+        _ -> undefined
+    end.
+
+update_identity_owner(undefined) -> ok;
+update_identity_owner(<<>>) -> ok;
+update_identity_owner(Owner) ->
+    case hecate_identity:update_owner(Owner) of
+        ok -> ok;
+        {error, already_claimed} -> ok;
+        {error, Reason} ->
+            logger:warning("Failed to update identity owner: ~p", [Reason]),
+            ok
+    end.
 
 -spec store_credential(binary(), binary(), binary() | undefined) -> ok.
 store_credential(_MembershipId, _Key, undefined) ->
