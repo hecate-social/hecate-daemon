@@ -191,6 +191,7 @@ handle_call({update_owner, NewOwner}, _From, #state{mri = MRI} = State) when MRI
                 owner => NewOwner
             }),
             logger:info("Updated identity owner: ~s -> ~s", [MRI, NewMRI]),
+            hecate_web_events:broadcast(identity_changed, #{mri => NewMRI}),
             {reply, ok, State#state{mri = NewMRI}};
         _ ->
             {reply, {error, already_claimed}, State}
@@ -287,6 +288,7 @@ maybe_fix_anonymous_owner(#state{mri = MRI} = State) when MRI =/= undefined ->
                         source => <<"startup_fixup">>
                     }),
                     logger:info("Fixed anonymous identity on startup: ~s -> ~s", [MRI, NewMRI]),
+                    hecate_web_events:broadcast(identity_changed, #{mri => NewMRI}),
                     State#state{mri = NewMRI}
             end;
         _ ->

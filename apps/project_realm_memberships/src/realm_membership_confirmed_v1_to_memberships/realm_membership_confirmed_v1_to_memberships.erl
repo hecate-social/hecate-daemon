@@ -53,4 +53,5 @@ project(Data) ->
            realm_id = ?1, oauth_account = ?2, oauth_provider = ?3,
            status = 'confirmed', confirmed_at = ?4
            WHERE membership_id = ?5",
-    project_realm_memberships_store:execute(Sql, [RealmId, OAuthAccount, OAuthProvider, ConfirmedAt, MembershipId]).
+    project_realm_memberships_store:execute(Sql, [RealmId, OAuthAccount, OAuthProvider, ConfirmedAt, MembershipId]),
+    hecate_web_events:broadcast(settings_changed, #{reason => realm_confirmed}).

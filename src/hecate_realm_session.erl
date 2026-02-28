@@ -89,8 +89,10 @@ handle_call({start_joining, Opts}, _From, _State) ->
                 membership_id = MembershipId
             },
             erlang:send_after(?POLL_INTERVAL, self(), poll),
+            hecate_web_events:broadcast(realm_join_status, #{status => joining}),
             {reply, {ok, state_to_map(NewState)}, NewState};
         {error, Reason} = Error ->
+            hecate_web_events:broadcast(realm_join_status, #{status => failed}),
             {reply, Error, #state{status = failed, error = Reason}}
     end;
 
@@ -98,6 +100,7 @@ handle_call(get_status, _From, State) ->
     {reply, state_to_map(State), State};
 
 handle_call(cancel, _From, _State) ->
+    hecate_web_events:broadcast(realm_join_status, #{status => idle}),
     {reply, ok, #state{status = idle}}.
 
 handle_cast(_Msg, State) ->
@@ -115,10 +118,12 @@ handle_info(poll, #state{status = joining, session_id = SessionId, realm_url = R
                     {noreply, State};
                 false ->
                     logger:info("Realm join session expired"),
+                    hecate_web_events:broadcast(realm_join_status, #{status => failed}),
                     {noreply, State#state{status = failed, error = expired}}
             end;
         {ok, #{status := <<"expired">>}} ->
             logger:info("Realm join session expired on server"),
+            hecate_web_events:broadcast(realm_join_status, #{status => failed}),
             {noreply, State#state{status = failed, error = expired}};
         {error, Reason} ->
             logger:warning("Realm join poll failed: ~p", [Reason]),
@@ -238,6 +243,7 @@ handle_join_confirmed(Data, #state{membership_id = MembershipId} = State) ->
     %% Dispatch confirm_realm_membership command
     dispatch_confirm_membership(MembershipId, OAuthAccount, OAuthProvider, State#state.realm_url),
 
+    hecate_web_events:broadcast(realm_join_status, #{status => joined}),
     {noreply, State#state{status = joined}}.
 
 -spec dispatch_initiate_membership(map()) ->
