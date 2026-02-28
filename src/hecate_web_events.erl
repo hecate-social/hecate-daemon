@@ -13,7 +13,7 @@
 -spec broadcast(atom(), map()) -> ok.
 broadcast(EventType, Data) ->
     TypeBin = atom_to_binary(EventType),
-    JsonBin = json:encode(Data),
+    JsonBin = iolist_to_binary(json:encode(Data)),
     Members = pg:get_members(?SCOPE, ?GROUP),
     [Pid ! {web_event, TypeBin, JsonBin} || Pid <- Members],
     ok.
