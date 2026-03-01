@@ -1,4 +1,4 @@
-%%% @doc API handler: PATCH /api/appstore/licenses/:license_id
+%%% @doc API handler: PATCH /api/appstore/licenses/:license_id/amend
 %%%
 %%% Amends any optional fields on a license (before publishing).
 %%% Lives in the amend_license desk for vertical slicing.
@@ -7,7 +7,7 @@
 
 -export([init/2, routes/0]).
 
-routes() -> [{"/api/appstore/licenses/:license_id", ?MODULE, []}].
+routes() -> [{"/api/appstore/licenses/:license_id/amend", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
