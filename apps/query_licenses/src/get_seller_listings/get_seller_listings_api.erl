@@ -51,5 +51,5 @@ handle_get(Req0, _State) ->
             end
     end.
 
-row_to_map(Row) when is_tuple(Row) ->
-    maps:from_list(lists:zip(?COLUMNS, tuple_to_list(Row))).
+row_to_map(Row) when is_list(Row) ->
+    maps:from_list(lists:zip(?COLUMNS, Row)).
