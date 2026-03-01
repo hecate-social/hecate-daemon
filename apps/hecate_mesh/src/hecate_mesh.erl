@@ -5,6 +5,7 @@
     subscribe/2,
     unsubscribe/1,
     get_client/0,
+    get_status/0,
     is_connected/0
 ]).
 
@@ -23,6 +24,10 @@ unsubscribe(SubRef) ->
 -spec get_client() -> {ok, pid()} | {error, term()}.
 get_client() ->
     hecate_mesh_client:get_client().
+
+-spec get_status() -> {ok, map()} | {error, term()}.
+get_status() ->
+    hecate_mesh_client:get_status().
 
 -spec is_connected() -> boolean().
 is_connected() ->

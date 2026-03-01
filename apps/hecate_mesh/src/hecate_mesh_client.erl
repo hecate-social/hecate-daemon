@@ -1,7 +1,7 @@
 -module(hecate_mesh_client).
 -behaviour(gen_server).
 
--export([start_link/0, get_client/0, publish/2, subscribe/2, unsubscribe/1]).
+-export([start_link/0, get_client/0, get_status/0, publish/2, subscribe/2, unsubscribe/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 %% Suppress dialyzer warnings for calls to macula (excluded from PLT)
@@ -32,6 +32,9 @@ subscribe(Topic, Callback) ->
 unsubscribe(SubRef) ->
     gen_server:call(?MODULE, {unsubscribe, SubRef}).
 
+get_status() ->
+    gen_server:call(?MODULE, get_status).
+
 %% Callbacks
 
 init([]) ->
@@ -51,6 +54,18 @@ init([]) ->
 
 handle_call(get_client, _From, #state{client = Client} = State) ->
     {reply, {ok, Client}, State};
+
+handle_call(get_status, _From, #state{client = Client, realm = Realm,
+                                       identity = Identity,
+                                       subscriptions = Subs} = State) ->
+    Connected = is_pid(Client),
+    Status = #{
+        connected => Connected,
+        realm => Realm,
+        identity => Identity,
+        subscription_count => maps:size(Subs)
+    },
+    {reply, {ok, Status}, State};
 
 handle_call({publish, _Topic, _Payload}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
