@@ -69,6 +69,13 @@ init([]) ->
             start => {license_amended_v1_to_catalog_sup, start_link, []},
             restart => permanent,
             type => supervisor
+        },
+        %% Projection: license_retracted_v1 -> catalog table
+        #{
+            id => license_retracted_v1_to_catalog_sup,
+            start => {license_retracted_v1_to_catalog_sup, start_link, []},
+            restart => permanent,
+            type => supervisor
         }
     ],
     {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

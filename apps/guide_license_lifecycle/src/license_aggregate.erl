@@ -72,20 +72,22 @@ execute(#license_state{status = S}, Payload) when S band ?LIC_LICENSED =/= 0 ->
         _ -> {error, unknown_command}
     end;
 
-%% Published — buyer can buy, seller can archive
+%% Published — buyer can buy, seller can retract or archive
 execute(#license_state{status = S}, Payload) when S band ?LIC_PUBLISHED =/= 0 ->
     case get_command_type(Payload) of
-        <<"buy_license">>     -> execute_buy_license(Payload);
-        <<"archive_license">> -> execute_archive_license(Payload);
+        <<"buy_license">>      -> execute_buy_license(Payload);
+        <<"retract_license">>  -> execute_retract_license(Payload);
+        <<"archive_license">>  -> execute_archive_license(Payload);
         _ -> {error, not_licensed}
     end;
 
-%% Announced — seller can publish, amend, or archive
+%% Announced — seller can publish, amend, retract, or archive
 execute(#license_state{status = S}, Payload) when S band ?LIC_ANNOUNCED =/= 0 ->
     case get_command_type(Payload) of
-        <<"publish_license">>         -> execute_publish_license(Payload);
-        <<"amend_license">>   -> execute_amend_license(Payload);
-        <<"archive_license">>         -> execute_archive_license(Payload);
+        <<"publish_license">>  -> execute_publish_license(Payload);
+        <<"amend_license">>    -> execute_amend_license(Payload);
+        <<"retract_license">>  -> execute_retract_license(Payload);
+        <<"archive_license">>  -> execute_archive_license(Payload);
         _ -> {error, not_published}
     end;
 
@@ -114,6 +116,10 @@ execute_announce_license(Payload) ->
 execute_publish_license(Payload) ->
     {ok, Cmd} = publish_license_v1:from_map(Payload),
     convert_events(maybe_publish_license:handle(Cmd), fun license_published_v1:to_map/1).
+
+execute_retract_license(Payload) ->
+    {ok, Cmd} = retract_license_v1:from_map(Payload),
+    convert_events(maybe_retract_license:handle(Cmd), fun license_retracted_v1:to_map/1).
 
 %% --- Command handlers (buyer side) ---
 
@@ -151,6 +157,8 @@ apply_event(#{<<"event_type">> := <<"license_announced_v1">>} = E, S)  -> apply_
 apply_event(#{event_type := <<"license_announced_v1">>} = E, S)        -> apply_announced(E, S);
 apply_event(#{<<"event_type">> := <<"license_published_v1">>} = E, S)  -> apply_published(E, S);
 apply_event(#{event_type := <<"license_published_v1">>} = E, S)        -> apply_published(E, S);
+apply_event(#{<<"event_type">> := <<"license_retracted_v1">>} = E, S)  -> apply_retracted(E, S);
+apply_event(#{event_type := <<"license_retracted_v1">>} = E, S)        -> apply_retracted(E, S);
 
 %% Amendment events
 apply_event(#{<<"event_type">> := <<"license_amended_v1">>} = E, S) -> apply_amended(E, S);
@@ -205,6 +213,12 @@ apply_published(E, #license_state{status = Status} = State) ->
     State#license_state{
         status = evoq_bit_flags:set(Status, ?LIC_PUBLISHED),
         published_at = hecate_api_utils:get_field(published_at, E)
+    }.
+
+apply_retracted(E, #license_state{} = State) ->
+    State#license_state{
+        status = ?LIC_INITIATED,
+        retracted_at = hecate_api_utils:get_field(retracted_at, E)
     }.
 
 %% --- Apply helpers (amendment) ---

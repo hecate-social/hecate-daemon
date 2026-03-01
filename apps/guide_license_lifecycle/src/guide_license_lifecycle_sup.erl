@@ -35,6 +35,9 @@ init([]) ->
         #{id => license_published_v1_to_pg,
           start => {license_published_v1_to_pg, start_link, []},
           restart => permanent, type => worker},
+        #{id => license_retracted_v1_to_pg,
+          start => {license_retracted_v1_to_pg, start_link, []},
+          restart => permanent, type => worker},
 
         %% Buyer-side emitters
         #{id => license_bought_v1_to_pg,

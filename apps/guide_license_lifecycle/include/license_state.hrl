@@ -30,5 +30,6 @@
     publisher_identity :: binary() | undefined,
     initiated_at      :: integer() | undefined,
     announced_at      :: integer() | undefined,
-    published_at      :: integer() | undefined
+    published_at      :: integer() | undefined,
+    retracted_at      :: integer() | undefined
 }).
