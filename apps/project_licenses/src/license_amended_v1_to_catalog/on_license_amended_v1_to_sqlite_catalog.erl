@@ -1,14 +1,14 @@
-%%% @doc Listener: subscribes to license_pricing_amended_v1 via evoq,
+%%% @doc Listener: subscribes to license_amended_v1 via evoq,
 %%% calls projection to update catalog.
--module(on_license_pricing_amended_v1_to_sqlite_catalog).
+-module(on_license_amended_v1_to_sqlite_catalog).
 -behaviour(gen_server).
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -include_lib("reckon_gater/include/esdb_gater_types.hrl").
 
--define(EVENT_TYPE, <<"license_pricing_amended_v1">>).
--define(SUB_NAME, <<"license_pricing_amended_v1_to_catalog">>).
+-define(EVENT_TYPE, <<"license_amended_v1">>).
+-define(SUB_NAME, <<"license_amended_v1_to_catalog">>).
 -define(STORE_ID, licenses_store).
 
 start_link() ->
@@ -23,7 +23,7 @@ init([]) ->
 handle_info({events, Events}, State) ->
     lists:foreach(fun(E) ->
         Map = projection_event:to_map(E),
-        license_pricing_amended_v1_to_sqlite_catalog:project(Map)
+        license_amended_v1_to_sqlite_catalog:project(Map)
     end, Events),
     {noreply, State};
 handle_info(_Info, State) ->

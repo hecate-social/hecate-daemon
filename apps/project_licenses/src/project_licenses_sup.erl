@@ -63,10 +63,10 @@ init([]) ->
             restart => permanent,
             type => supervisor
         },
-        %% Projection: license_pricing_amended_v1 -> catalog table
+        %% Projection: license_amended_v1 -> catalog table
         #{
-            id => license_pricing_amended_v1_to_catalog_sup,
-            start => {license_pricing_amended_v1_to_catalog_sup, start_link, []},
+            id => license_amended_v1_to_catalog_sup,
+            start => {license_amended_v1_to_catalog_sup, start_link, []},
             restart => permanent,
             type => supervisor
         }

@@ -1,13 +1,13 @@
-%%% @doc API handler: PATCH /api/appstore/licenses/:license_id/pricing
+%%% @doc API handler: PATCH /api/appstore/licenses/:license_id
 %%%
-%%% Amends pricing fields on a license (before publishing).
-%%% Lives in the amend_license_pricing desk for vertical slicing.
+%%% Amends any optional fields on a license (before publishing).
+%%% Lives in the amend_license desk for vertical slicing.
 %%% @end
--module(amend_license_pricing_api).
+-module(amend_license_api).
 
 -export([init/2, routes/0]).
 
-routes() -> [{"/api/appstore/licenses/:license_id/pricing", ?MODULE, []}].
+routes() -> [{"/api/appstore/licenses/:license_id", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
@@ -37,16 +37,16 @@ read_body_and_amend(LicenseId, Req0) ->
     end.
 
 do_amend(Params, Req) ->
-    case amend_license_pricing_v1:from_map(Params) of
+    case amend_license_v1:from_map(Params) of
         {ok, Cmd} -> dispatch(Cmd, Req);
         {error, Reason} -> hecate_api_utils:bad_request(Reason, Req)
     end.
 
 dispatch(Cmd, Req) ->
-    case maybe_amend_license_pricing:dispatch(Cmd) of
+    case maybe_amend_license:dispatch(Cmd) of
         {ok, Version, EventMaps} ->
             hecate_api_utils:json_ok(200, #{
-                license_id => amend_license_pricing_v1:get_license_id(Cmd),
+                license_id => amend_license_v1:get_license_id(Cmd),
                 version => Version,
                 events => EventMaps
             }, Req);

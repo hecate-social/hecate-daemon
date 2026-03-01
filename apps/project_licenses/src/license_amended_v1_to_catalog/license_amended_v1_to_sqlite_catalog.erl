@@ -1,6 +1,7 @@
-%%% @doc Projection: license_pricing_amended_v1 -> plugin_catalog table.
-%%% Updates only the non-null pricing fields in the catalog row.
--module(license_pricing_amended_v1_to_sqlite_catalog).
+%%% @doc Projection: license_amended_v1 -> plugin_catalog table.
+%%% Updates only the non-null fields in the catalog row.
+%%% Covers both metadata and pricing fields.
+-module(license_amended_v1_to_sqlite_catalog).
 -export([project/1]).
 
 -spec project(map()) -> ok | {error, term()}.
@@ -23,6 +24,18 @@ project(EventMap) ->
 
 build_set_clauses(EventMap) ->
     Fields = [
+        {plugin_name, "name"},
+        {description, "description"},
+        {icon, "icon"},
+        {github_repo, "github_repo"},
+        {oci_image, "oci_image"},
+        {org, "org"},
+        {version, "version"},
+        {manifest_tag, "manifest_tag"},
+        {tags, "tags"},
+        {homepage, "homepage"},
+        {min_daemon_version, "min_daemon_version"},
+        {publisher_identity, "publisher_identity"},
         {selling_formula, "selling_formula"},
         {license_type, "license_type"},
         {fee_cents, "fee_cents"},
