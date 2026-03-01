@@ -1,4 +1,4 @@
-%%% @doc API handler: GET /api/appstore/catalog/seller
+%%% @doc API handler: GET /api/appstore/seller/listings
 %%%
 %%% Returns all plugin catalog entries for the authenticated seller,
 %%% regardless of status (draft, announced, published).
@@ -29,7 +29,7 @@
     "WHERE c.seller_id = ?1 "
     "ORDER BY c.cataloged_at DESC").
 
-routes() -> [{"/api/appstore/catalog/seller", ?MODULE, []}].
+routes() -> [{"/api/appstore/seller/listings", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
