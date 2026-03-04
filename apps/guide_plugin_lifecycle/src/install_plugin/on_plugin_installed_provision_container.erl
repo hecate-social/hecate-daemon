@@ -91,13 +91,16 @@ query_installed_plugins() ->
     Sql = "SELECT plugin_id, oci_image FROM plugins WHERE (status & 2) = 0",
     try project_plugins_store:query(Sql) of
         {ok, Rows} ->
-            {ok, [{PluginId, OciImage} || {PluginId, OciImage} <- Rows]};
+            {ok, [row_to_tuple(R) || R <- Rows]};
         {error, _} = Err ->
             Err
     catch
         exit:{noproc, _} -> {error, store_not_ready};
         exit:{timeout, _} -> {error, store_timeout}
     end.
+
+row_to_tuple([PluginId, OciImage]) -> {PluginId, OciImage};
+row_to_tuple({PluginId, OciImage}) -> {PluginId, OciImage}.
 
 %% @private Extract the plugin name from a plugin_id like "hecate-social/trader".
 extract_plugin_name(PluginId) ->
