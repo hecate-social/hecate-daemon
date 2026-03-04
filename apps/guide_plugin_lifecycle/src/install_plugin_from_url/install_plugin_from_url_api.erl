@@ -125,7 +125,13 @@ validate_and_dispatch(Manifest, Req) ->
     Appstore = maps:get(<<"appstore">>, Manifest, undefined),
     case validate_manifest(Name, Version, Appstore) of
         {ok, Org, OciImage} ->
-            dispatch_install(Name, Version, Org, OciImage, Manifest, Req);
+            MinVsn = maps:get(<<"min_daemon_version">>, Appstore, undefined),
+            case check_daemon_version(MinVsn) of
+                ok ->
+                    dispatch_install(Name, Version, Org, OciImage, Manifest, Req);
+                {error, Reason} ->
+                    hecate_api_utils:bad_request(Reason, Req)
+            end;
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
@@ -146,6 +152,38 @@ validate_manifest(_, _, Appstore) when is_map(Appstore) ->
     end;
 validate_manifest(_, _, _) ->
     {error, <<"manifest missing 'appstore'">>}.
+
+%% --- Daemon version check ---
+
+check_daemon_version(undefined) -> ok;
+check_daemon_version(MinVsn) when is_binary(MinVsn) ->
+    {ok, DaemonVsn} = application:get_key(hecate, vsn),
+    case compare_versions(list_to_binary(DaemonVsn), MinVsn) of
+        lt ->
+            Msg = iolist_to_binary(io_lib:format(
+                "daemon version ~s is below minimum ~s required by plugin",
+                [DaemonVsn, MinVsn])),
+            {error, Msg};
+        _ ->
+            ok
+    end;
+check_daemon_version(_) -> ok.
+
+compare_versions(A, B) ->
+    PartsA = parse_version(A),
+    PartsB = parse_version(B),
+    compare_parts(PartsA, PartsB).
+
+parse_version(Vsn) ->
+    Parts = binary:split(Vsn, <<".">>, [global]),
+    [binary_to_integer(P) || P <- Parts].
+
+compare_parts([], []) -> eq;
+compare_parts([], _) -> lt;
+compare_parts(_, []) -> gt;
+compare_parts([H | TA], [H | TB]) -> compare_parts(TA, TB);
+compare_parts([HA | _], [HB | _]) when HA < HB -> lt;
+compare_parts([HA | _], [HB | _]) when HA > HB -> gt.
 
 dispatch_install(Name, Version, Org, OciImage, Manifest, Req) ->
     PluginId = <<Org/binary, "/", Name/binary>>,
