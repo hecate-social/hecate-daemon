@@ -9,7 +9,6 @@
     crypto,
     ssl,
     inets,
-    jsx,
     cowboy,
     hackney,
     esqlite,
