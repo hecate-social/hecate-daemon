@@ -199,6 +199,11 @@ apply_initiated(E, State) ->
         homepage = hecate_api_utils:get_field(homepage, E),
         min_daemon_version = hecate_api_utils:get_field(min_daemon_version, E),
         publisher_identity = hecate_api_utils:get_field(publisher_identity, E),
+        manifest_url = hecate_api_utils:get_field(manifest_url, E),
+        manifest_checksum = hecate_api_utils:get_field(manifest_checksum, E),
+        seller_signature = hecate_api_utils:get_field(seller_signature, E),
+        oci_image_verified = hecate_api_utils:get_field(oci_image_verified, E),
+        oci_image_digest = hecate_api_utils:get_field(oci_image_digest, E),
         status = evoq_bit_flags:set(0, ?LIC_INITIATED),
         initiated_at = hecate_api_utils:get_field(initiated_at, E)
     }.
@@ -229,7 +234,9 @@ apply_amended(E, State) ->
         org, version, manifest_tag, tags, homepage,
         min_daemon_version, publisher_identity,
         selling_formula, license_type, fee_cents, fee_currency,
-        duration_days, node_limit
+        duration_days, node_limit,
+        manifest_url, manifest_checksum, seller_signature,
+        oci_image_verified, oci_image_digest
     ],
     lists:foldl(
         fun(Field, S) -> maybe_set(Field, hecate_api_utils:get_field(Field, E), S) end,
@@ -290,4 +297,9 @@ maybe_set(license_type, V, S)       -> S#license_state{license_type = V};
 maybe_set(fee_cents, V, S)          -> S#license_state{fee_cents = V};
 maybe_set(fee_currency, V, S)       -> S#license_state{fee_currency = V};
 maybe_set(duration_days, V, S)      -> S#license_state{duration_days = V};
-maybe_set(node_limit, V, S)         -> S#license_state{node_limit = V}.
+maybe_set(node_limit, V, S)         -> S#license_state{node_limit = V};
+maybe_set(manifest_url, V, S)       -> S#license_state{manifest_url = V};
+maybe_set(manifest_checksum, V, S)  -> S#license_state{manifest_checksum = V};
+maybe_set(seller_signature, V, S)   -> S#license_state{seller_signature = V};
+maybe_set(oci_image_verified, V, S) -> S#license_state{oci_image_verified = V};
+maybe_set(oci_image_digest, V, S)   -> S#license_state{oci_image_digest = V}.

@@ -61,7 +61,12 @@ create_license(Params, Req) ->
         tags => hecate_api_utils:get_field(tags, Params, undefined),
         homepage => hecate_api_utils:get_field(homepage, Params, undefined),
         min_daemon_version => hecate_api_utils:get_field(min_daemon_version, Params, undefined),
-        publisher_identity => hecate_api_utils:get_field(publisher_identity, Params, undefined)
+        publisher_identity => hecate_api_utils:get_field(publisher_identity, Params, undefined),
+        manifest_url => hecate_api_utils:get_field(manifest_url, Params, undefined),
+        manifest_checksum => hecate_api_utils:get_field(manifest_checksum, Params, undefined),
+        seller_signature => hecate_api_utils:get_field(seller_signature, Params, undefined),
+        oci_image_verified => hecate_api_utils:get_field(oci_image_verified, Params, undefined),
+        oci_image_digest => hecate_api_utils:get_field(oci_image_digest, Params, undefined)
     },
     case initiate_license_v1:new(CmdParams) of
         {ok, Cmd} -> dispatch(Cmd, Req);

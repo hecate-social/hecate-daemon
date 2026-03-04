@@ -28,6 +28,12 @@
     homepage          :: binary() | undefined,
     min_daemon_version :: binary() | undefined,
     publisher_identity :: binary() | undefined,
+    %% Trust verification fields
+    manifest_url       :: binary() | undefined,
+    manifest_checksum  :: binary() | undefined,
+    seller_signature   :: binary() | undefined,
+    oci_image_verified :: 0 | 1 | undefined,
+    oci_image_digest   :: binary() | undefined,
     initiated_at      :: integer() | undefined,
     announced_at      :: integer() | undefined,
     published_at      :: integer() | undefined,

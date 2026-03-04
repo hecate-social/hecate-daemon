@@ -15,6 +15,9 @@ list_row_test() ->
            <<"snake-duel-studio">>, <<"game,arcade">>, <<"https://github.com/hecate-apps">>,
            <<"0.14.0">>, <<"did:macula:pub123">>, <<"free">>,
            <<"free">>, 0, <<"EUR">>, 0, 0,
+           <<"https://example.com/manifest.json">>,
+           <<"abcdef1234567890">>, <<"base64sig==">>,
+           1, <<"sha256:deadbeef">>,
            1772600000000, 1772600000000, 1772600000000,
            4, 0,
            undefined, 0, undefined],
@@ -23,14 +26,15 @@ list_row_test() ->
     ?assertEqual(<<"Snake Duel">>, maps:get(name, Map)),
     ?assertEqual(<<"hecate-apps">>, maps:get(org, Map)),
     ?assertEqual(<<"EUR">>, maps:get(fee_currency, Map)),
-    ?assertEqual(26, maps:size(Map)).
+    ?assertEqual(1, maps:get(oci_image_verified, Map)),
+    ?assertEqual(31, maps:size(Map)).
 
 %% -- Tuple row (backward compat) --
 
 tuple_row_test() ->
-    Row = list_to_tuple(lists:duplicate(26, <<"val">>)),
+    Row = list_to_tuple(lists:duplicate(31, <<"val">>)),
     Map = browse_catalog_api:row_to_map(Row),
-    ?assertEqual(26, maps:size(Map)).
+    ?assertEqual(31, maps:size(Map)).
 
 %% -- Column mismatch crashes --
 

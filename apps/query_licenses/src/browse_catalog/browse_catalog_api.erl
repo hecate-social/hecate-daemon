@@ -17,6 +17,8 @@
     oci_image, manifest_tag, tags, homepage, min_daemon_version,
     publisher_identity, selling_formula,
     license_type, fee_cents, fee_currency, duration_days, node_limit,
+    manifest_url, manifest_checksum, seller_signature,
+    oci_image_verified, oci_image_digest,
     published_at, cataloged_at, refreshed_at,
     status, retracted,
     license_id, installed, installed_version
@@ -27,6 +29,8 @@
     "c.oci_image, c.manifest_tag, c.tags, c.homepage, c.min_daemon_version, "
     "c.publisher_identity, c.selling_formula, "
     "c.license_type, c.fee_cents, c.fee_currency, c.duration_days, c.node_limit, "
+    "c.manifest_url, c.manifest_checksum, c.seller_signature, "
+    "c.oci_image_verified, c.oci_image_digest, "
     "c.published_at, c.cataloged_at, c.refreshed_at, "
     "c.status, c.retracted, "
     "l.license_id, l.installed, l.installed_version "

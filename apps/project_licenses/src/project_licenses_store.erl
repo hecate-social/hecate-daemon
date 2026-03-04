@@ -117,6 +117,11 @@ create_tables(Db) ->
             homepage           TEXT,
             min_daemon_version TEXT,
             publisher_identity TEXT,
+            manifest_url       TEXT,
+            manifest_checksum  TEXT,
+            seller_signature   TEXT,
+            oci_image_verified INTEGER DEFAULT 0,
+            oci_image_digest   TEXT,
             announced_at       INTEGER,
             published_at       INTEGER,
             cataloged_at       INTEGER,
@@ -170,7 +175,12 @@ run_migrations(Db) ->
         "ALTER TABLE plugin_catalog ADD COLUMN fee_cents INTEGER",
         "ALTER TABLE plugin_catalog ADD COLUMN fee_currency TEXT",
         "ALTER TABLE plugin_catalog ADD COLUMN duration_days INTEGER",
-        "ALTER TABLE plugin_catalog ADD COLUMN node_limit INTEGER"
+        "ALTER TABLE plugin_catalog ADD COLUMN node_limit INTEGER",
+        "ALTER TABLE plugin_catalog ADD COLUMN manifest_url TEXT",
+        "ALTER TABLE plugin_catalog ADD COLUMN manifest_checksum TEXT",
+        "ALTER TABLE plugin_catalog ADD COLUMN seller_signature TEXT",
+        "ALTER TABLE plugin_catalog ADD COLUMN oci_image_verified INTEGER DEFAULT 0",
+        "ALTER TABLE plugin_catalog ADD COLUMN oci_image_digest TEXT"
     ],
     LicenseAlters = [
         "ALTER TABLE licenses ADD COLUMN installed INTEGER NOT NULL DEFAULT 0",

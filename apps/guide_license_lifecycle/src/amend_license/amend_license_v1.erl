@@ -12,7 +12,9 @@
          get_homepage/1, get_min_daemon_version/1, get_publisher_identity/1,
          get_selling_formula/1, get_license_type/1,
          get_fee_cents/1, get_fee_currency/1,
-         get_duration_days/1, get_node_limit/1]).
+         get_duration_days/1, get_node_limit/1,
+         get_manifest_url/1, get_manifest_checksum/1, get_seller_signature/1,
+         get_oci_image_verified/1, get_oci_image_digest/1]).
 
 -record(amend_license_v1, {
     license_id         :: binary(),
@@ -29,6 +31,12 @@
     homepage           :: binary() | undefined,
     min_daemon_version :: binary() | undefined,
     publisher_identity :: binary() | undefined,
+    %% Trust verification
+    manifest_url       :: binary() | undefined,
+    manifest_checksum  :: binary() | undefined,
+    seller_signature   :: binary() | undefined,
+    oci_image_verified :: 0 | 1 | undefined,
+    oci_image_digest   :: binary() | undefined,
     %% Pricing
     selling_formula    :: binary() | undefined,
     license_type       :: binary() | undefined,
@@ -59,6 +67,11 @@ new(#{license_id := LicenseId} = M) ->
         homepage           = maps:get(homepage, M, undefined),
         min_daemon_version = maps:get(min_daemon_version, M, undefined),
         publisher_identity = maps:get(publisher_identity, M, undefined),
+        manifest_url       = maps:get(manifest_url, M, undefined),
+        manifest_checksum  = maps:get(manifest_checksum, M, undefined),
+        seller_signature   = maps:get(seller_signature, M, undefined),
+        oci_image_verified = maps:get(oci_image_verified, M, undefined),
+        oci_image_digest   = maps:get(oci_image_digest, M, undefined),
         selling_formula    = maps:get(selling_formula, M, undefined),
         license_type       = maps:get(license_type, M, undefined),
         fee_cents          = maps:get(fee_cents, M, undefined),
@@ -98,6 +111,11 @@ to_map(#amend_license_v1{} = Cmd) ->
         {<<"homepage">>,           Cmd#amend_license_v1.homepage},
         {<<"min_daemon_version">>, Cmd#amend_license_v1.min_daemon_version},
         {<<"publisher_identity">>, Cmd#amend_license_v1.publisher_identity},
+        {<<"manifest_url">>,       Cmd#amend_license_v1.manifest_url},
+        {<<"manifest_checksum">>,  Cmd#amend_license_v1.manifest_checksum},
+        {<<"seller_signature">>,   Cmd#amend_license_v1.seller_signature},
+        {<<"oci_image_verified">>, Cmd#amend_license_v1.oci_image_verified},
+        {<<"oci_image_digest">>,   Cmd#amend_license_v1.oci_image_digest},
         {<<"selling_formula">>,    Cmd#amend_license_v1.selling_formula},
         {<<"license_type">>,       Cmd#amend_license_v1.license_type},
         {<<"fee_cents">>,          Cmd#amend_license_v1.fee_cents},
@@ -126,6 +144,11 @@ from_map(Map) ->
                 homepage           = hecate_api_utils:get_field(homepage, Map),
                 min_daemon_version = hecate_api_utils:get_field(min_daemon_version, Map),
                 publisher_identity = hecate_api_utils:get_field(publisher_identity, Map),
+                manifest_url       = hecate_api_utils:get_field(manifest_url, Map),
+                manifest_checksum  = hecate_api_utils:get_field(manifest_checksum, Map),
+                seller_signature   = hecate_api_utils:get_field(seller_signature, Map),
+                oci_image_verified = hecate_api_utils:get_field(oci_image_verified, Map),
+                oci_image_digest   = hecate_api_utils:get_field(oci_image_digest, Map),
                 selling_formula    = hecate_api_utils:get_field(selling_formula, Map),
                 license_type       = hecate_api_utils:get_field(license_type, Map),
                 fee_cents          = hecate_api_utils:get_field(fee_cents, Map),
@@ -194,6 +217,21 @@ get_duration_days(#amend_license_v1{duration_days = V}) -> V.
 -spec get_node_limit(amend_license_v1()) -> non_neg_integer() | undefined.
 get_node_limit(#amend_license_v1{node_limit = V}) -> V.
 
+-spec get_manifest_url(amend_license_v1()) -> binary() | undefined.
+get_manifest_url(#amend_license_v1{manifest_url = V}) -> V.
+
+-spec get_manifest_checksum(amend_license_v1()) -> binary() | undefined.
+get_manifest_checksum(#amend_license_v1{manifest_checksum = V}) -> V.
+
+-spec get_seller_signature(amend_license_v1()) -> binary() | undefined.
+get_seller_signature(#amend_license_v1{seller_signature = V}) -> V.
+
+-spec get_oci_image_verified(amend_license_v1()) -> 0 | 1 | undefined.
+get_oci_image_verified(#amend_license_v1{oci_image_verified = V}) -> V.
+
+-spec get_oci_image_digest(amend_license_v1()) -> binary() | undefined.
+get_oci_image_digest(#amend_license_v1{oci_image_digest = V}) -> V.
+
 %% Internal
 
 has_any_field(#amend_license_v1{
@@ -201,6 +239,8 @@ has_any_field(#amend_license_v1{
     github_repo = GR, oci_image = OI, org = O,
     version = V, manifest_tag = MT, tags = T,
     homepage = HP, min_daemon_version = MDV, publisher_identity = PI,
+    manifest_url = MU, manifest_checksum = MC, seller_signature = SS,
+    oci_image_verified = OV, oci_image_digest = OD,
     selling_formula = SF, license_type = LT, fee_cents = FC,
     fee_currency = FCur, duration_days = DD, node_limit = NL
 }) ->
@@ -208,6 +248,8 @@ has_any_field(#amend_license_v1{
     GR =/= undefined orelse OI =/= undefined orelse O =/= undefined orelse
     V =/= undefined orelse MT =/= undefined orelse T =/= undefined orelse
     HP =/= undefined orelse MDV =/= undefined orelse PI =/= undefined orelse
+    MU =/= undefined orelse MC =/= undefined orelse SS =/= undefined orelse
+    OV =/= undefined orelse OD =/= undefined orelse
     SF =/= undefined orelse LT =/= undefined orelse FC =/= undefined orelse
     FCur =/= undefined orelse DD =/= undefined orelse NL =/= undefined.
 

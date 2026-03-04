@@ -35,12 +35,14 @@ full_catalog_columns_test() ->
         github_repo, oci_image, manifest_tag, tags, homepage,
         min_daemon_version, publisher_identity, selling_formula, seller_id,
         license_type, fee_cents, fee_currency, duration_days, node_limit,
+        manifest_url, manifest_checksum, seller_signature,
+        oci_image_verified, oci_image_digest,
         announced_at, published_at, cataloged_at, refreshed_at,
         status, status_label, retracted
     ],
-    Row = lists:duplicate(28, <<"val">>),
+    Row = lists:duplicate(33, <<"val">>),
     Map = get_catalog_entry_api:row_to_map(Columns, Row),
-    ?assertEqual(28, maps:size(Map)).
+    ?assertEqual(33, maps:size(Map)).
 
 %% -- Column mismatch crashes --
 

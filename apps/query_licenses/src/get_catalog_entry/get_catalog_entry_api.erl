@@ -17,6 +17,8 @@
     github_repo, oci_image, manifest_tag, tags, homepage,
     min_daemon_version, publisher_identity, selling_formula, seller_id,
     license_type, fee_cents, fee_currency, duration_days, node_limit,
+    manifest_url, manifest_checksum, seller_signature,
+    oci_image_verified, oci_image_digest,
     announced_at, published_at, cataloged_at, refreshed_at,
     status, status_label, retracted
 ]).
@@ -32,6 +34,8 @@
     "github_repo, oci_image, manifest_tag, tags, homepage, "
     "min_daemon_version, publisher_identity, selling_formula, seller_id, "
     "license_type, fee_cents, fee_currency, duration_days, node_limit, "
+    "manifest_url, manifest_checksum, seller_signature, "
+    "oci_image_verified, oci_image_digest, "
     "announced_at, published_at, cataloged_at, refreshed_at, "
     "status, status_label, retracted "
     "FROM plugin_catalog WHERE plugin_id = ?1").

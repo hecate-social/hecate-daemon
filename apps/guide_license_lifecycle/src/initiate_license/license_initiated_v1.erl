@@ -10,6 +10,8 @@
          get_homepage/1, get_min_daemon_version/1, get_publisher_identity/1,
          get_license_type/1, get_fee_cents/1, get_fee_currency/1,
          get_duration_days/1, get_node_limit/1,
+         get_manifest_url/1, get_manifest_checksum/1, get_seller_signature/1,
+         get_oci_image_verified/1, get_oci_image_digest/1,
          get_initiated_at/1]).
 
 -record(license_initiated_v1, {
@@ -34,6 +36,12 @@
     homepage        :: binary() | undefined,
     min_daemon_version :: binary() | undefined,
     publisher_identity :: binary() | undefined,
+    %% Trust verification
+    manifest_url       :: binary() | undefined,
+    manifest_checksum  :: binary() | undefined,
+    seller_signature   :: binary() | undefined,
+    oci_image_verified :: 0 | 1 | undefined,
+    oci_image_digest   :: binary() | undefined,
     initiated_at    :: integer()
 }).
 
@@ -66,6 +74,11 @@ new(#{license_id := LicenseId, seller_id := SellerId, plugin_id := PluginId} = P
         homepage = maps:get(homepage, Params, undefined),
         min_daemon_version = maps:get(min_daemon_version, Params, undefined),
         publisher_identity = maps:get(publisher_identity, Params, undefined),
+        manifest_url = maps:get(manifest_url, Params, undefined),
+        manifest_checksum = maps:get(manifest_checksum, Params, undefined),
+        seller_signature = maps:get(seller_signature, Params, undefined),
+        oci_image_verified = maps:get(oci_image_verified, Params, undefined),
+        oci_image_digest = maps:get(oci_image_digest, Params, undefined),
         initiated_at = erlang:system_time(millisecond)
     }.
 
@@ -94,6 +107,11 @@ to_map(#license_initiated_v1{} = E) ->
         <<"homepage">> => E#license_initiated_v1.homepage,
         <<"min_daemon_version">> => E#license_initiated_v1.min_daemon_version,
         <<"publisher_identity">> => E#license_initiated_v1.publisher_identity,
+        <<"manifest_url">> => E#license_initiated_v1.manifest_url,
+        <<"manifest_checksum">> => E#license_initiated_v1.manifest_checksum,
+        <<"seller_signature">> => E#license_initiated_v1.seller_signature,
+        <<"oci_image_verified">> => E#license_initiated_v1.oci_image_verified,
+        <<"oci_image_digest">> => E#license_initiated_v1.oci_image_digest,
         <<"initiated_at">> => E#license_initiated_v1.initiated_at
     }.
 
@@ -129,6 +147,11 @@ from_map(Map) ->
                 homepage = hecate_api_utils:get_field(homepage, Map, undefined),
                 min_daemon_version = hecate_api_utils:get_field(min_daemon_version, Map, undefined),
                 publisher_identity = hecate_api_utils:get_field(publisher_identity, Map, undefined),
+                manifest_url = hecate_api_utils:get_field(manifest_url, Map, undefined),
+                manifest_checksum = hecate_api_utils:get_field(manifest_checksum, Map, undefined),
+                seller_signature = hecate_api_utils:get_field(seller_signature, Map, undefined),
+                oci_image_verified = hecate_api_utils:get_field(oci_image_verified, Map, undefined),
+                oci_image_digest = hecate_api_utils:get_field(oci_image_digest, Map, undefined),
                 initiated_at = hecate_api_utils:get_field(initiated_at, Map, erlang:system_time(millisecond))
             }}
     end.
@@ -196,6 +219,21 @@ get_duration_days(#license_initiated_v1{duration_days = V}) -> V.
 
 -spec get_node_limit(license_initiated_v1()) -> non_neg_integer() | undefined.
 get_node_limit(#license_initiated_v1{node_limit = V}) -> V.
+
+-spec get_manifest_url(license_initiated_v1()) -> binary() | undefined.
+get_manifest_url(#license_initiated_v1{manifest_url = V}) -> V.
+
+-spec get_manifest_checksum(license_initiated_v1()) -> binary() | undefined.
+get_manifest_checksum(#license_initiated_v1{manifest_checksum = V}) -> V.
+
+-spec get_seller_signature(license_initiated_v1()) -> binary() | undefined.
+get_seller_signature(#license_initiated_v1{seller_signature = V}) -> V.
+
+-spec get_oci_image_verified(license_initiated_v1()) -> 0 | 1 | undefined.
+get_oci_image_verified(#license_initiated_v1{oci_image_verified = V}) -> V.
+
+-spec get_oci_image_digest(license_initiated_v1()) -> binary() | undefined.
+get_oci_image_digest(#license_initiated_v1{oci_image_digest = V}) -> V.
 
 -spec get_initiated_at(license_initiated_v1()) -> integer().
 get_initiated_at(#license_initiated_v1{initiated_at = V}) -> V.
