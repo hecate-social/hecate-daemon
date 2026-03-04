@@ -484,8 +484,6 @@ ensure_started() ->
     _ = application:ensure_all_started(crypto),
     _ = application:ensure_all_started(ssl),
     _ = application:ensure_all_started(hackney),
-    _ = application:ensure_all_started(jsx),
-    _ = ok,
     _ = application:ensure_all_started(esqlite),
     
     %% Try to start hecate (may fail in escript if some deps missing)

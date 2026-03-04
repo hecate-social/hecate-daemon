@@ -37,7 +37,6 @@ setup() ->
     application:set_env(hecate, data_dir, TempDir),
 
     {ok, _} = application:ensure_all_started(esqlite),
-    {ok, _} = application:ensure_all_started(jsx),
 
     %% Ensure clean state — stop any leftover processes from previous test
     catch gen_server:stop(hecate_ucan),

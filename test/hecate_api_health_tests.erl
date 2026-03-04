@@ -26,9 +26,6 @@ health_api_test_() ->
 %%====================================================================
 
 setup() ->
-    
-    {ok, _} = application:ensure_all_started(jsx),
-    
     %% Mock dependencies
     meck:new(hecate_identity, [passthrough]),
     meck:new(cowboy_req, [passthrough]),
