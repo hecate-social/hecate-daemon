@@ -6,6 +6,11 @@
 
 -export([init/2, routes/0]).
 
+-ifdef(TEST).
+-compile(export_all).
+-compile(nowarn_export_all).
+-endif.
+
 -define(LICENSE_COLUMNS, [
     license_id, user_id, plugin_id, plugin_name,
     installed, installed_version, oci_image,

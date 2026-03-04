@@ -15,6 +15,11 @@
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
+-ifdef(TEST).
+-compile(export_all).
+-compile(nowarn_export_all).
+-endif.
+
 -define(EVENT_TYPE, <<"plugin_installed_v1">>).
 -define(SUB_NAME, <<"on_plugin_installed_provision_container">>).
 -define(STORE_ID, plugins_store).

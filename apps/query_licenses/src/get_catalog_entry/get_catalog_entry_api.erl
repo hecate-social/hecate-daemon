@@ -7,6 +7,11 @@
 
 -export([init/2, routes/0]).
 
+-ifdef(TEST).
+-compile(export_all).
+-compile(nowarn_export_all).
+-endif.
+
 -define(CATALOG_COLUMNS, [
     plugin_id, license_id, name, org, version, description, icon,
     github_repo, oci_image, manifest_tag, tags, homepage,
