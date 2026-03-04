@@ -3,6 +3,9 @@
 %%% Subscribes to plugin_installed_v1 events from plugins_store.
 %%% Generates a .container Quadlet file and writes it to
 %%% ~/.hecate/gitops/apps/ so the local reconciler picks it up.
+%%%
+%%% On startup, reconciles installed plugins against existing Quadlet
+%%% files to catch events missed during downtime (crash, restart, etc.).
 %%% @end
 -module(on_plugin_installed_provision_container).
 -behaviour(gen_server).
@@ -15,6 +18,7 @@
 -define(EVENT_TYPE, <<"plugin_installed_v1">>).
 -define(SUB_NAME, <<"on_plugin_installed_provision_container">>).
 -define(STORE_ID, plugins_store).
+-define(RECONCILE_DELAY_MS, 5000).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -23,8 +27,12 @@ init([]) ->
     {ok, _} = evoq_subscriptions:subscribe(
         ?STORE_ID, event_type, ?EVENT_TYPE, ?SUB_NAME,
         #{subscriber_pid => self()}),
+    erlang:send_after(?RECONCILE_DELAY_MS, self(), reconcile),
     {ok, #{}}.
 
+handle_info(reconcile, State) ->
+    reconcile_installed_plugins(),
+    {noreply, State};
 handle_info({events, Events}, State) ->
     lists:foreach(fun(E) -> handle_event(E) end, Events),
     {noreply, State};
@@ -35,13 +43,16 @@ handle_call(_Req, _From, State) -> {reply, ok, State}.
 handle_cast(_Msg, State) -> {noreply, State}.
 terminate(_Reason, _State) -> ok.
 
-%% Internal
+%% Internal — event handling
 
 handle_event(Event) ->
     Map = projection_event:to_map(Event),
     PluginId = get_value(plugin_id, Map),
     OciImage = get_value(oci_image, Map),
     Name = extract_plugin_name(PluginId),
+    provision_container(PluginId, Name, OciImage).
+
+provision_container(PluginId, Name, OciImage) ->
     AppsDir = shared_paths:gitops_apps_dir(),
     ok = filelib:ensure_path(AppsDir),
     FilePath = filename:join(AppsDir, container_filename(Name)),
@@ -53,6 +64,39 @@ handle_event(Event) ->
         {error, Reason} ->
             logger:error("[PM] Failed to write container file ~s: ~p",
                          [FilePath, Reason])
+    end.
+
+%% Internal — startup reconciliation
+
+reconcile_installed_plugins() ->
+    case query_installed_plugins() of
+        {ok, Plugins} ->
+            lists:foreach(fun reconcile_plugin/1, Plugins);
+        {error, Reason} ->
+            logger:warning("[PM] Startup reconciliation failed: ~p", [Reason])
+    end.
+
+reconcile_plugin({PluginId, OciImage}) ->
+    Name = extract_plugin_name(PluginId),
+    FilePath = filename:join(shared_paths:gitops_apps_dir(), container_filename(Name)),
+    case filelib:is_regular(FilePath) of
+        true -> ok;
+        false -> provision_container(PluginId, Name, OciImage)
+    end.
+
+%% @private Query SQLite for installed (non-removed) plugins.
+%% Catches specific exit reasons because project_plugins_store
+%% may not be started yet during early daemon boot.
+query_installed_plugins() ->
+    Sql = "SELECT plugin_id, oci_image FROM plugins WHERE (status & 2) = 0",
+    try project_plugins_store:query(Sql) of
+        {ok, Rows} ->
+            {ok, [{PluginId, OciImage} || {PluginId, OciImage} <- Rows]};
+        {error, _} = Err ->
+            Err
+    catch
+        exit:{noproc, _} -> {error, store_not_ready};
+        exit:{timeout, _} -> {error, store_timeout}
     end.
 
 %% @private Extract the plugin name from a plugin_id like "hecate-social/trader".
@@ -89,7 +133,7 @@ render_container(Name, OciImage) ->
         "HealthStartPeriod=10s\n",
         "\n",
         "[Service]\n",
-        "Restart=on-failure\n",
+        "Restart=always\n",
         "RestartSec=5s\n",
         "TimeoutStartSec=60s\n",
         "\n",
