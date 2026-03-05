@@ -31,11 +31,11 @@ new(#{plugin_id := PluginId, oci_image := OciImage,
 -spec to_map(plugin_upgraded_v1()) -> map().
 to_map(#plugin_upgraded_v1{} = E) ->
     #{
-        <<"event_type">>        => <<"plugin_upgraded_v1">>,
-        <<"plugin_id">>         => E#plugin_upgraded_v1.plugin_id,
-        <<"oci_image">>         => E#plugin_upgraded_v1.oci_image,
-        <<"installed_version">> => E#plugin_upgraded_v1.installed_version,
-        <<"upgraded_at">>       => E#plugin_upgraded_v1.upgraded_at
+        event_type        => <<"plugin_upgraded_v1">>,
+        plugin_id         => E#plugin_upgraded_v1.plugin_id,
+        oci_image         => E#plugin_upgraded_v1.oci_image,
+        installed_version => E#plugin_upgraded_v1.installed_version,
+        upgraded_at       => E#plugin_upgraded_v1.upgraded_at
     }.
 
 -spec from_map(map()) -> {ok, plugin_upgraded_v1()} | {error, term()}.

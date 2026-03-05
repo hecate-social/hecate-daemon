@@ -87,34 +87,34 @@ new(#{license_id := LicenseId} = M) ->
 -spec to_map(license_amended_v1()) -> map().
 to_map(#license_amended_v1{} = E) ->
     Base = #{
-        <<"event_type">> => <<"license_amended_v1">>,
-        <<"license_id">> => E#license_amended_v1.license_id,
-        <<"amended_at">> => E#license_amended_v1.amended_at
+        event_type => <<"license_amended_v1">>,
+        license_id => E#license_amended_v1.license_id,
+        amended_at => E#license_amended_v1.amended_at
     },
     lists:foldl(fun({Key, Val}, Acc) -> maybe_put(Key, Val, Acc) end, Base, [
-        {<<"plugin_name">>,        E#license_amended_v1.plugin_name},
-        {<<"description">>,        E#license_amended_v1.description},
-        {<<"icon">>,               E#license_amended_v1.icon},
-        {<<"github_repo">>,        E#license_amended_v1.github_repo},
-        {<<"oci_image">>,          E#license_amended_v1.oci_image},
-        {<<"org">>,                E#license_amended_v1.org},
-        {<<"version">>,            E#license_amended_v1.version},
-        {<<"manifest_tag">>,       E#license_amended_v1.manifest_tag},
-        {<<"tags">>,               E#license_amended_v1.tags},
-        {<<"homepage">>,           E#license_amended_v1.homepage},
-        {<<"min_daemon_version">>, E#license_amended_v1.min_daemon_version},
-        {<<"publisher_identity">>, E#license_amended_v1.publisher_identity},
-        {<<"manifest_url">>,       E#license_amended_v1.manifest_url},
-        {<<"manifest_checksum">>,  E#license_amended_v1.manifest_checksum},
-        {<<"seller_signature">>,   E#license_amended_v1.seller_signature},
-        {<<"oci_image_verified">>, E#license_amended_v1.oci_image_verified},
-        {<<"oci_image_digest">>,   E#license_amended_v1.oci_image_digest},
-        {<<"selling_formula">>,    E#license_amended_v1.selling_formula},
-        {<<"license_type">>,       E#license_amended_v1.license_type},
-        {<<"fee_cents">>,          E#license_amended_v1.fee_cents},
-        {<<"fee_currency">>,       E#license_amended_v1.fee_currency},
-        {<<"duration_days">>,      E#license_amended_v1.duration_days},
-        {<<"node_limit">>,         E#license_amended_v1.node_limit}
+        {plugin_name,        E#license_amended_v1.plugin_name},
+        {description,        E#license_amended_v1.description},
+        {icon,               E#license_amended_v1.icon},
+        {github_repo,        E#license_amended_v1.github_repo},
+        {oci_image,          E#license_amended_v1.oci_image},
+        {org,                E#license_amended_v1.org},
+        {version,            E#license_amended_v1.version},
+        {manifest_tag,       E#license_amended_v1.manifest_tag},
+        {tags,               E#license_amended_v1.tags},
+        {homepage,           E#license_amended_v1.homepage},
+        {min_daemon_version, E#license_amended_v1.min_daemon_version},
+        {publisher_identity, E#license_amended_v1.publisher_identity},
+        {manifest_url,       E#license_amended_v1.manifest_url},
+        {manifest_checksum,  E#license_amended_v1.manifest_checksum},
+        {seller_signature,   E#license_amended_v1.seller_signature},
+        {oci_image_verified, E#license_amended_v1.oci_image_verified},
+        {oci_image_digest,   E#license_amended_v1.oci_image_digest},
+        {selling_formula,    E#license_amended_v1.selling_formula},
+        {license_type,       E#license_amended_v1.license_type},
+        {fee_cents,          E#license_amended_v1.fee_cents},
+        {fee_currency,       E#license_amended_v1.fee_currency},
+        {duration_days,      E#license_amended_v1.duration_days},
+        {node_limit,         E#license_amended_v1.node_limit}
     ]).
 
 -spec from_map(map()) -> {ok, license_amended_v1()} | {error, term()}.

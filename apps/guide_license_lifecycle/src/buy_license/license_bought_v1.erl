@@ -34,13 +34,13 @@ new(#{license_id := LicenseId, user_id := UserId, plugin_id := PluginId} = Param
 -spec to_map(license_bought_v1()) -> map().
 to_map(#license_bought_v1{} = E) ->
     #{
-        <<"event_type">> => <<"license_bought_v1">>,
-        <<"license_id">> => E#license_bought_v1.license_id,
-        <<"user_id">> => E#license_bought_v1.user_id,
-        <<"plugin_id">> => E#license_bought_v1.plugin_id,
-        <<"plugin_name">> => E#license_bought_v1.plugin_name,
-        <<"oci_image">> => E#license_bought_v1.oci_image,
-        <<"granted_at">> => E#license_bought_v1.granted_at
+        event_type => <<"license_bought_v1">>,
+        license_id => E#license_bought_v1.license_id,
+        user_id => E#license_bought_v1.user_id,
+        plugin_id => E#license_bought_v1.plugin_id,
+        plugin_name => E#license_bought_v1.plugin_name,
+        oci_image => E#license_bought_v1.oci_image,
+        granted_at => E#license_bought_v1.granted_at
     }.
 
 -spec from_map(map()) -> {ok, license_bought_v1()} | {error, term()}.

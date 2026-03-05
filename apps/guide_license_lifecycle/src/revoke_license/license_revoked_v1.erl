@@ -27,10 +27,10 @@ new(#{license_id := LicenseId} = Params) ->
 -spec to_map(license_revoked_v1()) -> map().
 to_map(#license_revoked_v1{} = E) ->
     #{
-        <<"event_type">> => <<"license_revoked_v1">>,
-        <<"license_id">> => E#license_revoked_v1.license_id,
-        <<"reason">> => E#license_revoked_v1.reason,
-        <<"revoked_at">> => E#license_revoked_v1.revoked_at
+        event_type => <<"license_revoked_v1">>,
+        license_id => E#license_revoked_v1.license_id,
+        reason => E#license_revoked_v1.reason,
+        revoked_at => E#license_revoked_v1.revoked_at
     }.
 
 -spec from_map(map()) -> {ok, license_revoked_v1()} | {error, term()}.

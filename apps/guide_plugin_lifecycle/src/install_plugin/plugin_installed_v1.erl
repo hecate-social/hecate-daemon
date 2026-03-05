@@ -35,13 +35,13 @@ new(#{plugin_id := PluginId, name := Name,
 -spec to_map(plugin_installed_v1()) -> map().
 to_map(#plugin_installed_v1{} = E) ->
     #{
-        <<"event_type">>        => <<"plugin_installed_v1">>,
-        <<"plugin_id">>         => E#plugin_installed_v1.plugin_id,
-        <<"name">>              => E#plugin_installed_v1.name,
-        <<"oci_image">>         => E#plugin_installed_v1.oci_image,
-        <<"installed_version">> => E#plugin_installed_v1.installed_version,
-        <<"license_id">>        => E#plugin_installed_v1.license_id,
-        <<"installed_at">>      => E#plugin_installed_v1.installed_at
+        event_type        => <<"plugin_installed_v1">>,
+        plugin_id         => E#plugin_installed_v1.plugin_id,
+        name              => E#plugin_installed_v1.name,
+        oci_image         => E#plugin_installed_v1.oci_image,
+        installed_version => E#plugin_installed_v1.installed_version,
+        license_id        => E#plugin_installed_v1.license_id,
+        installed_at      => E#plugin_installed_v1.installed_at
     }.
 
 -spec from_map(map()) -> {ok, plugin_installed_v1()} | {error, term()}.

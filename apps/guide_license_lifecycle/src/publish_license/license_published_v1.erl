@@ -25,9 +25,9 @@ new(#{license_id := LicenseId}) ->
 -spec to_map(license_published_v1()) -> map().
 to_map(#license_published_v1{} = E) ->
     #{
-        <<"event_type">> => <<"license_published_v1">>,
-        <<"license_id">> => E#license_published_v1.license_id,
-        <<"published_at">> => E#license_published_v1.published_at
+        event_type => <<"license_published_v1">>,
+        license_id => E#license_published_v1.license_id,
+        published_at => E#license_published_v1.published_at
     }.
 
 -spec from_map(map()) -> {ok, license_published_v1()} | {error, term()}.

@@ -25,9 +25,9 @@ new(#{plugin_id := PluginId}) ->
 -spec to_map(plugin_removed_v1()) -> map().
 to_map(#plugin_removed_v1{} = E) ->
     #{
-        <<"event_type">>  => <<"plugin_removed_v1">>,
-        <<"plugin_id">>   => E#plugin_removed_v1.plugin_id,
-        <<"removed_at">>  => E#plugin_removed_v1.removed_at
+        event_type  => <<"plugin_removed_v1">>,
+        plugin_id   => E#plugin_removed_v1.plugin_id,
+        removed_at  => E#plugin_removed_v1.removed_at
     }.
 
 -spec from_map(map()) -> {ok, plugin_removed_v1()} | {error, term()}.

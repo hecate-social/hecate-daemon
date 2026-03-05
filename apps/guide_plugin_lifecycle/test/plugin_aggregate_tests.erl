@@ -83,7 +83,7 @@ install_from_fresh_test() ->
 install_event_has_correct_type_test() ->
     {ok, _S, [Event]} = execute_and_apply(fresh_state(), make_install_payload()),
     ?assertEqual(<<"plugin_installed_v1">>,
-                 maps:get(<<"event_type">>, Event)).
+                 maps:get(event_type, Event)).
 
 %% -- Upgrade Tests --
 
@@ -98,7 +98,7 @@ upgrade_event_has_correct_type_test() ->
     {ok, S1, _} = execute_and_apply(fresh_state(), make_install_payload()),
     {ok, _S2, [Event]} = execute_and_apply(S1, make_upgrade_payload()),
     ?assertEqual(<<"plugin_upgraded_v1">>,
-                 maps:get(<<"event_type">>, Event)).
+                 maps:get(event_type, Event)).
 
 %% -- Remove Tests --
 
@@ -112,7 +112,7 @@ remove_event_has_correct_type_test() ->
     {ok, S1, _} = execute_and_apply(fresh_state(), make_install_payload()),
     {ok, _S2, [Event]} = execute_and_apply(S1, make_remove_payload()),
     ?assertEqual(<<"plugin_removed_v1">>,
-                 maps:get(<<"event_type">>, Event)).
+                 maps:get(event_type, Event)).
 
 %% -- Business Rule Tests (invalid transitions) --
 

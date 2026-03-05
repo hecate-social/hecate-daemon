@@ -194,20 +194,20 @@ revoked_only_allows_archive_test() ->
 initiate_event_has_correct_type_test() ->
     {ok, _S, [Event]} = execute_and_apply(fresh_state(), make_initiate_payload()),
     ?assertEqual(<<"license_initiated_v1">>,
-                 maps:get(<<"event_type">>, Event)).
+                 maps:get(event_type, Event)).
 
 announce_event_has_correct_type_test() ->
     {ok, S1, _} = execute_and_apply(fresh_state(), make_initiate_payload()),
     {ok, _S2, [Event]} = execute_and_apply(S1, make_announce_payload()),
     ?assertEqual(<<"license_announced_v1">>,
-                 maps:get(<<"event_type">>, Event)).
+                 maps:get(event_type, Event)).
 
 publish_event_has_correct_type_test() ->
     {ok, S1, _} = execute_and_apply(fresh_state(), make_initiate_payload()),
     {ok, S2, _} = execute_and_apply(S1, make_announce_payload()),
     {ok, _S3, [Event]} = execute_and_apply(S2, make_publish_payload()),
     ?assertEqual(<<"license_published_v1">>,
-                 maps:get(<<"event_type">>, Event)).
+                 maps:get(event_type, Event)).
 
 %% ── Bit Flag Tests ─────────────────────────────────────────────────────────
 
@@ -276,7 +276,7 @@ amend_after_initiate_test() ->
     ?assertEqual(<<"Updated trading bot">>, S2#license_state.description),
     ?assertEqual(<<"ghcr.io/hecate-social/hecate-traderd:0.2.0">>, S2#license_state.oci_image),
     ?assertEqual(<<"license_amended_v1">>,
-                 maps:get(<<"event_type">>, Event)).
+                 maps:get(event_type, Event)).
 
 amend_after_announce_test() ->
     {ok, S1, _} = execute_and_apply(fresh_state(), make_initiate_payload()),
