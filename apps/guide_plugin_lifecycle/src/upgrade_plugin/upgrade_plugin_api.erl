@@ -1,4 +1,4 @@
-%%% @doc API handler: POST /api/node/plugins/upgrade
+%%% @doc API handler: POST /api/appstore/plugins/upgrade
 %%%
 %%% Upgrades an installed plugin on this node.
 %%% Lives in the upgrade_plugin desk for vertical slicing.
@@ -7,7 +7,7 @@
 
 -export([init/2, routes/0]).
 
-routes() -> [{"/api/node/plugins/upgrade", ?MODULE, []}].
+routes() -> [{"/api/appstore/plugins/upgrade", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

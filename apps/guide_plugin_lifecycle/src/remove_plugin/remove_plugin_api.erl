@@ -1,4 +1,4 @@
-%%% @doc API handler: POST /api/node/plugins/remove
+%%% @doc API handler: POST /api/appstore/plugins/remove
 %%%
 %%% Removes an installed plugin from this node.
 %%% Lives in the remove_plugin desk for vertical slicing.
@@ -7,7 +7,7 @@
 
 -export([init/2, routes/0]).
 
-routes() -> [{"/api/node/plugins/remove", ?MODULE, []}].
+routes() -> [{"/api/appstore/plugins/remove", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of

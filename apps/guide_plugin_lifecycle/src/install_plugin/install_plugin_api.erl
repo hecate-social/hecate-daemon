@@ -1,4 +1,4 @@
-%%% @doc API handler: POST /api/node/plugins/install
+%%% @doc API handler: POST /api/appstore/plugins/install
 %%%
 %%% Installs a plugin on this node.
 %%% Lives in the install_plugin desk for vertical slicing.
@@ -7,7 +7,7 @@
 
 -export([init/2, routes/0]).
 
-routes() -> [{"/api/node/plugins/install", ?MODULE, []}].
+routes() -> [{"/api/appstore/plugins/install", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
@@ -25,9 +25,11 @@ handle_post(Req0, _State) ->
 
 do_install(Params, Req) ->
     PluginId  = hecate_api_utils:get_field(plugin_id, Params),
-    Name      = hecate_api_utils:get_field(name, Params),
+    Name      = coalesce(hecate_api_utils:get_field(plugin_name, Params),
+                         hecate_api_utils:get_field(name, Params)),
     OciImage  = hecate_api_utils:get_field(oci_image, Params),
-    Version   = hecate_api_utils:get_field(installed_version, Params),
+    Version   = coalesce(hecate_api_utils:get_field(version, Params),
+                         hecate_api_utils:get_field(installed_version, Params)),
     LicenseId = hecate_api_utils:get_field(license_id, Params),
 
     case validate(PluginId, Name, OciImage, Version) of
@@ -67,3 +69,6 @@ dispatch(Cmd, Req) ->
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
+
+coalesce(undefined, B) -> B;
+coalesce(A, _) -> A.

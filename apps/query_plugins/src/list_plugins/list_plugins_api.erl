@@ -1,4 +1,4 @@
-%%% @doc API handler: GET /api/node/plugins
+%%% @doc API handler: GET /api/appstore/plugins
 %%%
 %%% Returns all installed (non-removed) plugins on this node.
 %%% @end
@@ -23,7 +23,7 @@
     "status, status_label "
     "FROM plugins WHERE (status & 2) = 0").
 
-routes() -> [{"/api/node/plugins", ?MODULE, []}].
+routes() -> [{"/api/appstore/plugins", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
