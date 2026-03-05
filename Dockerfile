@@ -38,7 +38,8 @@ RUN apk add --no-cache \
     libstdc++ \
     libgcc \
     openssl \
-    ca-certificates
+    ca-certificates \
+    dbus
 
 WORKDIR /app
 

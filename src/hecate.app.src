@@ -1,6 +1,6 @@
 {application, hecate,
  [{description, "Macula Hecate - Agent sidecar for mesh networking"},
-  {vsn, "0.15.4"},
+  {vsn, "0.15.5"},
   {registered, [hecate_sup, hecate_store, hecate_identity, hecate_mesh]},
   {mod, {hecate_app, []}},
   {applications,

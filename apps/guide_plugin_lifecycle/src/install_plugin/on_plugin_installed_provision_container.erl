@@ -65,7 +65,15 @@ provision_container(PluginId, Name, OciImage) ->
     case file:write_file(FilePath, Content) of
         ok ->
             logger:info("[PM] Provisioned container file ~s for plugin ~s",
-                        [FilePath, PluginId]);
+                        [FilePath, PluginId]),
+            ServiceName = service_name(Name),
+            case shared_systemctl:reload_and_start(ServiceName) of
+                ok ->
+                    logger:info("[PM] Started service ~s", [ServiceName]);
+                {error, Reason} ->
+                    logger:error("[PM] Failed to start service ~s: ~p",
+                                 [ServiceName, Reason])
+            end;
         {error, Reason} ->
             logger:error("[PM] Failed to write container file ~s: ~p",
                          [FilePath, Reason])
@@ -117,6 +125,10 @@ extract_plugin_name(PluginId) ->
 %% @private Build the .container filename for a plugin.
 container_filename(Name) ->
     <<"hecate-", Name/binary, "d.container">>.
+
+%% @private Build the systemd service name for a plugin.
+service_name(Name) ->
+    <<"hecate-", Name/binary, "d.service">>.
 
 %% @private Render the Quadlet .container file content.
 render_container(Name, OciImage) ->

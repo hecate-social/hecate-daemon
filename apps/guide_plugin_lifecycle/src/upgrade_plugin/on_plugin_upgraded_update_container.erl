@@ -50,7 +50,15 @@ handle_event(Event) ->
             case file:write_file(FilePath, Updated) of
                 ok ->
                     logger:info("[PM] Updated container image for ~s to ~s",
-                                [PluginId, OciImage]);
+                                [PluginId, OciImage]),
+                    ServiceName = service_name(Name),
+                    case shared_systemctl:reload_and_start(ServiceName) of
+                        ok ->
+                            logger:info("[PM] Restarted service ~s", [ServiceName]);
+                        {error, SvcErr} ->
+                            logger:error("[PM] Failed to restart service ~s: ~p",
+                                         [ServiceName, SvcErr])
+                    end;
                 {error, WriteErr} ->
                     logger:error("[PM] Failed to write updated container ~s: ~p",
                                  [FilePath, WriteErr])
@@ -84,6 +92,10 @@ extract_plugin_name(PluginId) ->
 %% @private Build the .container filename for a plugin.
 container_filename(Name) ->
     <<"hecate-", Name/binary, "d.container">>.
+
+%% @private Build the systemd service name for a plugin.
+service_name(Name) ->
+    <<"hecate-", Name/binary, "d.service">>.
 
 %% @private Get a value from a map, trying atom key first, then binary.
 get_value(Key, Map) when is_atom(Key) ->

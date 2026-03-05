@@ -43,10 +43,19 @@ handle_event(Event) ->
     Name = extract_plugin_name(PluginId),
     AppsDir = shared_paths:gitops_apps_dir(),
     FilePath = filename:join(AppsDir, container_filename(Name)),
+    ServiceName = service_name(Name),
+    case shared_systemctl:reload_and_stop(ServiceName) of
+        ok ->
+            logger:info("[PM] Stopped service ~s", [ServiceName]);
+        {error, Reason0} ->
+            logger:warning("[PM] Failed to stop service ~s: ~p (continuing with file removal)",
+                           [ServiceName, Reason0])
+    end,
     case file:delete(FilePath) of
         ok ->
             logger:info("[PM] Deprovisioned container file ~s for plugin ~s",
-                        [FilePath, PluginId]);
+                        [FilePath, PluginId]),
+            _ = shared_systemctl:reload();
         {error, enoent} ->
             logger:info("[PM] Container file already absent for ~s, nothing to deprovision",
                         [PluginId]);
@@ -65,6 +74,10 @@ extract_plugin_name(PluginId) ->
 %% @private Build the .container filename for a plugin.
 container_filename(Name) ->
     <<"hecate-", Name/binary, "d.container">>.
+
+%% @private Build the systemd service name for a plugin.
+service_name(Name) ->
+    <<"hecate-", Name/binary, "d.service">>.
 
 %% @private Get a value from a map, trying atom key first, then binary.
 get_value(Key, Map) when is_atom(Key) ->
