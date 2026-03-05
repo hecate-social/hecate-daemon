@@ -132,6 +132,7 @@ service_name(Name) ->
 
 %% @private Render the Quadlet .container file content.
 render_container(Name, OciImage) ->
+    BaseImage = strip_tag(OciImage),
     iolist_to_binary([
         "[Unit]\n",
         "Description=Hecate ", Name, " (plugin)\n",
@@ -139,7 +140,7 @@ render_container(Name, OciImage) ->
         "Wants=hecate-daemon.service\n",
         "\n",
         "[Container]\n",
-        "Image=", OciImage, "\n",
+        "Image=", BaseImage, ":latest\n",
         "ContainerName=hecate-", Name, "d\n",
         "AutoUpdate=registry\n",
         "Network=host\n",
@@ -160,6 +161,28 @@ render_container(Name, OciImage) ->
         "[Install]\n",
         "WantedBy=default.target\n"
     ]).
+
+%% @private Strip the tag from an OCI image reference.
+%% "ghcr.io/org/image:0.1.1" -> "ghcr.io/org/image"
+%% "ghcr.io/org/image" -> "ghcr.io/org/image"
+%% Tag is the part after the last colon that contains no slashes.
+strip_tag(Image) ->
+    case split_last(Image, <<":">>) of
+        {Base, Tag} ->
+            case binary:match(Tag, <<"/">>) of
+                nomatch -> Base;
+                _ -> Image
+            end;
+        nomatch -> Image
+    end.
+
+split_last(Bin, Sep) ->
+    case binary:matches(Bin, Sep) of
+        [] -> nomatch;
+        Matches ->
+            {Pos, Len} = lists:last(Matches),
+            {binary:part(Bin, 0, Pos), binary:part(Bin, Pos + Len, byte_size(Bin) - Pos - Len)}
+    end.
 
 %% @private Get a value from a map, trying atom key first, then binary.
 get_value(Key, Map) when is_atom(Key) ->
