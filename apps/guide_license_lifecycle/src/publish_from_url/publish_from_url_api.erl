@@ -336,22 +336,43 @@ dispatch_initiate(Name, Version, Org, OciImage, Manifest,
     end.
 
 do_dispatch(Cmd, TrustData, Req) ->
+    LicenseId = initiate_license_v1:get_license_id(Cmd),
     case maybe_initiate_license:dispatch(Cmd) of
-        {ok, Version, EventMaps} ->
-            hecate_api_utils:json_ok(201, #{
-                license_id         => initiate_license_v1:get_license_id(Cmd),
-                plugin_id          => initiate_license_v1:get_plugin_id(Cmd),
-                plugin_name        => initiate_license_v1:get_plugin_name(Cmd),
-                oci_image           => initiate_license_v1:get_oci_image(Cmd),
-                manifest_checksum  => maps:get(manifest_checksum, TrustData),
-                seller_signature   => maps:get(seller_signature, TrustData),
-                oci_image_verified => maps:get(oci_image_verified, TrustData),
-                oci_image_digest   => maps:get(oci_image_digest, TrustData),
-                version            => Version,
-                events             => EventMaps
-            }, Req);
+        {ok, _Version, _EventMaps} ->
+            case auto_publish(LicenseId) of
+                {ok, PublishVersion} ->
+                    hecate_api_utils:json_ok(201, #{
+                        license_id         => LicenseId,
+                        plugin_id          => initiate_license_v1:get_plugin_id(Cmd),
+                        plugin_name        => initiate_license_v1:get_plugin_name(Cmd),
+                        oci_image          => initiate_license_v1:get_oci_image(Cmd),
+                        manifest_checksum  => maps:get(manifest_checksum, TrustData),
+                        seller_signature   => maps:get(seller_signature, TrustData),
+                        oci_image_verified => maps:get(oci_image_verified, TrustData),
+                        oci_image_digest   => maps:get(oci_image_digest, TrustData),
+                        version            => PublishVersion,
+                        status             => <<"published">>
+                    }, Req);
+                {error, Reason} ->
+                    logger:error("[publish_from_url] Auto-publish failed for ~s: ~p",
+                                 [LicenseId, Reason]),
+                    hecate_api_utils:json_error(500,
+                        <<"License initiated but auto-publish failed">>, Req)
+            end;
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
+    end.
+
+auto_publish(LicenseId) ->
+    {ok, AnnounceCmd} = announce_license_v1:new(#{license_id => LicenseId}),
+    case maybe_announce_license:dispatch(AnnounceCmd) of
+        {ok, _, _} ->
+            {ok, PublishCmd} = publish_license_v1:new(#{license_id => LicenseId}),
+            case maybe_publish_license:dispatch(PublishCmd) of
+                {ok, Version, _} -> {ok, Version};
+                {error, _} = Err -> Err
+            end;
+        {error, _} = Err -> Err
     end.
 
 format_tags(undefined) -> undefined;
