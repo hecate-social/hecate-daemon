@@ -71,7 +71,7 @@ start_web() {
     echo "  Socket: $DEV_SOCK"
     echo ""
     cd "$WEB_DIR"
-    HECATE_SOCKET_PATH="$DEV_SOCK" npm run tauri dev
+    HECATE_SOCKET_PATH="$DEV_SOCK" cargo tauri dev
 }
 
 case "$MODE" in
