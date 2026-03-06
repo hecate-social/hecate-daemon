@@ -108,4 +108,25 @@ create_tables(Db) ->
         );"
     ],
     lists:foreach(fun(Sql) -> ok = esqlite3:exec(Db, Sql) end, Stmts),
+    run_migrations(Db),
     ok.
+
+run_migrations(Db) ->
+    %% Migration 1: Add started_at and stopped_at columns for execution tracking
+    add_column_if_missing(Db, "plugins", "started_at", "INTEGER"),
+    add_column_if_missing(Db, "plugins", "stopped_at", "INTEGER"),
+    ok.
+
+add_column_if_missing(Db, Table, Column, Type) ->
+    Sql = ["PRAGMA table_info(", Table, ");"],
+    {ok, Stmt} = esqlite3:prepare(Db, iolist_to_binary(Sql)),
+    Rows = esqlite3:fetchall(Stmt),
+    HasColumn = lists:any(fun(Row) -> lists:nth(2, Row) =:= list_to_binary(Column) end, Rows),
+    case HasColumn of
+        true -> ok;
+        false ->
+            AlterSql = iolist_to_binary([
+                "ALTER TABLE ", Table, " ADD COLUMN ", Column, " ", Type, ";"
+            ]),
+            ok = esqlite3:exec(Db, AlterSql)
+    end.

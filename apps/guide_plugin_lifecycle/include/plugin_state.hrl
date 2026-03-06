@@ -9,5 +9,7 @@
     installed_at      :: integer() | undefined,
     upgraded_at       :: integer() | undefined,
     removed_at        :: integer() | undefined,
+    started_at        :: integer() | undefined,
+    stopped_at        :: integer() | undefined,
     status            :: non_neg_integer()
 }).

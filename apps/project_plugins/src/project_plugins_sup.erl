@@ -38,6 +38,34 @@ init([]) ->
             start => {plugin_removed_v1_to_plugins_sup, start_link, []},
             restart => permanent,
             type => supervisor
+        },
+        %% Projection: plugin_execution_started_v1 -> plugins table
+        #{
+            id => plugin_execution_started_v1_to_plugins_sup,
+            start => {plugin_execution_started_v1_to_plugins_sup, start_link, []},
+            restart => permanent,
+            type => supervisor
+        },
+        %% Projection: plugin_execution_stopped_v1 -> plugins table
+        #{
+            id => plugin_execution_stopped_v1_to_plugins_sup,
+            start => {plugin_execution_stopped_v1_to_plugins_sup, start_link, []},
+            restart => permanent,
+            type => supervisor
+        },
+        %% Projection: container_confirmed_up_v1 -> plugins table
+        #{
+            id => container_confirmed_up_v1_to_plugins_sup,
+            start => {container_confirmed_up_v1_to_plugins_sup, start_link, []},
+            restart => permanent,
+            type => supervisor
+        },
+        %% Projection: container_confirmed_down_v1 -> plugins table
+        #{
+            id => container_confirmed_down_v1_to_plugins_sup,
+            start => {container_confirmed_down_v1_to_plugins_sup, start_link, []},
+            restart => permanent,
+            type => supervisor
         }
     ],
     {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

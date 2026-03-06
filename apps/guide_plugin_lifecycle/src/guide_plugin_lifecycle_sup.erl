@@ -34,6 +34,12 @@ init([]) ->
         #{id => plugin_removed_v1_to_pg,
           start => {plugin_removed_v1_to_pg, start_link, []},
           restart => permanent, type => worker},
+        #{id => plugin_execution_started_v1_to_pg,
+          start => {plugin_execution_started_v1_to_pg, start_link, []},
+          restart => permanent, type => worker},
+        #{id => plugin_execution_stopped_v1_to_pg,
+          start => {plugin_execution_stopped_v1_to_pg, start_link, []},
+          restart => permanent, type => worker},
 
         %% -- Process Managers (side effects) --
 
@@ -45,6 +51,27 @@ init([]) ->
           restart => permanent, type => worker},
         #{id => on_plugin_removed_deprovision_container,
           start => {on_plugin_removed_deprovision_container, start_link, []},
+          restart => permanent, type => worker},
+        #{id => on_plugin_execution_started_start_container,
+          start => {on_plugin_execution_started_start_container, start_link, []},
+          restart => permanent, type => worker},
+        #{id => on_plugin_execution_stopped_stop_container,
+          start => {on_plugin_execution_stopped_stop_container, start_link, []},
+          restart => permanent, type => worker},
+
+        %% -- Container confirmation emitters --
+
+        #{id => container_confirmed_up_v1_to_pg,
+          start => {container_confirmed_up_v1_to_pg, start_link, []},
+          restart => permanent, type => worker},
+        #{id => container_confirmed_down_v1_to_pg,
+          start => {container_confirmed_down_v1_to_pg, start_link, []},
+          restart => permanent, type => worker},
+
+        %% -- Container health watcher (dispatches confirm up/down) --
+
+        #{id => plugin_container_watcher,
+          start => {plugin_container_watcher, start_link, []},
           restart => permanent, type => worker}
     ],
 

@@ -54,12 +54,31 @@ execute(#plugin_state{status = S}, Payload) when S band ?PLG_REMOVED =/= 0 ->
         _ -> {error, plugin_removed}
     end;
 
-%% Installed — route by command type
-execute(#plugin_state{status = S} = State, Payload) when S band ?PLG_INSTALLED =/= 0 ->
+%% Installed (not running) — route by command type
+execute(#plugin_state{status = S} = State, Payload)
+  when S band ?PLG_INSTALLED =/= 0, S band ?PLG_RUNNING =:= 0 ->
     case get_command_type(Payload) of
-        <<"install_plugin">>  -> {error, plugin_already_installed};
-        <<"upgrade_plugin">>  -> execute_upgrade_plugin(Payload, State);
-        <<"remove_plugin">>   -> execute_remove_plugin(Payload, State);
+        <<"install_plugin">>            -> {error, plugin_already_installed};
+        <<"upgrade_plugin">>            -> execute_upgrade_plugin(Payload, State);
+        <<"remove_plugin">>             -> execute_remove_plugin(Payload, State);
+        <<"start_plugin_execution">>    -> execute_start_execution(Payload);
+        <<"stop_plugin_execution">>     -> {error, plugin_not_running};
+        <<"confirm_container_up">>      -> execute_confirm_up(Payload);
+        <<"confirm_container_down">>    -> execute_confirm_down(Payload);
+        _ -> {error, unknown_command}
+    end;
+
+%% Running — route by command type
+execute(#plugin_state{status = S} = State, Payload)
+  when S band ?PLG_RUNNING =/= 0 ->
+    case get_command_type(Payload) of
+        <<"install_plugin">>            -> {error, plugin_already_installed};
+        <<"upgrade_plugin">>            -> execute_upgrade_plugin(Payload, State);
+        <<"remove_plugin">>             -> execute_remove_plugin(Payload, State);
+        <<"start_plugin_execution">>    -> {error, plugin_already_running};
+        <<"stop_plugin_execution">>     -> execute_stop_execution(Payload);
+        <<"confirm_container_up">>      -> execute_confirm_up(Payload);
+        <<"confirm_container_down">>    -> execute_confirm_down(Payload);
         _ -> {error, unknown_command}
     end;
 
@@ -80,6 +99,22 @@ execute_remove_plugin(Payload, _State) ->
     {ok, Cmd} = remove_plugin_v1:from_map(Payload),
     convert_events(maybe_remove_plugin:handle(Cmd), fun plugin_removed_v1:to_map/1).
 
+execute_start_execution(Payload) ->
+    {ok, Cmd} = start_plugin_execution_v1:from_map(Payload),
+    convert_events(maybe_start_plugin_execution:handle(Cmd), fun plugin_execution_started_v1:to_map/1).
+
+execute_stop_execution(Payload) ->
+    {ok, Cmd} = stop_plugin_execution_v1:from_map(Payload),
+    convert_events(maybe_stop_plugin_execution:handle(Cmd), fun plugin_execution_stopped_v1:to_map/1).
+
+execute_confirm_up(Payload) ->
+    {ok, Cmd} = confirm_container_up_v1:from_map(Payload),
+    convert_events(maybe_confirm_container_up:handle(Cmd), fun container_confirmed_up_v1:to_map/1).
+
+execute_confirm_down(Payload) ->
+    {ok, Cmd} = confirm_container_down_v1:from_map(Payload),
+    convert_events(maybe_confirm_container_down:handle(Cmd), fun container_confirmed_down_v1:to_map/1).
+
 %% --- Apply ---
 %% NOTE: evoq calls apply(State, Event) - State FIRST!
 
@@ -95,6 +130,14 @@ apply_event(#{<<"event_type">> := <<"plugin_upgraded_v1">>} = E, S)  -> apply_up
 apply_event(#{event_type := <<"plugin_upgraded_v1">>} = E, S)       -> apply_upgraded(E, S);
 apply_event(#{<<"event_type">> := <<"plugin_removed_v1">>} = E, S)  -> apply_removed(E, S);
 apply_event(#{event_type := <<"plugin_removed_v1">>} = E, S)        -> apply_removed(E, S);
+apply_event(#{<<"event_type">> := <<"plugin_execution_started_v1">>} = E, S) -> apply_started(E, S);
+apply_event(#{event_type := <<"plugin_execution_started_v1">>} = E, S)       -> apply_started(E, S);
+apply_event(#{<<"event_type">> := <<"plugin_execution_stopped_v1">>} = E, S) -> apply_stopped(E, S);
+apply_event(#{event_type := <<"plugin_execution_stopped_v1">>} = E, S)       -> apply_stopped(E, S);
+apply_event(#{<<"event_type">> := <<"container_confirmed_up_v1">>} = _E, S)  -> apply_confirmed_up(S);
+apply_event(#{event_type := <<"container_confirmed_up_v1">>} = _E, S)        -> apply_confirmed_up(S);
+apply_event(#{<<"event_type">> := <<"container_confirmed_down_v1">>} = _E, S) -> apply_confirmed_down(S);
+apply_event(#{event_type := <<"container_confirmed_down_v1">>} = _E, S)       -> apply_confirmed_down(S);
 %% Unknown — ignore
 apply_event(_E, S) -> S.
 
@@ -125,6 +168,29 @@ apply_removed(E, #plugin_state{status = Status} = State) ->
         status = evoq_bit_flags:set(Status, ?PLG_REMOVED),
         removed_at = get_value(removed_at, E)
     }.
+
+apply_started(E, #plugin_state{status = Status} = State) ->
+    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_RUNNING), ?PLG_STOPPED),
+    State#plugin_state{
+        status = NewStatus,
+        started_at = get_value(started_at, E),
+        stopped_at = undefined
+    }.
+
+apply_stopped(E, #plugin_state{status = Status} = State) ->
+    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_STOPPED), ?PLG_RUNNING),
+    State#plugin_state{
+        status = NewStatus,
+        stopped_at = get_value(stopped_at, E)
+    }.
+
+apply_confirmed_up(#plugin_state{status = Status} = State) ->
+    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_CONFIRMED_UP), ?PLG_CONFIRMED_DOWN),
+    State#plugin_state{status = NewStatus}.
+
+apply_confirmed_down(#plugin_state{status = Status} = State) ->
+    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_CONFIRMED_DOWN), ?PLG_CONFIRMED_UP),
+    State#plugin_state{status = NewStatus}.
 
 %% --- Internal ---
 
