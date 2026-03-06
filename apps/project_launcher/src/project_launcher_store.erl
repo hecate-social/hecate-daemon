@@ -94,22 +94,22 @@ step_until_done(Stmt) ->
 
 create_tables(Db) ->
     Stmts = [
-        "CREATE TABLE IF NOT EXISTS launcher_entries (
-            entry_id      TEXT PRIMARY KEY,
-            display_name  TEXT NOT NULL,
-            icon          TEXT NOT NULL DEFAULT '🔌',
-            group_name    TEXT NOT NULL DEFAULT 'PLUGINS',
-            position      INTEGER NOT NULL DEFAULT 0,
-            registered_at INTEGER,
-            status        INTEGER DEFAULT 1,
-            status_label  TEXT DEFAULT 'Active'
-        );",
-        "CREATE TABLE IF NOT EXISTS launcher_groups (
-            name       TEXT PRIMARY KEY,
-            icon       TEXT NOT NULL DEFAULT '📁',
-            collapsed  INTEGER NOT NULL DEFAULT 0,
-            position   INTEGER NOT NULL DEFAULT 0
-        );"
+        "CREATE TABLE IF NOT EXISTS launcher_entries ("
+        "  entry_id      TEXT PRIMARY KEY,"
+        "  display_name  TEXT NOT NULL,"
+        "  icon          TEXT NOT NULL DEFAULT '',"
+        "  group_name    TEXT NOT NULL DEFAULT 'PLUGINS',"
+        "  position      INTEGER NOT NULL DEFAULT 0,"
+        "  registered_at INTEGER,"
+        "  status        INTEGER DEFAULT 1,"
+        "  status_label  TEXT DEFAULT 'Active'"
+        ");",
+        "CREATE TABLE IF NOT EXISTS launcher_groups ("
+        "  name       TEXT PRIMARY KEY,"
+        "  icon       TEXT NOT NULL DEFAULT '',"
+        "  collapsed  INTEGER NOT NULL DEFAULT 0,"
+        "  position   INTEGER NOT NULL DEFAULT 0"
+        ");"
     ],
     lists:foreach(fun(Sql) -> ok = esqlite3:exec(Db, Sql) end, Stmts),
     ok.

@@ -10,7 +10,7 @@ project(Event) ->
     project_launcher_store:execute("DELETE FROM launcher_groups"),
     lists:foldl(fun(Group, GPos) ->
         Name = get_value(name, Group),
-        Icon = get_value(icon, Group, <<"📁">>),
+        Icon = get_value(icon, Group, <<"\xF0\x9F\x93\x81">>),
         Collapsed = case get_value(collapsed, Group, false) of true -> 1; _ -> 0 end,
         Apps = get_value(apps, Group, []),
         project_launcher_store:execute(
@@ -19,8 +19,8 @@ project(Event) ->
         lists:foldl(fun(AppId, EPos) ->
             project_launcher_store:execute(
                 "INSERT INTO launcher_entries (entry_id, display_name, icon, group_name, position, status, status_label) "
-                "VALUES (?1, ?1, '🔌', ?2, ?3, 1, 'Active')",
-                [AppId, Name, EPos]),
+                "VALUES (?1, ?1, ?4, ?2, ?3, 1, 'Active')",
+                [AppId, Name, EPos, <<"\xF0\x9F\x94\x8C">>]),
             EPos + 1
         end, 0, Apps),
         GPos + 1

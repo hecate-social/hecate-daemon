@@ -11,8 +11,8 @@ project(Event) ->
     RegisteredAt = hecate_api_utils:get_field(registered_at, Event),
     %% Ensure group exists
     GroupSql = "INSERT OR IGNORE INTO launcher_groups (name, icon, collapsed, position) "
-               "VALUES (?1, '📁', 0, (SELECT COALESCE(MAX(position),0)+1 FROM launcher_groups))",
-    project_launcher_store:execute(GroupSql, [GroupName]),
+               "VALUES (?1, ?2, 0, (SELECT COALESCE(MAX(position),0)+1 FROM launcher_groups))",
+    project_launcher_store:execute(GroupSql, [GroupName, <<"\xF0\x9F\x93\x81">>]),
     %% Insert entry
     EntrySql = "INSERT OR REPLACE INTO launcher_entries "
                "(entry_id, display_name, icon, group_name, position, registered_at, status, status_label) "
