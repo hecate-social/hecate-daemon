@@ -60,6 +60,9 @@ handle_event(Event) ->
 provision_container(PluginId, Name, OciImage) ->
     AppsDir = shared_paths:gitops_apps_dir(),
     ok = filelib:ensure_path(AppsDir),
+    %% Create plugin data directory so podman can mount it
+    PluginDataDir = plugin_data_dir(Name),
+    ok = filelib:ensure_path(PluginDataDir),
     FilePath = filename:join(AppsDir, container_filename(Name)),
     Content = render_container(Name, OciImage),
     case file:write_file(FilePath, Content) of
@@ -121,6 +124,10 @@ extract_plugin_name(PluginId) ->
         [_, Name] -> Name;
         [Name] -> Name
     end.
+
+%% @private Build the plugin data directory path.
+plugin_data_dir(Name) ->
+    filename:join(shared_paths:hecate_home(), <<"hecate-", Name/binary, "d">>).
 
 %% @private Build the .container filename for a plugin.
 container_filename(Name) ->
