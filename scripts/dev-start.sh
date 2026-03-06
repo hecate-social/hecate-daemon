@@ -26,6 +26,13 @@ mkdir -p ~/.hecate-dev/config
 # Clean stale socket
 rm -f ~/.hecate-dev/hecate-daemon/sockets/api.sock
 
+# Kill stale BEAM/epmd holding the dev node name
+if pgrep -f 'sname hecate_dev' > /dev/null 2>&1; then
+    echo "Killing stale hecate_dev BEAM process..."
+    pkill -f 'sname hecate_dev' || true
+    sleep 2
+fi
+
 # Build release with dev config
 echo "Building dev release..."
 rebar3 release
@@ -36,11 +43,13 @@ MODE="${1:-foreground}"
 export RELX_CONFIG_PATH="$PROJECT_DIR/config/dev.sys.config"
 export VMARGS_PATH="$PROJECT_DIR/config/dev.vm.args"
 
+NODE_HOST="$(cat /etc/hostname 2>/dev/null || uname -n)"
+
 echo ""
 echo "=== Hecate Dev ==="
 echo "  Data:   ~/.hecate-dev/hecate-daemon/"
 echo "  Socket: ~/.hecate-dev/hecate-daemon/sockets/api.sock"
-echo "  Node:   hecate_dev@$(hostname -s)"
+echo "  Node:   hecate_dev@${NODE_HOST}"
 echo ""
 
 exec _build/default/rel/hecate/bin/hecate "$MODE"
