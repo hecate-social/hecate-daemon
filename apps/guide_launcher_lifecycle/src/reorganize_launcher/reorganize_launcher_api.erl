@@ -1,21 +1,13 @@
-%%% @doc API handler: PUT /api/launcher/layout
+%%% @doc PUT /api/launcher/layout — full launcher layout reorganization.
 %%%
-%%% Full launcher layout reorganization.
-%%% Lives in the reorganize_launcher desk for vertical slicing.
+%%% Route is owned by get_launcher_layout_api (QRY), which delegates
+%%% PUT requests here. This module does NOT register its own route.
 %%% @end
 -module(reorganize_launcher_api).
 
--export([init/2, routes/0]).
+-export([handle_put/1]).
 
-routes() -> [{"/api/launcher/layout", ?MODULE, []}].
-
-init(Req0, State) ->
-    case cowboy_req:method(Req0) of
-        <<"PUT">> -> handle_put(Req0, State);
-        _ -> hecate_api_utils:method_not_allowed(Req0)
-    end.
-
-handle_put(Req0, _State) ->
+handle_put(Req0) ->
     case hecate_api_utils:read_json_body(Req0) of
         {ok, Params, Req1} ->
             do_reorganize(Params, Req1);

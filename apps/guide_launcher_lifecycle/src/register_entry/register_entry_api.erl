@@ -1,21 +1,13 @@
-%%% @doc API handler: POST /api/launcher/entries
+%%% @doc POST /api/launcher/entries — register an app entry.
 %%%
-%%% Registers an app entry in the launcher sidebar.
-%%% Lives in the register_entry desk for vertical slicing.
+%%% Route is owned by get_launcher_entries_api (QRY), which delegates
+%%% POST requests here. This module does NOT register its own route.
 %%% @end
 -module(register_entry_api).
 
--export([init/2, routes/0]).
+-export([handle_post/1]).
 
-routes() -> [{"/api/launcher/entries", ?MODULE, []}].
-
-init(Req0, State) ->
-    case cowboy_req:method(Req0) of
-        <<"POST">> -> handle_post(Req0, State);
-        _ -> hecate_api_utils:method_not_allowed(Req0)
-    end.
-
-handle_post(Req0, _State) ->
+handle_post(Req0) ->
     case hecate_api_utils:read_json_body(Req0) of
         {ok, Params, Req1} ->
             do_register(Params, Req1);

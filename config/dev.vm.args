@@ -1,0 +1,15 @@
+## Dev node — separate from production hecate@host
+-sname hecate_dev
+
+## Different cookie to avoid cluster conflicts
+-setcookie hecate_dev_cookie
+
+## No heartbeat in dev (don't auto-restart on crash)
+## -heart
+
+-smp auto
++A 64
++P 1048576
++Q 65536
++sbt db
++SDio 32

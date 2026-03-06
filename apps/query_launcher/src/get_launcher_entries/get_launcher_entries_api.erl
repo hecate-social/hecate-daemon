@@ -1,7 +1,7 @@
-%%% @doc API handler: GET /api/launcher/entries
+%%% @doc API handler: GET/POST /api/launcher/entries
 %%%
-%%% Returns all launcher entries as a flat list.
-%%% Reads from the SQLite store owned by project_launcher.
+%%% GET  - Returns all launcher entries as a flat list (SQLite read model).
+%%% POST - Delegates to register_entry_api for entry registration.
 %%% @end
 -module(get_launcher_entries_api).
 
@@ -27,6 +27,7 @@ routes() -> [{"/api/launcher/entries", ?MODULE, []}].
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
         <<"GET">> -> handle_get(Req0, State);
+        <<"POST">> -> register_entry_api:handle_post(Req0);
         _ -> hecate_api_utils:method_not_allowed(Req0)
     end.
 
