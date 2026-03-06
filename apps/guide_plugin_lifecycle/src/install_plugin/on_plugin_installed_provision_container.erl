@@ -54,8 +54,8 @@ handle_event(Event) ->
     Map = projection_event:to_map(Event),
     PluginId = get_value(plugin_id, Map),
     OciImage = get_value(oci_image, Map),
-    Name = extract_plugin_name(PluginId),
-    provision_container(PluginId, Name, OciImage).
+    DaemonName = extract_daemon_name(OciImage),
+    provision_container(PluginId, DaemonName, OciImage).
 
 provision_container(PluginId, Name, OciImage) ->
     AppsDir = shared_paths:gitops_apps_dir(),
@@ -93,7 +93,7 @@ reconcile_installed_plugins() ->
     end.
 
 reconcile_plugin({PluginId, OciImage}) ->
-    Name = extract_plugin_name(PluginId),
+    Name = extract_daemon_name(OciImage),
     FilePath = filename:join(shared_paths:gitops_apps_dir(), container_filename(Name)),
     case filelib:is_regular(FilePath) of
         true -> ok;
@@ -118,43 +118,46 @@ query_installed_plugins() ->
 row_to_tuple([PluginId, OciImage]) -> {PluginId, OciImage};
 row_to_tuple({PluginId, OciImage}) -> {PluginId, OciImage}.
 
-%% @private Extract the plugin name from a plugin_id like "hecate-social/trader".
-extract_plugin_name(PluginId) ->
-    case binary:split(PluginId, <<"/">>) of
-        [_, Name] -> Name;
-        [Name] -> Name
+%% @private Extract the daemon name from the OCI image reference.
+%% "ghcr.io/hecate-apps/hecate-app-snake-dueld:latest" -> "hecate-app-snake-dueld"
+%% "ghcr.io/hecate-apps/hecate-app-snake-dueld" -> "hecate-app-snake-dueld"
+extract_daemon_name(OciImage) ->
+    Base = strip_tag(OciImage),
+    case split_last(Base, <<"/">>) of
+        {_, Name} -> Name;
+        nomatch -> Base
     end.
 
 %% @private Build the plugin data directory path.
-plugin_data_dir(Name) ->
-    filename:join(shared_paths:hecate_home(), <<"hecate-", Name/binary, "d">>).
+plugin_data_dir(DaemonName) ->
+    filename:join(shared_paths:hecate_home(), DaemonName).
 
 %% @private Build the .container filename for a plugin.
-container_filename(Name) ->
-    <<"hecate-", Name/binary, "d.container">>.
+container_filename(DaemonName) ->
+    <<DaemonName/binary, ".container">>.
 
 %% @private Build the systemd service name for a plugin.
-service_name(Name) ->
-    <<"hecate-", Name/binary, "d.service">>.
+service_name(DaemonName) ->
+    <<DaemonName/binary, ".service">>.
 
 %% @private Render the Quadlet .container file content.
-render_container(Name, OciImage) ->
+render_container(DaemonName, OciImage) ->
     BaseImage = strip_tag(OciImage),
     iolist_to_binary([
         "[Unit]\n",
-        "Description=Hecate ", Name, " (plugin)\n",
+        "Description=Hecate ", DaemonName, " (plugin)\n",
         "After=hecate-daemon.service\n",
         "Wants=hecate-daemon.service\n",
         "\n",
         "[Container]\n",
         "Image=", BaseImage, ":latest\n",
-        "ContainerName=hecate-", Name, "d\n",
+        "ContainerName=", DaemonName, "\n",
         "AutoUpdate=registry\n",
         "Network=host\n",
         "Environment=HOME=%h\n",
-        "Volume=%h/.hecate/hecate-", Name, "d:%h/.hecate/hecate-", Name, "d:Z\n",
+        "Volume=%h/.hecate/", DaemonName, ":%h/.hecate/", DaemonName, ":Z\n",
         "Volume=%h/.hecate/hecate-daemon/sockets:%h/.hecate/hecate-daemon/sockets:ro\n",
-        "HealthCmd=test -S %h/.hecate/hecate-", Name, "d/sockets/api.sock\n",
+        "HealthCmd=test -S %h/.hecate/", DaemonName, "/sockets/api.sock\n",
         "HealthInterval=30s\n",
         "HealthRetries=3\n",
         "HealthTimeout=5s\n",

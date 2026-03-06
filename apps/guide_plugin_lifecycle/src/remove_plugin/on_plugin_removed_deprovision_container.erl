@@ -40,10 +40,20 @@ terminate(_Reason, _State) -> ok.
 handle_event(Event) ->
     Map = projection_event:to_map(Event),
     PluginId = get_value(plugin_id, Map),
-    Name = extract_plugin_name(PluginId),
+    case lookup_oci_image(PluginId) of
+        {ok, OciImage} ->
+            deprovision(PluginId, OciImage);
+        {error, not_found} ->
+            logger:warning("[PM] Cannot find OCI image for ~s, trying plugin_id fallback",
+                           [PluginId]),
+            deprovision_by_plugin_id(PluginId)
+    end.
+
+deprovision(PluginId, OciImage) ->
+    DaemonName = extract_daemon_name(OciImage),
     AppsDir = shared_paths:gitops_apps_dir(),
-    FilePath = filename:join(AppsDir, container_filename(Name)),
-    ServiceName = service_name(Name),
+    FilePath = filename:join(AppsDir, container_filename(DaemonName)),
+    ServiceName = service_name(DaemonName),
     case shared_systemctl:reload_and_stop(ServiceName) of
         ok ->
             logger:info("[PM] Stopped service ~s", [ServiceName]);
@@ -64,20 +74,71 @@ handle_event(Event) ->
                          [FilePath, Reason])
     end.
 
-%% @private Extract the plugin name from a plugin_id like "hecate-social/trader".
-extract_plugin_name(PluginId) ->
-    case binary:split(PluginId, <<"/">>) of
-        [_, Name] -> Name;
-        [Name] -> Name
+%% @private Fallback: derive daemon name from plugin_id (legacy naming).
+deprovision_by_plugin_id(PluginId) ->
+    Name = case binary:split(PluginId, <<"/">>) of
+        [_, N] -> N;
+        [N] -> N
+    end,
+    LegacyDaemonName = <<"hecate-", Name/binary, "d">>,
+    AppsDir = shared_paths:gitops_apps_dir(),
+    FilePath = filename:join(AppsDir, <<LegacyDaemonName/binary, ".container">>),
+    ServiceName = <<LegacyDaemonName/binary, ".service">>,
+    case shared_systemctl:reload_and_stop(ServiceName) of
+        ok -> ok;
+        {error, _} -> ok
+    end,
+    case file:delete(FilePath) of
+        ok ->
+            logger:info("[PM] Deprovisioned (fallback) ~s", [FilePath]),
+            _ = shared_systemctl:reload();
+        _ -> ok
     end.
 
-%% @private Build the .container filename for a plugin.
-container_filename(Name) ->
-    <<"hecate-", Name/binary, "d.container">>.
+%% @private Look up the OCI image for a plugin from the read model.
+lookup_oci_image(PluginId) ->
+    Sql = <<"SELECT oci_image FROM plugins WHERE plugin_id = ?1 LIMIT 1">>,
+    try project_plugins_store:query(Sql, [PluginId]) of
+        {ok, [[OciImage]]} -> {ok, OciImage};
+        {ok, []} -> {error, not_found};
+        _ -> {error, not_found}
+    catch
+        _:_ -> {error, not_found}
+    end.
 
-%% @private Build the systemd service name for a plugin.
-service_name(Name) ->
-    <<"hecate-", Name/binary, "d.service">>.
+%% @private Extract the daemon name from the OCI image reference.
+extract_daemon_name(OciImage) ->
+    Base = strip_tag(OciImage),
+    case split_last(Base, <<"/">>) of
+        {_, Name} -> Name;
+        nomatch -> Base
+    end.
+
+strip_tag(Image) ->
+    case split_last(Image, <<":">>) of
+        {Base, Tag} ->
+            case binary:match(Tag, <<"/">>) of
+                nomatch -> Base;
+                _ -> Image
+            end;
+        nomatch -> Image
+    end.
+
+split_last(Bin, Sep) ->
+    case binary:matches(Bin, Sep) of
+        [] -> nomatch;
+        Matches ->
+            {Pos, Len} = lists:last(Matches),
+            {binary:part(Bin, 0, Pos), binary:part(Bin, Pos + Len, byte_size(Bin) - Pos - Len)}
+    end.
+
+%% @private Build the .container filename.
+container_filename(DaemonName) ->
+    <<DaemonName/binary, ".container">>.
+
+%% @private Build the systemd service name.
+service_name(DaemonName) ->
+    <<DaemonName/binary, ".service">>.
 
 %% @private Get a value from a map, trying atom key first, then binary.
 get_value(Key, Map) when is_atom(Key) ->

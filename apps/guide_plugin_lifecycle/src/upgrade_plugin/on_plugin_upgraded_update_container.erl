@@ -41,9 +41,9 @@ handle_event(Event) ->
     Map = projection_event:to_map(Event),
     PluginId = get_value(plugin_id, Map),
     OciImage = get_value(oci_image, Map),
-    Name = extract_plugin_name(PluginId),
+    DaemonName = extract_daemon_name(OciImage),
     AppsDir = shared_paths:gitops_apps_dir(),
-    FilePath = filename:join(AppsDir, container_filename(Name)),
+    FilePath = filename:join(AppsDir, container_filename(DaemonName)),
     case file:read_file(FilePath) of
         {ok, Content} ->
             Updated = update_image_line(Content, OciImage),
@@ -51,7 +51,7 @@ handle_event(Event) ->
                 ok ->
                     logger:info("[PM] Updated container image for ~s to ~s",
                                 [PluginId, OciImage]),
-                    ServiceName = service_name(Name),
+                    ServiceName = service_name(DaemonName),
                     case shared_systemctl:reload_and_start(ServiceName) of
                         ok ->
                             logger:info("[PM] Restarted service ~s", [ServiceName]);
@@ -82,20 +82,39 @@ update_image_line(Content, NewImage) ->
     end, Lines),
     iolist_to_binary(lists:join(<<"\n">>, Updated)).
 
-%% @private Extract the plugin name from a plugin_id like "hecate-social/trader".
-extract_plugin_name(PluginId) ->
-    case binary:split(PluginId, <<"/">>) of
-        [_, Name] -> Name;
-        [Name] -> Name
+%% @private Extract the daemon name from the OCI image reference.
+extract_daemon_name(OciImage) ->
+    Base = strip_tag(OciImage),
+    case split_last(Base, <<"/">>) of
+        {_, Name} -> Name;
+        nomatch -> Base
     end.
 
-%% @private Build the .container filename for a plugin.
-container_filename(Name) ->
-    <<"hecate-", Name/binary, "d.container">>.
+strip_tag(Image) ->
+    case split_last(Image, <<":">>) of
+        {Base, Tag} ->
+            case binary:match(Tag, <<"/">>) of
+                nomatch -> Base;
+                _ -> Image
+            end;
+        nomatch -> Image
+    end.
 
-%% @private Build the systemd service name for a plugin.
-service_name(Name) ->
-    <<"hecate-", Name/binary, "d.service">>.
+split_last(Bin, Sep) ->
+    case binary:matches(Bin, Sep) of
+        [] -> nomatch;
+        Matches ->
+            {Pos, Len} = lists:last(Matches),
+            {binary:part(Bin, 0, Pos), binary:part(Bin, Pos + Len, byte_size(Bin) - Pos - Len)}
+    end.
+
+%% @private Build the .container filename.
+container_filename(DaemonName) ->
+    <<DaemonName/binary, ".container">>.
+
+%% @private Build the systemd service name.
+service_name(DaemonName) ->
+    <<DaemonName/binary, ".service">>.
 
 %% @private Get a value from a map, trying atom key first, then binary.
 get_value(Key, Map) when is_atom(Key) ->
