@@ -18,7 +18,8 @@
     mentor_llms, project_llm_mentorships, query_llm_mentorships,
     serve_llm,
     guide_license_lifecycle, project_licenses, query_licenses,
-    guide_plugin_lifecycle, project_plugins, query_plugins
+    guide_plugin_lifecycle, project_plugins, query_plugins,
+    guide_launcher_lifecycle, project_launcher, query_launcher
 ]).
 
 -spec compile() -> cowboy_router:dispatch_rules().

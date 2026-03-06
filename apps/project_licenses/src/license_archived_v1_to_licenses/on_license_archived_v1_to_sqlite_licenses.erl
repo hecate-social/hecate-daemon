@@ -5,6 +5,8 @@
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
+-include_lib("evoq/include/evoq_types.hrl").
+
 -define(EVENT_TYPE, <<"license_archived_v1">>).
 -define(SUB_NAME, <<"license_archived_v1_to_sqlite_licenses">>).
 -define(STORE_ID, licenses_store).
@@ -18,8 +20,8 @@ init([]) ->
     {ok, #{}}.
 
 handle_info({events, Events}, State) ->
-    lists:foreach(fun(E) ->
-        case license_archived_v1_to_sqlite_licenses:project(projection_event:to_map(E)) of
+    lists:foreach(fun(#evoq_event{data = Data}) ->
+        case license_archived_v1_to_sqlite_licenses:project(Data) of
             ok -> ok;
             {error, Reason} ->
                 logger:warning("[~s] projection failed: ~p", [?EVENT_TYPE, Reason])

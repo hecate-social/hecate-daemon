@@ -1,0 +1,16 @@
+{application, guide_launcher_lifecycle, [
+    {description, "Launcher lifecycle command service (register/unregister/reorganize entries)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_launcher_lifecycle_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        evoq
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

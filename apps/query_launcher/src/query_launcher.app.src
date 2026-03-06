@@ -1,0 +1,16 @@
+{application, query_launcher, [
+    {description, "Launcher read endpoints (QRY)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_launcher_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        hecate,
+        project_launcher
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

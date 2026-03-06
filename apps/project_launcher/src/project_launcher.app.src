@@ -1,0 +1,18 @@
+{application, project_launcher, [
+    {description, "Launcher projections (PRJ) - event subscriptions and read model writes"},
+    {vsn, "0.1.0"},
+    {registered, [project_launcher_sup, project_launcher_store]},
+    {mod, {project_launcher_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        esqlite,
+        evoq,
+        hecate,
+        guide_launcher_lifecycle
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

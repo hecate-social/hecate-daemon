@@ -7,7 +7,7 @@
 -module(on_plugin_removed_deprovision_container).
 -behaviour(gen_server).
 
--include_lib("reckon_gater/include/esdb_gater_types.hrl").
+-include_lib("evoq/include/evoq_types.hrl").
 
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
@@ -37,9 +37,8 @@ terminate(_Reason, _State) -> ok.
 
 %% Internal
 
-handle_event(Event) ->
-    Map = projection_event:to_map(Event),
-    PluginId = get_value(plugin_id, Map),
+handle_event(#evoq_event{data = Data}) ->
+    PluginId = get_value(plugin_id, Data),
     case lookup_oci_image(PluginId) of
         {ok, OciImage} ->
             deprovision(PluginId, OciImage);

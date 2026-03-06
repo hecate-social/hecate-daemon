@@ -94,7 +94,8 @@ start_event_stores() ->
         {llm_store,                 "llm",                 "LLM (detection, status reporting)"},
         {mentorships_store,         "mentorships",         "Mentorships (expertise, learning)"},
         {licenses_store,            "licenses",            "Licenses (appstore lifecycle)"},
-        {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"}
+        {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"},
+        {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"}
     ],
     start_stores(Stores).
 
