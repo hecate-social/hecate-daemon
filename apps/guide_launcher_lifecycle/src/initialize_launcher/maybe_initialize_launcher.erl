@@ -1,6 +1,6 @@
 %%% @doc maybe_initialize_launcher handler
 %%% Business logic for initializing the launcher singleton.
-%%% Creates default groups (SYSTEM with node, llm, appstore).
+%%% Creates default groups (SYSTEM with llm, appstore).
 -module(maybe_initialize_launcher).
 
 -include_lib("evoq/include/evoq.hrl").
@@ -58,5 +58,5 @@ default_groups() ->
         name => <<"SYSTEM">>,
         icon => <<"\xE2\x9A\x99\xEF\xB8\x8F">>,
         collapsed => false,
-        apps => [<<"node">>, <<"llm">>, <<"appstore">>]
+        apps => [<<"llm">>, <<"appstore">>]
     }].
