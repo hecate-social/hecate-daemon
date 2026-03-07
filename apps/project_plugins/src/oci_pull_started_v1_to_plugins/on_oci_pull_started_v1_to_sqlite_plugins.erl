@@ -1,14 +1,14 @@
-%%% @doc Listener for container_pull_completed_v1 events.
+%%% @doc Listener for oci_pull_started_v1 events.
 %%% Subscribes to evoq, projects to SQLite plugins table.
--module(on_container_pull_completed_v1_to_sqlite_plugins).
+-module(on_oci_pull_started_v1_to_sqlite_plugins).
 -behaviour(gen_server).
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -include_lib("evoq/include/evoq_types.hrl").
 
--define(EVENT_TYPE, <<"container_pull_completed_v1">>).
--define(SUB_NAME, <<"container_pull_completed_v1_to_sqlite_plugins">>).
+-define(EVENT_TYPE, <<"oci_pull_started_v1">>).
+-define(SUB_NAME, <<"oci_pull_started_v1_to_sqlite_plugins">>).
 -define(STORE_ID, plugins_store).
 
 start_link() -> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -21,7 +21,7 @@ init([]) ->
 
 handle_info({events, Events}, State) ->
     lists:foreach(fun(#evoq_event{data = Data}) ->
-        case container_pull_completed_v1_to_sqlite_plugins:project(Data) of
+        case oci_pull_started_v1_to_sqlite_plugins:project(Data) of
             ok -> ok;
             {error, Reason} ->
                 logger:warning("[~s] projection failed: ~p", [?EVENT_TYPE, Reason])

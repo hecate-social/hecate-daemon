@@ -68,24 +68,24 @@ init([]) ->
             restart => permanent,
             type => worker
         },
-        %% Projection: container_pull_started_v1 -> plugins ETS
+        %% Projection: oci_pull_started_v1 -> plugins ETS
         #{
-            id => container_pull_started_v1_to_plugins,
-            start => {evoq_projection, start_link, [container_pull_started_v1_to_plugins, #{}]},
+            id => oci_pull_started_v1_to_plugins,
+            start => {evoq_projection, start_link, [oci_pull_started_v1_to_plugins, #{}]},
             restart => permanent,
             type => worker
         },
-        %% Projection: container_pull_cancelled_v1 -> plugins ETS
+        %% Projection: oci_pull_cancelled_v1 -> plugins ETS
         #{
-            id => container_pull_cancelled_v1_to_plugins,
-            start => {evoq_projection, start_link, [container_pull_cancelled_v1_to_plugins, #{}]},
+            id => oci_pull_cancelled_v1_to_plugins,
+            start => {evoq_projection, start_link, [oci_pull_cancelled_v1_to_plugins, #{}]},
             restart => permanent,
             type => worker
         },
-        %% Projection: container_pull_completed_v1 -> plugins ETS
+        %% Projection: oci_pull_completed_v1 -> plugins ETS
         #{
-            id => container_pull_completed_v1_to_plugins,
-            start => {evoq_projection, start_link, [container_pull_completed_v1_to_plugins, #{}]},
+            id => oci_pull_completed_v1_to_plugins,
+            start => {evoq_projection, start_link, [oci_pull_completed_v1_to_plugins, #{}]},
             restart => permanent,
             type => worker
         }

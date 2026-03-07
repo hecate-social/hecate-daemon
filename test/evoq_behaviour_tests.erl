@@ -35,16 +35,16 @@ pg_emitter_interested_in_test_() ->
         {plugin_execution_stopped_v1_to_pg, <<"plugin_execution_stopped_v1">>},
         {container_confirmed_up_v1_to_pg, <<"container_confirmed_up_v1">>},
         {container_confirmed_down_v1_to_pg, <<"container_confirmed_down_v1">>},
-        {container_pull_started_v1_to_pg, <<"container_pull_started_v1">>},
-        {container_pull_completed_v1_to_pg, <<"container_pull_completed_v1">>},
-        {container_pull_cancelled_v1_to_pg, <<"container_pull_cancelled_v1">>}
+        {oci_pull_started_v1_to_pg, <<"oci_pull_started_v1">>},
+        {oci_pull_completed_v1_to_pg, <<"oci_pull_completed_v1">>},
+        {oci_pull_cancelled_v1_to_pg, <<"oci_pull_cancelled_v1">>}
     ],
     [?_assertEqual([EventType], Mod:interested_in())
      || {Mod, EventType} <- PgEmitters].
 
 pg_emitter_init_test_() ->
     Mods = [license_bought_v1_to_pg, entry_registered_v1_to_pg,
-            plugin_installed_v1_to_pg, container_pull_started_v1_to_pg],
+            plugin_installed_v1_to_pg, oci_pull_started_v1_to_pg],
     [?_assertMatch({ok, _}, Mod:init(#{})) || Mod <- Mods].
 
 pg_emitter_handle_event_broadcasts_test() ->
@@ -128,9 +128,9 @@ plugin_projection_interested_in_test_() ->
         {plugin_execution_stopped_v1_to_plugins, <<"plugin_execution_stopped_v1">>},
         {container_confirmed_up_v1_to_plugins, <<"container_confirmed_up_v1">>},
         {container_confirmed_down_v1_to_plugins, <<"container_confirmed_down_v1">>},
-        {container_pull_started_v1_to_plugins, <<"container_pull_started_v1">>},
-        {container_pull_completed_v1_to_plugins, <<"container_pull_completed_v1">>},
-        {container_pull_cancelled_v1_to_plugins, <<"container_pull_cancelled_v1">>}
+        {oci_pull_started_v1_to_plugins, <<"oci_pull_started_v1">>},
+        {oci_pull_completed_v1_to_plugins, <<"oci_pull_completed_v1">>},
+        {oci_pull_cancelled_v1_to_plugins, <<"oci_pull_cancelled_v1">>}
     ],
     [?_assertEqual([EventType], Mod:interested_in())
      || {Mod, EventType} <- Projections].
@@ -245,8 +245,8 @@ pg_emitter_modules() ->
      plugin_upgraded_v1_to_pg,
      plugin_execution_started_v1_to_pg, plugin_execution_stopped_v1_to_pg,
      container_confirmed_up_v1_to_pg, container_confirmed_down_v1_to_pg,
-     container_pull_started_v1_to_pg, container_pull_completed_v1_to_pg,
-     container_pull_cancelled_v1_to_pg].
+     oci_pull_started_v1_to_pg, oci_pull_completed_v1_to_pg,
+     oci_pull_cancelled_v1_to_pg].
 
 mesh_emitter_modules() ->
     [license_published_v1_to_mesh,
@@ -267,9 +267,9 @@ ets_projection_modules() ->
      plugin_execution_stopped_v1_to_plugins,
      container_confirmed_up_v1_to_plugins,
      container_confirmed_down_v1_to_plugins,
-     container_pull_started_v1_to_plugins,
-     container_pull_completed_v1_to_plugins,
-     container_pull_cancelled_v1_to_plugins,
+     oci_pull_started_v1_to_plugins,
+     oci_pull_completed_v1_to_plugins,
+     oci_pull_cancelled_v1_to_plugins,
      %% License projections
      license_bought_v1_to_licenses,
      license_revoked_v1_to_licenses,

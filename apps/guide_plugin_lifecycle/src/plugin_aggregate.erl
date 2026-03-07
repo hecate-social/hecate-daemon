@@ -65,9 +65,9 @@ execute(#plugin_state{status = S} = State, Payload)
         <<"stop_plugin_execution">>     -> {error, plugin_not_running};
         <<"confirm_container_up">>      -> execute_confirm_up(Payload);
         <<"confirm_container_down">>    -> execute_confirm_down(Payload);
-        <<"start_container_pull">>      -> execute_start_pull(Payload, S);
-        <<"cancel_container_pull">>     -> execute_cancel_pull(Payload, S);
-        <<"complete_container_pull">>   -> execute_complete_pull(Payload, S);
+        <<"start_oci_pull">>      -> execute_start_pull(Payload, S);
+        <<"cancel_oci_pull">>     -> execute_cancel_pull(Payload, S);
+        <<"complete_oci_pull">>   -> execute_complete_pull(Payload, S);
         _ -> {error, unknown_command}
     end;
 
@@ -82,9 +82,9 @@ execute(#plugin_state{status = S} = State, Payload)
         <<"stop_plugin_execution">>     -> execute_stop_execution(Payload);
         <<"confirm_container_up">>      -> execute_confirm_up(Payload);
         <<"confirm_container_down">>    -> execute_confirm_down(Payload);
-        <<"start_container_pull">>      -> {error, plugin_already_running};
-        <<"cancel_container_pull">>     -> execute_cancel_pull(Payload, S);
-        <<"complete_container_pull">>   -> execute_complete_pull(Payload, S);
+        <<"start_oci_pull">>      -> {error, plugin_already_running};
+        <<"cancel_oci_pull">>     -> execute_cancel_pull(Payload, S);
+        <<"complete_oci_pull">>   -> execute_complete_pull(Payload, S);
         _ -> {error, unknown_command}
     end;
 
@@ -124,8 +124,8 @@ execute_confirm_down(Payload) ->
 execute_start_pull(Payload, Status) ->
     case Status band ?PLG_PULLING of
         0 ->
-            {ok, Cmd} = start_container_pull_v1:from_map(Payload),
-            convert_events(maybe_start_container_pull:handle(Cmd), fun container_pull_started_v1:to_map/1);
+            {ok, Cmd} = start_oci_pull_v1:from_map(Payload),
+            convert_events(maybe_start_oci_pull:handle(Cmd), fun oci_pull_started_v1:to_map/1);
         _ ->
             {error, already_pulling}
     end.
@@ -134,16 +134,16 @@ execute_cancel_pull(Payload, Status) ->
     case Status band ?PLG_PULLING of
         0 -> {error, not_pulling};
         _ ->
-            {ok, Cmd} = cancel_container_pull_v1:from_map(Payload),
-            convert_events(maybe_cancel_container_pull:handle(Cmd), fun container_pull_cancelled_v1:to_map/1)
+            {ok, Cmd} = cancel_oci_pull_v1:from_map(Payload),
+            convert_events(maybe_cancel_oci_pull:handle(Cmd), fun oci_pull_cancelled_v1:to_map/1)
     end.
 
 execute_complete_pull(Payload, Status) ->
     case Status band ?PLG_PULLING of
         0 -> {error, not_pulling};
         _ ->
-            {ok, Cmd} = complete_container_pull_v1:from_map(Payload),
-            convert_events(maybe_complete_container_pull:handle(Cmd), fun container_pull_completed_v1:to_map/1)
+            {ok, Cmd} = complete_oci_pull_v1:from_map(Payload),
+            convert_events(maybe_complete_oci_pull:handle(Cmd), fun oci_pull_completed_v1:to_map/1)
     end.
 
 %% --- Apply ---
@@ -169,12 +169,12 @@ apply_event(#{<<"event_type">> := <<"container_confirmed_up_v1">>} = _E, S)  -> 
 apply_event(#{event_type := <<"container_confirmed_up_v1">>} = _E, S)        -> apply_confirmed_up(S);
 apply_event(#{<<"event_type">> := <<"container_confirmed_down_v1">>} = _E, S) -> apply_confirmed_down(S);
 apply_event(#{event_type := <<"container_confirmed_down_v1">>} = _E, S)       -> apply_confirmed_down(S);
-apply_event(#{<<"event_type">> := <<"container_pull_started_v1">>} = _E, S)   -> apply_pull_started(S);
-apply_event(#{event_type := <<"container_pull_started_v1">>} = _E, S)         -> apply_pull_started(S);
-apply_event(#{<<"event_type">> := <<"container_pull_cancelled_v1">>} = _E, S) -> apply_pull_cancelled(S);
-apply_event(#{event_type := <<"container_pull_cancelled_v1">>} = _E, S)       -> apply_pull_cancelled(S);
-apply_event(#{<<"event_type">> := <<"container_pull_completed_v1">>} = _E, S) -> apply_pull_completed(S);
-apply_event(#{event_type := <<"container_pull_completed_v1">>} = _E, S)       -> apply_pull_completed(S);
+apply_event(#{<<"event_type">> := <<"oci_pull_started_v1">>} = _E, S)   -> apply_pull_started(S);
+apply_event(#{event_type := <<"oci_pull_started_v1">>} = _E, S)         -> apply_pull_started(S);
+apply_event(#{<<"event_type">> := <<"oci_pull_cancelled_v1">>} = _E, S) -> apply_pull_cancelled(S);
+apply_event(#{event_type := <<"oci_pull_cancelled_v1">>} = _E, S)       -> apply_pull_cancelled(S);
+apply_event(#{<<"event_type">> := <<"oci_pull_completed_v1">>} = _E, S) -> apply_pull_completed(S);
+apply_event(#{event_type := <<"oci_pull_completed_v1">>} = _E, S)       -> apply_pull_completed(S);
 %% Unknown — ignore
 apply_event(_E, S) -> S.
 

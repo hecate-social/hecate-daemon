@@ -9,7 +9,7 @@
 -define(PLG_STOPPED,       8).   %% Plugin execution stop requested (stopping)
 -define(PLG_CONFIRMED_UP,  16).  %% Container confirmed running (socket alive)
 -define(PLG_CONFIRMED_DOWN,32).  %% Container confirmed down (socket gone)
--define(PLG_PULLING,      64).  %% Container starting / pulling image
+-define(PLG_PULLING,      64).  %% OCI image pull in progress
 
 -define(PLG_FLAG_MAP, #{
     1  => <<"Installed">>,

@@ -79,9 +79,9 @@ dispatch(Cmd, Req) ->
 
 %% @private Auto-pull the container image after install (best-effort).
 auto_pull(PluginId, OciImage) ->
-    case start_container_pull_v1:new(#{plugin_id => PluginId, oci_image => OciImage}) of
+    case start_oci_pull_v1:new(#{plugin_id => PluginId, oci_image => OciImage}) of
         {ok, PullCmd} ->
-            case maybe_start_container_pull:dispatch(PullCmd) of
+            case maybe_start_oci_pull:dispatch(PullCmd) of
                 {ok, _, _} ->
                     logger:info("[install] Auto-pull started for ~s", [PluginId]);
                 {error, Reason} ->

@@ -1,12 +1,12 @@
-%%% @doc Projection: container_pull_cancelled_v1 -> plugins ETS read model.
-%%% Clears PULLING(64) flag.
--module(container_pull_cancelled_v1_to_plugins).
+%%% @doc Projection: oci_pull_started_v1 -> plugins ETS read model.
+%%% Sets PULLING(64) flag.
+-module(oci_pull_started_v1_to_plugins).
 -behaviour(evoq_projection).
 -export([interested_in/0, init/1, project/4]).
 
 -define(TABLE, plugins).
 
-interested_in() -> [<<"container_pull_cancelled_v1">>].
+interested_in() -> [<<"oci_pull_started_v1">>].
 
 init(_Config) ->
     {ok, RM} = evoq_read_model:new(evoq_read_model_ets, #{name => ?TABLE}),
@@ -17,8 +17,8 @@ project(#{data := Data}, _Metadata, State, RM) ->
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
             Updated = Plugin#{
-                status       => S band (bnot 64),
-                status_label => <<"Installed">>
+                status       => S bor 64,
+                status_label => <<"Downloading">>
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};

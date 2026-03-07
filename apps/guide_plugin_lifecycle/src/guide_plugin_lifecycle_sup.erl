@@ -62,16 +62,16 @@ init([]) ->
           start => {evoq_event_handler, start_link, [on_plugin_execution_stopped_stop_container, #{}]},
           restart => permanent, type => worker},
 
-        %% -- Container pull emitters --
+        %% -- OCI pull emitters --
 
-        #{id => container_pull_started_v1_to_pg,
-          start => {evoq_event_handler, start_link, [container_pull_started_v1_to_pg, #{}]},
+        #{id => oci_pull_started_v1_to_pg,
+          start => {evoq_event_handler, start_link, [oci_pull_started_v1_to_pg, #{}]},
           restart => permanent, type => worker},
-        #{id => container_pull_cancelled_v1_to_pg,
-          start => {evoq_event_handler, start_link, [container_pull_cancelled_v1_to_pg, #{}]},
+        #{id => oci_pull_cancelled_v1_to_pg,
+          start => {evoq_event_handler, start_link, [oci_pull_cancelled_v1_to_pg, #{}]},
           restart => permanent, type => worker},
-        #{id => container_pull_completed_v1_to_pg,
-          start => {evoq_event_handler, start_link, [container_pull_completed_v1_to_pg, #{}]},
+        #{id => oci_pull_completed_v1_to_pg,
+          start => {evoq_event_handler, start_link, [oci_pull_completed_v1_to_pg, #{}]},
           restart => permanent, type => worker},
 
         %% -- Container confirmation emitters --
@@ -83,10 +83,10 @@ init([]) ->
           start => {evoq_event_handler, start_link, [container_confirmed_down_v1_to_pg, #{}]},
           restart => permanent, type => worker},
 
-        %% -- Pull PM (runs podman pull, provisions .container) --
+        %% -- OCI Pull PM (runs podman pull, provisions .container) --
 
-        #{id => on_container_pull_started_pull_image,
-          start => {on_container_pull_started_pull_image, start_link, []},
+        #{id => on_oci_pull_started_pull_image,
+          start => {on_oci_pull_started_pull_image, start_link, []},
           restart => permanent, type => worker},
 
         %% -- Container health watcher (dispatches confirm up/down) --

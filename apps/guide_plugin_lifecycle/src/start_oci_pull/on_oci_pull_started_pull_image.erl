@@ -1,13 +1,13 @@
-%%% @doc Process Manager: On container pull started, pull the OCI image.
+%%% @doc Process Manager: On OCI pull started, pull the OCI image.
 %%%
-%%% Subscribes to container_pull_started_v1 events from plugins_store.
+%%% Subscribes to oci_pull_started_v1 events from plugins_store.
 %%% Runs `podman pull` via shared_podman, tracks progress in ETS,
-%%% provisions .container file, and dispatches complete_container_pull_v1.
+%%% provisions .container file, and dispatches complete_oci_pull_v1.
 %%%
 %%% Also listens for cancel events via pg to kill in-progress pulls.
 %%% On startup, reconciles plugins stuck in PULLING state.
 %%% @end
--module(on_container_pull_started_pull_image).
+-module(on_oci_pull_started_pull_image).
 -behaviour(gen_server).
 
 -include_lib("evoq/include/evoq_types.hrl").
@@ -15,11 +15,11 @@
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
--define(EVENT_TYPE, <<"container_pull_started_v1">>).
--define(SUB_NAME, <<"on_container_pull_started_pull_image">>).
+-define(EVENT_TYPE, <<"oci_pull_started_v1">>).
+-define(SUB_NAME, <<"on_oci_pull_started_pull_image">>).
 -define(STORE_ID, plugins_store).
 -define(ETS_TABLE, plugin_pull_progress).
--define(CANCEL_GROUP, {container_pull_cancelled_v1, node}).
+-define(CANCEL_GROUP, {oci_pull_cancelled_v1, node}).
 -define(RECONCILE_DELAY_MS, 8000).
 
 -record(state, {
@@ -145,9 +145,9 @@ provision_container(PluginId, DaemonName, OciImage) ->
     end.
 
 dispatch_complete(PluginId) ->
-    case complete_container_pull_v1:new(#{plugin_id => PluginId}) of
+    case complete_oci_pull_v1:new(#{plugin_id => PluginId}) of
         {ok, Cmd} ->
-            case maybe_complete_container_pull:dispatch(Cmd) of
+            case maybe_complete_oci_pull:dispatch(Cmd) of
                 {ok, _, _} ->
                     logger:info("[pull-pm] Pull completed for ~s", [PluginId]);
                 {error, Reason} ->
