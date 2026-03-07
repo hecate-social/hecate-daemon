@@ -81,18 +81,13 @@ pg_emitter_handle_event_broadcasts_test() ->
 
 mesh_emitter_interested_in_test_() ->
     MeshEmitters = [
-        {license_published_v1_to_mesh, <<"license_published_v1">>},
-        {expertise_declared_v1_to_mesh, <<"expertise_declared_v1">>},
-        {expertise_withdrawn_v1_to_mesh, <<"expertise_withdrawn_v1">>},
-        {learning_validated_v1_to_mesh, <<"learning_validated_v1">>},
-        {learning_endorsed_v1_to_mesh, <<"learning_endorsed_v1">>}
+        {license_published_v1_to_mesh, <<"license_published_v1">>}
     ],
     [?_assertEqual([EventType], Mod:interested_in())
      || {Mod, EventType} <- MeshEmitters].
 
 mesh_emitter_init_test_() ->
-    [?_assertMatch({ok, _}, license_published_v1_to_mesh:init(#{})),
-     ?_assertMatch({ok, _}, expertise_declared_v1_to_mesh:init(#{}))].
+    [?_assertMatch({ok, _}, license_published_v1_to_mesh:init(#{}))].
 
 %%====================================================================
 %% Projection Tests (license domain)
@@ -173,26 +168,6 @@ policy_init_test_() ->
     [?_assertMatch({ok, _}, Mod:init(#{})) || Mod <- Mods].
 
 %%====================================================================
-%% Mentorship Projection Tests
-%%====================================================================
-
-mentorship_projection_interested_in_test_() ->
-    Projections = [
-        {learning_submitted_v1_to_learnings, <<"learning_submitted_v1">>},
-        {learning_validated_v1_to_learnings, <<"learning_validated_v1">>},
-        {learning_rejected_v1_to_learnings, <<"learning_rejected_v1">>},
-        {learning_endorsed_v1_to_learnings, <<"learning_endorsed_v1">>},
-        {learning_disputed_v1_to_learnings, <<"learning_disputed_v1">>},
-        {learning_dispute_resolved_v1_to_learnings, <<"learning_dispute_resolved_v1">>},
-        {mentor_subscribed_v1_to_subscriptions, <<"mentor_subscribed_v1">>},
-        {mentor_unsubscribed_v1_to_subscriptions, <<"mentor_unsubscribed_v1">>},
-        {expertise_declared_v1_to_profiles, <<"expertise_declared_v1">>},
-        {expertise_withdrawn_v1_to_profiles, <<"expertise_withdrawn_v1">>}
-    ],
-    [?_assertEqual([EventType], Mod:interested_in())
-     || {Mod, EventType} <- Projections].
-
-%%====================================================================
 %% Behaviour Contract Tests
 %%====================================================================
 
@@ -249,9 +224,7 @@ pg_emitter_modules() ->
      oci_pull_cancelled_v1_to_pg].
 
 mesh_emitter_modules() ->
-    [license_published_v1_to_mesh,
-     expertise_declared_v1_to_mesh, expertise_withdrawn_v1_to_mesh,
-     learning_validated_v1_to_mesh, learning_endorsed_v1_to_mesh].
+    [license_published_v1_to_mesh].
 
 %% No more SQLite-backed projections — all converted to evoq_projection
 sqlite_projection_modules() ->
@@ -286,18 +259,7 @@ ets_projection_modules() ->
      entry_registered_v1_to_launcher,
      entry_unregistered_v1_to_launcher,
      launcher_initialized_v1_to_launcher,
-     launcher_reorganized_v1_to_launcher,
-     %% Mentorship projections
-     learning_submitted_v1_to_learnings,
-     learning_validated_v1_to_learnings,
-     learning_rejected_v1_to_learnings,
-     learning_endorsed_v1_to_learnings,
-     learning_disputed_v1_to_learnings,
-     learning_dispute_resolved_v1_to_learnings,
-     mentor_subscribed_v1_to_subscriptions,
-     mentor_unsubscribed_v1_to_subscriptions,
-     expertise_declared_v1_to_profiles,
-     expertise_withdrawn_v1_to_profiles].
+     launcher_reorganized_v1_to_launcher].
 
 policy_modules() ->
     [on_plugin_installed_register_entry,

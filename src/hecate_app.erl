@@ -92,7 +92,6 @@ start_event_stores() ->
         {settings_store,            "settings",            "Settings (identity, preferences)"},
         {realm_memberships_store,   "realm_memberships",   "Realm Memberships (join, confirm, revoke)"},
         {llm_store,                 "llm",                 "LLM (detection, status reporting)"},
-        {mentorships_store,         "mentorships",         "Mentorships (expertise, learning)"},
         {licenses_store,            "licenses",            "Licenses (appstore lifecycle)"},
         {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"},
         {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"}
@@ -141,7 +140,7 @@ start_store(#store_config{store_id = StoreId} = Config) ->
 %% (evoq_event_handler, evoq_projection, evoq_process_manager).
 start_store_subscriptions() ->
     Stores = [settings_store, realm_memberships_store, llm_store,
-              mentorships_store, licenses_store, plugins_store,
+              licenses_store, plugins_store,
               launcher_store],
     lists:foreach(fun(StoreId) ->
         case evoq_store_subscription:start_link(StoreId) of

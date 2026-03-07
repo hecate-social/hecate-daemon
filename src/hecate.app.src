@@ -25,7 +25,7 @@
 
     %% NOTE: Domain apps (guide_*, query_*) are NOT listed here.
     %% hecate_app:start/2 creates domain event stores (settings_store,
-    %% llm_store, mentorships_store, licenses_store, plugins_store).
+    %% llm_store, licenses_store, plugins_store).
     %% Domain apps subscribe to these stores in their init/1 callbacks. If domain apps are listed as hecate deps, OTP
     %% starts them BEFORE hecate_app:start/2 runs → subscriptions silently
     %% fail because the store worker pool doesn't exist yet.

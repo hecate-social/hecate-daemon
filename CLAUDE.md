@@ -133,7 +133,6 @@ Each domain follows strict CQRS separation:
 |-------|--------|------|
 | `settings_store` | Identity, realm joining, preferences | guide_settings_lifecycle, project_settings |
 | `llm_store` | LLM detection and status | serve_llm |
-| `mentorships_store` | Expertise and learning | mentor_llms, project_llm_mentorships |
 | `licenses_store` | Appstore license lifecycle | guide_license_lifecycle, project_licenses |
 | `plugins_store` | Plugin install/upgrade/remove | guide_plugin_lifecycle, project_plugins |
 
