@@ -29,8 +29,8 @@ project(#{data := Data}, _Metadata, State, RM) ->
 
 find_by_license_id(LicenseId) ->
     All = ets:tab2list(catalog),
-    case [E || {K, #{license_id := LId} = E} <- All, LId =:= LicenseId, _ = K] of
-        [#{plugin_id := PId} = Entry | _] -> {ok, PId, Entry};
+    case [{K, E} || {K, #{license_id := LId} = E} <- All, LId =:= LicenseId] of
+        [{PId, Entry} | _] -> {ok, PId, Entry};
         [] -> not_found
     end.
 
