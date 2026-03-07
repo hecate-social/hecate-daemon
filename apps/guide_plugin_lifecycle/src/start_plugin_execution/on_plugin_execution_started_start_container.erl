@@ -1,8 +1,8 @@
 %%% @doc Process Manager: On plugin execution started, start container.
 %%%
 %%% Subscribes to plugin_execution_started_v1 events from plugins_store.
-%%% Container provisioning and image pulling are handled by the pull PM.
-%%% This PM only starts the systemd service (image should be cached).
+%%% Provisions the .container Quadlet file and data directory, then
+%%% starts the systemd service.
 %%%
 %%% On startup, reconciles installed+running plugins to catch events
 %%% missed during downtime.
@@ -57,7 +57,8 @@ start_container(PluginId) ->
     case resolve_plugin_info(PluginId) of
         undefined ->
             logger:error("[PM] Cannot resolve plugin info for ~s", [PluginId]);
-        {DaemonName, _OciImage} ->
+        {DaemonName, OciImage} ->
+            ensure_container_provisioned(DaemonName, OciImage),
             ServiceName = <<DaemonName/binary, ".service">>,
             case shared_systemctl:reload_and_start(ServiceName) of
                 ok ->
@@ -67,6 +68,28 @@ start_container(PluginId) ->
                     logger:error("[PM] Failed to start service ~s: ~p",
                                  [ServiceName, Reason])
             end
+    end.
+
+%% @private Provision the .container Quadlet file and data directory.
+ensure_container_provisioned(DaemonName, OciImage) ->
+    %% Create plugin data directory
+    Home = os:getenv("HOME"),
+    DataDir = filename:join([Home, ".hecate", binary_to_list(DaemonName)]),
+    SocketDir = filename:join(DataDir, "sockets"),
+    ok = filelib:ensure_path(SocketDir),
+
+    %% Write .container Quadlet file
+    ContainerContent = shared_podman:render_container(DaemonName, OciImage),
+    ContainerFile = shared_podman:container_filename(DaemonName),
+    QuadletDir = filename:join([Home, ".config", "containers", "systemd"]),
+    ok = filelib:ensure_path(QuadletDir),
+    FilePath = filename:join(QuadletDir, binary_to_list(ContainerFile)),
+    case filelib:is_regular(FilePath) of
+        true ->
+            logger:debug("[PM] Container file already exists: ~s", [FilePath]);
+        false ->
+            ok = file:write_file(FilePath, ContainerContent),
+            logger:info("[PM] Provisioned container file: ~s", [FilePath])
     end.
 
 %% Internal — startup reconciliation
