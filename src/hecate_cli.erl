@@ -13,9 +13,6 @@
 
 -export([main/1]).
 
-%% Suppress dialyzer warnings for calls to qrcode (excluded from PLT)
--dialyzer({nowarn_function, [generate_qr/1]}).
-
 %% ANSI color codes
 -define(RESET,   "\e[0m").
 -define(BOLD,    "\e[1m").
@@ -167,11 +164,8 @@ show_join_screen(Url, _Data) ->
     %% Clear screen and hide cursor
     io:format("\e[2J\e[H\e[?25l"),
 
-    %% Generate QR code
-    QrLines = generate_qr(Url),
-
     %% Print join box
-    print_join_box(QrLines, Url),
+    print_join_box(Url),
 
     %% Start polling loop
     poll_join_status(),
@@ -179,7 +173,7 @@ show_join_screen(Url, _Data) ->
     %% Show cursor again
     io:format("\e[?25h").
 
-print_join_box(QrLines, Url) ->
+print_join_box(Url) ->
     Width = 64,
 
     %% Header
@@ -188,17 +182,8 @@ print_join_box(QrLines, Url) ->
     print_box_content(Width, ?BOLD ++ ?CYAN ++ ?ICON_KEY ++ " Join Realm" ++ ?RESET),
     print_box_separator(Width),
 
-    %% QR Code
-    print_box_content(Width, ?DIM ++ "Scan with your phone:" ++ ?RESET),
-    io:format("~s~n", [?VERTICAL]),
-    lists:foreach(fun(Line) ->
-        Padded = center_text(Line, Width - 2),
-        io:format("~s ~s ~s~n", [?VERTICAL, Padded, ?VERTICAL])
-    end, QrLines),
-    io:format("~s~n", [?VERTICAL]),
-
     %% URL
-    print_box_content(Width, ?DIM ++ "Or visit:" ++ ?RESET),
+    print_box_content(Width, ?DIM ++ "Visit:" ++ ?RESET),
     print_box_content(Width, ?CYAN ++ binary_to_list(Url) ++ ?RESET),
     io:format("~s~n", [?VERTICAL]),
 
@@ -324,58 +309,6 @@ watch_loop() ->
     watch_loop().
 
 %%%===================================================================
-%%% QR Code Generation
-%%%===================================================================
-
-generate_qr(Url) when is_binary(Url) ->
-    generate_qr(binary_to_list(Url));
-generate_qr(Url) ->
-    try
-        QR = qrcode:encode(Url),
-        {_, _, Matrix} = QR,
-        render_qr_matrix(Matrix)
-    catch
-        _:_ ->
-            %% Fallback if qrcode lib fails
-            ["(QR code unavailable)", "", "Visit the URL below"]
-    end.
-
-render_qr_matrix(Matrix) ->
-    %% Convert matrix to block characters
-    %% Use Unicode block elements for compact display
-    Rows = tuple_to_list(Matrix),
-    render_qr_rows(Rows, []).
-
-render_qr_rows([], Acc) ->
-    lists:reverse(Acc);
-render_qr_rows([Row], Acc) ->
-    %% Odd row at end - render with spaces below
-    Line = render_qr_single_row(Row),
-    render_qr_rows([], [Line | Acc]);
-render_qr_rows([Row1, Row2 | Rest], Acc) ->
-    %% Combine two rows into one line using block chars
-    Line = render_qr_row_pair(Row1, Row2),
-    render_qr_rows(Rest, [Line | Acc]).
-
-render_qr_single_row(Row) ->
-    Cells = tuple_to_list(Row),
-    lists:map(fun
-        (1) -> "▀";  %% Upper half block
-        (_) -> " "
-    end, Cells).
-
-render_qr_row_pair(Row1, Row2) ->
-    Cells1 = tuple_to_list(Row1),
-    Cells2 = tuple_to_list(Row2),
-    Pairs = lists:zip(Cells1, Cells2),
-    lists:map(fun
-        ({1, 1}) -> "█";  %% Full block
-        ({1, 0}) -> "▀";  %% Upper half
-        ({0, 1}) -> "▄";  %% Lower half
-        ({0, 0}) -> " "   %% Empty
-    end, Pairs).
-
-%%%===================================================================
 %%% Box Drawing
 %%%===================================================================
 
@@ -405,17 +338,6 @@ visible_length(Str) ->
     %% Remove ANSI escape sequences for length calculation
     Clean = re:replace(Str, "\e\\[[0-9;]*m", "", [global, {return, list}]),
     string:length(Clean).
-
-center_text(Text, Width) ->
-    Len = visible_length(Text),
-    case Len >= Width of
-        true -> Text;
-        false ->
-            Pad = Width - Len,
-            Left = Pad div 2,
-            Right = Pad - Left,
-            lists:duplicate(Left, $\s) ++ Text ++ lists:duplicate(Right, $\s)
-    end.
 
 %%%===================================================================
 %%% Output Helpers
