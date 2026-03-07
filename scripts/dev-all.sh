@@ -6,9 +6,11 @@
 # Web:    Tauri dev mode, pointed at dev daemon socket
 #
 # Usage:
-#   ./scripts/dev-all.sh          # start both
-#   ./scripts/dev-all.sh daemon   # daemon only (same as dev-start.sh)
-#   ./scripts/dev-all.sh web      # web only (assumes daemon running)
+#   ./scripts/dev-all.sh                # start both
+#   ./scripts/dev-all.sh daemon         # daemon only (same as dev-start.sh)
+#   ./scripts/dev-all.sh web            # web only (assumes daemon running)
+#   ./scripts/dev-all.sh --clear        # wipe dev data + webkit cache, then start both
+#   ./scripts/dev-all.sh --clear daemon # wipe, then daemon only
 #
 # Ctrl+C stops the web (foreground). Daemon is stopped via trap.
 #
@@ -17,9 +19,37 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DAEMON_DIR="$(dirname "$SCRIPT_DIR")"
 WEB_DIR="$DAEMON_DIR/../hecate-web"
-DEV_SOCK="$HOME/.hecate-dev/hecate-daemon/sockets/api.sock"
+DEV_DATA_DIR="$HOME/.hecate-dev"
+WEBKIT_DATA_DIR="$HOME/.local/share/social.hecate.web"
+DEV_SOCK="$DEV_DATA_DIR/hecate-daemon/sockets/api.sock"
 
-MODE="${1:-all}"
+CLEAR=false
+MODE="all"
+
+for arg in "$@"; do
+    case "$arg" in
+        --clear) CLEAR=true ;;
+        daemon|web|all) MODE="$arg" ;;
+        *) echo "Usage: $0 [--clear] [all|daemon|web]"; exit 1 ;;
+    esac
+done
+
+clear_dev_data() {
+    echo "=== Clearing dev data ==="
+    if [ -d "$DEV_DATA_DIR" ]; then
+        rm -rf "$DEV_DATA_DIR"
+        echo "  Removed $DEV_DATA_DIR"
+    fi
+    if [ -d "$WEBKIT_DATA_DIR" ]; then
+        rm -rf "$WEBKIT_DATA_DIR"
+        echo "  Removed $WEBKIT_DATA_DIR (WebKitGTK localStorage/cache)"
+    fi
+    echo ""
+}
+
+if [ "$CLEAR" = true ]; then
+    clear_dev_data
+fi
 DAEMON_PID=""
 
 cleanup() {
@@ -87,9 +117,5 @@ case "$MODE" in
     all)
         start_daemon
         start_web
-        ;;
-    *)
-        echo "Usage: $0 [all|daemon|web]"
-        exit 1
         ;;
 esac
