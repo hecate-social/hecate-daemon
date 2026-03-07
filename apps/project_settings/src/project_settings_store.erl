@@ -1,76 +1,68 @@
-%%% @doc SQLite store for settings read models.
+%%% @doc Query facade for the settings ETS read model.
 %%%
-%%% Single table: settings (singleton row).
+%%% Singleton row keyed by atom 'settings'.
+%%% The table is created here and shared with the merged projection
+%%% via evoq_read_model_ets named table support.
+%%% @end
 -module(project_settings_store).
 -behaviour(gen_server).
 
--export([start_link/0, db/0, execute/1, execute/2, query/1, query/2]).
+-export([start_link/0]).
+-export([get/0, get_identity/0, get_preferences/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
--record(state, {db :: reference()}).
+-define(TABLE, settings).
+-define(KEY, settings).
 
+-spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-db() ->
-    gen_server:call(?MODULE, get_db).
+%%====================================================================
+%% Query API (reads directly from public ETS)
+%%====================================================================
 
-execute(Sql) -> execute(Sql, []).
-execute(Sql, Params) -> gen_server:call(?MODULE, {execute, Sql, Params}).
+-spec get() -> {ok, map()} | {error, not_found}.
+get() ->
+    case ets:lookup(?TABLE, ?KEY) of
+        [{_, Entry}] -> {ok, Entry};
+        [] -> {error, not_found}
+    end.
 
-query(Sql) -> query(Sql, []).
-query(Sql, Params) -> gen_server:call(?MODULE, {query, Sql, Params}).
+-spec get_identity() -> {ok, map()} | {error, not_found}.
+get_identity() ->
+    case ?MODULE:get() of
+        {ok, #{hecate_user_id := HecateUserId, linux_user := LinuxUser,
+               hostname := Hostname}} ->
+            {ok, #{hecate_user_id => HecateUserId,
+                   linux_user => LinuxUser,
+                   hostname => Hostname}};
+        Other -> Other
+    end.
+
+-spec get_preferences() -> {ok, map()}.
+get_preferences() ->
+    case ?MODULE:get() of
+        {ok, #{preferences := Prefs}} -> {ok, Prefs};
+        _ -> {ok, #{}}
+    end.
+
+%%====================================================================
+%% gen_server (owns the ETS table)
+%%====================================================================
 
 init([]) ->
-    DbPath = shared_paths:sqlite_path("project_settings.db"),
-    ok = filelib:ensure_dir(DbPath),
-    {ok, Db} = esqlite3:open(DbPath),
-    ok = create_tables(Db),
-    {ok, #state{db = Db}}.
+    ?TABLE = ets:new(?TABLE, [set, public, named_table, {read_concurrency, true}]),
+    {ok, #{}}.
 
-handle_call(get_db, _From, #state{db = Db} = State) ->
-    {reply, {ok, Db}, State};
-handle_call({execute, Sql, Params}, _From, #state{db = Db} = State) ->
-    Result = case Params of
-        [] -> esqlite3:exec(Db, Sql);
-        _ ->
-            case esqlite3:q(Db, Sql, Params) of
-                Rows when is_list(Rows) -> ok;
-                {error, _} = Err -> Err
-            end
-    end,
-    {reply, Result, State};
-handle_call({query, Sql, Params}, _From, #state{db = Db} = State) ->
-    Result = case esqlite3:q(Db, Sql, Params) of
-        Rows when is_list(Rows) -> {ok, Rows};
-        {error, _} = Err -> Err
-    end,
-    {reply, Result, State};
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.
 
-handle_cast(_Msg, State) -> {noreply, State}.
-handle_info(_Info, State) -> {noreply, State}.
+handle_cast(_Msg, State) ->
+    {noreply, State}.
 
-terminate(_Reason, #state{db = Db}) ->
-    esqlite3:close(Db).
+handle_info(_Info, State) ->
+    {noreply, State}.
 
-%% ===================================================================
-%% Internal
-%% ===================================================================
-
-create_tables(Db) ->
-    ok = esqlite3:exec(Db, "PRAGMA journal_mode=WAL"),
-    ok = esqlite3:exec(Db, "PRAGMA foreign_keys=ON"),
-
-    ok = esqlite3:exec(Db, "CREATE TABLE IF NOT EXISTS settings (
-        id INTEGER PRIMARY KEY DEFAULT 1,
-        linux_user TEXT NOT NULL,
-        hostname TEXT NOT NULL,
-        hecate_user_id TEXT NOT NULL,
-        preferences TEXT NOT NULL DEFAULT '{}',
-        status INTEGER NOT NULL DEFAULT 0,
-        initiated_at INTEGER NOT NULL
-    )"),
-
+terminate(_Reason, _State) ->
     ok.

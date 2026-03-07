@@ -19,73 +19,12 @@ init([]) ->
             restart => permanent,
             type => worker
         },
-        %% Projection: plugin_installed_v1 -> plugins ETS
+        %% Merged projection: all plugin lifecycle events -> plugins ETS
+        %% Single projection eliminates race conditions between separate
+        %% projections competing for the same ETS table.
         #{
-            id => plugin_installed_v1_to_plugins,
-            start => {evoq_projection, start_link, [plugin_installed_v1_to_plugins, #{}]},
-            restart => permanent,
-            type => worker
-        },
-        %% Projection: plugin_upgraded_v1 -> plugins ETS
-        #{
-            id => plugin_upgraded_v1_to_plugins,
-            start => {evoq_projection, start_link, [plugin_upgraded_v1_to_plugins, #{}]},
-            restart => permanent,
-            type => worker
-        },
-        %% Projection: plugin_removed_v1 -> plugins ETS
-        #{
-            id => plugin_removed_v1_to_plugins,
-            start => {evoq_projection, start_link, [plugin_removed_v1_to_plugins, #{}]},
-            restart => permanent,
-            type => worker
-        },
-        %% Projection: plugin_execution_started_v1 -> plugins ETS
-        #{
-            id => plugin_execution_started_v1_to_plugins,
-            start => {evoq_projection, start_link, [plugin_execution_started_v1_to_plugins, #{}]},
-            restart => permanent,
-            type => worker
-        },
-        %% Projection: plugin_execution_stopped_v1 -> plugins ETS
-        #{
-            id => plugin_execution_stopped_v1_to_plugins,
-            start => {evoq_projection, start_link, [plugin_execution_stopped_v1_to_plugins, #{}]},
-            restart => permanent,
-            type => worker
-        },
-        %% Projection: container_confirmed_up_v1 -> plugins ETS
-        #{
-            id => container_confirmed_up_v1_to_plugins,
-            start => {evoq_projection, start_link, [container_confirmed_up_v1_to_plugins, #{}]},
-            restart => permanent,
-            type => worker
-        },
-        %% Projection: container_confirmed_down_v1 -> plugins ETS
-        #{
-            id => container_confirmed_down_v1_to_plugins,
-            start => {evoq_projection, start_link, [container_confirmed_down_v1_to_plugins, #{}]},
-            restart => permanent,
-            type => worker
-        },
-        %% Projection: oci_pull_started_v1 -> plugins ETS
-        #{
-            id => oci_pull_started_v1_to_plugins,
-            start => {evoq_projection, start_link, [oci_pull_started_v1_to_plugins, #{}]},
-            restart => permanent,
-            type => worker
-        },
-        %% Projection: oci_pull_cancelled_v1 -> plugins ETS
-        #{
-            id => oci_pull_cancelled_v1_to_plugins,
-            start => {evoq_projection, start_link, [oci_pull_cancelled_v1_to_plugins, #{}]},
-            restart => permanent,
-            type => worker
-        },
-        %% Projection: oci_pull_completed_v1 -> plugins ETS
-        #{
-            id => oci_pull_completed_v1_to_plugins,
-            start => {evoq_projection, start_link, [oci_pull_completed_v1_to_plugins, #{}]},
+            id => plugin_lifecycle_to_plugins,
+            start => {evoq_projection, start_link, [plugin_lifecycle_to_plugins, #{}]},
             restart => permanent,
             type => worker
         }

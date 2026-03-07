@@ -94,55 +94,49 @@ mesh_emitter_init_test_() ->
 %%====================================================================
 
 license_projection_interested_in_test_() ->
-    Projections = [
+    %% Individual projections (one event type each)
+    Singles = [
         {license_bought_v1_to_licenses, <<"license_bought_v1">>},
         {license_revoked_v1_to_licenses, <<"license_revoked_v1">>},
         {license_archived_v1_to_licenses, <<"license_archived_v1">>},
-        {license_initiated_v1_to_catalog, <<"license_initiated_v1">>},
-        {license_announced_v1_to_catalog, <<"license_announced_v1">>},
-        {license_published_v1_to_catalog, <<"license_published_v1">>},
-        {license_amended_v1_to_catalog, <<"license_amended_v1">>},
-        {license_retracted_v1_to_catalog, <<"license_retracted_v1">>},
         {plugin_installed_v1_to_licenses, <<"plugin_installed_v1">>},
         {plugin_removed_v1_to_licenses, <<"plugin_removed_v1">>},
         {plugin_upgraded_v1_to_licenses, <<"plugin_upgraded_v1">>}
     ],
-    [?_assertEqual([EventType], Mod:interested_in())
-     || {Mod, EventType} <- Projections].
+    SingleTests = [?_assertEqual([EventType], Mod:interested_in())
+                   || {Mod, EventType} <- Singles],
+    %% Merged lifecycle projection (multiple event types, single gen_server)
+    MergedTest = ?_assertEqual(
+        [<<"license_initiated_v1">>, <<"license_announced_v1">>,
+         <<"license_published_v1">>, <<"license_amended_v1">>,
+         <<"license_retracted_v1">>],
+        license_lifecycle_to_catalog:interested_in()),
+    [MergedTest | SingleTests].
 
 %%====================================================================
 %% Projection Tests (plugin domain)
 %%====================================================================
 
 plugin_projection_interested_in_test_() ->
-    Projections = [
-        {plugin_installed_v1_to_plugins, <<"plugin_installed_v1">>},
-        {plugin_removed_v1_to_plugins, <<"plugin_removed_v1">>},
-        {plugin_upgraded_v1_to_plugins, <<"plugin_upgraded_v1">>},
-        {plugin_execution_started_v1_to_plugins, <<"plugin_execution_started_v1">>},
-        {plugin_execution_stopped_v1_to_plugins, <<"plugin_execution_stopped_v1">>},
-        {container_confirmed_up_v1_to_plugins, <<"container_confirmed_up_v1">>},
-        {container_confirmed_down_v1_to_plugins, <<"container_confirmed_down_v1">>},
-        {oci_pull_started_v1_to_plugins, <<"oci_pull_started_v1">>},
-        {oci_pull_completed_v1_to_plugins, <<"oci_pull_completed_v1">>},
-        {oci_pull_cancelled_v1_to_plugins, <<"oci_pull_cancelled_v1">>}
-    ],
-    [?_assertEqual([EventType], Mod:interested_in())
-     || {Mod, EventType} <- Projections].
+    %% Merged lifecycle projection (all plugin events in single gen_server)
+    [?_assertEqual(
+        [<<"plugin_installed_v1">>, <<"plugin_upgraded_v1">>,
+         <<"plugin_removed_v1">>, <<"plugin_execution_started_v1">>,
+         <<"plugin_execution_stopped_v1">>, <<"container_confirmed_up_v1">>,
+         <<"container_confirmed_down_v1">>, <<"oci_pull_started_v1">>,
+         <<"oci_pull_cancelled_v1">>, <<"oci_pull_completed_v1">>],
+        plugin_lifecycle_to_plugins:interested_in())].
 
 %%====================================================================
 %% Projection Tests (launcher domain)
 %%====================================================================
 
 launcher_projection_interested_in_test_() ->
-    Projections = [
-        {entry_registered_v1_to_launcher, <<"entry_registered_v1">>},
-        {entry_unregistered_v1_to_launcher, <<"entry_unregistered_v1">>},
-        {launcher_initialized_v1_to_launcher, <<"launcher_initialized_v1">>},
-        {launcher_reorganized_v1_to_launcher, <<"launcher_reorganized_v1">>}
-    ],
-    [?_assertEqual([EventType], Mod:interested_in())
-     || {Mod, EventType} <- Projections].
+    %% Merged lifecycle projection (all launcher events in single gen_server)
+    [?_assertEqual(
+        [<<"launcher_initialized_v1">>, <<"entry_registered_v1">>,
+         <<"entry_unregistered_v1">>, <<"launcher_reorganized_v1">>],
+        launcher_lifecycle_to_launcher:interested_in())].
 
 %%====================================================================
 %% Policy/PM Tests
@@ -232,34 +226,17 @@ sqlite_projection_modules() ->
 
 %% ETS-backed projections (evoq_projection, converted)
 ets_projection_modules() ->
-    %% Plugin projections
-    [plugin_installed_v1_to_plugins,
-     plugin_removed_v1_to_plugins,
-     plugin_upgraded_v1_to_plugins,
-     plugin_execution_started_v1_to_plugins,
-     plugin_execution_stopped_v1_to_plugins,
-     container_confirmed_up_v1_to_plugins,
-     container_confirmed_down_v1_to_plugins,
-     oci_pull_started_v1_to_plugins,
-     oci_pull_completed_v1_to_plugins,
-     oci_pull_cancelled_v1_to_plugins,
-     %% License projections
+    %% Merged lifecycle projections (one gen_server per ETS table)
+    [plugin_lifecycle_to_plugins,
+     license_lifecycle_to_catalog,
+     launcher_lifecycle_to_launcher,
+     %% Individual license projections (each writes to separate licenses table)
      license_bought_v1_to_licenses,
      license_revoked_v1_to_licenses,
      license_archived_v1_to_licenses,
-     license_initiated_v1_to_catalog,
-     license_announced_v1_to_catalog,
-     license_published_v1_to_catalog,
-     license_amended_v1_to_catalog,
-     license_retracted_v1_to_catalog,
      plugin_installed_v1_to_licenses,
      plugin_removed_v1_to_licenses,
-     plugin_upgraded_v1_to_licenses,
-     %% Launcher projections
-     entry_registered_v1_to_launcher,
-     entry_unregistered_v1_to_launcher,
-     launcher_initialized_v1_to_launcher,
-     launcher_reorganized_v1_to_launcher].
+     plugin_upgraded_v1_to_licenses].
 
 policy_modules() ->
     [on_plugin_installed_register_entry,

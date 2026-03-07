@@ -17,9 +17,7 @@ get_settings_api_test_() ->
         [
             {"returns structured identity and preferences", fun returns_structured_response/0},
             {"returns 404 when settings not initialized", fun returns_404_not_initialized/0},
-            {"returns 500 on query error", fun returns_500_on_error/0},
-            {"decodes preferences JSON", fun decodes_preferences_json/0},
-            {"handles malformed preferences JSON gracefully", fun handles_bad_prefs_json/0},
+            {"decodes preferences from ETS", fun decodes_preferences/0},
             {"rejects non-GET methods", fun rejects_non_get/0},
             {"includes realm memberships in response", fun includes_realm_memberships/0}
         ]
@@ -39,7 +37,7 @@ setup() ->
     end),
     meck:expect(cowboy_req, method, fun(_Req) -> <<"GET">> end),
     %% Default: no realms
-    meck:expect(project_realm_memberships_store, query, fun(_Sql) -> {ok, []} end),
+    meck:expect(project_realm_memberships_store, list_confirmed, fun() -> {ok, []} end),
     ok.
 
 cleanup(_) ->
@@ -54,7 +52,7 @@ cleanup(_) ->
 %%====================================================================
 
 returns_structured_response() ->
-    mock_settings_row(<<"rl">>, <<"host00">>, <<"usr-1">>, <<"{}">>, 0, 1000),
+    mock_settings(<<"rl">>, <<"host00">>, <<"usr-1">>, #{}, 0, 1000),
 
     {ok, _Req, _State} = get_settings_api:init(#{}, []),
 
@@ -77,7 +75,7 @@ returns_structured_response() ->
     ?assertEqual([], Realms).
 
 returns_404_not_initialized() ->
-    meck:expect(project_settings_store, query, fun(_Sql) -> {ok, []} end),
+    meck:expect(project_settings_store, get, fun() -> {error, not_found} end),
 
     {ok, _Req, _State} = get_settings_api:init(#{}, []),
 
@@ -85,35 +83,17 @@ returns_404_not_initialized() ->
     Decoded = json:decode(iolist_to_binary(Body)),
     ?assertEqual(false, maps:get(<<"ok">>, Decoded)).
 
-returns_500_on_error() ->
-    meck:expect(project_settings_store, query, fun(_Sql) -> {error, db_error} end),
-
-    {ok, _Req, _State} = get_settings_api:init(#{}, []),
-
-    {500, _, _Body} = get(last_response).
-
-decodes_preferences_json() ->
-    PrefsJson = iolist_to_binary(json:encode(#{<<"theme">> => <<"dark">>, <<"lang">> => <<"en">>})),
-    mock_settings_row(<<"rl">>, <<"host00">>, <<"usr-1">>, PrefsJson, 0, 1000),
+decodes_preferences() ->
+    Prefs = #{<<"theme">> => <<"dark">>, <<"lang">> => <<"en">>},
+    mock_settings(<<"rl">>, <<"host00">>, <<"usr-1">>, Prefs, 0, 1000),
 
     {ok, _Req, _State} = get_settings_api:init(#{}, []),
 
     {200, _, Body} = get(last_response),
     Decoded = json:decode(iolist_to_binary(Body)),
-    Prefs = maps:get(<<"preferences">>, Decoded),
-    ?assertEqual(<<"dark">>, maps:get(<<"theme">>, Prefs)),
-    ?assertEqual(<<"en">>, maps:get(<<"lang">>, Prefs)).
-
-handles_bad_prefs_json() ->
-    mock_settings_row(<<"rl">>, <<"host00">>, <<"usr-1">>, <<"not valid json">>, 0, 1000),
-
-    {ok, _Req, _State} = get_settings_api:init(#{}, []),
-
-    {200, _, Body} = get(last_response),
-    Decoded = json:decode(iolist_to_binary(Body)),
-    %% Malformed JSON falls back to empty map
-    Prefs = maps:get(<<"preferences">>, Decoded),
-    ?assertEqual(#{}, Prefs).
+    DecodedPrefs = maps:get(<<"preferences">>, Decoded),
+    ?assertEqual(<<"dark">>, maps:get(<<"theme">>, DecodedPrefs)),
+    ?assertEqual(<<"en">>, maps:get(<<"lang">>, DecodedPrefs)).
 
 rejects_non_get() ->
     meck:expect(cowboy_req, method, fun(_Req) -> <<"POST">> end),
@@ -123,10 +103,12 @@ rejects_non_get() ->
     {405, _, _Body} = get(last_response).
 
 includes_realm_memberships() ->
-    mock_settings_row(<<"rl">>, <<"host00">>, <<"usr-1">>, <<"{}">>, 0, 1000),
-    meck:expect(project_realm_memberships_store, query, fun(_Sql) ->
-        {ok, [[<<"mem-1">>, <<"io.macula">>, <<"https://macula.io">>,
-               <<"octocat">>, <<"github">>, 2000]]}
+    mock_settings(<<"rl">>, <<"host00">>, <<"usr-1">>, #{}, 0, 1000),
+    meck:expect(project_realm_memberships_store, list_confirmed, fun() ->
+        {ok, [#{membership_id => <<"mem-1">>, realm_id => <<"io.macula">>,
+                realm_url => <<"https://macula.io">>,
+                oauth_account => <<"octocat">>, oauth_provider => <<"github">>,
+                confirmed_at => 2000}]}
     end),
 
     {ok, _Req, _State} = get_settings_api:init(#{}, []),
@@ -146,7 +128,9 @@ includes_realm_memberships() ->
 %% Helpers
 %%====================================================================
 
-mock_settings_row(LinuxUser, Hostname, HecateUserId, PrefsJson, Status, InitiatedAt) ->
-    meck:expect(project_settings_store, query, fun(_Sql) ->
-        {ok, [[LinuxUser, Hostname, HecateUserId, PrefsJson, Status, InitiatedAt]]}
+mock_settings(LinuxUser, Hostname, HecateUserId, Prefs, Status, InitiatedAt) ->
+    meck:expect(project_settings_store, get, fun() ->
+        {ok, #{linux_user => LinuxUser, hostname => Hostname,
+               hecate_user_id => HecateUserId, preferences => Prefs,
+               status => Status, initiated_at => InitiatedAt}}
     end).

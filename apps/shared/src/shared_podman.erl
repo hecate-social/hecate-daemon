@@ -85,9 +85,7 @@ render_container(DaemonName, OciImage) ->
         "Restart=always\n",
         "RestartSec=5s\n",
         "TimeoutStartSec=60s\n",
-        "\n",
-        "[Install]\n",
-        "WantedBy=default.target\n"
+        "\n"
     ]).
 
 %% @doc Extract daemon name from OCI image ref.

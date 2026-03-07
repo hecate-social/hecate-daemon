@@ -11,10 +11,7 @@ start_link() ->
 
 init([]) ->
     Projections = [
-        launcher_initialized_v1_to_launcher,
-        entry_registered_v1_to_launcher,
-        entry_unregistered_v1_to_launcher,
-        launcher_reorganized_v1_to_launcher
+        launcher_lifecycle_to_launcher
     ],
     Children = [
         #{

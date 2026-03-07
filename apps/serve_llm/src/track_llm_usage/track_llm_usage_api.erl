@@ -23,18 +23,10 @@ init(Req0, [cost_by_venture]) ->
     end.
 
 handle_total_cost(Req0) ->
-    case llm_usage_store:get_total_cost() of
-        {ok, Cost} ->
-            hecate_api_utils:json_ok(#{total_cost_usd => Cost, currency => <<"USD">>}, Req0);
-        {error, Reason} ->
-            hecate_api_utils:json_error(500, Reason, Req0)
-    end.
+    {ok, Cost} = project_llm_usage_store:get_total_cost(),
+    hecate_api_utils:json_ok(#{total_cost_usd => Cost, currency => <<"USD">>}, Req0).
 
 handle_cost_by_venture(Req0) ->
     VentureId = cowboy_req:binding(venture_id, Req0),
-    case llm_usage_store:get_cost_by_venture(VentureId) of
-        {ok, Cost} ->
-            hecate_api_utils:json_ok(#{venture_id => VentureId, cost_usd => Cost, currency => <<"USD">>}, Req0);
-        {error, Reason} ->
-            hecate_api_utils:json_error(500, Reason, Req0)
-    end.
+    {ok, Cost} = project_llm_usage_store:get_cost_by_venture(VentureId),
+    hecate_api_utils:json_ok(#{venture_id => VentureId, cost_usd => Cost, currency => <<"USD">>}, Req0).

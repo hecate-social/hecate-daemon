@@ -1,31 +1,23 @@
-%%% @doc Supervisor for project_realm_memberships.
+%%% @doc Top-level supervisor for project_realm_memberships (PRJ).
 %%%
-%%% Starts SQLite store first, then projection workers.
+%%% Starts the ETS store first (creates table), then the merged projection.
+%%% @end
 -module(project_realm_memberships_sup).
 -behaviour(supervisor).
-
 -export([start_link/0, init/1]).
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-    SupFlags = #{strategy => one_for_one, intensity => 10, period => 10},
     Children = [
-        %% SQLite store (must start first)
+        %% ETS store (must start first — creates table)
         #{id => project_realm_memberships_store,
           start => {project_realm_memberships_store, start_link, []},
           restart => permanent, type => worker},
-
-        %% Projections
-        #{id => realm_membership_initiated_v1_to_memberships,
-          start => {realm_membership_initiated_v1_to_memberships, start_link, []},
-          restart => permanent, type => worker},
-        #{id => realm_membership_confirmed_v1_to_memberships,
-          start => {realm_membership_confirmed_v1_to_memberships, start_link, []},
-          restart => permanent, type => worker},
-        #{id => realm_membership_revoked_v1_to_memberships,
-          start => {realm_membership_revoked_v1_to_memberships, start_link, []},
+        %% Merged projection: all membership events -> realm_memberships ETS
+        #{id => membership_lifecycle_to_memberships,
+          start => {evoq_projection, start_link, [membership_lifecycle_to_memberships, #{}]},
           restart => permanent, type => worker}
     ],
-    {ok, {SupFlags, Children}}.
+    {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

@@ -1,12 +1,12 @@
 {application, project_realm_memberships, [
-    {description, "PRJ service for realm memberships: SQLite store + projections"},
+    {description, "PRJ service for realm memberships: ETS store + merged projection"},
     {vsn, "0.1.0"},
     {registered, []},
     {mod, {project_realm_memberships_app, []}},
     {applications, [
         kernel,
         stdlib,
-        esqlite,
+        evoq,
         reckon_evoq,
         guide_realm_memberships
     ]},

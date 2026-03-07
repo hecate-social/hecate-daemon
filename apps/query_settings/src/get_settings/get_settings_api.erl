@@ -13,13 +13,10 @@ init(Req0, State) ->
     end.
 
 handle_get(Req0, _State) ->
-    Sql = "SELECT linux_user, hostname, hecate_user_id,
-                  preferences, status, initiated_at
-           FROM settings WHERE id = 1",
-    case project_settings_store:query(Sql) of
-        {ok, [[LinuxUser, Hostname, HecateUserId,
-               PrefsJson, Status, InitiatedAt]]} ->
-            Prefs = try json:decode(PrefsJson) catch _:_ -> #{} end,
+    case project_settings_store:get() of
+        {ok, #{hecate_user_id := HecateUserId, linux_user := LinuxUser,
+               hostname := Hostname, preferences := Prefs,
+               status := Status, initiated_at := InitiatedAt}} ->
             Identity = #{
                 hecate_user_id => HecateUserId,
                 linux_user => LinuxUser,
@@ -27,27 +24,12 @@ handle_get(Req0, _State) ->
                 initiated_at => InitiatedAt,
                 status => Status
             },
-            Realms = fetch_realms(),
+            {ok, Realms} = project_realm_memberships_store:list_confirmed(),
             hecate_api_utils:json_ok(#{
                 identity => Identity,
                 preferences => Prefs,
                 realms => Realms
             }, Req0);
-        {ok, []} ->
-            hecate_api_utils:json_error(404, <<"Settings not initialized">>, Req0);
-        {error, Reason} ->
-            hecate_api_utils:json_error(500, Reason, Req0)
-    end.
-
-fetch_realms() ->
-    Sql = "SELECT membership_id, realm_id, realm_url, oauth_account, oauth_provider, confirmed_at
-           FROM realm_memberships WHERE status = 'confirmed' ORDER BY confirmed_at",
-    case project_realm_memberships_store:query(Sql) of
-        {ok, Rows} ->
-            lists:map(fun([MId, RId, RUrl, Acct, Prov, At]) ->
-                #{membership_id => MId, realm_id => RId, realm_url => RUrl,
-                  oauth_account => Acct, oauth_provider => Prov, confirmed_at => At}
-            end, Rows);
-        _ ->
-            []
+        {error, not_found} ->
+            hecate_api_utils:json_error(404, <<"Settings not initialized">>, Req0)
     end.

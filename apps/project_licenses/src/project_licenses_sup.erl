@@ -15,12 +15,8 @@ init([]) ->
         license_bought_v1_to_licenses,
         license_revoked_v1_to_licenses,
         license_archived_v1_to_licenses,
-        %% Catalog table projections
-        license_initiated_v1_to_catalog,
-        license_announced_v1_to_catalog,
-        license_published_v1_to_catalog,
-        license_amended_v1_to_catalog,
-        license_retracted_v1_to_catalog,
+        %% Catalog table projection (merged — ordering matters!)
+        license_lifecycle_to_catalog,
         %% Cross-domain: plugin events -> licenses table
         plugin_installed_v1_to_licenses,
         plugin_removed_v1_to_licenses,

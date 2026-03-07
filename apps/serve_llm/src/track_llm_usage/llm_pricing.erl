@@ -38,6 +38,7 @@
 }).
 
 %% @doc Record an LLM call. Calculates cost if not provided.
+%% Dispatches via evoq to llm_store (event sourced).
 -spec record_llm_call(map()) -> ok | {error, term()}.
 record_llm_call(Data) when is_map(Data) ->
     Model = maps:get(model, Data),
@@ -49,7 +50,10 @@ record_llm_call(Data) when is_map(Data) ->
             Cost = calculate_cost(Model, TokensIn, TokensOut),
             Data#{cost_usd => Cost}
     end,
-    llm_usage_store:record_llm_call(DataWithCost).
+    case maybe_track_llm_call:dispatch(DataWithCost) of
+        {ok, _, _} -> ok;
+        {error, _} = Err -> Err
+    end.
 
 %% @doc Calculate cost in USD for a given model and token counts.
 -spec calculate_cost(binary(), non_neg_integer(), non_neg_integer()) -> float().

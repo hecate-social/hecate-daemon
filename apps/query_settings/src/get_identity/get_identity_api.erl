@@ -11,18 +11,9 @@ init(Req0, State) ->
     end.
 
 handle_get(Req0, _State) ->
-    Sql = "SELECT hecate_user_id, linux_user, hostname
-           FROM settings WHERE id = 1",
-    case project_settings_store:query(Sql) of
-        {ok, [[HecateUserId, LinuxUser, Hostname]]} ->
-            Identity = #{
-                hecate_user_id => HecateUserId,
-                linux_user => LinuxUser,
-                hostname => Hostname
-            },
+    case project_settings_store:get_identity() of
+        {ok, Identity} ->
             hecate_api_utils:json_ok(#{identity => Identity}, Req0);
-        {ok, []} ->
-            hecate_api_utils:json_error(404, <<"Settings not initialized">>, Req0);
-        {error, Reason} ->
-            hecate_api_utils:json_error(500, Reason, Req0)
+        {error, not_found} ->
+            hecate_api_utils:json_error(404, <<"Settings not initialized">>, Req0)
     end.
