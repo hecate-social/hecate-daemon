@@ -101,6 +101,33 @@ append_manifest(Url) ->
     Stripped = strip_trailing_slash(Url),
     <<Stripped/binary, "/manifest.json">>.
 
+%% @private Resolve OCI image: use explicit value if provided,
+%% otherwise derive from GitHub repo URL convention: ghcr.io/{org}/{repo}d
+resolve_manifest_oci_image(OciImage, _Org, _ManifestUrl)
+  when is_binary(OciImage), byte_size(OciImage) > 0 ->
+    OciImage;
+resolve_manifest_oci_image(_, _Org, ManifestUrl) ->
+    derive_oci_image_from_url(ManifestUrl).
+
+derive_oci_image_from_url(ManifestUrl) ->
+    case parse_github_from_raw_url(ManifestUrl) of
+        {ok, Org, Repo} ->
+            <<"ghcr.io/", Org/binary, "/", Repo/binary, "d">>;
+        not_github ->
+            undefined
+    end.
+
+parse_github_from_raw_url(Url) ->
+    case Url of
+        <<"https://raw.githubusercontent.com/", Rest/binary>> ->
+            case binary:split(Rest, <<"/">>, [global]) of
+                [Org, Repo | _] -> {ok, Org, Repo};
+                _ -> not_github
+            end;
+        _ ->
+            not_github
+    end.
+
 %% --- Fetch and publish ---
 
 fetch_and_publish(ManifestUrl, SellerId, Req) ->
@@ -133,15 +160,22 @@ validate_and_publish(Manifest, RawBody, ManifestUrl, SellerId, Req) ->
     Version = maps:get(<<"version">>, Manifest, undefined),
     Appstore = maps:get(<<"appstore">>, Manifest, undefined),
     case validate_manifest(Name, Version, Appstore) of
-        {ok, Org, OciImage} ->
-            MinVsn = maps:get(<<"min_daemon_version">>, Appstore, undefined),
-            case check_daemon_version(MinVsn) of
-                ok ->
-                    TrustData = compute_trust(RawBody, OciImage, Version),
-                    dispatch_initiate(Name, Version, Org, OciImage, Manifest,
-                                      Appstore, ManifestUrl, SellerId, TrustData, Req);
-                {error, Reason} ->
-                    hecate_api_utils:bad_request(Reason, Req)
+        {ok, Org, MaybeOciImage} ->
+            OciImage = resolve_manifest_oci_image(MaybeOciImage, Org, ManifestUrl),
+            case OciImage of
+                undefined ->
+                    hecate_api_utils:bad_request(
+                        <<"Cannot determine oci_image: set appstore.oci_image or publish from a GitHub URL">>, Req);
+                _ ->
+                    MinVsn = maps:get(<<"min_daemon_version">>, Appstore, undefined),
+                    case check_daemon_version(MinVsn) of
+                        ok ->
+                            TrustData = compute_trust(RawBody, OciImage, Version),
+                            dispatch_initiate(Name, Version, Org, OciImage, Manifest,
+                                              Appstore, ManifestUrl, SellerId, TrustData, Req);
+                        {error, Reason} ->
+                            hecate_api_utils:bad_request(Reason, Req)
+                    end
             end;
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
@@ -158,7 +192,6 @@ validate_manifest(_, _, Appstore) when is_map(Appstore) ->
     OciImage = maps:get(<<"oci_image">>, Appstore, undefined),
     case {Org, OciImage} of
         {undefined, _} -> {error, <<"manifest.appstore missing 'org'">>};
-        {_, undefined} -> {error, <<"manifest.appstore missing 'oci_image'">>};
         {_, _} -> {ok, Org, OciImage}
     end;
 validate_manifest(_, _, _) ->

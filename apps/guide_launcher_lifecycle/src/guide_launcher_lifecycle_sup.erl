@@ -27,22 +27,23 @@ init([]) ->
         %% -- PG emitters (internal, subscribe via evoq -> broadcast to pg) --
 
         #{id => entry_registered_v1_to_pg,
-          start => {entry_registered_v1_to_pg, start_link, []},
+          start => {evoq_event_handler, start_link, [entry_registered_v1_to_pg, #{}]},
           restart => permanent, type => worker},
         #{id => entry_unregistered_v1_to_pg,
-          start => {entry_unregistered_v1_to_pg, start_link, []},
+          start => {evoq_event_handler, start_link, [entry_unregistered_v1_to_pg, #{}]},
           restart => permanent, type => worker},
         #{id => launcher_reorganized_v1_to_pg,
-          start => {launcher_reorganized_v1_to_pg, start_link, []},
+          start => {evoq_event_handler, start_link, [launcher_reorganized_v1_to_pg, #{}]},
           restart => permanent, type => worker},
 
         %% -- Process Managers (cross-domain, react to plugin events) --
+        %% Started via evoq_event_handler — auto-registers with event type registry
 
         #{id => on_plugin_installed_register_entry,
-          start => {on_plugin_installed_register_entry, start_link, []},
+          start => {evoq_event_handler, start_link, [on_plugin_installed_register_entry, #{}]},
           restart => permanent, type => worker},
         #{id => on_plugin_removed_unregister_entry,
-          start => {on_plugin_removed_unregister_entry, start_link, []},
+          start => {evoq_event_handler, start_link, [on_plugin_removed_unregister_entry, #{}]},
           restart => permanent, type => worker},
 
         %% -- Launcher initializer (ensures birth event on startup) --

@@ -1,6 +1,7 @@
 %%% @doc Top-level supervisor for project_plugins (PRJ).
 %%%
-%%% Supervises the SQLite store and all projection desk supervisors.
+%%% Supervises the plugins read model store and all projection desks.
+%%% Each projection writes to a shared named ETS table (plugins).
 %%% @end
 -module(project_plugins_sup).
 -behaviour(supervisor).
@@ -11,61 +12,82 @@ start_link() ->
 
 init([]) ->
     Children = [
-        %% SQLite connection worker (must start first)
+        %% Read model query facade (must start first — creates ETS table)
         #{
             id => project_plugins_store,
             start => {project_plugins_store, start_link, []},
             restart => permanent,
             type => worker
         },
-        %% Projection: plugin_installed_v1 -> plugins table
+        %% Projection: plugin_installed_v1 -> plugins ETS
         #{
-            id => plugin_installed_v1_to_plugins_sup,
-            start => {plugin_installed_v1_to_plugins_sup, start_link, []},
+            id => plugin_installed_v1_to_plugins,
+            start => {evoq_projection, start_link, [plugin_installed_v1_to_plugins, #{}]},
             restart => permanent,
-            type => supervisor
+            type => worker
         },
-        %% Projection: plugin_upgraded_v1 -> plugins table
+        %% Projection: plugin_upgraded_v1 -> plugins ETS
         #{
-            id => plugin_upgraded_v1_to_plugins_sup,
-            start => {plugin_upgraded_v1_to_plugins_sup, start_link, []},
+            id => plugin_upgraded_v1_to_plugins,
+            start => {evoq_projection, start_link, [plugin_upgraded_v1_to_plugins, #{}]},
             restart => permanent,
-            type => supervisor
+            type => worker
         },
-        %% Projection: plugin_removed_v1 -> plugins table
+        %% Projection: plugin_removed_v1 -> plugins ETS
         #{
-            id => plugin_removed_v1_to_plugins_sup,
-            start => {plugin_removed_v1_to_plugins_sup, start_link, []},
+            id => plugin_removed_v1_to_plugins,
+            start => {evoq_projection, start_link, [plugin_removed_v1_to_plugins, #{}]},
             restart => permanent,
-            type => supervisor
+            type => worker
         },
-        %% Projection: plugin_execution_started_v1 -> plugins table
+        %% Projection: plugin_execution_started_v1 -> plugins ETS
         #{
-            id => plugin_execution_started_v1_to_plugins_sup,
-            start => {plugin_execution_started_v1_to_plugins_sup, start_link, []},
+            id => plugin_execution_started_v1_to_plugins,
+            start => {evoq_projection, start_link, [plugin_execution_started_v1_to_plugins, #{}]},
             restart => permanent,
-            type => supervisor
+            type => worker
         },
-        %% Projection: plugin_execution_stopped_v1 -> plugins table
+        %% Projection: plugin_execution_stopped_v1 -> plugins ETS
         #{
-            id => plugin_execution_stopped_v1_to_plugins_sup,
-            start => {plugin_execution_stopped_v1_to_plugins_sup, start_link, []},
+            id => plugin_execution_stopped_v1_to_plugins,
+            start => {evoq_projection, start_link, [plugin_execution_stopped_v1_to_plugins, #{}]},
             restart => permanent,
-            type => supervisor
+            type => worker
         },
-        %% Projection: container_confirmed_up_v1 -> plugins table
+        %% Projection: container_confirmed_up_v1 -> plugins ETS
         #{
-            id => container_confirmed_up_v1_to_plugins_sup,
-            start => {container_confirmed_up_v1_to_plugins_sup, start_link, []},
+            id => container_confirmed_up_v1_to_plugins,
+            start => {evoq_projection, start_link, [container_confirmed_up_v1_to_plugins, #{}]},
             restart => permanent,
-            type => supervisor
+            type => worker
         },
-        %% Projection: container_confirmed_down_v1 -> plugins table
+        %% Projection: container_confirmed_down_v1 -> plugins ETS
         #{
-            id => container_confirmed_down_v1_to_plugins_sup,
-            start => {container_confirmed_down_v1_to_plugins_sup, start_link, []},
+            id => container_confirmed_down_v1_to_plugins,
+            start => {evoq_projection, start_link, [container_confirmed_down_v1_to_plugins, #{}]},
             restart => permanent,
-            type => supervisor
+            type => worker
+        },
+        %% Projection: container_pull_started_v1 -> plugins ETS
+        #{
+            id => container_pull_started_v1_to_plugins,
+            start => {evoq_projection, start_link, [container_pull_started_v1_to_plugins, #{}]},
+            restart => permanent,
+            type => worker
+        },
+        %% Projection: container_pull_cancelled_v1 -> plugins ETS
+        #{
+            id => container_pull_cancelled_v1_to_plugins,
+            start => {evoq_projection, start_link, [container_pull_cancelled_v1_to_plugins, #{}]},
+            restart => permanent,
+            type => worker
+        },
+        %% Projection: container_pull_completed_v1 -> plugins ETS
+        #{
+            id => container_pull_completed_v1_to_plugins,
+            start => {evoq_projection, start_link, [container_pull_completed_v1_to_plugins, #{}]},
+            restart => permanent,
+            type => worker
         }
     ],
     {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

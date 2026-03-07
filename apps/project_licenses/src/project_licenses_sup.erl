@@ -1,6 +1,6 @@
 %%% @doc Top-level supervisor for project_licenses (PRJ).
 %%%
-%%% Supervises the SQLite store and all projection desk supervisors.
+%%% Starts the ETS store first (creates tables), then all projections.
 %%% @end
 -module(project_licenses_sup).
 -behaviour(supervisor).
@@ -10,72 +10,34 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
+    Projections = [
+        %% Licenses table projections
+        license_bought_v1_to_licenses,
+        license_revoked_v1_to_licenses,
+        license_archived_v1_to_licenses,
+        %% Catalog table projections
+        license_initiated_v1_to_catalog,
+        license_announced_v1_to_catalog,
+        license_published_v1_to_catalog,
+        license_amended_v1_to_catalog,
+        license_retracted_v1_to_catalog,
+        %% Cross-domain: plugin events -> licenses table
+        plugin_installed_v1_to_licenses,
+        plugin_removed_v1_to_licenses,
+        plugin_upgraded_v1_to_licenses
+    ],
     Children = [
-        %% SQLite connection worker (must start first)
         #{
             id => project_licenses_store,
             start => {project_licenses_store, start_link, []},
             restart => permanent,
             type => worker
-        },
-        %% Projection: license_bought_v1 -> licenses table
-        #{
-            id => license_bought_v1_to_licenses_sup,
-            start => {license_bought_v1_to_licenses_sup, start_link, []},
-            restart => permanent,
-            type => supervisor
-        },
-        %% Projection: license_revoked_v1 -> licenses table
-        #{
-            id => license_revoked_v1_to_licenses_sup,
-            start => {license_revoked_v1_to_licenses_sup, start_link, []},
-            restart => permanent,
-            type => supervisor
-        },
-        %% Projection: license_archived_v1 -> licenses table
-        #{
-            id => license_archived_v1_to_licenses_sup,
-            start => {license_archived_v1_to_licenses_sup, start_link, []},
-            restart => permanent,
-            type => supervisor
-        },
-
-        %% ── Catalog projections (seller-side events) ────────────────────────
-
-        %% Projection: license_initiated_v1 -> catalog table (birth)
-        #{
-            id => license_initiated_v1_to_catalog_sup,
-            start => {license_initiated_v1_to_catalog_sup, start_link, []},
-            restart => permanent,
-            type => supervisor
-        },
-        %% Projection: license_announced_v1 -> catalog table
-        #{
-            id => license_announced_v1_to_catalog_sup,
-            start => {license_announced_v1_to_catalog_sup, start_link, []},
-            restart => permanent,
-            type => supervisor
-        },
-        %% Projection: license_published_v1 -> catalog table
-        #{
-            id => license_published_v1_to_catalog_sup,
-            start => {license_published_v1_to_catalog_sup, start_link, []},
-            restart => permanent,
-            type => supervisor
-        },
-        %% Projection: license_amended_v1 -> catalog table
-        #{
-            id => license_amended_v1_to_catalog_sup,
-            start => {license_amended_v1_to_catalog_sup, start_link, []},
-            restart => permanent,
-            type => supervisor
-        },
-        %% Projection: license_retracted_v1 -> catalog table
-        #{
-            id => license_retracted_v1_to_catalog_sup,
-            start => {license_retracted_v1_to_catalog_sup, start_link, []},
-            restart => permanent,
-            type => supervisor
         }
+        | [#{
+            id => Mod,
+            start => {evoq_projection, start_link, [Mod, #{}]},
+            restart => permanent,
+            type => worker
+        } || Mod <- Projections]
     ],
     {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

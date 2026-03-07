@@ -67,5 +67,7 @@ create_event(Cmd) ->
         name              => install_plugin_v1:get_name(Cmd),
         oci_image         => install_plugin_v1:get_oci_image(Cmd),
         installed_version => install_plugin_v1:get_installed_version(Cmd),
-        license_id        => install_plugin_v1:get_license_id(Cmd)
+        license_id        => install_plugin_v1:get_license_id(Cmd),
+        icon              => install_plugin_v1:get_icon(Cmd),
+        group_name        => install_plugin_v1:get_group(Cmd)
     }).

@@ -1,16 +1,11 @@
 %%% @doc API handler: GET/PUT /api/launcher/layout
 %%%
-%%% GET  - Returns the full launcher layout from SQLite read model.
+%%% GET  - Returns the full launcher layout.
 %%% PUT  - Delegates to reorganize_launcher_api for full layout update.
 %%% @end
 -module(get_launcher_layout_api).
 
 -export([init/2, routes/0]).
-
--ifdef(TEST).
--compile(export_all).
--compile(nowarn_export_all).
--endif.
 
 routes() -> [{"/api/launcher/layout", ?MODULE, []}].
 
@@ -22,25 +17,9 @@ init(Req0, State) ->
     end.
 
 handle_get(Req0, _State) ->
-    case project_launcher_store:query(
-        "SELECT name, icon, collapsed, position "
-        "FROM launcher_groups ORDER BY position ASC") of
-        {ok, GroupRows} ->
-            Groups = lists:map(fun(Row) -> group_with_entries(Row) end, GroupRows),
+    case project_launcher_store:get_layout() of
+        {ok, Groups} ->
             hecate_api_utils:json_ok(#{groups => Groups}, Req0);
         {error, Reason} ->
             hecate_api_utils:json_error(500, Reason, Req0)
     end.
-
-group_with_entries([Name, Icon, Collapsed, _Pos]) ->
-    {ok, EntryRows} = project_launcher_store:query(
-        "SELECT entry_id FROM launcher_entries "
-        "WHERE group_name = ?1 ORDER BY position ASC",
-        [Name]),
-    Apps = [EId || [EId] <- EntryRows],
-    #{
-        name => Name,
-        icon => Icon,
-        collapsed => Collapsed =:= 1,
-        apps => Apps
-    }.

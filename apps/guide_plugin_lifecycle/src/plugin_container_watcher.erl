@@ -100,19 +100,14 @@ dispatch_confirm_down(PluginId) ->
     end.
 
 query_installed_plugins() ->
-    Sql = "SELECT plugin_id, oci_image FROM plugins WHERE (status & 2) = 0",
-    try project_plugins_store:query(Sql) of
-        {ok, Rows} ->
-            {ok, [row_to_tuple(R) || R <- Rows]};
+    try project_plugins_store:list_active() of
+        {ok, Plugins} ->
+            {ok, [{maps:get(plugin_id, P), maps:get(oci_image, P)} || P <- Plugins]};
         {error, _} = Err ->
             Err
     catch
-        exit:{noproc, _} -> {error, store_not_ready};
-        exit:{timeout, _} -> {error, store_timeout}
+        error:badarg -> {error, store_not_ready}
     end.
-
-row_to_tuple([PluginId, OciImage]) -> {PluginId, OciImage};
-row_to_tuple({PluginId, OciImage}) -> {PluginId, OciImage}.
 
 plugin_socket_path(DaemonName) ->
     HecateHome = shared_paths:hecate_home(),

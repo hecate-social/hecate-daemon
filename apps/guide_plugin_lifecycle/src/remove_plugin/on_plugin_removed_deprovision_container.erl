@@ -1,43 +1,28 @@
 %%% @doc Process Manager: On plugin removed, deprovision the container.
 %%%
-%%% Subscribes to plugin_removed_v1 events from plugins_store.
+%%% Subscribes to plugin_removed_v1 events via evoq_event_handler.
 %%% Deletes the .container Quadlet file from ~/.hecate/gitops/apps/
 %%% so the local reconciler stops and removes the container.
 %%% @end
 -module(on_plugin_removed_deprovision_container).
--behaviour(gen_server).
+-behaviour(evoq_event_handler).
 
--include_lib("evoq/include/evoq_types.hrl").
+-export([interested_in/0, init/1, handle_event/4]).
 
--export([start_link/0]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+interested_in() ->
+    [<<"plugin_removed_v1">>].
 
--define(EVENT_TYPE, <<"plugin_removed_v1">>).
--define(SUB_NAME, <<"on_plugin_removed_deprovision_container">>).
--define(STORE_ID, plugins_store).
-
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-init([]) ->
-    {ok, _} = evoq_subscriptions:subscribe(
-        ?STORE_ID, event_type, ?EVENT_TYPE, ?SUB_NAME,
-        #{subscriber_pid => self()}),
+init(_Config) ->
     {ok, #{}}.
 
-handle_info({events, Events}, State) ->
-    lists:foreach(fun(E) -> handle_event(E) end, Events),
-    {noreply, State};
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-handle_call(_Req, _From, State) -> {reply, ok, State}.
-handle_cast(_Msg, State) -> {noreply, State}.
-terminate(_Reason, _State) -> ok.
+handle_event(_EventType, Event, _Metadata, State) ->
+    Data = maps:get(data, Event),
+    do_handle(Data),
+    {ok, State}.
 
 %% Internal
 
-handle_event(#evoq_event{data = Data}) ->
+do_handle(Data) ->
     PluginId = get_value(plugin_id, Data),
     case lookup_oci_image(PluginId) of
         {ok, OciImage} ->
@@ -96,13 +81,9 @@ deprovision_by_plugin_id(PluginId) ->
 
 %% @private Look up the OCI image for a plugin from the read model.
 lookup_oci_image(PluginId) ->
-    Sql = <<"SELECT oci_image FROM plugins WHERE plugin_id = ?1 LIMIT 1">>,
-    try project_plugins_store:query(Sql, [PluginId]) of
-        {ok, [[OciImage]]} -> {ok, OciImage};
-        {ok, []} -> {error, not_found};
+    case project_plugins_store:get(PluginId) of
+        {ok, #{oci_image := OciImage}} -> {ok, OciImage};
         _ -> {error, not_found}
-    catch
-        _:_ -> {error, not_found}
     end.
 
 %% @private Extract the daemon name from the OCI image reference.

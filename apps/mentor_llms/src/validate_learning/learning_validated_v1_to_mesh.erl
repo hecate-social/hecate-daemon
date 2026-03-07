@@ -1,46 +1,16 @@
 %%% @doc Mesh emitter: learning_validated_v1 -> hecate.learning.validated
-%%% Publishes validated learnings to mesh as integration facts.
+%%% Registered via evoq_event_handler; evoq_store_subscription routes events automatically.
 -module(learning_validated_v1_to_mesh).
--behaviour(gen_server).
+-behaviour(evoq_event_handler).
 
--export([start_link/0]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+-export([interested_in/0, init/1, handle_event/4]).
 
--dialyzer({nowarn_function, [init/1, terminate/2]}).
+-define(MESH_TOPIC, <<"hecate.learning.validated">>).
 
--include_lib("evoq/include/evoq_types.hrl").
+interested_in() -> [<<"learning_validated_v1">>].
 
--record(state, {subscription_id :: binary() | undefined}).
+init(_Config) -> {ok, #{}}.
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-init([]) ->
-    {ok, SubId} = evoq_subscriptions:subscribe(
-        mentorships_store,
-        event_type,
-        <<"learning_validated_v1">>,
-        <<"mesh_learning_validated">>,
-        #{start_from => 0, subscriber_pid => self()}
-    ),
-    {ok, #state{subscription_id = SubId}}.
-
-handle_call(_Request, _From, State) ->
-    {reply, {error, unknown_call}, State}.
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-handle_info({events, Events}, State) ->
-    lists:foreach(fun(#evoq_event{data = EventData}) ->
-        hecate_mesh_client:publish(<<"hecate.learning.validated">>, EventData)
-    end, Events),
-    {noreply, State};
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-terminate(_Reason, #state{subscription_id = SubId}) ->
-    case SubId of
-        undefined -> ok;
-        _ -> evoq_subscriptions:unsubscribe(mentorships_store, SubId)
-    end.
+handle_event(_EventType, Event, _Metadata, State) ->
+    hecate_mesh_client:publish(?MESH_TOPIC, Event),
+    {ok, State}.

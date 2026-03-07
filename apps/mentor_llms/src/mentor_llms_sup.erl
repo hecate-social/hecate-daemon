@@ -19,16 +19,16 @@ init([]) ->
     Children = [
         %% Emitters: publish domain events to mesh as integration facts
         {learning_validated_v1_to_mesh,
-            {learning_validated_v1_to_mesh, start_link, []},
+            {evoq_event_handler, start_link, [learning_validated_v1_to_mesh, #{}]},
             permanent, 5000, worker, [learning_validated_v1_to_mesh]},
         {learning_endorsed_v1_to_mesh,
-            {learning_endorsed_v1_to_mesh, start_link, []},
+            {evoq_event_handler, start_link, [learning_endorsed_v1_to_mesh, #{}]},
             permanent, 5000, worker, [learning_endorsed_v1_to_mesh]},
         {expertise_declared_v1_to_mesh,
-            {expertise_declared_v1_to_mesh, start_link, []},
+            {evoq_event_handler, start_link, [expertise_declared_v1_to_mesh, #{}]},
             permanent, 5000, worker, [expertise_declared_v1_to_mesh]},
         {expertise_withdrawn_v1_to_mesh,
-            {expertise_withdrawn_v1_to_mesh, start_link, []},
+            {evoq_event_handler, start_link, [expertise_withdrawn_v1_to_mesh, #{}]},
             permanent, 5000, worker, [expertise_withdrawn_v1_to_mesh]}
     ],
 

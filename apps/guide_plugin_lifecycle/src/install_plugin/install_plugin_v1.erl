@@ -4,14 +4,17 @@
 
 -export([new/1, from_map/1, validate/1, to_map/1]).
 -export([get_plugin_id/1, get_name/1, get_oci_image/1,
-         get_installed_version/1, get_license_id/1]).
+         get_installed_version/1, get_license_id/1,
+         get_icon/1, get_group/1]).
 
 -record(install_plugin_v1, {
     plugin_id         :: binary(),
     name              :: binary(),
     oci_image         :: binary(),
     installed_version :: binary(),
-    license_id        :: binary() | undefined
+    license_id        :: binary() | undefined,
+    icon              :: binary() | undefined,
+    group_name        :: binary() | undefined
 }).
 
 -export_type([install_plugin_v1/0]).
@@ -27,7 +30,9 @@ new(#{plugin_id := PluginId, name := Name,
         name              = Name,
         oci_image         = OciImage,
         installed_version = Version,
-        license_id        = maps:get(license_id, Params, undefined)
+        license_id        = maps:get(license_id, Params, undefined),
+        icon              = maps:get(icon, Params, undefined),
+        group_name        = maps:get(group_name, Params, undefined)
     }};
 new(_) ->
     {error, missing_required_fields}.
@@ -56,7 +61,9 @@ to_map(#install_plugin_v1{} = Cmd) ->
         <<"name">>               => Cmd#install_plugin_v1.name,
         <<"oci_image">>          => Cmd#install_plugin_v1.oci_image,
         <<"installed_version">>  => Cmd#install_plugin_v1.installed_version,
-        <<"license_id">>         => Cmd#install_plugin_v1.license_id
+        <<"license_id">>         => Cmd#install_plugin_v1.license_id,
+        <<"icon">>               => Cmd#install_plugin_v1.icon,
+        <<"group_name">>         => Cmd#install_plugin_v1.group_name
     }.
 
 -spec from_map(map()) -> {ok, install_plugin_v1()} | {error, term()}.
@@ -72,12 +79,16 @@ from_map(Map) ->
         {_, _, undefined, _} -> {error, missing_required_fields};
         {_, _, _, undefined} -> {error, missing_required_fields};
         _ ->
+            Icon = get_value(icon, Map, undefined),
+            GroupName = get_value(group_name, Map, undefined),
             {ok, #install_plugin_v1{
                 plugin_id         = PluginId,
                 name              = Name,
                 oci_image         = OciImage,
                 installed_version = Version,
-                license_id        = LicenseId
+                license_id        = LicenseId,
+                icon              = Icon,
+                group_name        = GroupName
             }}
     end.
 
@@ -96,6 +107,12 @@ get_installed_version(#install_plugin_v1{installed_version = V}) -> V.
 
 -spec get_license_id(install_plugin_v1()) -> binary() | undefined.
 get_license_id(#install_plugin_v1{license_id = V}) -> V.
+
+-spec get_icon(install_plugin_v1()) -> binary() | undefined.
+get_icon(#install_plugin_v1{icon = V}) -> V.
+
+-spec get_group(install_plugin_v1()) -> binary() | undefined.
+get_group(#install_plugin_v1{group_name = V}) -> V.
 
 %% Internal helper to get value with atom or binary key
 get_value(Key, Map) ->

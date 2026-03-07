@@ -4,7 +4,8 @@
 
 -export([new/1, to_map/1, from_map/1]).
 -export([get_plugin_id/1, get_name/1, get_oci_image/1,
-         get_installed_version/1, get_license_id/1, get_installed_at/1]).
+         get_installed_version/1, get_license_id/1, get_installed_at/1,
+         get_icon/1, get_group/1]).
 
 -record(plugin_installed_v1, {
     plugin_id         :: binary(),
@@ -12,6 +13,8 @@
     oci_image         :: binary(),
     installed_version :: binary(),
     license_id        :: binary() | undefined,
+    icon              :: binary() | undefined,
+    group_name        :: binary() | undefined,
     installed_at      :: integer()
 }).
 
@@ -29,6 +32,8 @@ new(#{plugin_id := PluginId, name := Name,
         oci_image         = OciImage,
         installed_version = Version,
         license_id        = maps:get(license_id, Params, undefined),
+        icon              = maps:get(icon, Params, undefined),
+        group_name        = maps:get(group_name, Params, undefined),
         installed_at      = erlang:system_time(millisecond)
     }.
 
@@ -41,6 +46,8 @@ to_map(#plugin_installed_v1{} = E) ->
         oci_image         => E#plugin_installed_v1.oci_image,
         installed_version => E#plugin_installed_v1.installed_version,
         license_id        => E#plugin_installed_v1.license_id,
+        icon              => E#plugin_installed_v1.icon,
+        group_name        => E#plugin_installed_v1.group_name,
         installed_at      => E#plugin_installed_v1.installed_at
     }.
 
@@ -62,6 +69,8 @@ from_map(Map) ->
                 oci_image         = OciImage,
                 installed_version = Version,
                 license_id        = get_value(license_id, Map, undefined),
+                icon              = get_value(icon, Map, undefined),
+                group_name        = get_value(group_name, Map, undefined),
                 installed_at      = get_value(installed_at, Map, erlang:system_time(millisecond))
             }}
     end.
@@ -84,6 +93,12 @@ get_license_id(#plugin_installed_v1{license_id = V}) -> V.
 
 -spec get_installed_at(plugin_installed_v1()) -> integer().
 get_installed_at(#plugin_installed_v1{installed_at = V}) -> V.
+
+-spec get_icon(plugin_installed_v1()) -> binary() | undefined.
+get_icon(#plugin_installed_v1{icon = V}) -> V.
+
+-spec get_group(plugin_installed_v1()) -> binary() | undefined.
+get_group(#plugin_installed_v1{group_name = V}) -> V.
 
 %% Internal helper to get value with atom or binary key
 get_value(Key, Map) ->

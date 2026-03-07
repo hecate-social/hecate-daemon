@@ -1,7 +1,6 @@
-%%% @doc Tests for mentor profile projections (event -> SQLite mentor_profiles table).
+%%% @doc Tests for mentor profile projections (event -> ETS mentor_profiles table).
 %%%
-%%% Uses a temp SQLite database via project_llm_mentorships_store.
-%%% Each test group gets a fresh database (foreach pattern).
+%%% Creates a named ETS table and calls evoq_projection callbacks directly.
 -module(profiles_projection_tests).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -31,70 +30,68 @@ projection_test_() ->
 %% ===================================================================
 
 setup() ->
-    file:delete(shared_paths:sqlite_path("query_mentorships.db")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-wal")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-shm")),
-    {ok, _} = application:ensure_all_started(esqlite),
-    {ok, Pid} = project_llm_mentorships_store:start_link(),
-    Pid.
+    ensure_ets(mentor_profiles).
 
-cleanup(Pid) ->
-    gen_server:stop(Pid),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-wal")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-shm")),
+cleanup(_) ->
+    catch ets:delete(mentor_profiles),
     ok.
+
+ensure_ets(Name) ->
+    case ets:whereis(Name) of
+        undefined ->
+            ets:new(Name, [public, named_table, set, {read_concurrency, true}]);
+        _ ->
+            ets:delete_all_objects(Name),
+            Name
+    end.
+
+%% ===================================================================
+%% Helpers
+%% ===================================================================
+
+project(Mod, Event) ->
+    {ok, _, RM} = Mod:init(#{}),
+    {ok, _, _} = Mod:project(Event, #{}, #{}, RM).
 
 %% ===================================================================
 %% Projection tests
 %% ===================================================================
 
 proj_declared() ->
-    Event = #{
+    Event = #{data => #{
         agent_id => <<"agent-001">>,
         domains => [<<"erlang">>, <<"elixir">>],
         declared_at => 1000
-    },
-    ok = expertise_declared_v1_to_profiles:project(Event),
-    {ok, Rows} = project_llm_mentorships_store:query(
-        "SELECT agent_id, domains, status, declared_at "
-        "FROM mentor_profiles", []),
-    ?assertEqual(1, length(Rows)),
-    [[AgentId, DomainsJson, Status, DeclaredAt]] = Rows,
-    ?assertEqual(<<"agent-001">>, AgentId),
-    ?assertEqual(1, Status),
-    ?assertEqual(1000, DeclaredAt),
-    DecodedDomains = json:decode(DomainsJson),
-    ?assertEqual([<<"erlang">>, <<"elixir">>], DecodedDomains).
+    }},
+    project(expertise_declared_v1_to_profiles, Event),
+    [{_, P}] = ets:lookup(mentor_profiles, <<"agent-001">>),
+    ?assertEqual(<<"agent-001">>, maps:get(agent_id, P)),
+    ?assertEqual(1, maps:get(status, P)),
+    ?assertEqual(1000, maps:get(declared_at, P)),
+    ?assertEqual([<<"erlang">>, <<"elixir">>], maps:get(domains, P)).
 
 proj_withdrawn() ->
-    %% First declare
-    ok = expertise_declared_v1_to_profiles:project(#{
+    project(expertise_declared_v1_to_profiles, #{data => #{
         agent_id => <<"agent-001">>,
         domains => [<<"erlang">>],
         declared_at => 1000
-    }),
-    %% Then withdraw
-    ok = expertise_withdrawn_v1_to_profiles:project(#{
+    }}),
+    project(expertise_withdrawn_v1_to_profiles, #{data => #{
         agent_id => <<"agent-001">>
-    }),
-    {ok, [[Status]]} =
-        project_llm_mentorships_store:query(
-            "SELECT status FROM mentor_profiles WHERE agent_id = ?1",
-            [<<"agent-001">>]),
-    %% DECLARED=1 | WITHDRAWN=2 = 3
-    ?assert(Status band 2 =/= 0).
+    }}),
+    [{_, P}] = ets:lookup(mentor_profiles, <<"agent-001">>),
+    ?assert(maps:get(status, P) band 2 =/= 0).
 
 %% ===================================================================
 %% Roundtrip tests: project -> query via query desk modules
 %% ===================================================================
 
 roundtrip_by_id() ->
-    ok = expertise_declared_v1_to_profiles:project(#{
+    project(expertise_declared_v1_to_profiles, #{data => #{
         agent_id => <<"agent-rt1">>,
         domains => [<<"erlang">>, <<"otp">>],
         declared_at => 1000
-    }),
+    }}),
     {ok, Map} = get_mentor_profile_by_id:execute(<<"agent-rt1">>),
     ?assertEqual(<<"agent-rt1">>, maps:get(agent_id, Map)),
     ?assertEqual([<<"erlang">>, <<"otp">>], maps:get(domains, Map)),
@@ -102,16 +99,16 @@ roundtrip_by_id() ->
     ?assertEqual(1000, maps:get(declared_at, Map)).
 
 roundtrip_page() ->
-    ok = expertise_declared_v1_to_profiles:project(#{
+    project(expertise_declared_v1_to_profiles, #{data => #{
         agent_id => <<"agent-pg1">>,
         domains => [<<"erlang">>],
         declared_at => 1000
-    }),
-    ok = expertise_declared_v1_to_profiles:project(#{
+    }}),
+    project(expertise_declared_v1_to_profiles, #{data => #{
         agent_id => <<"agent-pg2">>,
         domains => [<<"elixir">>],
         declared_at => 2000
-    }),
+    }}),
     {ok, Results} = get_mentors_page:execute(),
     ?assertEqual(2, length(Results)),
     Ids = [maps:get(agent_id, R) || R <- Results],

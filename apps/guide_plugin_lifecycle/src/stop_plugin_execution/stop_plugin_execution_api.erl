@@ -1,10 +1,11 @@
-%%% @doc API handler: POST /api/plugins/:name/stop
+%%% @doc API handler: POST /api/plugins/stop
 %%% Stops execution of a running plugin.
+%%% Requires plugin_id in POST body.
 -module(stop_plugin_execution_api).
 
 -export([init/2, routes/0]).
 
-routes() -> [{"/api/plugins/:name/stop", ?MODULE, []}].
+routes() -> [{"/api/plugins/stop", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
@@ -13,11 +14,22 @@ init(Req0, State) ->
     end.
 
 handle_post(Req0, _State) ->
-    Name = cowboy_req:binding(name, Req0),
-    PluginId = resolve_plugin_id(Name),
+    case hecate_api_utils:read_json_body(Req0) of
+        {ok, Body, Req1} ->
+            case hecate_api_utils:get_field(plugin_id, Body) of
+                undefined ->
+                    hecate_api_utils:bad_request(<<"plugin_id is required">>, Req1);
+                PluginId ->
+                    do_stop(PluginId, Req1)
+            end;
+        {error, invalid_json, Req1} ->
+            hecate_api_utils:bad_request(<<"Invalid JSON">>, Req1)
+    end.
+
+do_stop(PluginId, Req) ->
     case stop_plugin_execution_v1:new(#{plugin_id => PluginId}) of
-        {ok, Cmd} -> dispatch(Cmd, Req0);
-        {error, Reason} -> hecate_api_utils:bad_request(Reason, Req0)
+        {ok, Cmd} -> dispatch(Cmd, Req);
+        {error, Reason} -> hecate_api_utils:bad_request(Reason, Req)
     end.
 
 dispatch(Cmd, Req) ->
@@ -30,11 +42,4 @@ dispatch(Cmd, Req) ->
             }, Req);
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
-    end.
-
-resolve_plugin_id(Name) ->
-    Sql = "SELECT plugin_id FROM plugins WHERE name = ?1 AND (status & 2) = 0 LIMIT 1",
-    case project_plugins_store:query(Sql, [Name]) of
-        {ok, [[PluginId]]} -> PluginId;
-        _ -> Name
     end.

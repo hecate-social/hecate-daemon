@@ -1,49 +1,34 @@
 %%% @doc Process Manager: On plugin installed, register a launcher entry.
 %%%
-%%% Subscribes to plugin_installed_v1 events from plugins_store.
+%%% Subscribes to plugin_installed_v1 events via evoq_event_handler.
 %%% Dispatches register_entry_v1 to add the plugin to the launcher
-%%% under the "PLUGINS" group.
+%%% under the "APPS" group.
 %%% @end
 -module(on_plugin_installed_register_entry).
--behaviour(gen_server).
+-behaviour(evoq_event_handler).
 
--include_lib("evoq/include/evoq_types.hrl").
+-export([interested_in/0, init/1, handle_event/4]).
 
--export([start_link/0]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+interested_in() ->
+    [<<"plugin_installed_v1">>].
 
--define(EVENT_TYPE, <<"plugin_installed_v1">>).
--define(SUB_NAME, <<"on_plugin_installed_register_entry">>).
--define(STORE_ID, plugins_store).
-
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-init([]) ->
-    {ok, _} = evoq_subscriptions:subscribe(
-        ?STORE_ID, event_type, ?EVENT_TYPE, ?SUB_NAME,
-        #{subscriber_pid => self()}),
+init(_Config) ->
     {ok, #{}}.
 
-handle_info({events, Events}, State) ->
-    lists:foreach(fun(E) -> handle_event(E) end, Events),
-    {noreply, State};
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-handle_call(_Req, _From, State) -> {reply, ok, State}.
-handle_cast(_Msg, State) -> {noreply, State}.
-terminate(_Reason, _State) -> ok.
+handle_event(_EventType, Event, _Metadata, State) ->
+    Data = maps:get(data, Event),
+    do_handle(Data),
+    {ok, State}.
 
 %% Internal — event handling
 
-handle_event(#evoq_event{data = Data}) ->
+do_handle(Data) ->
     PluginId = get_value(plugin_id, Data),
     Name = get_value(name, Data),
     EntryId = Name,
     DisplayName = Name,
-    Icon = <<"\xF0\x9F\x94\x8C">>,
-    GroupName = <<"PLUGINS">>,
+    Icon = coalesce(get_value(icon, Data), <<"\xF0\x9F\x94\x8C">>),
+    GroupName = coalesce(get_value(group_name, Data), <<"APPS">>),
     CmdParams = #{
         entry_id     => EntryId,
         display_name => DisplayName,
@@ -77,3 +62,7 @@ get_value(Key, Map) when is_atom(Key) ->
         {ok, V} -> V;
         error -> maps:get(atom_to_binary(Key), Map, undefined)
     end.
+
+coalesce(undefined, Default) -> Default;
+coalesce(null, Default) -> Default;
+coalesce(Value, _Default) -> Value.

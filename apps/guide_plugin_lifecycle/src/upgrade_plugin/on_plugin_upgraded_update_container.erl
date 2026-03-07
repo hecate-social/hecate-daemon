@@ -1,43 +1,28 @@
 %%% @doc Process Manager: On plugin upgraded, update the container image.
 %%%
-%%% Subscribes to plugin_upgraded_v1 events from plugins_store.
+%%% Subscribes to plugin_upgraded_v1 events via evoq_event_handler.
 %%% Reads the existing .container Quadlet file, updates the Image= line
 %%% with the new OCI image, and writes it back.
 %%% @end
 -module(on_plugin_upgraded_update_container).
--behaviour(gen_server).
+-behaviour(evoq_event_handler).
 
--include_lib("evoq/include/evoq_types.hrl").
+-export([interested_in/0, init/1, handle_event/4]).
 
--export([start_link/0]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+interested_in() ->
+    [<<"plugin_upgraded_v1">>].
 
--define(EVENT_TYPE, <<"plugin_upgraded_v1">>).
--define(SUB_NAME, <<"on_plugin_upgraded_update_container">>).
--define(STORE_ID, plugins_store).
-
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-init([]) ->
-    {ok, _} = evoq_subscriptions:subscribe(
-        ?STORE_ID, event_type, ?EVENT_TYPE, ?SUB_NAME,
-        #{subscriber_pid => self()}),
+init(_Config) ->
     {ok, #{}}.
 
-handle_info({events, Events}, State) ->
-    lists:foreach(fun(E) -> handle_event(E) end, Events),
-    {noreply, State};
-handle_info(_Info, State) ->
-    {noreply, State}.
-
-handle_call(_Req, _From, State) -> {reply, ok, State}.
-handle_cast(_Msg, State) -> {noreply, State}.
-terminate(_Reason, _State) -> ok.
+handle_event(_EventType, Event, _Metadata, State) ->
+    Data = maps:get(data, Event),
+    do_handle(Data),
+    {ok, State}.
 
 %% Internal
 
-handle_event(#evoq_event{data = Data}) ->
+do_handle(Data) ->
     PluginId = get_value(plugin_id, Data),
     OciImage = get_value(oci_image, Data),
     DaemonName = extract_daemon_name(OciImage),

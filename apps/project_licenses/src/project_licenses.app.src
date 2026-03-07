@@ -9,7 +9,8 @@
         esqlite,
         evoq,
         hecate,
-        guide_license_lifecycle
+        guide_license_lifecycle,
+        guide_plugin_lifecycle
     ]},
     {env, []},
     {modules, []},

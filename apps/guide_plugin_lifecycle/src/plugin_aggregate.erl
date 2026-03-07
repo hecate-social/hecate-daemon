@@ -65,6 +65,9 @@ execute(#plugin_state{status = S} = State, Payload)
         <<"stop_plugin_execution">>     -> {error, plugin_not_running};
         <<"confirm_container_up">>      -> execute_confirm_up(Payload);
         <<"confirm_container_down">>    -> execute_confirm_down(Payload);
+        <<"start_container_pull">>      -> execute_start_pull(Payload, S);
+        <<"cancel_container_pull">>     -> execute_cancel_pull(Payload, S);
+        <<"complete_container_pull">>   -> execute_complete_pull(Payload, S);
         _ -> {error, unknown_command}
     end;
 
@@ -79,6 +82,9 @@ execute(#plugin_state{status = S} = State, Payload)
         <<"stop_plugin_execution">>     -> execute_stop_execution(Payload);
         <<"confirm_container_up">>      -> execute_confirm_up(Payload);
         <<"confirm_container_down">>    -> execute_confirm_down(Payload);
+        <<"start_container_pull">>      -> {error, plugin_already_running};
+        <<"cancel_container_pull">>     -> execute_cancel_pull(Payload, S);
+        <<"complete_container_pull">>   -> execute_complete_pull(Payload, S);
         _ -> {error, unknown_command}
     end;
 
@@ -115,6 +121,31 @@ execute_confirm_down(Payload) ->
     {ok, Cmd} = confirm_container_down_v1:from_map(Payload),
     convert_events(maybe_confirm_container_down:handle(Cmd), fun container_confirmed_down_v1:to_map/1).
 
+execute_start_pull(Payload, Status) ->
+    case Status band ?PLG_PULLING of
+        0 ->
+            {ok, Cmd} = start_container_pull_v1:from_map(Payload),
+            convert_events(maybe_start_container_pull:handle(Cmd), fun container_pull_started_v1:to_map/1);
+        _ ->
+            {error, already_pulling}
+    end.
+
+execute_cancel_pull(Payload, Status) ->
+    case Status band ?PLG_PULLING of
+        0 -> {error, not_pulling};
+        _ ->
+            {ok, Cmd} = cancel_container_pull_v1:from_map(Payload),
+            convert_events(maybe_cancel_container_pull:handle(Cmd), fun container_pull_cancelled_v1:to_map/1)
+    end.
+
+execute_complete_pull(Payload, Status) ->
+    case Status band ?PLG_PULLING of
+        0 -> {error, not_pulling};
+        _ ->
+            {ok, Cmd} = complete_container_pull_v1:from_map(Payload),
+            convert_events(maybe_complete_container_pull:handle(Cmd), fun container_pull_completed_v1:to_map/1)
+    end.
+
 %% --- Apply ---
 %% NOTE: evoq calls apply(State, Event) - State FIRST!
 
@@ -138,6 +169,12 @@ apply_event(#{<<"event_type">> := <<"container_confirmed_up_v1">>} = _E, S)  -> 
 apply_event(#{event_type := <<"container_confirmed_up_v1">>} = _E, S)        -> apply_confirmed_up(S);
 apply_event(#{<<"event_type">> := <<"container_confirmed_down_v1">>} = _E, S) -> apply_confirmed_down(S);
 apply_event(#{event_type := <<"container_confirmed_down_v1">>} = _E, S)       -> apply_confirmed_down(S);
+apply_event(#{<<"event_type">> := <<"container_pull_started_v1">>} = _E, S)   -> apply_pull_started(S);
+apply_event(#{event_type := <<"container_pull_started_v1">>} = _E, S)         -> apply_pull_started(S);
+apply_event(#{<<"event_type">> := <<"container_pull_cancelled_v1">>} = _E, S) -> apply_pull_cancelled(S);
+apply_event(#{event_type := <<"container_pull_cancelled_v1">>} = _E, S)       -> apply_pull_cancelled(S);
+apply_event(#{<<"event_type">> := <<"container_pull_completed_v1">>} = _E, S) -> apply_pull_completed(S);
+apply_event(#{event_type := <<"container_pull_completed_v1">>} = _E, S)       -> apply_pull_completed(S);
 %% Unknown — ignore
 apply_event(_E, S) -> S.
 
@@ -150,6 +187,8 @@ apply_installed(E, _State) ->
         oci_image = get_value(oci_image, E),
         installed_version = get_value(installed_version, E),
         license_id = get_value(license_id, E),
+        icon = get_value(icon, E),
+        group_name = get_value(group_name, E),
         installed_at = get_value(installed_at, E),
         upgraded_at = undefined,
         removed_at = undefined,
@@ -170,7 +209,7 @@ apply_removed(E, #plugin_state{status = Status} = State) ->
     }.
 
 apply_started(E, #plugin_state{status = Status} = State) ->
-    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_RUNNING), ?PLG_STOPPED),
+    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(evoq_bit_flags:set(Status, ?PLG_RUNNING), ?PLG_PULLING), ?PLG_STOPPED),
     State#plugin_state{
         status = NewStatus,
         started_at = get_value(started_at, E),
@@ -185,12 +224,21 @@ apply_stopped(E, #plugin_state{status = Status} = State) ->
     }.
 
 apply_confirmed_up(#plugin_state{status = Status} = State) ->
-    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_CONFIRMED_UP), ?PLG_CONFIRMED_DOWN),
+    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_CONFIRMED_UP), ?PLG_CONFIRMED_DOWN), ?PLG_PULLING),
     State#plugin_state{status = NewStatus}.
 
 apply_confirmed_down(#plugin_state{status = Status} = State) ->
     NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_CONFIRMED_DOWN), ?PLG_CONFIRMED_UP),
     State#plugin_state{status = NewStatus}.
+
+apply_pull_started(#plugin_state{status = Status} = State) ->
+    State#plugin_state{status = evoq_bit_flags:set(Status, ?PLG_PULLING)}.
+
+apply_pull_cancelled(#plugin_state{status = Status} = State) ->
+    State#plugin_state{status = evoq_bit_flags:unset(Status, ?PLG_PULLING)}.
+
+apply_pull_completed(#plugin_state{status = Status} = State) ->
+    State#plugin_state{status = evoq_bit_flags:unset(Status, ?PLG_PULLING)}.
 
 %% --- Internal ---
 

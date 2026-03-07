@@ -1,7 +1,6 @@
-%%% @doc Tests for mentor subscription projections (event -> SQLite mentor_subscriptions table).
+%%% @doc Tests for mentor subscription projections (event -> ETS mentor_subscriptions table).
 %%%
-%%% Uses a temp SQLite database via project_llm_mentorships_store.
-%%% Each test group gets a fresh database (foreach pattern).
+%%% Creates a named ETS table and calls evoq_projection callbacks directly.
 -module(subscriptions_projection_tests).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -29,76 +28,74 @@ projection_test_() ->
 %% ===================================================================
 
 setup() ->
-    file:delete(shared_paths:sqlite_path("query_mentorships.db")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-wal")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-shm")),
-    {ok, _} = application:ensure_all_started(esqlite),
-    {ok, Pid} = project_llm_mentorships_store:start_link(),
-    Pid.
+    ensure_ets(mentor_subscriptions).
 
-cleanup(Pid) ->
-    gen_server:stop(Pid),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-wal")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-shm")),
+cleanup(_) ->
+    catch ets:delete(mentor_subscriptions),
     ok.
+
+ensure_ets(Name) ->
+    case ets:whereis(Name) of
+        undefined ->
+            ets:new(Name, [public, named_table, set, {read_concurrency, true}]);
+        _ ->
+            ets:delete_all_objects(Name),
+            Name
+    end.
+
+%% ===================================================================
+%% Helpers
+%% ===================================================================
+
+project(Mod, Event) ->
+    {ok, _, RM} = Mod:init(#{}),
+    {ok, _, _} = Mod:project(Event, #{}, #{}, RM).
 
 %% ===================================================================
 %% Projection tests
 %% ===================================================================
 
 proj_subscribed() ->
-    Event = #{
+    Event = #{data => #{
         subscriber_id => <<"agent-001">>,
         mentor_id => <<"mentor-001">>,
         subscribed_at => 1000
-    },
-    ok = mentor_subscribed_v1_to_subscriptions:project(Event),
-    {ok, Rows} = project_llm_mentorships_store:query(
-        "SELECT subscriber_id, mentor_id, status, subscribed_at "
-        "FROM mentor_subscriptions", []),
-    ?assertEqual(1, length(Rows)),
-    [[SubId, MenId, Status, SubAt]] = Rows,
-    ?assertEqual(<<"agent-001">>, SubId),
-    ?assertEqual(<<"mentor-001">>, MenId),
-    ?assertEqual(1, Status),
-    ?assertEqual(1000, SubAt).
+    }},
+    project(mentor_subscribed_v1_to_subscriptions, Event),
+    [{_, S}] = ets:lookup(mentor_subscriptions, {<<"agent-001">>, <<"mentor-001">>}),
+    ?assertEqual(<<"agent-001">>, maps:get(subscriber_id, S)),
+    ?assertEqual(<<"mentor-001">>, maps:get(mentor_id, S)),
+    ?assertEqual(1, maps:get(status, S)),
+    ?assertEqual(1000, maps:get(subscribed_at, S)).
 
 proj_unsubscribed() ->
-    %% First subscribe
-    ok = mentor_subscribed_v1_to_subscriptions:project(#{
+    project(mentor_subscribed_v1_to_subscriptions, #{data => #{
         subscriber_id => <<"agent-001">>,
         mentor_id => <<"mentor-001">>,
         subscribed_at => 1000
-    }),
-    %% Then unsubscribe
-    ok = mentor_unsubscribed_v1_to_subscriptions:project(#{
+    }}),
+    project(mentor_unsubscribed_v1_to_subscriptions, #{data => #{
         subscriber_id => <<"agent-001">>,
         mentor_id => <<"mentor-001">>
-    }),
-    {ok, [[Status]]} =
-        project_llm_mentorships_store:query(
-            "SELECT status FROM mentor_subscriptions "
-            "WHERE subscriber_id = ?1 AND mentor_id = ?2",
-            [<<"agent-001">>, <<"mentor-001">>]),
-    %% SUBSCRIBED=1 | UNSUBSCRIBED=2 = 3
-    ?assert(Status band 2 =/= 0).
+    }}),
+    [{_, S}] = ets:lookup(mentor_subscriptions, {<<"agent-001">>, <<"mentor-001">>}),
+    ?assert(maps:get(status, S) band 2 =/= 0).
 
 %% ===================================================================
 %% Roundtrip tests: project -> query via query desk modules
 %% ===================================================================
 
 roundtrip() ->
-    ok = mentor_subscribed_v1_to_subscriptions:project(#{
+    project(mentor_subscribed_v1_to_subscriptions, #{data => #{
         subscriber_id => <<"agent-rt">>,
         mentor_id => <<"mentor-rt1">>,
         subscribed_at => 1000
-    }),
-    ok = mentor_subscribed_v1_to_subscriptions:project(#{
+    }}),
+    project(mentor_subscribed_v1_to_subscriptions, #{data => #{
         subscriber_id => <<"agent-rt">>,
         mentor_id => <<"mentor-rt2">>,
         subscribed_at => 2000
-    }),
+    }}),
     {ok, Results} = get_mentor_subscriptions_page:execute(<<"agent-rt">>),
     ?assertEqual(2, length(Results)),
     Ids = [maps:get(mentor_id, R) || R <- Results],

@@ -1,7 +1,6 @@
-%%% @doc Tests for learning projections (event -> SQLite learnings table).
+%%% @doc Tests for learning projections (event -> ETS learnings table).
 %%%
-%%% Uses a temp SQLite database via project_llm_mentorships_store.
-%%% Each test group gets a fresh database (foreach pattern).
+%%% Creates a named ETS table and calls evoq_projection callbacks directly.
 -module(learnings_projection_tests).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -41,26 +40,27 @@ projection_test_() ->
 %% ===================================================================
 
 setup() ->
-    file:delete(shared_paths:sqlite_path("query_mentorships.db")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-wal")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-shm")),
-    {ok, _} = application:ensure_all_started(esqlite),
-    {ok, Pid} = project_llm_mentorships_store:start_link(),
-    Pid.
+    ensure_ets(learnings).
 
-cleanup(Pid) ->
-    gen_server:stop(Pid),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-wal")),
-    file:delete(shared_paths:sqlite_path("query_mentorships.db-shm")),
+cleanup(_) ->
+    catch ets:delete(learnings),
     ok.
+
+ensure_ets(Name) ->
+    case ets:whereis(Name) of
+        undefined ->
+            ets:new(Name, [public, named_table, set, {read_concurrency, true}]);
+        _ ->
+            ets:delete_all_objects(Name),
+            Name
+    end.
 
 %% ===================================================================
 %% Helpers
 %% ===================================================================
 
 submit_event(Id) ->
-    #{
+    #{data => #{
         learning_id => Id,
         submitter_id => <<"agent-001">>,
         category => <<"antipattern">>,
@@ -75,138 +75,123 @@ submit_event(Id) ->
         confidence => 0.9,
         source => <<"code_review">>,
         submitted_at => 1000
-    }.
+    }}.
+
+project(Mod, Event) ->
+    {ok, _, RM} = Mod:init(#{}),
+    {ok, _, _} = Mod:project(Event, #{}, #{}, RM).
+
+project_chain(Steps) ->
+    lists:foreach(fun({Mod, Event}) -> project(Mod, Event) end, Steps).
 
 %% ===================================================================
 %% Projection tests
 %% ===================================================================
 
 proj_submitted() ->
-    Event = submit_event(<<"learn-001">>),
-    ok = learning_submitted_v1_to_learnings:project(Event),
-    {ok, Rows} = project_llm_mentorships_store:query(
-        "SELECT id, submitter_id, category, domain, title, status, "
-        "endorsement_count, dispute_count FROM learnings", []),
-    ?assertEqual(1, length(Rows)),
-    [[Id, Sub, Cat, Dom, Title, Status, EndCnt, DispCnt]] = Rows,
-    ?assertEqual(<<"learn-001">>, Id),
-    ?assertEqual(<<"agent-001">>, Sub),
-    ?assertEqual(<<"antipattern">>, Cat),
-    ?assertEqual(<<"erlang">>, Dom),
-    ?assertEqual(<<"Avoid blocking gen_server calls">>, Title),
-    ?assertEqual(1, Status),
-    ?assertEqual(0, EndCnt),
-    ?assertEqual(0, DispCnt).
+    project(learning_submitted_v1_to_learnings, submit_event(<<"learn-001">>)),
+    [{_, L}] = ets:lookup(learnings, <<"learn-001">>),
+    ?assertEqual(<<"learn-001">>, maps:get(id, L)),
+    ?assertEqual(<<"agent-001">>, maps:get(submitter_id, L)),
+    ?assertEqual(<<"antipattern">>, maps:get(category, L)),
+    ?assertEqual(<<"erlang">>, maps:get(domain, L)),
+    ?assertEqual(<<"Avoid blocking gen_server calls">>, maps:get(title, L)),
+    ?assertEqual(1, maps:get(status, L)),
+    ?assertEqual(0, maps:get(endorsement_count, L)),
+    ?assertEqual(0, maps:get(dispute_count, L)).
 
 proj_validated() ->
-    ok = learning_submitted_v1_to_learnings:project(submit_event(<<"learn-002">>)),
-    ValidateEvent = #{
-        learning_id => <<"learn-002">>,
-        validator_id => <<"validator-001">>,
-        validated_at => 2000
-    },
-    ok = learning_validated_v1_to_learnings:project(ValidateEvent),
-    {ok, [[Status, ValidatorId, ValidatedAt]]} =
-        project_llm_mentorships_store:query(
-            "SELECT status, validator_id, validated_at FROM learnings WHERE id = ?1",
-            [<<"learn-002">>]),
-    %% SUBMITTED=1 | VALIDATED=2 = 3
-    ?assert(Status band 2 =/= 0),
-    ?assertEqual(<<"validator-001">>, ValidatorId),
-    ?assertEqual(2000, ValidatedAt).
+    project_chain([
+        {learning_submitted_v1_to_learnings, submit_event(<<"learn-002">>)},
+        {learning_validated_v1_to_learnings, #{data => #{
+            learning_id => <<"learn-002">>,
+            validator_id => <<"validator-001">>,
+            validated_at => 2000
+        }}}
+    ]),
+    [{_, L}] = ets:lookup(learnings, <<"learn-002">>),
+    ?assert(maps:get(status, L) band 2 =/= 0),
+    ?assertEqual(<<"validator-001">>, maps:get(validator_id, L)),
+    ?assertEqual(2000, maps:get(validated_at, L)).
 
 proj_rejected() ->
-    ok = learning_submitted_v1_to_learnings:project(submit_event(<<"learn-003">>)),
-    RejectEvent = #{
-        learning_id => <<"learn-003">>,
-        validator_id => <<"validator-002">>
-    },
-    ok = learning_rejected_v1_to_learnings:project(RejectEvent),
-    {ok, [[Status, ValidatorId]]} =
-        project_llm_mentorships_store:query(
-            "SELECT status, validator_id FROM learnings WHERE id = ?1",
-            [<<"learn-003">>]),
-    %% SUBMITTED=1 | REJECTED=4 = 5
-    ?assert(Status band 4 =/= 0),
-    ?assertEqual(<<"validator-002">>, ValidatorId).
+    project_chain([
+        {learning_submitted_v1_to_learnings, submit_event(<<"learn-003">>)},
+        {learning_rejected_v1_to_learnings, #{data => #{
+            learning_id => <<"learn-003">>,
+            validator_id => <<"validator-002">>
+        }}}
+    ]),
+    [{_, L}] = ets:lookup(learnings, <<"learn-003">>),
+    ?assert(maps:get(status, L) band 4 =/= 0),
+    ?assertEqual(<<"validator-002">>, maps:get(validator_id, L)).
 
 proj_endorsed() ->
-    ok = learning_submitted_v1_to_learnings:project(submit_event(<<"learn-004">>)),
-    ok = learning_validated_v1_to_learnings:project(#{
-        learning_id => <<"learn-004">>,
-        validator_id => <<"validator-001">>,
-        validated_at => 2000
-    }),
-    ok = learning_endorsed_v1_to_learnings:project(#{
-        learning_id => <<"learn-004">>
-    }),
-    {ok, [[Status, EndCnt]]} =
-        project_llm_mentorships_store:query(
-            "SELECT status, endorsement_count FROM learnings WHERE id = ?1",
-            [<<"learn-004">>]),
-    %% ENDORSED bit = 8
-    ?assert(Status band 8 =/= 0),
-    ?assertEqual(1, EndCnt).
+    project_chain([
+        {learning_submitted_v1_to_learnings, submit_event(<<"learn-004">>)},
+        {learning_validated_v1_to_learnings, #{data => #{
+            learning_id => <<"learn-004">>,
+            validator_id => <<"validator-001">>,
+            validated_at => 2000
+        }}},
+        {learning_endorsed_v1_to_learnings, #{data => #{
+            learning_id => <<"learn-004">>
+        }}}
+    ]),
+    [{_, L}] = ets:lookup(learnings, <<"learn-004">>),
+    ?assert(maps:get(status, L) band 8 =/= 0),
+    ?assertEqual(1, maps:get(endorsement_count, L)).
 
 proj_endorsed_twice() ->
-    ok = learning_submitted_v1_to_learnings:project(submit_event(<<"learn-005">>)),
-    ok = learning_validated_v1_to_learnings:project(#{
-        learning_id => <<"learn-005">>,
-        validator_id => <<"v-001">>,
-        validated_at => 2000
-    }),
-    ok = learning_endorsed_v1_to_learnings:project(#{learning_id => <<"learn-005">>}),
-    ok = learning_endorsed_v1_to_learnings:project(#{learning_id => <<"learn-005">>}),
-    {ok, [[EndCnt]]} =
-        project_llm_mentorships_store:query(
-            "SELECT endorsement_count FROM learnings WHERE id = ?1",
-            [<<"learn-005">>]),
-    ?assertEqual(2, EndCnt).
+    project_chain([
+        {learning_submitted_v1_to_learnings, submit_event(<<"learn-005">>)},
+        {learning_validated_v1_to_learnings, #{data => #{
+            learning_id => <<"learn-005">>,
+            validator_id => <<"v-001">>,
+            validated_at => 2000
+        }}},
+        {learning_endorsed_v1_to_learnings, #{data => #{learning_id => <<"learn-005">>}}},
+        {learning_endorsed_v1_to_learnings, #{data => #{learning_id => <<"learn-005">>}}}
+    ]),
+    [{_, L}] = ets:lookup(learnings, <<"learn-005">>),
+    ?assertEqual(2, maps:get(endorsement_count, L)).
 
 proj_disputed() ->
-    ok = learning_submitted_v1_to_learnings:project(submit_event(<<"learn-006">>)),
-    ok = learning_validated_v1_to_learnings:project(#{
-        learning_id => <<"learn-006">>,
-        validator_id => <<"v-001">>,
-        validated_at => 2000
-    }),
-    ok = learning_disputed_v1_to_learnings:project(#{
-        learning_id => <<"learn-006">>
-    }),
-    {ok, [[Status, DispCnt]]} =
-        project_llm_mentorships_store:query(
-            "SELECT status, dispute_count FROM learnings WHERE id = ?1",
-            [<<"learn-006">>]),
-    %% DISPUTED bit = 16
-    ?assert(Status band 16 =/= 0),
-    ?assertEqual(1, DispCnt).
+    project_chain([
+        {learning_submitted_v1_to_learnings, submit_event(<<"learn-006">>)},
+        {learning_validated_v1_to_learnings, #{data => #{
+            learning_id => <<"learn-006">>,
+            validator_id => <<"v-001">>,
+            validated_at => 2000
+        }}},
+        {learning_disputed_v1_to_learnings, #{data => #{
+            learning_id => <<"learn-006">>
+        }}}
+    ]),
+    [{_, L}] = ets:lookup(learnings, <<"learn-006">>),
+    ?assert(maps:get(status, L) band 16 =/= 0),
+    ?assertEqual(1, maps:get(dispute_count, L)).
 
 proj_resolved() ->
-    ok = learning_submitted_v1_to_learnings:project(submit_event(<<"learn-007">>)),
-    ok = learning_validated_v1_to_learnings:project(#{
-        learning_id => <<"learn-007">>,
-        validator_id => <<"v-001">>,
-        validated_at => 2000
-    }),
-    ok = learning_disputed_v1_to_learnings:project(#{
-        learning_id => <<"learn-007">>
-    }),
-    ok = learning_dispute_resolved_v1_to_learnings:project(#{
-        learning_id => <<"learn-007">>
-    }),
-    {ok, [[Status]]} =
-        project_llm_mentorships_store:query(
-            "SELECT status FROM learnings WHERE id = ?1",
-            [<<"learn-007">>]),
-    %% RESOLVED bit = 32
-    ?assert(Status band 32 =/= 0).
+    project_chain([
+        {learning_submitted_v1_to_learnings, submit_event(<<"learn-007">>)},
+        {learning_validated_v1_to_learnings, #{data => #{
+            learning_id => <<"learn-007">>,
+            validator_id => <<"v-001">>,
+            validated_at => 2000
+        }}},
+        {learning_disputed_v1_to_learnings, #{data => #{learning_id => <<"learn-007">>}}},
+        {learning_dispute_resolved_v1_to_learnings, #{data => #{learning_id => <<"learn-007">>}}}
+    ]),
+    [{_, L}] = ets:lookup(learnings, <<"learn-007">>),
+    ?assert(maps:get(status, L) band 32 =/= 0).
 
 %% ===================================================================
 %% Roundtrip tests: project -> query via query desk modules
 %% ===================================================================
 
 roundtrip_by_id() ->
-    ok = learning_submitted_v1_to_learnings:project(submit_event(<<"learn-rt1">>)),
+    project(learning_submitted_v1_to_learnings, submit_event(<<"learn-rt1">>)),
     {ok, Map} = get_learning_by_id:execute(<<"learn-rt1">>),
     ?assertEqual(<<"learn-rt1">>, maps:get(id, Map)),
     ?assertEqual(<<"agent-001">>, maps:get(submitter_id, Map)),
@@ -216,18 +201,19 @@ roundtrip_by_id() ->
     ?assertEqual(1, maps:get(status, Map)),
     ?assertEqual(0, maps:get(endorsement_count, Map)),
     ?assertEqual(0, maps:get(dispute_count, Map)),
-    %% Tags decoded from JSON
     ?assertEqual([<<"otp">>, <<"gen_server">>], maps:get(tags, Map)).
 
 roundtrip_page() ->
-    Event1 = (submit_event(<<"learn-pg1">>))#{submitted_at => 1000},
-    Event2 = (submit_event(<<"learn-pg2">>))#{
+    project(learning_submitted_v1_to_learnings, submit_event(<<"learn-pg1">>)),
+    Event2 = #{data => #{
+        learning_id => <<"learn-pg2">>,
         submitter_id => <<"agent-002">>,
+        category => <<"antipattern">>,
+        domain => <<"erlang">>,
         title => <<"Second learning">>,
         submitted_at => 2000
-    },
-    ok = learning_submitted_v1_to_learnings:project(Event1),
-    ok = learning_submitted_v1_to_learnings:project(Event2),
+    }},
+    project(learning_submitted_v1_to_learnings, Event2),
     {ok, Results} = get_learnings_page:execute(#{limit => 50, offset => 0}),
     ?assertEqual(2, length(Results)),
     %% Ordered by submitted_at DESC, so learn-pg2 first

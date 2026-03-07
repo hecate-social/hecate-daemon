@@ -100,6 +100,7 @@ start_event_stores() ->
     start_stores(Stores).
 
 start_stores([]) ->
+    start_store_subscriptions(),
     start_hecate_sup();
 start_stores([{StoreId, SubDir, Label} | Rest]) ->
     logger:info("Starting ~s event store (~p)...", [Label, StoreId]),
@@ -133,6 +134,24 @@ start_store(#store_config{store_id = StoreId} = Config) ->
         {error, Reason} ->
             {error, Reason}
     end.
+
+%% @private Start store subscriptions (evoq 1.6.0 bridge).
+%% Creates one evoq_store_subscription per domain store.
+%% These route events from reckon-db stores to evoq behaviours
+%% (evoq_event_handler, evoq_projection, evoq_process_manager).
+start_store_subscriptions() ->
+    Stores = [settings_store, realm_memberships_store, llm_store,
+              mentorships_store, licenses_store, plugins_store,
+              launcher_store],
+    lists:foreach(fun(StoreId) ->
+        case evoq_store_subscription:start_link(StoreId) of
+            {ok, _Pid} ->
+                logger:info("Store subscription ready for ~p", [StoreId]);
+            {error, Reason} ->
+                logger:warning("Store subscription failed for ~p: ~p",
+                               [StoreId, Reason])
+        end
+    end, Stores).
 
 %% @private Start Hecate supervisor
 start_hecate_sup() ->

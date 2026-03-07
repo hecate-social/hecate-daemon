@@ -6,6 +6,8 @@
     oci_image         :: binary() | undefined,
     installed_version :: binary() | undefined,
     license_id        :: binary() | undefined,
+    icon              :: binary() | undefined,
+    group_name        :: binary() | undefined,
     installed_at      :: integer() | undefined,
     upgraded_at       :: integer() | undefined,
     removed_at        :: integer() | undefined,

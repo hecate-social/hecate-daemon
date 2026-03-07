@@ -1,0 +1,57 @@
+%%% @doc Handler for start_container_pull_v1 command.
+%%% Business rules:
+%%%   - Plugin must be installed (PLG_INSTALLED set)
+%%%   - Must not already be pulling (PLG_PULLING not set)
+-module(maybe_start_container_pull).
+
+-include_lib("evoq/include/evoq.hrl").
+
+-export([handle/1, handle/2, dispatch/1]).
+
+-spec handle(start_container_pull_v1:start_container_pull_v1()) ->
+    {ok, [container_pull_started_v1:container_pull_started_v1()]} | {error, term()}.
+handle(Cmd) ->
+    handle(Cmd, undefined).
+
+-spec handle(start_container_pull_v1:start_container_pull_v1(), term()) ->
+    {ok, [container_pull_started_v1:container_pull_started_v1()]} | {error, term()}.
+handle(Cmd, _State) ->
+    PluginId = start_container_pull_v1:get_plugin_id(Cmd),
+    CmdOciImage = start_container_pull_v1:get_oci_image(Cmd),
+    OciImage = case CmdOciImage of
+        undefined -> resolve_oci_image(PluginId);
+        _ -> CmdOciImage
+    end,
+    Event = container_pull_started_v1:new(#{
+        plugin_id => PluginId,
+        oci_image => OciImage
+    }),
+    {ok, [Event]}.
+
+-spec dispatch(start_container_pull_v1:start_container_pull_v1()) ->
+    {ok, non_neg_integer(), [map()]} | {error, term()}.
+dispatch(Cmd) ->
+    PluginId = start_container_pull_v1:get_plugin_id(Cmd),
+    Timestamp = erlang:system_time(millisecond),
+    EvoqCmd = #evoq_command{
+        command_type = start_container_pull,
+        aggregate_type = plugin_aggregate,
+        aggregate_id = PluginId,
+        payload = start_container_pull_v1:to_map(Cmd),
+        metadata = #{timestamp => Timestamp, aggregate_type => plugin_aggregate},
+        causation_id = undefined,
+        correlation_id = undefined
+    },
+    Opts = #{
+        store_id => plugins_store,
+        adapter => reckon_evoq_adapter,
+        consistency => eventual
+    },
+    evoq_dispatcher:dispatch(EvoqCmd, Opts).
+
+%% @private Look up OCI image from read model for event enrichment.
+resolve_oci_image(PluginId) ->
+    case project_plugins_store:get(PluginId) of
+        {ok, #{oci_image := OciImage}} -> OciImage;
+        _ -> undefined
+    end.

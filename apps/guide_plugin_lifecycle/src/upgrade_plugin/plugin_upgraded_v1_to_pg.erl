@@ -1,33 +1,17 @@
 %%% @doc Emitter: plugin_upgraded_v1 -> pg (internal pub/sub)
-%%% Subscribes to plugins_store via evoq, broadcasts to pg group.
+%%% Receives events via evoq_event_handler, broadcasts to pg group.
 -module(plugin_upgraded_v1_to_pg).
--behaviour(gen_server).
--export([start_link/0]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+-behaviour(evoq_event_handler).
+-export([interested_in/0, init/1, handle_event/4]).
 
--define(EVENT_TYPE, <<"plugin_upgraded_v1">>).
 -define(PG_GROUP, {plugin_upgraded_v1, node}).
--define(SUB_NAME, <<"plugin_upgraded_v1_to_pg">>).
--define(STORE_ID, plugins_store).
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+interested_in() -> [<<"plugin_upgraded_v1">>].
 
-init([]) ->
-    {ok, _} = evoq_subscriptions:subscribe(
-        ?STORE_ID, event_type, ?EVENT_TYPE, ?SUB_NAME,
-        #{subscriber_pid => self()}),
-    {ok, #{}}.
+init(_Config) -> {ok, #{}}.
 
-handle_info({events, Events}, State) ->
+handle_event(_EventType, Event, _Metadata, State) ->
     Members = pg:get_members(pg, ?PG_GROUP),
-    lists:foreach(fun(E) ->
-        Msg = {?PG_GROUP, E},
-        lists:foreach(fun(Pid) -> Pid ! Msg end, Members)
-    end, Events),
-    {noreply, State};
-handle_info(_Info, State) -> {noreply, State}.
-
-handle_call(_Req, _From, State) -> {reply, ok, State}.
-handle_cast(_Msg, State) -> {noreply, State}.
-terminate(_Reason, _State) -> ok.
+    Msg = {?PG_GROUP, Event},
+    lists:foreach(fun(Pid) -> Pid ! Msg end, Members),
+    {ok, State}.

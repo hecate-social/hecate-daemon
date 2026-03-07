@@ -27,33 +27,33 @@ init([]) ->
 
         %% Seller-side emitters
         #{id => license_initiated_v1_to_pg,
-          start => {license_initiated_v1_to_pg, start_link, []},
+          start => {evoq_event_handler, start_link, [license_initiated_v1_to_pg, #{}]},
           restart => permanent, type => worker},
         #{id => license_announced_v1_to_pg,
-          start => {license_announced_v1_to_pg, start_link, []},
+          start => {evoq_event_handler, start_link, [license_announced_v1_to_pg, #{}]},
           restart => permanent, type => worker},
         #{id => license_published_v1_to_pg,
-          start => {license_published_v1_to_pg, start_link, []},
+          start => {evoq_event_handler, start_link, [license_published_v1_to_pg, #{}]},
           restart => permanent, type => worker},
         #{id => license_retracted_v1_to_pg,
-          start => {license_retracted_v1_to_pg, start_link, []},
+          start => {evoq_event_handler, start_link, [license_retracted_v1_to_pg, #{}]},
           restart => permanent, type => worker},
 
         %% Buyer-side emitters
         #{id => license_bought_v1_to_pg,
-          start => {license_bought_v1_to_pg, start_link, []},
+          start => {evoq_event_handler, start_link, [license_bought_v1_to_pg, #{}]},
           restart => permanent, type => worker},
         #{id => license_revoked_v1_to_pg,
-          start => {license_revoked_v1_to_pg, start_link, []},
+          start => {evoq_event_handler, start_link, [license_revoked_v1_to_pg, #{}]},
           restart => permanent, type => worker},
         #{id => license_archived_v1_to_pg,
-          start => {license_archived_v1_to_pg, start_link, []},
+          start => {evoq_event_handler, start_link, [license_archived_v1_to_pg, #{}]},
           restart => permanent, type => worker},
 
         %% ── Mesh emitters (external, subscribe via evoq -> publish to mesh) ──
 
         #{id => license_published_v1_to_mesh,
-          start => {license_published_v1_to_mesh, start_link, []},
+          start => {evoq_event_handler, start_link, [license_published_v1_to_mesh, #{}]},
           restart => permanent, type => worker}
     ],
 
