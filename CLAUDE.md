@@ -159,13 +159,20 @@ apps/manage_capabilities/     # Command service (producer)
 │   └── manage_capabilities_sup.erl
 └── manage_capabilities.app.src
 
-apps/query_capabilities/      # Query service (consumer)
+apps/project_capabilities/    # PRJ service (projections)
 ├── src/
-│   ├── projections/
-│   │   └── capability_announced_v1_to_capabilities.erl  # Projection
-│   ├── queries/
-│   │   ├── find_capability.erl
-│   │   └── list_capabilities.erl
+│   ├── capability_announced/                              # PRJ desk (event name, no version)
+│   │   └── capability_announced_v1_to_capabilities.erl    # Projection module (versioned)
+│   ├── project_capabilities_store.erl                     # Read model store
+│   └── project_capabilities_sup.erl
+└── project_capabilities.app.src
+
+apps/query_capabilities/      # QRY service (read API)
+├── src/
+│   ├── get_capabilities_page/
+│   │   └── get_capabilities_page_api.erl
+│   ├── get_capability_by_id/
+│   │   └── get_capability_by_id_api.erl
 │   └── query_capabilities_sup.erl
 ├── query_capabilities.app.src
 └── rebar.config  # Depends on manage_capabilities for event schemas
@@ -619,13 +626,22 @@ Projections should read from ONE source: the local event store (ReckonDB/Evoq).
 
 Do NOT have mesh subscribers calling projections directly. The event store is the single source of truth.
 
-### 3. Horizontal Subdirectories in `query_capabilities`
+### 3. PRJ Desk Naming Convention
 
-`apps/query_capabilities/src/` has:
-- `projections/` ❌
-- `queries/` ❌
+PRJ desks are named after the **event** (without version, without target):
 
-Other query apps correctly put files flat in `src/`. Do NOT create horizontal subdirectories. Follow the pattern in `query_identities`, `query_social`, etc.
+```
+apps/project_plugins/src/
+├── plugin_installed/                          ← desk = event name (no version)
+│   ├── plugin_installed_v1_to_plugins.erl     ← module = full {event}_v{N}_to_{target}
+│   └── on_plugin_installed_v1_to_sqlite_plugins.erl
+├── plugin_removed/
+│   └── plugin_removed_v1_to_plugins.erl
+```
+
+**NOT** `plugin_installed_v1_to_plugins/` — the target and version are implementation details.
+
+This matches CMD desks: `install_plugin/` not `install_plugin_v1/`. The desk is "what happens when this event occurs" — version-agnostic. If v2 arrives, add `plugin_installed_v2_to_plugins.erl` to the same desk.
 
 ### 4. Duplicate API Files
 

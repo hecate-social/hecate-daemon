@@ -2,7 +2,7 @@
 %%%
 %%% Returns all installed (non-removed) plugins on this node.
 %%% @end
--module(list_plugins_api).
+-module(get_plugins_page_api).
 
 -export([init/2, routes/0]).
 
