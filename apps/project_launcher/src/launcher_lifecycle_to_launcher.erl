@@ -36,7 +36,7 @@ project(#{event_type := <<"entry_registered_v1">>, data := Data},
     EntryId = gf(entry_id, Data),
     DisplayName = gf(display_name, Data),
     Icon = gf(icon, Data),
-    GroupName = gf(group_name, Data),
+    GroupName = coalesce(gf(group_name, Data), <<"APPS">>),
     RegisteredAt = gf(registered_at, Data),
     %% Ensure group exists
     GroupRM2 = case evoq_read_model:get(GroupName, GroupRM) of
@@ -112,6 +112,13 @@ rebuild_from_groups(Data, State, GroupRM, EntryRM) ->
     {ok, State#{group_rm => GroupRM2}, EntryRM2}.
 
 gf(Key, Data) -> hecate_api_utils:get_field(Key, Data).
+
+coalesce(undefined, Default) -> Default;
+coalesce(null, Default) -> Default;
+coalesce(<<"undefined">>, Default) -> Default;
+coalesce(<<"null">>, Default) -> Default;
+coalesce(<<>>, Default) -> Default;
+coalesce(Value, _Default) -> Value.
 
 gv(Key, Map) when is_map(Map) ->
     BinKey = atom_to_binary(Key, utf8),
