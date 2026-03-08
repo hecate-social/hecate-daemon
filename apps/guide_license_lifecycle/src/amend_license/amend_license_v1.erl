@@ -6,7 +6,7 @@
 
 -export([new/1, from_map/1, validate/1, to_map/1]).
 -export([get_license_id/1,
-         get_plugin_name/1, get_description/1, get_icon/1,
+         get_plugin_name/1, get_description/1, get_icon/1, get_group_name/1,
          get_github_repo/1, get_oci_image/1, get_org/1,
          get_version/1, get_manifest_tag/1, get_tags/1,
          get_homepage/1, get_min_daemon_version/1, get_publisher_identity/1,
@@ -22,6 +22,7 @@
     plugin_name        :: binary() | undefined,
     description        :: binary() | undefined,
     icon               :: binary() | undefined,
+    group_name         :: binary() | undefined,
     github_repo        :: binary() | undefined,
     oci_image          :: binary() | undefined,
     org                :: binary() | undefined,
@@ -58,6 +59,7 @@ new(#{license_id := LicenseId} = M) ->
         plugin_name        = maps:get(plugin_name, M, undefined),
         description        = maps:get(description, M, undefined),
         icon               = maps:get(icon, M, undefined),
+        group_name         = maps:get(group_name, M, undefined),
         github_repo        = maps:get(github_repo, M, undefined),
         oci_image          = maps:get(oci_image, M, undefined),
         org                = maps:get(org, M, undefined),
@@ -102,6 +104,7 @@ to_map(#amend_license_v1{} = Cmd) ->
         {<<"plugin_name">>,        Cmd#amend_license_v1.plugin_name},
         {<<"description">>,        Cmd#amend_license_v1.description},
         {<<"icon">>,               Cmd#amend_license_v1.icon},
+        {<<"group_name">>,         Cmd#amend_license_v1.group_name},
         {<<"github_repo">>,        Cmd#amend_license_v1.github_repo},
         {<<"oci_image">>,          Cmd#amend_license_v1.oci_image},
         {<<"org">>,                Cmd#amend_license_v1.org},
@@ -135,6 +138,7 @@ from_map(Map) ->
                 plugin_name        = hecate_api_utils:get_field(plugin_name, Map),
                 description        = hecate_api_utils:get_field(description, Map),
                 icon               = hecate_api_utils:get_field(icon, Map),
+                group_name         = hecate_api_utils:get_field(group_name, Map),
                 github_repo        = hecate_api_utils:get_field(github_repo, Map),
                 oci_image          = hecate_api_utils:get_field(oci_image, Map),
                 org                = hecate_api_utils:get_field(org, Map),
@@ -171,6 +175,9 @@ get_description(#amend_license_v1{description = V}) -> V.
 
 -spec get_icon(amend_license_v1()) -> binary() | undefined.
 get_icon(#amend_license_v1{icon = V}) -> V.
+
+-spec get_group_name(amend_license_v1()) -> binary() | undefined.
+get_group_name(#amend_license_v1{group_name = V}) -> V.
 
 -spec get_github_repo(amend_license_v1()) -> binary() | undefined.
 get_github_repo(#amend_license_v1{github_repo = V}) -> V.
@@ -235,7 +242,7 @@ get_oci_image_digest(#amend_license_v1{oci_image_digest = V}) -> V.
 %% Internal
 
 has_any_field(#amend_license_v1{
-    plugin_name = PN, description = D, icon = I,
+    plugin_name = PN, description = D, icon = I, group_name = GN,
     github_repo = GR, oci_image = OI, org = O,
     version = V, manifest_tag = MT, tags = T,
     homepage = HP, min_daemon_version = MDV, publisher_identity = PI,
@@ -245,6 +252,7 @@ has_any_field(#amend_license_v1{
     fee_currency = FCur, duration_days = DD, node_limit = NL
 }) ->
     PN =/= undefined orelse D =/= undefined orelse I =/= undefined orelse
+    GN =/= undefined orelse
     GR =/= undefined orelse OI =/= undefined orelse O =/= undefined orelse
     V =/= undefined orelse MT =/= undefined orelse T =/= undefined orelse
     HP =/= undefined orelse MDV =/= undefined orelse PI =/= undefined orelse

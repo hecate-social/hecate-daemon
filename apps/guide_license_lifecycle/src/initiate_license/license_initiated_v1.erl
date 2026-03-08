@@ -4,7 +4,7 @@
 
 -export([new/1, to_map/1, from_map/1]).
 -export([get_license_id/1, get_plugin_id/1, get_plugin_name/1,
-         get_description/1, get_icon/1, get_github_repo/1,
+         get_description/1, get_icon/1, get_group_name/1, get_github_repo/1,
          get_oci_image/1, get_selling_formula/1, get_seller_id/1,
          get_org/1, get_version/1, get_manifest_tag/1, get_tags/1,
          get_homepage/1, get_min_daemon_version/1, get_publisher_identity/1,
@@ -20,6 +20,7 @@
     plugin_name     :: binary() | undefined,
     description     :: binary() | undefined,
     icon            :: binary() | undefined,
+    group_name      :: binary() | undefined,
     github_repo     :: binary() | undefined,
     oci_image       :: binary() | undefined,
     selling_formula :: binary() | undefined,
@@ -58,6 +59,7 @@ new(#{license_id := LicenseId, seller_id := SellerId, plugin_id := PluginId} = P
         plugin_name = maps:get(plugin_name, Params, undefined),
         description = maps:get(description, Params, undefined),
         icon = maps:get(icon, Params, undefined),
+        group_name = maps:get(group_name, Params, undefined),
         github_repo = maps:get(github_repo, Params, undefined),
         oci_image = maps:get(oci_image, Params, undefined),
         selling_formula = maps:get(selling_formula, Params, undefined),
@@ -91,6 +93,7 @@ to_map(#license_initiated_v1{} = E) ->
         plugin_name => E#license_initiated_v1.plugin_name,
         description => E#license_initiated_v1.description,
         icon => E#license_initiated_v1.icon,
+        group_name => E#license_initiated_v1.group_name,
         github_repo => E#license_initiated_v1.github_repo,
         oci_image => E#license_initiated_v1.oci_image,
         selling_formula => E#license_initiated_v1.selling_formula,
@@ -131,6 +134,7 @@ from_map(Map) ->
                 plugin_name = hecate_api_utils:get_field(plugin_name, Map, undefined),
                 description = hecate_api_utils:get_field(description, Map, undefined),
                 icon = hecate_api_utils:get_field(icon, Map, undefined),
+                group_name = hecate_api_utils:get_field(group_name, Map, undefined),
                 github_repo = hecate_api_utils:get_field(github_repo, Map, undefined),
                 oci_image = hecate_api_utils:get_field(oci_image, Map, undefined),
                 selling_formula = hecate_api_utils:get_field(selling_formula, Map, undefined),
@@ -171,6 +175,9 @@ get_description(#license_initiated_v1{description = V}) -> V.
 
 -spec get_icon(license_initiated_v1()) -> binary() | undefined.
 get_icon(#license_initiated_v1{icon = V}) -> V.
+
+-spec get_group_name(license_initiated_v1()) -> binary() | undefined.
+get_group_name(#license_initiated_v1{group_name = V}) -> V.
 
 -spec get_github_repo(license_initiated_v1()) -> binary() | undefined.
 get_github_repo(#license_initiated_v1{github_repo = V}) -> V.

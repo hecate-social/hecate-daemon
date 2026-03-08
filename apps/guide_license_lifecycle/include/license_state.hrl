@@ -13,6 +13,7 @@
     plugin_name       :: binary() | undefined,
     description       :: binary() | undefined,
     icon              :: binary() | undefined,
+    group_name        :: binary() | undefined,
     github_repo       :: binary() | undefined,
     selling_formula   :: binary() | undefined,
     seller_id         :: binary() | undefined,

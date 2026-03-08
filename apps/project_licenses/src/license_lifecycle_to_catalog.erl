@@ -43,6 +43,7 @@ project_initiated(Data, State, RM) ->
         name                => gf(plugin_name, Data),
         description         => gf(description, Data),
         icon                => gf(icon, Data),
+        group_name          => gf(group_name, Data),
         github_repo         => gf(github_repo, Data),
         oci_image           => gf(oci_image, Data),
         selling_formula     => gf(selling_formula, Data),
@@ -125,7 +126,7 @@ project_amended(Data, State, RM) ->
 apply_amendments(Entry, Data) ->
     Fields = [
         {plugin_name, name}, {description, description}, {icon, icon},
-        {github_repo, github_repo}, {oci_image, oci_image},
+        {group_name, group_name}, {github_repo, github_repo}, {oci_image, oci_image},
         {org, org}, {version, version}, {manifest_tag, manifest_tag},
         {tags, tags}, {homepage, homepage},
         {min_daemon_version, min_daemon_version},

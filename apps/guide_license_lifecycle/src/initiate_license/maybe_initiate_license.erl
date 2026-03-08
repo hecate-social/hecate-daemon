@@ -68,6 +68,7 @@ create_event(Cmd) ->
         plugin_name => initiate_license_v1:get_plugin_name(Cmd),
         description => initiate_license_v1:get_description(Cmd),
         icon => initiate_license_v1:get_icon(Cmd),
+        group_name => initiate_license_v1:get_group_name(Cmd),
         github_repo => initiate_license_v1:get_github_repo(Cmd),
         oci_image => initiate_license_v1:get_oci_image(Cmd),
         selling_formula => initiate_license_v1:get_selling_formula(Cmd),

@@ -183,6 +183,7 @@ apply_initiated(E, State) ->
         plugin_name = hecate_api_utils:get_field(plugin_name, E),
         description = hecate_api_utils:get_field(description, E),
         icon = hecate_api_utils:get_field(icon, E),
+        group_name = hecate_api_utils:get_field(group_name, E),
         github_repo = hecate_api_utils:get_field(github_repo, E),
         oci_image = hecate_api_utils:get_field(oci_image, E),
         selling_formula = hecate_api_utils:get_field(selling_formula, E),
@@ -230,7 +231,7 @@ apply_retracted(E, #license_state{} = State) ->
 
 apply_amended(E, State) ->
     Fields = [
-        plugin_name, description, icon, github_repo, oci_image,
+        plugin_name, description, icon, group_name, github_repo, oci_image,
         org, version, manifest_tag, tags, homepage,
         min_daemon_version, publisher_identity,
         selling_formula, license_type, fee_cents, fee_currency,
@@ -283,6 +284,7 @@ maybe_set(_Field, undefined, State) -> State;
 maybe_set(plugin_name, V, S)        -> S#license_state{plugin_name = V};
 maybe_set(description, V, S)        -> S#license_state{description = V};
 maybe_set(icon, V, S)               -> S#license_state{icon = V};
+maybe_set(group_name, V, S)         -> S#license_state{group_name = V};
 maybe_set(github_repo, V, S)        -> S#license_state{github_repo = V};
 maybe_set(oci_image, V, S)          -> S#license_state{oci_image = V};
 maybe_set(org, V, S)                -> S#license_state{org = V};
