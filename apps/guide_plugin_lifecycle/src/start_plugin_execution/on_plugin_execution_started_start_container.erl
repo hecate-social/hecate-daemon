@@ -54,81 +54,46 @@ handle_event(_) ->
     ok.
 
 start_container(PluginId) ->
-    case resolve_plugin_info(PluginId) of
+    case resolve_daemon_name(PluginId) of
         undefined ->
-            logger:error("[PM] Cannot resolve plugin info for ~s", [PluginId]);
-        {DaemonName, OciImage} ->
-            ensure_container_provisioned(DaemonName, OciImage),
+            logger:error("[start-pm] Cannot resolve plugin info for ~s", [PluginId]);
+        DaemonName ->
             ServiceName = <<DaemonName/binary, ".service">>,
             case shared_systemctl:reload_and_start(ServiceName) of
                 ok ->
-                    logger:info("[PM] Started service ~s for plugin ~s",
+                    logger:info("[start-pm] Started service ~s for plugin ~s",
                                 [ServiceName, PluginId]);
                 {error, Reason} ->
-                    logger:error("[PM] Failed to start service ~s: ~p",
+                    logger:error("[start-pm] Failed to start service ~s: ~p",
                                  [ServiceName, Reason])
             end
-    end.
-
-%% @private Provision the .container Quadlet file and data directory.
-ensure_container_provisioned(DaemonName, OciImage) ->
-    %% Create plugin data directory
-    Home = os:getenv("HOME"),
-    DataDir = filename:join([Home, ".hecate", binary_to_list(DaemonName)]),
-    SocketDir = filename:join(DataDir, "sockets"),
-    ok = filelib:ensure_path(SocketDir),
-
-    %% Write .container Quadlet file
-    ContainerContent = shared_podman:render_container(DaemonName, OciImage),
-    ContainerFile = shared_podman:container_filename(DaemonName),
-    QuadletDir = filename:join([Home, ".config", "containers", "systemd"]),
-    ok = filelib:ensure_path(QuadletDir),
-    FilePath = filename:join(QuadletDir, binary_to_list(ContainerFile)),
-    case filelib:is_regular(FilePath) of
-        true ->
-            logger:debug("[PM] Container file already exists: ~s", [FilePath]);
-        false ->
-            ok = file:write_file(FilePath, ContainerContent),
-            logger:info("[PM] Provisioned container file: ~s", [FilePath])
     end.
 
 %% Internal — startup reconciliation
 
 reconcile_running_plugins() ->
-    case query_running_plugins() of
+    try project_plugins_store:list_by_status(4) of
         {ok, Plugins} ->
-            lists:foreach(fun({_PluginId, OciImage}) ->
+            lists:foreach(fun(#{oci_image := OciImage}) ->
                 DaemonName = shared_podman:extract_daemon_name(OciImage),
                 ServiceName = <<DaemonName/binary, ".service">>,
                 case shared_systemctl:reload_and_start(ServiceName) of
                     ok -> ok;
                     {error, Reason} ->
-                        logger:warning("[PM] Reconcile: failed to start ~s: ~p",
+                        logger:warning("[start-pm] Reconcile: failed to start ~s: ~p",
                                        [ServiceName, Reason])
                 end
             end, Plugins);
         {error, Reason} ->
-            logger:warning("[PM] Startup reconciliation failed: ~p", [Reason])
-    end.
-
-%% @private Query plugins with RUNNING flag set (status & 4).
-query_running_plugins() ->
-    try project_plugins_store:list_by_status(4) of
-        {ok, Plugins} ->
-            Running = [{maps:get(plugin_id, P), maps:get(oci_image, P)}
-                       || P <- Plugins, maps:get(status, P) band 2 =:= 0],
-            {ok, Running};
-        {error, _} = Err ->
-            Err
+            logger:warning("[start-pm] Startup reconciliation failed: ~p", [Reason])
     catch
-        error:badarg -> {error, store_not_ready}
+        error:badarg -> ok
     end.
 
-%% @private Look up oci_image from plugins read model.
-resolve_plugin_info(PluginId) ->
+resolve_daemon_name(PluginId) ->
     case project_plugins_store:get(PluginId) of
         {ok, #{oci_image := OciImage}} ->
-            {shared_podman:extract_daemon_name(OciImage), OciImage};
+            shared_podman:extract_daemon_name(OciImage);
         _ -> undefined
     end.
 
