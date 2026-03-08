@@ -11,6 +11,8 @@
 %%% 5. Evoq (CQRS framework)
 %%% 6. Domain event stores (one per bounded context)
 %%% 7. hecate_sup (domain services)
+%%% 8. [Domain apps start via release config]
+%%% 9. Store subscriptions (started by hecate_api_app, AFTER projections register)
 %%%
 %%% The socket becomes fully operational later when hecate_api_app
 %%% hot-swaps the full route table and sets state to `running`.
@@ -22,6 +24,7 @@
 -include_lib("reckon_db/include/reckon_db.hrl").
 
 -export([start/2, stop/1]).
+-export([start_store_subscriptions/0]).
 
 %%--------------------------------------------------------------------
 %% @doc Start the Hecate application.
@@ -99,7 +102,10 @@ start_event_stores() ->
     start_stores(Stores).
 
 start_stores([]) ->
-    start_store_subscriptions(),
+    %% NOTE: store subscriptions are started LATER by hecate_api_app:start/2,
+    %% after all domain apps (and their projections) have registered with the
+    %% type registry. This ensures historical events replayed from the $all
+    %% subscription are delivered to projections instead of being dropped.
     start_hecate_sup();
 start_stores([{StoreId, SubDir, Label} | Rest]) ->
     logger:info("Starting ~s event store (~p)...", [Label, StoreId]),
