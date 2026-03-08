@@ -82,14 +82,14 @@ enrich_with_license(CatalogEntry, UserId) ->
         {ok, License} ->
             CatalogEntry#{
                 license_id        => maps:get(license_id, License),
-                installed         => maps:get(installed, License),
-                installed_version => maps:get(installed_version, License)
+                installed         => maps:get(installed, License, 0),
+                installed_version => maps:get(installed_version, License, null)
             };
         {error, not_found} ->
             CatalogEntry#{
-                license_id        => undefined,
+                license_id        => null,
                 installed         => 0,
-                installed_version => undefined
+                installed_version => null
             }
     end.
 

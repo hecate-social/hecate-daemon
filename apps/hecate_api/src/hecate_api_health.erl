@@ -9,9 +9,10 @@
 routes() -> [{"/health", ?MODULE, []}].
 
 init(Req0, State) ->
+    DaemonState = hecate_lifecycle:get_state(),
     Response = #{
-        status => <<"healthy">>,
-        ready => true,
+        status => lifecycle_status(DaemonState),
+        ready => DaemonState =:= running,
         service => <<"hecate">>,
         version => app_version(),
         uptime_seconds => element(1, erlang:statistics(wall_clock)) div 1000,
@@ -25,6 +26,11 @@ init(Req0, State) ->
         <<"content-type">> => <<"application/json">>
     }, Body, Req0),
     {ok, Req, State}.
+
+lifecycle_status(running) -> <<"healthy">>;
+lifecycle_status(starting) -> <<"starting">>;
+lifecycle_status(stopping) -> <<"stopping">>;
+lifecycle_status(_) -> <<"starting">>.
 
 app_version() ->
     case application:get_key(hecate, vsn) of

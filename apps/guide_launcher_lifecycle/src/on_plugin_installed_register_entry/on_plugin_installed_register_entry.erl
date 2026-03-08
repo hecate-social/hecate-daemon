@@ -65,4 +65,7 @@ get_value(Key, Map) when is_atom(Key) ->
 
 coalesce(undefined, Default) -> Default;
 coalesce(null, Default) -> Default;
+coalesce(<<"undefined">>, Default) -> Default;
+coalesce(<<"null">>, Default) -> Default;
+coalesce(<<>>, Default) -> Default;
 coalesce(Value, _Default) -> Value.

@@ -90,6 +90,7 @@ start_evoq() ->
     end.
 
 %% @private Start domain event stores (one per bounded context).
+%% All stores start in parallel since Ra clusters are independent.
 start_event_stores() ->
     Stores = [
         {settings_store,            "settings",            "Settings (identity, preferences)"},
@@ -99,32 +100,62 @@ start_event_stores() ->
         {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"},
         {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"}
     ],
-    start_stores(Stores).
+    start_stores_parallel(Stores).
 
-start_stores([]) ->
-    %% NOTE: store subscriptions are started LATER by hecate_api_app:start/2,
-    %% after all domain apps (and their projections) have registered with the
-    %% type registry. This ensures historical events replayed from the $all
-    %% subscription are delivered to projections instead of being dropped.
-    start_hecate_sup();
-start_stores([{StoreId, SubDir, Label} | Rest]) ->
-    logger:info("Starting ~s event store (~p)...", [Label, StoreId]),
-    DataDir = shared_paths:reckon_path(SubDir),
-    ok = filelib:ensure_path(DataDir),
-    Config = #store_config{
-        store_id = StoreId,
-        data_dir = DataDir,
-        mode = single,
-        writer_pool_size = 5,
-        reader_pool_size = 5,
-        gateway_pool_size = 2,
-        options = #{}
-    },
-    case start_store(Config) of
-        ok -> start_stores(Rest);
-        {error, Reason} ->
+%% @private Start all stores concurrently using async tasks.
+%% Each Ra cluster is independent so there's no ordering dependency.
+start_stores_parallel(Stores) ->
+    logger:info("Starting ~b event stores in parallel...", [length(Stores)]),
+    StartTime = erlang:monotonic_time(millisecond),
+    %% Spawn a process per store, collect results
+    Refs = lists:map(fun({StoreId, SubDir, Label}) ->
+        Ref = make_ref(),
+        Parent = self(),
+        spawn_link(fun() ->
+            logger:info("Starting ~s event store (~p)...", [Label, StoreId]),
+            DataDir = shared_paths:reckon_path(SubDir),
+            ok = filelib:ensure_path(DataDir),
+            Config = #store_config{
+                store_id = StoreId,
+                data_dir = DataDir,
+                mode = single,
+                writer_pool_size = 5,
+                reader_pool_size = 5,
+                gateway_pool_size = 2,
+                options = #{}
+            },
+            Result = start_store(Config),
+            Parent ! {store_started, Ref, StoreId, Result}
+        end),
+        {Ref, StoreId}
+    end, Stores),
+    %% Wait for all stores to complete
+    case collect_store_results(Refs, []) of
+        ok ->
+            Duration = erlang:monotonic_time(millisecond) - StartTime,
+            logger:info("All ~b event stores ready in ~bms", [length(Stores), Duration]),
+            %% NOTE: store subscriptions are started LATER by hecate_api_app:start/2,
+            %% after all domain apps (and their projections) have registered with the
+            %% type registry. This ensures historical events replayed from the $all
+            %% subscription are delivered to projections instead of being dropped.
+            start_hecate_sup();
+        {error, _} = Error ->
+            Error
+    end.
+
+%% @private Collect results from parallel store startup.
+collect_store_results([], _Acc) ->
+    ok;
+collect_store_results([{Ref, StoreId} | Rest], Acc) ->
+    receive
+        {store_started, Ref, StoreId, ok} ->
+            collect_store_results(Rest, [StoreId | Acc]);
+        {store_started, Ref, StoreId, {error, Reason}} ->
             logger:error("Failed to start ~p: ~p", [StoreId, Reason]),
             {error, {StoreId, Reason}}
+    after 30000 ->
+        logger:error("Timeout waiting for store ~p to start", [StoreId]),
+        {error, {StoreId, timeout}}
     end.
 
 %% @private Start a single ReckonDB store, handling already_started.

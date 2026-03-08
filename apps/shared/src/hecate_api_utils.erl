@@ -12,10 +12,12 @@
 -export([get_field/2, get_field/3]).
 
 %% @doc Send a JSON response with status code.
+%% Sanitizes maps before encoding: converts atom `undefined` to `null`
+%% so OTP json produces JSON null instead of the string "undefined".
 -spec json_response(StatusCode :: non_neg_integer(), Body :: map(), Req :: cowboy_req:req()) ->
     {ok, cowboy_req:req(), []}.
 json_response(StatusCode, Body, Req0) ->
-    JsonBody = json:encode(Body),
+    JsonBody = json:encode(sanitize_for_json(Body)),
     Req = cowboy_req:reply(StatusCode, #{
         <<"content-type">> => <<"application/json">>
     }, JsonBody, Req0),
@@ -90,3 +92,14 @@ get_field(Key, Map) ->
 get_field(Key, Map, Default) when is_atom(Key) ->
     BinKey = atom_to_binary(Key, utf8),
     maps:get(Key, Map, maps:get(BinKey, Map, Default)).
+
+%% @doc Recursively sanitize data for JSON encoding.
+%% Converts atom `undefined` to `null` so OTP json:encode/1 produces
+%% JSON null instead of the string "undefined".
+-spec sanitize_for_json(term()) -> term().
+sanitize_for_json(undefined) -> null;
+sanitize_for_json(Map) when is_map(Map) ->
+    maps:map(fun(_K, V) -> sanitize_for_json(V) end, Map);
+sanitize_for_json(List) when is_list(List) ->
+    [sanitize_for_json(E) || E <- List];
+sanitize_for_json(Other) -> Other.

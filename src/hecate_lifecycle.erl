@@ -12,7 +12,7 @@
 %%%-------------------------------------------------------------------
 -module(hecate_lifecycle).
 
--export([init/0, set_state/1, cleanup/0]).
+-export([init/0, get_state/0, set_state/1, cleanup/0]).
 
 %%--------------------------------------------------------------------
 %% @doc Initialize lifecycle files. Writes daemon.pid and sets state
@@ -25,6 +25,20 @@ init() ->
     ok = filelib:ensure_dir(PidFile),
     ok = file:write_file(PidFile, os:getpid()),
     set_state(starting).
+
+%%--------------------------------------------------------------------
+%% @doc Read the current daemon lifecycle state from the state file.
+%% Returns `starting` if the file doesn't exist or is unreadable.
+%% @end
+%%--------------------------------------------------------------------
+-spec get_state() -> starting | running | stopping.
+get_state() ->
+    File = shared_paths:run_path("daemon.state"),
+    case file:read_file(File) of
+        {ok, <<"running">>} -> running;
+        {ok, <<"stopping">>} -> stopping;
+        _ -> starting
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc Update the daemon.state file.

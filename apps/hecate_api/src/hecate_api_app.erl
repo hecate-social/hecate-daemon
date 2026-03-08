@@ -9,8 +9,6 @@ start(_StartType, _StartArgs) ->
     %% Start store subscriptions NOW — after all domain apps have started.
     %% This guarantees projections are registered with the type registry
     %% before the $all subscription replays historical events.
-    %% Previously these were started in hecate_app:start/2 (before domain
-    %% apps), causing all historical events to be silently dropped.
     hecate_app:start_store_subscriptions(),
 
     %% Compile full routes and hot-swap onto the already-running listener.
@@ -18,10 +16,14 @@ start(_StartType, _StartArgs) ->
     %% dispatch. Now we replace it with the full route table.
     Dispatch = hecate_api_routes:compile(),
     cowboy:set_env(hecate_socket_listener, dispatch, Dispatch),
-    logger:info("[hecate_api] Full routes loaded — daemon ready"),
+    logger:info("[hecate_api] Full routes loaded — awaiting projection replay"),
 
-    %% Mark daemon as fully operational
-    hecate_lifecycle:set_state(running),
+    %% Don't set `running` yet — store subscriptions deliver events
+    %% asynchronously. A background watcher monitors ETS tables and
+    %% sets `running` once projections have replayed all historical events.
+    %% Until then, /health returns ready:false and the frontend shows
+    %% a loading overlay (not the onboarding overlay).
+    hecate_readiness:await_projections(),
 
     Result = hecate_api_sup:start_link(),
     logger:info("[hecate_api] Supervisor started: ~p", [Result]),

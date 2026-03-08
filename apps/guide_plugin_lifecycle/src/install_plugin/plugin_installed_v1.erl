@@ -39,17 +39,19 @@ new(#{plugin_id := PluginId, name := Name,
 
 -spec to_map(plugin_installed_v1()) -> map().
 to_map(#plugin_installed_v1{} = E) ->
-    #{
+    Base = #{
         event_type        => <<"plugin_installed_v1">>,
         plugin_id         => E#plugin_installed_v1.plugin_id,
         name              => E#plugin_installed_v1.name,
         oci_image         => E#plugin_installed_v1.oci_image,
         installed_version => E#plugin_installed_v1.installed_version,
-        license_id        => E#plugin_installed_v1.license_id,
-        icon              => E#plugin_installed_v1.icon,
-        group_name        => E#plugin_installed_v1.group_name,
         installed_at      => E#plugin_installed_v1.installed_at
-    }.
+    },
+    %% Only include optional fields when set — atom undefined serializes
+    %% as the string "undefined" in JSON, causing round-trip corruption.
+    maybe_put(group_name, E#plugin_installed_v1.group_name,
+    maybe_put(icon, E#plugin_installed_v1.icon,
+    maybe_put(license_id, E#plugin_installed_v1.license_id, Base))).
 
 -spec from_map(map()) -> {ok, plugin_installed_v1()} | {error, term()}.
 from_map(Map) ->
@@ -99,6 +101,11 @@ get_icon(#plugin_installed_v1{icon = V}) -> V.
 
 -spec get_group(plugin_installed_v1()) -> binary() | undefined.
 get_group(#plugin_installed_v1{group_name = V}) -> V.
+
+%% @private Only add key to map if value is not undefined/null.
+maybe_put(_Key, undefined, Map) -> Map;
+maybe_put(_Key, null, Map) -> Map;
+maybe_put(Key, Value, Map) -> Map#{Key => Value}.
 
 %% Internal helper to get value with atom or binary key
 get_value(Key, Map) ->
