@@ -1,0 +1,1 @@
+import{I as a}from"./DEVkX5Nn.js";import{g as i}from"./De5rq01Q.js";const n=a(null);async function r(){try{const e=await i("/api/node/identity");n.set(e.node_identity)}catch{n.set(null)}}let t=null;async function c(){t||(t=setInterval(r,3e4))}function l(){t&&(clearInterval(t),t=null)}export{l as a,r as f,n,c as s};

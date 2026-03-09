@@ -14,17 +14,24 @@ init(_Config) -> {ok, #{}}.
 handle_event(_EventType, Event, _Metadata, State) ->
     Data = maps:get(data, Event),
     PluginId = hecate_api_utils:get_field(plugin_id, Data),
-    OciImage = hecate_api_utils:get_field(oci_image, Data),
-    logger:info("[PM] Plugin ~s installed, starting OCI pull", [PluginId]),
-    case start_oci_pull_v1:new(#{plugin_id => PluginId, oci_image => OciImage}) of
-        {ok, Cmd} ->
-            case maybe_start_oci_pull:dispatch(Cmd) of
-                {ok, _, _} ->
-                    logger:info("[PM] OCI pull started for ~s", [PluginId]);
+    PluginType = hecate_api_utils:get_field(plugin_type, Data, <<"container">>),
+    case PluginType of
+        <<"container">> ->
+            OciImage = hecate_api_utils:get_field(oci_image, Data),
+            logger:info("[PM] Container plugin ~s installed, starting OCI pull", [PluginId]),
+            case start_oci_pull_v1:new(#{plugin_id => PluginId, oci_image => OciImage}) of
+                {ok, Cmd} ->
+                    case maybe_start_oci_pull:dispatch(Cmd) of
+                        {ok, _, _} ->
+                            logger:info("[PM] OCI pull started for ~s", [PluginId]);
+                        {error, Reason} ->
+                            logger:error("[PM] Failed to start OCI pull for ~s: ~p", [PluginId, Reason])
+                    end;
                 {error, Reason} ->
-                    logger:error("[PM] Failed to start OCI pull for ~s: ~p", [PluginId, Reason])
+                    logger:error("[PM] Failed to create pull command for ~s: ~p", [PluginId, Reason])
             end;
-        {error, Reason} ->
-            logger:error("[PM] Failed to create pull command for ~s: ~p", [PluginId, Reason])
+        _ ->
+            %% in_vm plugins are handled by on_plugin_installed_extract_package
+            ok
     end,
     {ok, State}.

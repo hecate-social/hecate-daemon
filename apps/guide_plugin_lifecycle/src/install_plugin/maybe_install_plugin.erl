@@ -17,10 +17,8 @@ handle(Cmd) ->
 -spec handle(install_plugin_v1:install_plugin_v1(), term()) ->
     {ok, [plugin_installed_v1:plugin_installed_v1()]} | {error, term()}.
 handle(Cmd, _State) ->
-    PluginId = install_plugin_v1:get_plugin_id(Cmd),
-    OciImage = install_plugin_v1:get_oci_image(Cmd),
-    case validate_command(PluginId, OciImage) of
-        ok ->
+    case install_plugin_v1:validate(Cmd) of
+        {ok, _} ->
             Event = create_event(Cmd),
             {ok, [Event]};
         {error, Reason} ->
@@ -54,19 +52,15 @@ dispatch(Cmd) ->
 
 %% Internal
 
-validate_command(PluginId, OciImage) when
-    is_binary(PluginId), byte_size(PluginId) > 0,
-    is_binary(OciImage), byte_size(OciImage) > 0 ->
-    ok;
-validate_command(_, _) ->
-    {error, invalid_command}.
-
 create_event(Cmd) ->
     plugin_installed_v1:new(#{
         plugin_id         => install_plugin_v1:get_plugin_id(Cmd),
         name              => install_plugin_v1:get_name(Cmd),
         display_name      => install_plugin_v1:get_display_name(Cmd),
+        plugin_type       => install_plugin_v1:get_plugin_type(Cmd),
         oci_image         => install_plugin_v1:get_oci_image(Cmd),
+        callback_module   => install_plugin_v1:get_callback_module(Cmd),
+        package_url       => install_plugin_v1:get_package_url(Cmd),
         installed_version => install_plugin_v1:get_installed_version(Cmd),
         license_id        => install_plugin_v1:get_license_id(Cmd),
         icon              => install_plugin_v1:get_icon(Cmd),

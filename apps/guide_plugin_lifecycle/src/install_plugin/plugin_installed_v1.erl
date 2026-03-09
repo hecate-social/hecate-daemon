@@ -3,15 +3,19 @@
 -module(plugin_installed_v1).
 
 -export([new/1, to_map/1, from_map/1]).
--export([get_plugin_id/1, get_name/1, get_display_name/1, get_oci_image/1,
-         get_installed_version/1, get_license_id/1, get_installed_at/1,
-         get_icon/1, get_group/1]).
+-export([get_plugin_id/1, get_name/1, get_display_name/1,
+         get_plugin_type/1, get_oci_image/1, get_callback_module/1,
+         get_package_url/1, get_installed_version/1, get_license_id/1,
+         get_installed_at/1, get_icon/1, get_group/1]).
 
 -record(plugin_installed_v1, {
     plugin_id         :: binary(),
     name              :: binary(),
     display_name      :: binary() | undefined,
-    oci_image         :: binary(),
+    plugin_type       :: binary(),                %% <<"container">> | <<"in_vm">>
+    oci_image         :: binary() | undefined,    %% container only
+    callback_module   :: binary() | undefined,    %% in_vm only
+    package_url       :: binary() | undefined,    %% in_vm only: URL to .tar.gz package
     installed_version :: binary(),
     license_id        :: binary() | undefined,
     icon              :: binary() | undefined,
@@ -26,12 +30,15 @@
 
 -spec new(map()) -> plugin_installed_v1().
 new(#{plugin_id := PluginId, name := Name,
-      oci_image := OciImage, installed_version := Version} = Params) ->
+      installed_version := Version} = Params) ->
     #plugin_installed_v1{
         plugin_id         = PluginId,
         name              = Name,
         display_name      = maps:get(display_name, Params, undefined),
-        oci_image         = OciImage,
+        plugin_type       = maps:get(plugin_type, Params, <<"container">>),
+        oci_image         = maps:get(oci_image, Params, undefined),
+        callback_module   = maps:get(callback_module, Params, undefined),
+        package_url       = maps:get(package_url, Params, undefined),
         installed_version = Version,
         license_id        = maps:get(license_id, Params, undefined),
         icon              = maps:get(icon, Params, undefined),
@@ -45,7 +52,7 @@ to_map(#plugin_installed_v1{} = E) ->
         event_type        => <<"plugin_installed_v1">>,
         plugin_id         => E#plugin_installed_v1.plugin_id,
         name              => E#plugin_installed_v1.name,
-        oci_image         => E#plugin_installed_v1.oci_image,
+        plugin_type       => E#plugin_installed_v1.plugin_type,
         installed_version => E#plugin_installed_v1.installed_version,
         installed_at      => E#plugin_installed_v1.installed_at
     },
@@ -54,25 +61,29 @@ to_map(#plugin_installed_v1{} = E) ->
     maybe_put(group_name, E#plugin_installed_v1.group_name,
     maybe_put(icon, E#plugin_installed_v1.icon,
     maybe_put(license_id, E#plugin_installed_v1.license_id,
-    maybe_put(display_name, E#plugin_installed_v1.display_name, Base)))).
+    maybe_put(callback_module, E#plugin_installed_v1.callback_module,
+    maybe_put(package_url, E#plugin_installed_v1.package_url,
+    maybe_put(oci_image, E#plugin_installed_v1.oci_image,
+    maybe_put(display_name, E#plugin_installed_v1.display_name, Base))))))).
 
 -spec from_map(map()) -> {ok, plugin_installed_v1()} | {error, term()}.
 from_map(Map) ->
     PluginId = get_value(plugin_id, Map),
     Name     = get_value(name, Map),
-    OciImage = get_value(oci_image, Map),
     Version  = get_value(installed_version, Map),
-    case {PluginId, Name, OciImage, Version} of
-        {undefined, _, _, _} -> {error, invalid_event};
-        {_, undefined, _, _} -> {error, invalid_event};
-        {_, _, undefined, _} -> {error, invalid_event};
-        {_, _, _, undefined} -> {error, invalid_event};
+    case {PluginId, Name, Version} of
+        {undefined, _, _} -> {error, invalid_event};
+        {_, undefined, _} -> {error, invalid_event};
+        {_, _, undefined} -> {error, invalid_event};
         _ ->
             {ok, #plugin_installed_v1{
                 plugin_id         = PluginId,
                 name              = Name,
                 display_name      = get_value(display_name, Map, undefined),
-                oci_image         = OciImage,
+                plugin_type       = get_value(plugin_type, Map, <<"container">>),
+                oci_image         = get_value(oci_image, Map, undefined),
+                callback_module   = get_value(callback_module, Map, undefined),
+                package_url       = get_value(package_url, Map, undefined),
                 installed_version = Version,
                 license_id        = get_value(license_id, Map, undefined),
                 icon              = get_value(icon, Map, undefined),
@@ -91,8 +102,17 @@ get_name(#plugin_installed_v1{name = V}) -> V.
 -spec get_display_name(plugin_installed_v1()) -> binary() | undefined.
 get_display_name(#plugin_installed_v1{display_name = V}) -> V.
 
--spec get_oci_image(plugin_installed_v1()) -> binary().
+-spec get_plugin_type(plugin_installed_v1()) -> binary().
+get_plugin_type(#plugin_installed_v1{plugin_type = V}) -> V.
+
+-spec get_oci_image(plugin_installed_v1()) -> binary() | undefined.
 get_oci_image(#plugin_installed_v1{oci_image = V}) -> V.
+
+-spec get_callback_module(plugin_installed_v1()) -> binary() | undefined.
+get_callback_module(#plugin_installed_v1{callback_module = V}) -> V.
+
+-spec get_package_url(plugin_installed_v1()) -> binary() | undefined.
+get_package_url(#plugin_installed_v1{package_url = V}) -> V.
 
 -spec get_installed_version(plugin_installed_v1()) -> binary().
 get_installed_version(#plugin_installed_v1{installed_version = V}) -> V.

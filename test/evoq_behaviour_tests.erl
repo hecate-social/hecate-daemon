@@ -149,7 +149,11 @@ plugin_projection_interested_in_test_() ->
          <<"plugin_removed_v1">>, <<"plugin_execution_started_v1">>,
          <<"plugin_execution_stopped_v1">>, <<"container_confirmed_up_v1">>,
          <<"container_confirmed_down_v1">>, <<"oci_pull_started_v1">>,
-         <<"oci_pull_cancelled_v1">>, <<"oci_pull_completed_v1">>],
+         <<"oci_pull_cancelled_v1">>, <<"oci_pull_completed_v1">>,
+         %% In-VM plugin events
+         <<"plugin_package_extracted_v1">>, <<"plugin_activated_v1">>,
+         <<"plugin_deactivated_v1">>, <<"plugin_load_confirmed_v1">>,
+         <<"plugin_unload_confirmed_v1">>],
         plugin_lifecycle_to_plugins:interested_in())].
 
 %%====================================================================

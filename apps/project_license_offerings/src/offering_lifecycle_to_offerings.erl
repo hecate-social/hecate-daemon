@@ -51,6 +51,9 @@ project_initiated(Data, State, RM) ->
         group_name          => gf(group_name, Data),
         github_repo         => gf(github_repo, Data),
         oci_image           => gf(oci_image, Data),
+        package_url         => gf(package_url, Data),
+        plugin_type         => gf(plugin_type, Data),
+        callback_module     => gf(callback_module, Data),
         selling_formula     => gf(selling_formula, Data),
         author_id           => gf(author_id, Data),
         license_type        => gf(license_type, Data),
@@ -132,6 +135,8 @@ apply_amendments(Entry, Data) ->
     Fields = [
         {plugin_name, name}, {description, description}, {icon, icon},
         {group_name, group_name}, {github_repo, github_repo}, {oci_image, oci_image},
+        {package_url, package_url},
+        {plugin_type, plugin_type}, {callback_module, callback_module},
         {org, org}, {version, version}, {manifest_tag, manifest_tag},
         {tags, tags}, {homepage, homepage},
         {min_daemon_version, min_daemon_version},

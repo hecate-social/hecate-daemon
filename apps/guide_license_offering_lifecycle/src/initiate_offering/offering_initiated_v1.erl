@@ -6,7 +6,8 @@
 -export([get_offering_id/1, get_plugin_id/1, get_author_id/1,
          get_plugin_name/1, get_description/1, get_icon/1, get_group_name/1,
          get_github_repo/1, get_homepage/1, get_tags/1,
-         get_oci_image/1, get_org/1, get_version/1, get_manifest_tag/1,
+         get_oci_image/1, get_package_url/1, get_plugin_type/1, get_callback_module/1,
+         get_org/1, get_version/1, get_manifest_tag/1,
          get_min_daemon_version/1, get_publisher_identity/1,
          get_selling_formula/1, get_license_type/1,
          get_fee_cents/1, get_fee_currency/1,
@@ -29,6 +30,9 @@
     tags               :: binary() | undefined,
     %% Technical
     oci_image          :: binary() | undefined,
+    package_url        :: binary() | undefined,
+    plugin_type        :: binary() | undefined,
+    callback_module    :: binary() | undefined,
     org                :: binary() | undefined,
     version            :: binary() | undefined,
     manifest_tag       :: binary() | undefined,
@@ -70,6 +74,9 @@ new(#{offering_id := OfferingId, author_id := AuthorId, plugin_id := PluginId} =
         homepage = maps:get(homepage, Params, undefined),
         tags = maps:get(tags, Params, undefined),
         oci_image = maps:get(oci_image, Params, undefined),
+        package_url = maps:get(package_url, Params, undefined),
+        plugin_type = maps:get(plugin_type, Params, undefined),
+        callback_module = maps:get(callback_module, Params, undefined),
         org = maps:get(org, Params, undefined),
         version = maps:get(version, Params, undefined),
         manifest_tag = maps:get(manifest_tag, Params, undefined),
@@ -104,6 +111,9 @@ to_map(#offering_initiated_v1{} = E) ->
         homepage => E#offering_initiated_v1.homepage,
         tags => E#offering_initiated_v1.tags,
         oci_image => E#offering_initiated_v1.oci_image,
+        package_url => E#offering_initiated_v1.package_url,
+        plugin_type => E#offering_initiated_v1.plugin_type,
+        callback_module => E#offering_initiated_v1.callback_module,
         org => E#offering_initiated_v1.org,
         version => E#offering_initiated_v1.version,
         manifest_tag => E#offering_initiated_v1.manifest_tag,
@@ -145,6 +155,9 @@ from_map(Map) ->
                 homepage = hecate_api_utils:get_field(homepage, Map, undefined),
                 tags = hecate_api_utils:get_field(tags, Map, undefined),
                 oci_image = hecate_api_utils:get_field(oci_image, Map, undefined),
+                package_url = hecate_api_utils:get_field(package_url, Map, undefined),
+                plugin_type = hecate_api_utils:get_field(plugin_type, Map, undefined),
+                callback_module = hecate_api_utils:get_field(callback_module, Map, undefined),
                 org = hecate_api_utils:get_field(org, Map, undefined),
                 version = hecate_api_utils:get_field(version, Map, undefined),
                 manifest_tag = hecate_api_utils:get_field(manifest_tag, Map, undefined),
@@ -198,6 +211,15 @@ get_tags(#offering_initiated_v1{tags = V}) -> V.
 
 -spec get_oci_image(offering_initiated_v1()) -> binary() | undefined.
 get_oci_image(#offering_initiated_v1{oci_image = V}) -> V.
+
+-spec get_package_url(offering_initiated_v1()) -> binary() | undefined.
+get_package_url(#offering_initiated_v1{package_url = V}) -> V.
+
+-spec get_plugin_type(offering_initiated_v1()) -> binary() | undefined.
+get_plugin_type(#offering_initiated_v1{plugin_type = V}) -> V.
+
+-spec get_callback_module(offering_initiated_v1()) -> binary() | undefined.
+get_callback_module(#offering_initiated_v1{callback_module = V}) -> V.
 
 -spec get_org(offering_initiated_v1()) -> binary() | undefined.
 get_org(#offering_initiated_v1{org = V}) -> V.

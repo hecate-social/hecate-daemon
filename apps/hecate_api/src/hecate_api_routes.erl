@@ -6,7 +6,7 @@
 %%% @end
 -module(hecate_api_routes).
 
--export([compile/0]).
+-export([compile/0, discover_routes/0]).
 
 %% All hecate OTP apps that may contain API handlers.
 -define(HECATE_APPS, [
@@ -27,7 +27,25 @@
 
 -spec compile() -> cowboy_router:dispatch_rules().
 compile() ->
-    cowboy_router:compile([{'_', discover_routes()}]).
+    ApiRoutes = discover_routes(),
+    StaticRoutes = hecate_api_static:routes(),
+    PluginApiRoutes = plugin_api_routes(),
+    PluginStaticRoutes = plugin_static_routes(),
+    %% SPA fallback MUST be last — catches all unmatched paths
+    SpaFallback = [{'_', hecate_api_spa_fallback, []}],
+    cowboy_router:compile([{'_', ApiRoutes ++ PluginApiRoutes
+                                 ++ StaticRoutes ++ PluginStaticRoutes
+                                 ++ SpaFallback}]).
+
+plugin_api_routes() ->
+    try hecate_plugin_loader:plugin_routes()
+    catch _:_ -> []
+    end.
+
+plugin_static_routes() ->
+    try hecate_plugin_loader:plugin_static_routes()
+    catch _:_ -> []
+    end.
 
 -spec discover_routes() -> [cowboy_router:route_match()].
 discover_routes() ->

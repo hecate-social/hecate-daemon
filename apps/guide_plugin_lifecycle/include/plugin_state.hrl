@@ -3,7 +3,10 @@
 -record(plugin_state, {
     plugin_id         :: binary() | undefined,
     name              :: binary() | undefined,
-    oci_image         :: binary() | undefined,
+    plugin_type       :: binary() | undefined,       %% <<"container">> | <<"in_vm">>
+    callback_module   :: binary() | undefined,       %% e.g., <<"app_scribe">> (in_vm only)
+    oci_image         :: binary() | undefined,       %% (container only)
+    package_url       :: binary() | undefined,       %% URL to .tar.gz (in_vm only)
     installed_version :: binary() | undefined,
     license_id        :: binary() | undefined,
     icon              :: binary() | undefined,
@@ -13,5 +16,8 @@
     removed_at        :: integer() | undefined,
     started_at        :: integer() | undefined,
     stopped_at        :: integer() | undefined,
+    activated_at      :: integer() | undefined,      %% in_vm: when code was loaded
+    deactivated_at    :: integer() | undefined,      %% in_vm: when code was unloaded
+    extracted_at      :: integer() | undefined,      %% in_vm: when package was extracted
     status            :: non_neg_integer()
 }).

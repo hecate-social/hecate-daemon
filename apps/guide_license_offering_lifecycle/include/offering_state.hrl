@@ -15,6 +15,9 @@
     tags               :: binary() | undefined,
     %% Technical fields
     oci_image          :: binary() | undefined,
+    package_url        :: binary() | undefined,
+    plugin_type        :: binary() | undefined,
+    callback_module    :: binary() | undefined,
     org                :: binary() | undefined,
     version            :: binary() | undefined,
     manifest_tag       :: binary() | undefined,

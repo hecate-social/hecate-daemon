@@ -6,7 +6,9 @@
 
 -export([new/1, to_map/1, from_map/1]).
 -export([get_license_id/1, get_consumer_id/1, get_plugin_id/1,
-         get_offering_id/1, get_initiated_at/1]).
+         get_offering_id/1, get_initiated_at/1,
+         get_plugin_type/1, get_callback_module/1,
+         get_package_url/1]).
 
 -record(license_initiated_v1, {
     license_id         :: binary(),
@@ -20,6 +22,9 @@
     group_name         :: binary() | undefined,
     github_repo        :: binary() | undefined,
     oci_image          :: binary() | undefined,
+    plugin_type        :: binary() | undefined,
+    callback_module    :: binary() | undefined,
+    package_url        :: binary() | undefined,
     selling_formula    :: binary() | undefined,
     author_id          :: binary() | undefined,
     license_type       :: binary() | undefined,
@@ -61,6 +66,9 @@ new(#{license_id := LicenseId, consumer_id := ConsumerId,
         group_name         = maps:get(group_name, P, undefined),
         github_repo        = maps:get(github_repo, P, undefined),
         oci_image          = maps:get(oci_image, P, undefined),
+        plugin_type        = maps:get(plugin_type, P, undefined),
+        callback_module    = maps:get(callback_module, P, undefined),
+        package_url        = maps:get(package_url, P, undefined),
         selling_formula    = maps:get(selling_formula, P, undefined),
         author_id          = maps:get(author_id, P, undefined),
         license_type       = maps:get(license_type, P, undefined),
@@ -97,6 +105,9 @@ to_map(#license_initiated_v1{} = E) ->
         group_name          => E#license_initiated_v1.group_name,
         github_repo         => E#license_initiated_v1.github_repo,
         oci_image           => E#license_initiated_v1.oci_image,
+        plugin_type         => E#license_initiated_v1.plugin_type,
+        callback_module     => E#license_initiated_v1.callback_module,
+        package_url         => E#license_initiated_v1.package_url,
         selling_formula     => E#license_initiated_v1.selling_formula,
         author_id           => E#license_initiated_v1.author_id,
         license_type        => E#license_initiated_v1.license_type,
@@ -142,6 +153,9 @@ from_map(Map) ->
                 group_name         = hecate_api_utils:get_field(group_name, Map, undefined),
                 github_repo        = hecate_api_utils:get_field(github_repo, Map, undefined),
                 oci_image          = hecate_api_utils:get_field(oci_image, Map, undefined),
+                plugin_type        = hecate_api_utils:get_field(plugin_type, Map, undefined),
+                callback_module    = hecate_api_utils:get_field(callback_module, Map, undefined),
+                package_url        = hecate_api_utils:get_field(package_url, Map, undefined),
                 selling_formula    = hecate_api_utils:get_field(selling_formula, Map, undefined),
                 author_id          = hecate_api_utils:get_field(author_id, Map, undefined),
                 license_type       = hecate_api_utils:get_field(license_type, Map, undefined),
@@ -180,3 +194,12 @@ get_offering_id(#license_initiated_v1{offering_id = V}) -> V.
 
 -spec get_initiated_at(license_initiated_v1()) -> integer().
 get_initiated_at(#license_initiated_v1{initiated_at = V}) -> V.
+
+-spec get_plugin_type(license_initiated_v1()) -> binary() | undefined.
+get_plugin_type(#license_initiated_v1{plugin_type = V}) -> V.
+
+-spec get_callback_module(license_initiated_v1()) -> binary() | undefined.
+get_callback_module(#license_initiated_v1{callback_module = V}) -> V.
+
+-spec get_package_url(license_initiated_v1()) -> binary() | undefined.
+get_package_url(#license_initiated_v1{package_url = V}) -> V.

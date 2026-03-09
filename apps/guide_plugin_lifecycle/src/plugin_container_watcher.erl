@@ -43,7 +43,7 @@ terminate(_Reason, _State) -> ok.
 do_poll(#state{known = Known} = State) ->
     case query_installed_plugins() of
         {ok, Plugins} ->
-            logger:info("[plugin-watcher] poll: ~p active plugins", [length(Plugins)]),
+            log_poll_count(length(Plugins), maps:size(Known)),
             NewKnown = lists:foldl(
                 fun({PluginId, OciImage}, Acc) ->
                     check_plugin(PluginId, OciImage, Acc, Known)
@@ -63,8 +63,6 @@ check_plugin(PluginId, OciImage, Acc, Known) ->
         {error, _} -> down
     end,
     PreviousStatus = maps:get(PluginId, Known, undefined),
-    logger:info("[plugin-watcher] ~s daemon=~s path=~s file_result=~p status=~p prev=~p",
-                 [PluginId, DaemonName, SocketPath, FileResult, CurrentStatus, PreviousStatus]),
     handle_transition(PluginId, PreviousStatus, CurrentStatus),
     maps:put(PluginId, CurrentStatus, Acc).
 
@@ -107,10 +105,20 @@ dispatch_confirm_down(PluginId) ->
         {error, _} -> ok
     end.
 
+%% Only log when count changes (avoids spamming "0 active plugins" every 2s)
+log_poll_count(Count, Count) -> ok;
+log_poll_count(Count, _PrevCount) ->
+    logger:info("[plugin-watcher] poll: ~p active container plugins", [Count]).
+
 query_installed_plugins() ->
     try project_plugins_store:list_active() of
         {ok, Plugins} ->
-            {ok, [{maps:get(plugin_id, P), maps:get(oci_image, P)} || P <- Plugins]};
+            %% Only watch container plugins — in-VM plugins have no OCI image/socket
+            ContainerPlugins = [P || P <- Plugins,
+                                     maps:get(plugin_type, P, <<"container">>) =:= <<"container">>,
+                                     is_binary(maps:get(oci_image, P, undefined)),
+                                     maps:get(oci_image, P, undefined) =/= <<>>],
+            {ok, [{maps:get(plugin_id, P), maps:get(oci_image, P)} || P <- ContainerPlugins]};
         {error, _} = Err ->
             Err
     catch

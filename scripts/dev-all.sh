@@ -19,6 +19,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DAEMON_DIR="$(dirname "$SCRIPT_DIR")"
 WEB_DIR="$DAEMON_DIR/../hecate-web"
+UI_DIR="$WEB_DIR"
 DEV_DATA_DIR="$HOME/.hecate-dev"
 WEBKIT_DATA_DIR="$HOME/.local/share/social.hecate.web"
 DEV_SOCK="$DEV_DATA_DIR/hecate-daemon/sockets/api.sock"
@@ -51,8 +52,15 @@ if [ "$CLEAR" = true ]; then
     clear_dev_data
 fi
 DAEMON_PID=""
+VITE_PID=""
 
 cleanup() {
+    if [ -n "$VITE_PID" ] && kill -0 "$VITE_PID" 2>/dev/null; then
+        echo ""
+        echo "Stopping Vite dev server (PID $VITE_PID)..."
+        kill "$VITE_PID" 2>/dev/null || true
+        wait "$VITE_PID" 2>/dev/null || true
+    fi
     if [ -n "$DAEMON_PID" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
         echo ""
         echo "Stopping dev daemon (PID $DAEMON_PID)..."
@@ -84,6 +92,40 @@ start_daemon() {
     return 1
 }
 
+start_ui() {
+    if [ ! -d "$UI_DIR" ]; then
+        echo "ERROR: hecate-web not found at $UI_DIR"
+        exit 1
+    fi
+
+    echo ""
+    echo "=== Starting UI dev server (Vite) ==="
+
+    # Install npm deps if missing
+    if [ ! -d "$UI_DIR/node_modules" ]; then
+        echo "  Installing npm dependencies..."
+        (cd "$UI_DIR" && npm install)
+    fi
+
+    # Start Vite dev server in background (pass socket path for API proxy)
+    (cd "$UI_DIR" && HECATE_SOCKET_PATH="$DEV_SOCK" npm run dev) &
+    VITE_PID=$!
+
+    # Wait for Vite to be ready on port 1420
+    echo -n "  Waiting for Vite on :1420"
+    for i in $(seq 1 30); do
+        if ss -tlnp 2>/dev/null | grep -q ":1420 "; then
+            echo " ready!"
+            return 0
+        fi
+        echo -n "."
+        sleep 1
+    done
+    echo " TIMEOUT"
+    echo "ERROR: Vite dev server not available after 30s"
+    return 1
+}
+
 start_web() {
     if [ ! -d "$WEB_DIR" ]; then
         echo "ERROR: hecate-web not found at $WEB_DIR"
@@ -94,6 +136,13 @@ start_web() {
         echo "ERROR: Dev daemon socket not found at $DEV_SOCK"
         echo "       Start the daemon first: ./scripts/dev-start.sh"
         exit 1
+    fi
+
+    # Start UI dev server (Vite) if not already running
+    if ! ss -tlnp 2>/dev/null | grep -q ":1420 "; then
+        start_ui
+    else
+        echo "  Vite already running on :1420"
     fi
 
     echo ""

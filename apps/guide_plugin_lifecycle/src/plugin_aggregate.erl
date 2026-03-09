@@ -3,8 +3,12 @@
 %%% Stream: plugin-{plugin_id}
 %%% Store: plugins_store
 %%%
-%%% Lifecycle:
-%%%   1. install_plugin (birth event - plugin_installed_v1)
+%%% Supports two plugin models via plugin_type field:
+%%%   container: OCI/Podman lifecycle (pull, start, stop, confirm up/down)
+%%%   in_vm:     In-VM OTP application lifecycle (extract, activate, deactivate, confirm load/unload)
+%%%
+%%% Common lifecycle:
+%%%   1. install_plugin (birth event)
 %%%   2. upgrade_plugin
 %%%   3. remove_plugin
 %%% @end
@@ -54,37 +58,27 @@ execute(#plugin_state{status = S}, Payload) when S band ?PLG_REMOVED =/= 0 ->
         _ -> {error, plugin_removed}
     end;
 
-%% Installed (not running) — route by command type
+%% Installed — route by command type
 execute(#plugin_state{status = S} = State, Payload)
-  when S band ?PLG_INSTALLED =/= 0, S band ?PLG_RUNNING =:= 0 ->
+  when S band ?PLG_INSTALLED =/= 0 ->
     case get_command_type(Payload) of
         <<"install_plugin">>            -> {error, plugin_already_installed};
         <<"upgrade_plugin">>            -> execute_upgrade_plugin(Payload, State);
         <<"remove_plugin">>             -> execute_remove_plugin(Payload, State);
+        %% Container-model commands
         <<"start_plugin_execution">>    -> execute_start_execution(Payload, State);
-        <<"stop_plugin_execution">>     -> {error, plugin_not_running};
-        <<"confirm_container_up">>      -> execute_confirm_up(Payload);
-        <<"confirm_container_down">>    -> execute_confirm_down(Payload);
-        <<"start_oci_pull">>      -> execute_start_pull(Payload, S, State);
-        <<"cancel_oci_pull">>     -> execute_cancel_pull(Payload, S);
-        <<"complete_oci_pull">>   -> execute_complete_pull(Payload, S);
-        _ -> {error, unknown_command}
-    end;
-
-%% Running — route by command type
-execute(#plugin_state{status = S} = State, Payload)
-  when S band ?PLG_RUNNING =/= 0 ->
-    case get_command_type(Payload) of
-        <<"install_plugin">>            -> {error, plugin_already_installed};
-        <<"upgrade_plugin">>            -> execute_upgrade_plugin(Payload, State);
-        <<"remove_plugin">>             -> execute_remove_plugin(Payload, State);
-        <<"start_plugin_execution">>    -> {error, plugin_already_running};
         <<"stop_plugin_execution">>     -> execute_stop_execution(Payload, State);
         <<"confirm_container_up">>      -> execute_confirm_up(Payload);
         <<"confirm_container_down">>    -> execute_confirm_down(Payload);
-        <<"start_oci_pull">>      -> {error, plugin_already_running};
-        <<"cancel_oci_pull">>     -> execute_cancel_pull(Payload, S);
-        <<"complete_oci_pull">>   -> execute_complete_pull(Payload, S);
+        <<"start_oci_pull">>            -> execute_start_pull(Payload, S, State);
+        <<"cancel_oci_pull">>           -> execute_cancel_pull(Payload, S);
+        <<"complete_oci_pull">>         -> execute_complete_pull(Payload, S);
+        %% In-VM model commands
+        <<"extract_plugin_package">>    -> execute_extract_package(Payload, State);
+        <<"activate_plugin">>           -> execute_activate_plugin(Payload, S);
+        <<"deactivate_plugin">>         -> execute_deactivate_plugin(Payload, S);
+        <<"confirm_plugin_loaded">>     -> execute_confirm_loaded(Payload);
+        <<"confirm_plugin_unloaded">>   -> execute_confirm_unloaded(Payload);
         _ -> {error, unknown_command}
     end;
 
@@ -146,6 +140,37 @@ execute_complete_pull(Payload, Status) ->
             convert_events(maybe_complete_oci_pull:handle(Cmd), fun oci_pull_completed_v1:to_map/1)
     end.
 
+%% In-VM command handlers
+
+execute_extract_package(Payload, State) ->
+    {ok, Cmd} = extract_plugin_package_v1:from_map(Payload),
+    convert_events(maybe_extract_plugin_package:handle(Cmd, State), fun plugin_package_extracted_v1:to_map/1).
+
+execute_activate_plugin(Payload, Status) ->
+    case Status band ?PLG_ACTIVATED of
+        0 ->
+            {ok, Cmd} = activate_plugin_v1:from_map(Payload),
+            convert_events(maybe_activate_plugin:handle(Cmd), fun plugin_activated_v1:to_map/1);
+        _ ->
+            {error, plugin_already_activated}
+    end.
+
+execute_deactivate_plugin(Payload, Status) ->
+    case Status band ?PLG_ACTIVATED of
+        0 -> {error, plugin_not_activated};
+        _ ->
+            {ok, Cmd} = deactivate_plugin_v1:from_map(Payload),
+            convert_events(maybe_deactivate_plugin:handle(Cmd), fun plugin_deactivated_v1:to_map/1)
+    end.
+
+execute_confirm_loaded(Payload) ->
+    {ok, Cmd} = confirm_plugin_loaded_v1:from_map(Payload),
+    convert_events(maybe_confirm_plugin_loaded:handle(Cmd), fun plugin_load_confirmed_v1:to_map/1).
+
+execute_confirm_unloaded(Payload) ->
+    {ok, Cmd} = confirm_plugin_unloaded_v1:from_map(Payload),
+    convert_events(maybe_confirm_plugin_unloaded:handle(Cmd), fun plugin_unload_confirmed_v1:to_map/1).
+
 %% --- Apply ---
 %% NOTE: evoq calls apply(State, Event) - State FIRST!
 
@@ -175,6 +200,17 @@ apply_event(#{<<"event_type">> := <<"oci_pull_cancelled_v1">>} = _E, S) -> apply
 apply_event(#{event_type := <<"oci_pull_cancelled_v1">>} = _E, S)       -> apply_pull_cancelled(S);
 apply_event(#{<<"event_type">> := <<"oci_pull_completed_v1">>} = _E, S) -> apply_pull_completed(S);
 apply_event(#{event_type := <<"oci_pull_completed_v1">>} = _E, S)       -> apply_pull_completed(S);
+%% In-VM events
+apply_event(#{<<"event_type">> := <<"plugin_package_extracted_v1">>} = E, S) -> apply_package_extracted(E, S);
+apply_event(#{event_type := <<"plugin_package_extracted_v1">>} = E, S)      -> apply_package_extracted(E, S);
+apply_event(#{<<"event_type">> := <<"plugin_activated_v1">>} = E, S)        -> apply_activated(E, S);
+apply_event(#{event_type := <<"plugin_activated_v1">>} = E, S)              -> apply_activated(E, S);
+apply_event(#{<<"event_type">> := <<"plugin_deactivated_v1">>} = E, S)      -> apply_deactivated(E, S);
+apply_event(#{event_type := <<"plugin_deactivated_v1">>} = E, S)            -> apply_deactivated(E, S);
+apply_event(#{<<"event_type">> := <<"plugin_load_confirmed_v1">>} = _E, S)  -> apply_load_confirmed(S);
+apply_event(#{event_type := <<"plugin_load_confirmed_v1">>} = _E, S)        -> apply_load_confirmed(S);
+apply_event(#{<<"event_type">> := <<"plugin_unload_confirmed_v1">>} = _E, S) -> apply_unload_confirmed(S);
+apply_event(#{event_type := <<"plugin_unload_confirmed_v1">>} = _E, S)       -> apply_unload_confirmed(S);
 %% Unknown — ignore
 apply_event(_E, S) -> S.
 
@@ -184,7 +220,10 @@ apply_installed(E, _State) ->
     #plugin_state{
         plugin_id = get_value(plugin_id, E),
         name = get_value(name, E),
+        plugin_type = get_value(plugin_type, E),
+        callback_module = get_value(callback_module, E),
         oci_image = get_value(oci_image, E),
+        package_url = get_value(package_url, E),
         installed_version = get_value(installed_version, E),
         license_id = get_value(license_id, E),
         icon = get_value(icon, E),
@@ -240,6 +279,40 @@ apply_pull_cancelled(#plugin_state{status = Status} = State) ->
 apply_pull_completed(#plugin_state{status = Status} = State) ->
     State#plugin_state{status = evoq_bit_flags:unset(Status, ?PLG_PULLING)}.
 
+%% In-VM apply helpers
+
+apply_package_extracted(E, #plugin_state{} = State) ->
+    CB = get_value(callback_module, E),
+    State#plugin_state{
+        status = evoq_bit_flags:unset(evoq_bit_flags:set(State#plugin_state.status, ?PLG_EXTRACTING), ?PLG_EXTRACTING),
+        callback_module = case CB of undefined -> State#plugin_state.callback_module; _ -> CB end,
+        extracted_at = get_value(extracted_at, E)
+    }.
+
+apply_activated(E, #plugin_state{status = Status} = State) ->
+    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_ACTIVATED), ?PLG_DEACTIVATED),
+    State#plugin_state{
+        status = NewStatus,
+        callback_module = get_value(callback_module, E),
+        activated_at = get_value(activated_at, E),
+        deactivated_at = undefined
+    }.
+
+apply_deactivated(E, #plugin_state{status = Status} = State) ->
+    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_DEACTIVATED), ?PLG_ACTIVATED),
+    State#plugin_state{
+        status = NewStatus,
+        deactivated_at = get_value(deactivated_at, E)
+    }.
+
+apply_load_confirmed(#plugin_state{} = State) ->
+    %% Load confirmed is informational — ACTIVATED flag is already set
+    State.
+
+apply_unload_confirmed(#plugin_state{} = State) ->
+    %% Unload confirmed is informational — DEACTIVATED flag is already set
+    State.
+
 %% --- Internal ---
 
 get_command_type(#{<<"command_type">> := T}) -> T;
@@ -249,6 +322,7 @@ get_command_type(_) -> undefined.
 
 get_value(Key, Map) when is_atom(Key) ->
     case maps:find(Key, Map) of
+        {ok, null} -> undefined;
         {ok, V} -> V;
         error -> maps:get(atom_to_binary(Key), Map, undefined)
     end.

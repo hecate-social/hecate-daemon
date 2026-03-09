@@ -96,6 +96,39 @@ init([]) ->
 
         #{id => plugin_container_watcher,
           start => {plugin_container_watcher, start_link, []},
+          restart => permanent, type => worker},
+
+        %% -- In-VM plugin emitters --
+
+        #{id => plugin_package_extracted_v1_to_pg,
+          start => {evoq_event_handler, start_link, [plugin_package_extracted_v1_to_pg, #{}]},
+          restart => permanent, type => worker},
+        #{id => plugin_activated_v1_to_pg,
+          start => {evoq_event_handler, start_link, [plugin_activated_v1_to_pg, #{}]},
+          restart => permanent, type => worker},
+        #{id => plugin_deactivated_v1_to_pg,
+          start => {evoq_event_handler, start_link, [plugin_deactivated_v1_to_pg, #{}]},
+          restart => permanent, type => worker},
+        #{id => plugin_load_confirmed_v1_to_pg,
+          start => {evoq_event_handler, start_link, [plugin_load_confirmed_v1_to_pg, #{}]},
+          restart => permanent, type => worker},
+        #{id => plugin_unload_confirmed_v1_to_pg,
+          start => {evoq_event_handler, start_link, [plugin_unload_confirmed_v1_to_pg, #{}]},
+          restart => permanent, type => worker},
+
+        %% -- In-VM plugin process managers --
+
+        #{id => on_plugin_installed_extract_package,
+          start => {evoq_event_handler, start_link, [on_plugin_installed_extract_package, #{}]},
+          restart => permanent, type => worker},
+        #{id => on_plugin_package_extracted_activate_plugin,
+          start => {evoq_event_handler, start_link, [on_plugin_package_extracted_activate_plugin, #{}]},
+          restart => permanent, type => worker},
+        #{id => on_plugin_activated_load_plugin,
+          start => {evoq_event_handler, start_link, [on_plugin_activated_load_plugin, #{}]},
+          restart => permanent, type => worker},
+        #{id => on_plugin_deactivated_unload_plugin,
+          start => {evoq_event_handler, start_link, [on_plugin_deactivated_unload_plugin, #{}]},
           restart => permanent, type => worker}
     ],
 

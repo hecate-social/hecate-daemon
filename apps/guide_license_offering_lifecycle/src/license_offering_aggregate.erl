@@ -158,6 +158,9 @@ apply_initiated(E, State) ->
         homepage = hecate_api_utils:get_field(homepage, E),
         tags = hecate_api_utils:get_field(tags, E),
         oci_image = hecate_api_utils:get_field(oci_image, E),
+        package_url = hecate_api_utils:get_field(package_url, E),
+        plugin_type = hecate_api_utils:get_field(plugin_type, E),
+        callback_module = hecate_api_utils:get_field(callback_module, E),
         org = hecate_api_utils:get_field(org, E),
         version = hecate_api_utils:get_field(version, E),
         manifest_tag = hecate_api_utils:get_field(manifest_tag, E),
@@ -181,7 +184,8 @@ apply_initiated(E, State) ->
 apply_drafted(E, State) ->
     Fields = [
         plugin_name, description, icon, group_name, github_repo, homepage, tags,
-        oci_image, org, version, manifest_tag, min_daemon_version, publisher_identity,
+        oci_image, package_url, plugin_type, callback_module,
+        org, version, manifest_tag, min_daemon_version, publisher_identity,
         selling_formula, license_type, fee_cents, fee_currency,
         duration_days, node_limit,
         manifest_url, manifest_checksum, author_signature,
@@ -214,7 +218,8 @@ apply_retracted(E, #offering_state{} = State) ->
 apply_amended(E, State) ->
     Fields = [
         plugin_name, description, icon, group_name, github_repo, homepage, tags,
-        oci_image, org, version, manifest_tag, min_daemon_version, publisher_identity,
+        oci_image, package_url, plugin_type, callback_module,
+        org, version, manifest_tag, min_daemon_version, publisher_identity,
         selling_formula, license_type, fee_cents, fee_currency,
         duration_days, node_limit,
         manifest_url, manifest_checksum, author_signature,
@@ -254,6 +259,9 @@ maybe_set(github_repo, V, S)        -> S#offering_state{github_repo = V};
 maybe_set(homepage, V, S)           -> S#offering_state{homepage = V};
 maybe_set(tags, V, S)               -> S#offering_state{tags = V};
 maybe_set(oci_image, V, S)          -> S#offering_state{oci_image = V};
+maybe_set(package_url, V, S)        -> S#offering_state{package_url = V};
+maybe_set(plugin_type, V, S)        -> S#offering_state{plugin_type = V};
+maybe_set(callback_module, V, S)    -> S#offering_state{callback_module = V};
 maybe_set(org, V, S)                -> S#offering_state{org = V};
 maybe_set(version, V, S)            -> S#offering_state{version = V};
 maybe_set(manifest_tag, V, S)       -> S#offering_state{manifest_tag = V};

@@ -7,6 +7,9 @@
 ## No heartbeat in dev (don't auto-restart on crash)
 ## -heart
 
+## Interactive code server — required for in-VM plugin loading
+-mode interactive
+
 -smp auto
 +A 64
 +P 1048576

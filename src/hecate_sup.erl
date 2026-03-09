@@ -78,6 +78,14 @@ init([]) ->
             start => {hecate_ucan, start_link, []},
             restart => permanent,
             type => worker
+        },
+
+        %% In-VM plugin loader
+        #{
+            id => hecate_plugin_loader,
+            start => {hecate_plugin_loader, start_link, []},
+            restart => permanent,
+            type => worker
         }
     ],
     

@@ -7,6 +7,9 @@
 ## Heartbeat management
 -heart
 
+## Interactive code server — required for in-VM plugin loading
+-mode interactive
+
 ## Enable SMP
 -smp auto
 

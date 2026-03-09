@@ -69,7 +69,10 @@ create_event(Cmd, #license_state{} = State) ->
         oci_image    => State#license_state.oci_image,
         version      => State#license_state.version,
         icon         => State#license_state.icon,
-        group_name   => State#license_state.group_name
+        group_name   => State#license_state.group_name,
+        plugin_type  => State#license_state.plugin_type,
+        callback_module => State#license_state.callback_module,
+        package_url  => State#license_state.package_url
     });
 create_event(Cmd, _State) ->
     license_granted_v1:new(#{

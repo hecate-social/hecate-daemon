@@ -23,16 +23,13 @@ handle_event(_EventType, Event, _Metadata, State) ->
 %% Internal
 
 do_handle(Data) ->
-    PluginId = get_value(plugin_id, Data),
-    OciImage = get_value(oci_image, Data),
-    case OciImage of
-        undefined ->
-            logger:warning("[PM] No oci_image in event for ~s, trying plugin_id fallback",
-                           [PluginId]),
-            deprovision_by_plugin_id(PluginId);
-        _ ->
-            deprovision(PluginId, OciImage)
-    end.
+    deprovision_plugin(get_value(plugin_id, Data), get_value(oci_image, Data)).
+
+deprovision_plugin(PluginId, OciImage) when is_binary(OciImage), byte_size(OciImage) > 0 ->
+    deprovision(PluginId, OciImage);
+deprovision_plugin(PluginId, _) ->
+    logger:warning("[PM] No oci_image for ~s, trying plugin_id fallback", [PluginId]),
+    deprovision_by_plugin_id(PluginId).
 
 deprovision(PluginId, OciImage) ->
     DaemonName = extract_daemon_name(OciImage),

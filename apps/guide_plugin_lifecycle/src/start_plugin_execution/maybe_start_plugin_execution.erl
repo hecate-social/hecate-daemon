@@ -16,13 +16,20 @@ handle(Cmd) ->
 
 -spec handle(start_plugin_execution_v1:start_plugin_execution_v1(), term()) ->
     {ok, [plugin_execution_started_v1:plugin_execution_started_v1()]} | {error, term()}.
-handle(Cmd, #plugin_state{oci_image = OciImage}) ->
+handle(Cmd, #plugin_state{oci_image = OciImage, plugin_type = PluginType,
+                          callback_module = CallbackModule, name = Name}) ->
     PluginId = start_plugin_execution_v1:get_plugin_id(Cmd),
-    Event = plugin_execution_started_v1:new(#{plugin_id => PluginId, oci_image => OciImage}),
+    Event = plugin_execution_started_v1:new(#{
+        plugin_id => PluginId,
+        oci_image => OciImage,
+        plugin_type => PluginType,
+        callback_module => CallbackModule,
+        name => Name
+    }),
     {ok, [Event]};
 handle(Cmd, _State) ->
     PluginId = start_plugin_execution_v1:get_plugin_id(Cmd),
-    Event = plugin_execution_started_v1:new(#{plugin_id => PluginId, oci_image => undefined}),
+    Event = plugin_execution_started_v1:new(#{plugin_id => PluginId}),
     {ok, [Event]}.
 
 -spec dispatch(start_plugin_execution_v1:start_plugin_execution_v1()) ->

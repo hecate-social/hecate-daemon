@@ -13,7 +13,9 @@
          get_node_limit/1, get_org/1, get_version/1, get_manifest_tag/1, get_tags/1,
          get_homepage/1, get_min_daemon_version/1, get_publisher_identity/1,
          get_manifest_url/1, get_manifest_checksum/1, get_author_signature/1,
-         get_oci_image_verified/1, get_oci_image_digest/1]).
+         get_oci_image_verified/1, get_oci_image_digest/1,
+         get_plugin_type/1, get_callback_module/1,
+         get_package_url/1]).
 
 -record(initiate_license_v1, {
     license_id         :: binary(),
@@ -27,6 +29,9 @@
     group_name         :: binary() | undefined,
     github_repo        :: binary() | undefined,
     oci_image          :: binary() | undefined,
+    plugin_type        :: binary() | undefined,
+    callback_module    :: binary() | undefined,
+    package_url        :: binary() | undefined,
     selling_formula    :: binary() | undefined,
     author_id          :: binary() | undefined,
     license_type       :: binary() | undefined,
@@ -67,6 +72,9 @@ new(#{consumer_id := ConsumerId, plugin_id := PluginId, offering_id := OfferingI
         group_name         = maps:get(group_name, P, undefined),
         github_repo        = maps:get(github_repo, P, undefined),
         oci_image          = maps:get(oci_image, P, undefined),
+        plugin_type        = maps:get(plugin_type, P, undefined),
+        callback_module    = maps:get(callback_module, P, undefined),
+        package_url        = maps:get(package_url, P, undefined),
         selling_formula    = maps:get(selling_formula, P, undefined),
         author_id          = maps:get(author_id, P, undefined),
         license_type       = maps:get(license_type, P, undefined),
@@ -114,6 +122,9 @@ to_map(#initiate_license_v1{} = C) ->
         <<"group_name">>        => C#initiate_license_v1.group_name,
         <<"github_repo">>       => C#initiate_license_v1.github_repo,
         <<"oci_image">>         => C#initiate_license_v1.oci_image,
+        <<"plugin_type">>       => C#initiate_license_v1.plugin_type,
+        <<"callback_module">>   => C#initiate_license_v1.callback_module,
+        <<"package_url">>       => C#initiate_license_v1.package_url,
         <<"selling_formula">>   => C#initiate_license_v1.selling_formula,
         <<"author_id">>         => C#initiate_license_v1.author_id,
         <<"license_type">>      => C#initiate_license_v1.license_type,
@@ -157,6 +168,9 @@ from_map(Map) ->
                 group_name         = hecate_api_utils:get_field(group_name, Map, undefined),
                 github_repo        = hecate_api_utils:get_field(github_repo, Map, undefined),
                 oci_image          = hecate_api_utils:get_field(oci_image, Map, undefined),
+                plugin_type        = hecate_api_utils:get_field(plugin_type, Map, undefined),
+                callback_module    = hecate_api_utils:get_field(callback_module, Map, undefined),
+                package_url        = hecate_api_utils:get_field(package_url, Map, undefined),
                 selling_formula    = hecate_api_utils:get_field(selling_formula, Map, undefined),
                 author_id          = hecate_api_utils:get_field(author_id, Map, undefined),
                 license_type       = hecate_api_utils:get_field(license_type, Map, undefined),
@@ -266,3 +280,12 @@ get_oci_image_verified(#initiate_license_v1{oci_image_verified = V}) -> V.
 
 -spec get_oci_image_digest(initiate_license_v1()) -> binary() | undefined.
 get_oci_image_digest(#initiate_license_v1{oci_image_digest = V}) -> V.
+
+-spec get_plugin_type(initiate_license_v1()) -> binary() | undefined.
+get_plugin_type(#initiate_license_v1{plugin_type = V}) -> V.
+
+-spec get_callback_module(initiate_license_v1()) -> binary() | undefined.
+get_callback_module(#initiate_license_v1{callback_module = V}) -> V.
+
+-spec get_package_url(initiate_license_v1()) -> binary() | undefined.
+get_package_url(#initiate_license_v1{package_url = V}) -> V.

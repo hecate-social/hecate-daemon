@@ -7,7 +7,9 @@
 -export([new/1, to_map/1, from_map/1]).
 -export([get_license_id/1, get_grant_reason/1, get_granted_at/1,
          get_plugin_id/1, get_plugin_name/1, get_oci_image/1,
-         get_version/1, get_icon/1, get_group_name/1]).
+         get_version/1, get_icon/1, get_group_name/1,
+         get_plugin_type/1, get_callback_module/1,
+         get_package_url/1]).
 
 -record(license_granted_v1, {
     license_id   :: binary(),
@@ -19,7 +21,10 @@
     oci_image    :: binary() | undefined,
     version      :: binary() | undefined,
     icon         :: binary() | undefined,
-    group_name   :: binary() | undefined
+    group_name   :: binary() | undefined,
+    plugin_type  :: binary() | undefined,
+    callback_module :: binary() | undefined,
+    package_url  :: binary() | undefined
 }).
 
 -export_type([license_granted_v1/0]).
@@ -38,7 +43,10 @@ new(#{license_id := LicenseId} = Params) ->
         oci_image    = maps:get(oci_image, Params, undefined),
         version      = maps:get(version, Params, undefined),
         icon         = maps:get(icon, Params, undefined),
-        group_name   = maps:get(group_name, Params, undefined)
+        group_name   = maps:get(group_name, Params, undefined),
+        plugin_type  = maps:get(plugin_type, Params, undefined),
+        callback_module = maps:get(callback_module, Params, undefined),
+        package_url  = maps:get(package_url, Params, undefined)
     }.
 
 -spec to_map(license_granted_v1()) -> map().
@@ -53,7 +61,10 @@ to_map(#license_granted_v1{} = E) ->
         oci_image    => E#license_granted_v1.oci_image,
         version      => E#license_granted_v1.version,
         icon         => E#license_granted_v1.icon,
-        group_name   => E#license_granted_v1.group_name
+        group_name   => E#license_granted_v1.group_name,
+        plugin_type  => E#license_granted_v1.plugin_type,
+        callback_module => E#license_granted_v1.callback_module,
+        package_url  => E#license_granted_v1.package_url
     }.
 
 -spec from_map(map()) -> {ok, license_granted_v1()} | {error, term()}.
@@ -71,7 +82,10 @@ from_map(Map) ->
                 oci_image    = hecate_api_utils:get_field(oci_image, Map, undefined),
                 version      = hecate_api_utils:get_field(version, Map, undefined),
                 icon         = hecate_api_utils:get_field(icon, Map, undefined),
-                group_name   = hecate_api_utils:get_field(group_name, Map, undefined)
+                group_name   = hecate_api_utils:get_field(group_name, Map, undefined),
+                plugin_type  = hecate_api_utils:get_field(plugin_type, Map, undefined),
+                callback_module = hecate_api_utils:get_field(callback_module, Map, undefined),
+                package_url  = hecate_api_utils:get_field(package_url, Map, undefined)
             }}
     end.
 
@@ -102,3 +116,12 @@ get_icon(#license_granted_v1{icon = V}) -> V.
 
 -spec get_group_name(license_granted_v1()) -> binary() | undefined.
 get_group_name(#license_granted_v1{group_name = V}) -> V.
+
+-spec get_plugin_type(license_granted_v1()) -> binary() | undefined.
+get_plugin_type(#license_granted_v1{plugin_type = V}) -> V.
+
+-spec get_callback_module(license_granted_v1()) -> binary() | undefined.
+get_callback_module(#license_granted_v1{callback_module = V}) -> V.
+
+-spec get_package_url(license_granted_v1()) -> binary() | undefined.
+get_package_url(#license_granted_v1{package_url = V}) -> V.

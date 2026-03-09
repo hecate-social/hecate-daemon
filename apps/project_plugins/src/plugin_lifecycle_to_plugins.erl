@@ -15,6 +15,9 @@
 %%%   ?PLG_CONFIRMED_UP   = 16
 %%%   ?PLG_CONFIRMED_DOWN = 32
 %%%   ?PLG_PULLING        = 64
+%%%   ?PLG_EXTRACTING     = 128
+%%%   ?PLG_ACTIVATED      = 256
+%%%   ?PLG_DEACTIVATED    = 512
 %%% @end
 -module(plugin_lifecycle_to_plugins).
 -behaviour(evoq_projection).
@@ -34,7 +37,13 @@ interested_in() ->
      <<"container_confirmed_down_v1">>,
      <<"oci_pull_started_v1">>,
      <<"oci_pull_cancelled_v1">>,
-     <<"oci_pull_completed_v1">>].
+     <<"oci_pull_completed_v1">>,
+     %% In-VM plugin events
+     <<"plugin_package_extracted_v1">>,
+     <<"plugin_activated_v1">>,
+     <<"plugin_deactivated_v1">>,
+     <<"plugin_load_confirmed_v1">>,
+     <<"plugin_unload_confirmed_v1">>].
 
 init(_Config) ->
     {ok, RM} = evoq_read_model:new(evoq_read_model_ets, #{name => ?TABLE}),
@@ -57,7 +66,10 @@ do_project(<<"plugin_installed_v1">>, Data, State, RM) ->
         plugin_id         => PluginId,
         name              => Name,
         display_name      => DisplayName,
+        plugin_type       => gf(plugin_type, Data, <<"container">>),
         oci_image         => gf(oci_image, Data),
+        callback_module   => gf(callback_module, Data),
+        package_url       => gf(package_url, Data),
         installed_version => gf(installed_version, Data),
         license_id        => gf(license_id, Data),
         installed_at      => gf(installed_at, Data),
@@ -65,6 +77,9 @@ do_project(<<"plugin_installed_v1">>, Data, State, RM) ->
         removed_at        => undefined,
         started_at        => undefined,
         stopped_at        => undefined,
+        activated_at      => undefined,
+        deactivated_at    => undefined,
+        extracted_at      => undefined,
         status            => ?PLG_INSTALLED,
         status_label      => <<"Installed">>,
         icon              => gf(icon, Data),
@@ -222,6 +237,88 @@ do_project(<<"oci_pull_completed_v1">>, Data, State, RM) ->
             {skip, State, RM}
     end;
 
+%% --- plugin_package_extracted_v1: set EXTRACTING flag (transient), record timestamp ---
+
+do_project(<<"plugin_package_extracted_v1">>, Data, State, RM) ->
+    PluginId = gf(plugin_id, Data),
+    case evoq_read_model:get(PluginId, RM) of
+        {ok, Plugin} ->
+            Updated = Plugin#{
+                extracted_at    => gf(extracted_at, Data),
+                callback_module => gf(callback_module, Data, maps:get(callback_module, Plugin, undefined)),
+                status_label    => <<"Extracted">>
+            },
+            {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
+            {ok, State, RM2};
+        {error, not_found} ->
+            {skip, State, RM}
+    end;
+
+%% --- plugin_activated_v1: set ACTIVATED(256), clear DEACTIVATED(512) ---
+
+do_project(<<"plugin_activated_v1">>, Data, State, RM) ->
+    PluginId = gf(plugin_id, Data),
+    case evoq_read_model:get(PluginId, RM) of
+        {ok, #{status := S} = Plugin} ->
+            Updated = Plugin#{
+                status          => evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_DEACTIVATED), ?PLG_ACTIVATED),
+                status_label    => <<"Activating">>,
+                callback_module => gf(callback_module, Data),
+                activated_at    => gf(activated_at, Data),
+                deactivated_at  => undefined
+            },
+            {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
+            {ok, State, RM2};
+        {error, not_found} ->
+            {skip, State, RM}
+    end;
+
+%% --- plugin_deactivated_v1: set DEACTIVATED(512), clear ACTIVATED(256) ---
+
+do_project(<<"plugin_deactivated_v1">>, Data, State, RM) ->
+    PluginId = gf(plugin_id, Data),
+    case evoq_read_model:get(PluginId, RM) of
+        {ok, #{status := S} = Plugin} ->
+            Updated = Plugin#{
+                status          => evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_ACTIVATED), ?PLG_DEACTIVATED),
+                status_label    => <<"Deactivated">>,
+                deactivated_at  => gf(deactivated_at, Data)
+            },
+            {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
+            {ok, State, RM2};
+        {error, not_found} ->
+            {skip, State, RM}
+    end;
+
+%% --- plugin_load_confirmed_v1: ACTIVATED confirmed running ---
+
+do_project(<<"plugin_load_confirmed_v1">>, Data, State, RM) ->
+    PluginId = gf(plugin_id, Data),
+    logger:info("[projection] plugin_load_confirmed_v1 received for ~s", [PluginId]),
+    case evoq_read_model:get(PluginId, RM) of
+        {ok, Plugin} ->
+            Updated = Plugin#{status_label => <<"Running">>},
+            {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
+            logger:info("[projection] status_label set to Running for ~s", [PluginId]),
+            {ok, State, RM2};
+        {error, not_found} ->
+            logger:warning("[projection] plugin_load_confirmed_v1 for ~s: not_found in read model", [PluginId]),
+            {skip, State, RM}
+    end;
+
+%% --- plugin_unload_confirmed_v1: DEACTIVATED confirmed unloaded ---
+
+do_project(<<"plugin_unload_confirmed_v1">>, Data, State, RM) ->
+    PluginId = gf(plugin_id, Data),
+    case evoq_read_model:get(PluginId, RM) of
+        {ok, Plugin} ->
+            Updated = Plugin#{status_label => <<"Stopped">>},
+            {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
+            {ok, State, RM2};
+        {error, not_found} ->
+            {skip, State, RM}
+    end;
+
 %% --- Unknown event type: skip ---
 
 do_project(_Unknown, _Data, State, RM) ->
@@ -234,3 +331,5 @@ get_event_type(#{<<"event_type">> := T}) when is_binary(T) -> T;
 get_event_type(_) -> undefined.
 
 gf(Key, Data) -> hecate_api_utils:get_field(Key, Data).
+gf(Key, Data, Default) -> hecate_api_utils:get_field(Key, Data, Default).
+

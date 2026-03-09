@@ -156,26 +156,41 @@ validate_and_publish(Manifest, RawBody, ManifestUrl, AuthorId, Req) ->
     Name = maps:get(<<"name">>, Manifest, undefined),
     Version = maps:get(<<"version">>, Manifest, undefined),
     Appstore = maps:get(<<"appstore">>, Manifest, undefined),
+    PluginType = maps:get(<<"plugin_type">>, Manifest, <<"container">>),
     case validate_manifest(Name, Version, Appstore) of
         {ok, Org, MaybeOciImage} ->
-            OciImage = resolve_manifest_oci_image(MaybeOciImage, Org, ManifestUrl),
-            case OciImage of
-                undefined ->
-                    hecate_api_utils:bad_request(
-                        <<"Cannot determine oci_image: set appstore.oci_image or publish from a GitHub URL">>, Req);
-                _ ->
-                    MinVsn = maps:get(<<"min_daemon_version">>, Appstore, undefined),
-                    case check_daemon_version(MinVsn) of
-                        ok ->
-                            TrustData = compute_trust(RawBody, OciImage, Version),
-                            dispatch_initiate(Name, Version, Org, OciImage, Manifest,
-                                              Appstore, ManifestUrl, AuthorId, TrustData, Req);
-                        {error, Reason} ->
-                            hecate_api_utils:bad_request(Reason, Req)
-                    end
+            MinVsn = maps:get(<<"min_daemon_version">>, Appstore, undefined),
+            case check_daemon_version(MinVsn) of
+                ok ->
+                    resolve_and_dispatch(PluginType, MaybeOciImage, Org, Name, Version,
+                                         Manifest, Appstore, RawBody, ManifestUrl, AuthorId, Req);
+                {error, Reason} ->
+                    hecate_api_utils:bad_request(Reason, Req)
             end;
         {error, Reason} ->
             hecate_api_utils:bad_request(Reason, Req)
+    end.
+
+resolve_and_dispatch(<<"in_vm">>, _MaybeOciImage, Org, Name, Version,
+                     Manifest, Appstore, RawBody, ManifestUrl, AuthorId, Req) ->
+    %% In-VM plugins: no OCI image needed, derive/use package_url instead
+    ExplicitPackageUrl = maps:get(<<"package_url">>, Appstore, undefined),
+    PackageUrl = resolve_package_url(ExplicitPackageUrl, Org, Name, Version, ManifestUrl),
+    TrustData = compute_trust_in_vm(RawBody, PackageUrl),
+    dispatch_initiate(Name, Version, Org, undefined, PackageUrl, Manifest,
+                      Appstore, ManifestUrl, AuthorId, TrustData, Req);
+resolve_and_dispatch(_, MaybeOciImage, Org, Name, Version,
+                     Manifest, Appstore, RawBody, ManifestUrl, AuthorId, Req) ->
+    %% Container plugins: require OCI image, verify it
+    OciImage = resolve_manifest_oci_image(MaybeOciImage, Org, ManifestUrl),
+    case OciImage of
+        undefined ->
+            hecate_api_utils:bad_request(
+                <<"Cannot determine oci_image: set appstore.oci_image or publish from a GitHub URL">>, Req);
+        _ ->
+            TrustData = compute_trust(RawBody, OciImage, Version),
+            dispatch_initiate(Name, Version, Org, OciImage, undefined, Manifest,
+                              Appstore, ManifestUrl, AuthorId, TrustData, Req)
     end.
 
 validate_manifest(undefined, _, _) ->
@@ -215,6 +230,47 @@ compute_trust(RawBody, OciImage, Version) ->
         oci_image_verified => OciVerified,
         oci_image_digest => OciDigest
     }.
+
+compute_trust_in_vm(RawBody, PackageUrl) ->
+    ChecksumBin = crypto:hash(sha256, RawBody),
+    ChecksumHex = binary:encode_hex(ChecksumBin, lowercase),
+    {SignatureB64, AuthorMRI} = sign_checksum(ChecksumBin),
+    {PkgVerified, PkgSize} = case PackageUrl of
+        undefined -> {0, undefined};
+        _ -> verify_package_url(PackageUrl)
+    end,
+    #{
+        manifest_checksum => ChecksumHex,
+        author_signature => SignatureB64,
+        author_mri => AuthorMRI,
+        oci_image_verified => PkgVerified,
+        oci_image_digest => PkgSize
+    }.
+
+resolve_package_url(ExplicitUrl, _Org, _Name, _Version, _ManifestUrl)
+  when is_binary(ExplicitUrl), byte_size(ExplicitUrl) > 0 ->
+    ExplicitUrl;
+resolve_package_url(_, _Org, Name, Version, ManifestUrl) ->
+    derive_package_url_from_manifest(ManifestUrl, Version, Name).
+
+derive_package_url_from_manifest(ManifestUrl, Version, Name) ->
+    case parse_github_from_raw_url(ManifestUrl) of
+        {ok, Org, Repo} ->
+            Tag = <<"v", Version/binary>>,
+            <<"https://github.com/", Org/binary, "/", Repo/binary,
+              "/releases/download/", Tag/binary, "/", Name/binary, ".tar.gz">>;
+        not_github ->
+            undefined
+    end.
+
+verify_package_url(PackageUrl) ->
+    case hackney:head(PackageUrl, [{<<"Accept">>, <<"application/octet-stream">>}], <<>>, [{follow_redirect, true}]) of
+        {ok, Status, Headers} when Status >= 200, Status < 400 ->
+            Size = proplists:get_value(<<"content-length">>, Headers, undefined),
+            {1, Size};
+        _ ->
+            {0, undefined}
+    end.
 
 sign_checksum(ChecksumBin) ->
     case hecate_identity:is_initialized() of
@@ -324,10 +380,16 @@ compare_parts([HA | _], [HB | _]) when HA > HB -> gt.
 
 %% --- Dispatch initiate_offering_v1 ---
 
-dispatch_initiate(Name, Version, Org, OciImage, Manifest,
+dispatch_initiate(Name, Version, Org, OciImage, PackageUrl, Manifest,
                   Appstore, ManifestUrl, AuthorId, TrustData, Req) ->
     PluginId = <<Org/binary, "/", Name/binary>>,
-    FullOciImage = <<OciImage/binary, ":", Version/binary>>,
+    FullOciImage = case OciImage of
+        undefined -> undefined;
+        _ -> <<OciImage/binary, ":", Version/binary>>
+    end,
+
+    PluginType = maps:get(<<"plugin_type">>, Manifest, <<"container">>),
+    CallbackModule = maps:get(<<"callback_module">>, Manifest, undefined),
 
     CmdParams = #{
         author_id          => AuthorId,
@@ -337,7 +399,10 @@ dispatch_initiate(Name, Version, Org, OciImage, Manifest,
         icon               => maps:get(<<"icon">>, Manifest, undefined),
         group_name         => maps:get(<<"group_name">>, Appstore, undefined),
         github_repo        => maps:get(<<"github_repo">>, Appstore, undefined),
+        plugin_type        => PluginType,
+        callback_module    => CallbackModule,
         oci_image          => FullOciImage,
+        package_url        => PackageUrl,
         org                => Org,
         version            => Version,
         manifest_tag       => maps:get(<<"manifest_tag">>, Appstore, undefined),
