@@ -99,6 +99,10 @@ execute_remove_plugin(Payload, State) ->
     {ok, Cmd} = remove_plugin_v1:from_map(Payload),
     convert_events(maybe_remove_plugin:handle(Cmd, State), fun plugin_removed_v1:to_map/1).
 
+execute_start_execution(_Payload, #plugin_state{status = S}) when S band ?PLG_ACTIVATED =/= 0 ->
+    {error, plugin_already_running};
+execute_start_execution(_Payload, #plugin_state{status = S}) when S band ?PLG_RUNNING =/= 0 ->
+    {error, plugin_already_running};
 execute_start_execution(Payload, State) ->
     {ok, Cmd} = start_plugin_execution_v1:from_map(Payload),
     convert_events(maybe_start_plugin_execution:handle(Cmd, State), fun plugin_execution_started_v1:to_map/1).

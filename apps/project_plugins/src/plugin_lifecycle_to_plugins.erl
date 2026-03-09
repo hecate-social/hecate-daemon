@@ -127,6 +127,15 @@ do_project(<<"plugin_removed_v1">>, Data, State, RM) ->
 do_project(<<"plugin_execution_started_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
+        {ok, #{status := S, status_label := <<"Running">>} = Plugin} ->
+            %% Already running (e.g. in-VM plugin) — update flags but don't regress label
+            Updated = Plugin#{
+                status       => evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_STOPPED), ?PLG_RUNNING),
+                started_at   => gf(started_at, Data),
+                stopped_at   => undefined
+            },
+            {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
+            {ok, State, RM2};
         {ok, #{status := S} = Plugin} ->
             Updated = Plugin#{
                 status       => evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_STOPPED), ?PLG_RUNNING),

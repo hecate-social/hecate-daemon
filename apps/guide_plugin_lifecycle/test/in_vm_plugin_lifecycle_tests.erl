@@ -192,3 +192,23 @@ full_in_vm_lifecycle_test() ->
 
     ?assertNotEqual(0, S5#plugin_state.status band ?PLG_DEACTIVATED),
     ?assertEqual(0, S5#plugin_state.status band ?PLG_ACTIVATED).
+
+%% ===================================================================
+%% Guard: start_plugin_execution rejected for activated in-VM plugins
+%% ===================================================================
+
+start_execution_rejected_when_activated_test() ->
+    %% After activate, start_plugin_execution must be rejected
+    Result = plugin_aggregate:execute(activated_state(), make_start_execution_payload()),
+    ?assertEqual({error, plugin_already_running}, Result).
+
+start_execution_rejected_when_loaded_test() ->
+    %% After confirm_loaded, start_plugin_execution must still be rejected
+    Result = plugin_aggregate:execute(loaded_state(), make_start_execution_payload()),
+    ?assertEqual({error, plugin_already_running}, Result).
+
+make_start_execution_payload() ->
+    #{
+        <<"command_type">> => <<"start_plugin_execution">>,
+        <<"plugin_id">>    => ?PLUGIN_ID
+    }.
