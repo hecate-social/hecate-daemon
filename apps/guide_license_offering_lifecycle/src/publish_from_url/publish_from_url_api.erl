@@ -394,7 +394,7 @@ dispatch_initiate(Name, Version, Org, OciImage, PackageUrl, Manifest,
     CmdParams = #{
         author_id          => AuthorId,
         plugin_id          => PluginId,
-        plugin_name        => Name,
+        plugin_name        => maps:get(<<"display_name">>, Manifest, Name),
         description        => maps:get(<<"description">>, Manifest, undefined),
         icon               => maps:get(<<"icon">>, Manifest, undefined),
         group_name         => maps:get(<<"group_name">>, Appstore, undefined),
