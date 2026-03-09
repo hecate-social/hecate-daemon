@@ -1,16 +1,14 @@
 {application, project_licenses, [
-    {description, "License projections (PRJ) - event subscriptions and read model writes"},
-    {vsn, "0.1.0"},
+    {description, "Consumer license projections (PRJ) - ETS read model"},
+    {vsn, "0.2.0"},
     {registered, [project_licenses_sup, project_licenses_store]},
     {mod, {project_licenses_app, []}},
     {applications, [
         kernel,
         stdlib,
-        esqlite,
         evoq,
         hecate,
-        guide_license_lifecycle,
-        guide_plugin_lifecycle
+        guide_license_lifecycle
     ]},
     {env, []},
     {modules, []},

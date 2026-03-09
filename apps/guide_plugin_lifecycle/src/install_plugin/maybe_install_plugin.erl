@@ -65,6 +65,7 @@ create_event(Cmd) ->
     plugin_installed_v1:new(#{
         plugin_id         => install_plugin_v1:get_plugin_id(Cmd),
         name              => install_plugin_v1:get_name(Cmd),
+        display_name      => install_plugin_v1:get_display_name(Cmd),
         oci_image         => install_plugin_v1:get_oci_image(Cmd),
         installed_version => install_plugin_v1:get_installed_version(Cmd),
         license_id        => install_plugin_v1:get_license_id(Cmd),

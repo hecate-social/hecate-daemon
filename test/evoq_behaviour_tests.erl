@@ -1,10 +1,9 @@
-%%% @doc Tests for evoq behaviour refactoring.
+%%% @doc Tests for evoq behaviour compliance.
 %%%
-%%% Verifies that all refactored modules correctly implement
-%%% evoq_event_handler callbacks:
-%%% - interested_in/0 returns correct event types
-%%% - init/1 returns {ok, State}
-%%% - handle_event/4 processes events correctly
+%%% Verifies that all modules implementing evoq behaviours
+%%% correctly export the required callbacks:
+%%% - evoq_event_handler: interested_in/0, init/1, handle_event/4
+%%% - evoq_projection: interested_in/0, init/1, project/4
 %%%
 %%% These are unit tests — no gen_server, no stores, no subscriptions.
 %%% We call the callback functions directly.
@@ -18,16 +17,30 @@
 
 pg_emitter_interested_in_test_() ->
     PgEmitters = [
+        %% Consumer license domain
+        {license_initiated_v1_to_pg, <<"license_initiated_v1">>},
+        {offering_terms_accepted_v1_to_pg, <<"offering_terms_accepted_v1">>},
+        {offering_terms_rejected_v1_to_pg, <<"offering_terms_rejected_v1">>},
         {license_bought_v1_to_pg, <<"license_bought_v1">>},
+        {license_abandoned_v1_to_pg, <<"license_abandoned_v1">>},
+        {license_granted_v1_to_pg, <<"license_granted_v1">>},
+        {license_expired_v1_to_pg, <<"license_expired_v1">>},
+        {license_renewed_v1_to_pg, <<"license_renewed_v1">>},
         {license_revoked_v1_to_pg, <<"license_revoked_v1">>},
         {license_archived_v1_to_pg, <<"license_archived_v1">>},
-        {license_initiated_v1_to_pg, <<"license_initiated_v1">>},
-        {license_announced_v1_to_pg, <<"license_announced_v1">>},
-        {license_published_v1_to_pg, <<"license_published_v1">>},
-        {license_retracted_v1_to_pg, <<"license_retracted_v1">>},
+        %% Author offering domain
+        {offering_initiated_v1_to_pg, <<"offering_initiated_v1">>},
+        {offering_announced_v1_to_pg, <<"offering_announced_v1">>},
+        {offering_published_v1_to_pg, <<"offering_published_v1">>},
+        {offering_amended_v1_to_pg, <<"offering_amended_v1">>},
+        {offering_retracted_v1_to_pg, <<"offering_retracted_v1">>},
+        {offering_archived_v1_to_pg, <<"offering_archived_v1">>},
+        {offering_drafted_v1_to_pg, <<"offering_drafted_v1">>},
+        %% Launcher domain
         {entry_registered_v1_to_pg, <<"entry_registered_v1">>},
         {entry_unregistered_v1_to_pg, <<"entry_unregistered_v1">>},
         {launcher_reorganized_v1_to_pg, <<"launcher_reorganized_v1">>},
+        %% Plugin domain
         {plugin_installed_v1_to_pg, <<"plugin_installed_v1">>},
         {plugin_removed_v1_to_pg, <<"plugin_removed_v1">>},
         {plugin_upgraded_v1_to_pg, <<"plugin_upgraded_v1">>},
@@ -43,7 +56,9 @@ pg_emitter_interested_in_test_() ->
      || {Mod, EventType} <- PgEmitters].
 
 pg_emitter_init_test_() ->
-    Mods = [license_bought_v1_to_pg, entry_registered_v1_to_pg,
+    Mods = [license_bought_v1_to_pg, license_initiated_v1_to_pg,
+            offering_initiated_v1_to_pg, offering_published_v1_to_pg,
+            entry_registered_v1_to_pg,
             plugin_installed_v1_to_pg, oci_pull_started_v1_to_pg],
     [?_assertMatch({ok, _}, Mod:init(#{})) || Mod <- Mods].
 
@@ -81,37 +96,47 @@ pg_emitter_handle_event_broadcasts_test() ->
 
 mesh_emitter_interested_in_test_() ->
     MeshEmitters = [
-        {license_published_v1_to_mesh, <<"license_published_v1">>}
+        {offering_published_v1_to_mesh, <<"offering_published_v1">>}
     ],
     [?_assertEqual([EventType], Mod:interested_in())
      || {Mod, EventType} <- MeshEmitters].
 
 mesh_emitter_init_test_() ->
-    [?_assertMatch({ok, _}, license_published_v1_to_mesh:init(#{}))].
+    [?_assertMatch({ok, _}, offering_published_v1_to_mesh:init(#{}))].
 
 %%====================================================================
-%% Projection Tests (license domain)
+%% Projection Tests (consumer license domain)
 %%====================================================================
 
 license_projection_interested_in_test_() ->
-    %% Individual projections (one event type each)
-    Singles = [
-        {license_bought_v1_to_licenses, <<"license_bought_v1">>},
-        {license_revoked_v1_to_licenses, <<"license_revoked_v1">>},
-        {license_archived_v1_to_licenses, <<"license_archived_v1">>},
-        {plugin_installed_v1_to_licenses, <<"plugin_installed_v1">>},
-        {plugin_removed_v1_to_licenses, <<"plugin_removed_v1">>},
-        {plugin_upgraded_v1_to_licenses, <<"plugin_upgraded_v1">>}
-    ],
-    SingleTests = [?_assertEqual([EventType], Mod:interested_in())
-                   || {Mod, EventType} <- Singles],
-    %% Merged lifecycle projection (multiple event types, single gen_server)
-    MergedTest = ?_assertEqual(
-        [<<"license_initiated_v1">>, <<"license_announced_v1">>,
-         <<"license_published_v1">>, <<"license_amended_v1">>,
-         <<"license_retracted_v1">>],
-        license_lifecycle_to_catalog:interested_in()),
-    [MergedTest | SingleTests].
+    %% Merged lifecycle projection (all consumer license events)
+    [?_assertEqual(
+        [<<"license_initiated_v1">>,
+         <<"offering_terms_accepted_v1">>,
+         <<"offering_terms_rejected_v1">>,
+         <<"license_bought_v1">>,
+         <<"license_abandoned_v1">>,
+         <<"license_granted_v1">>,
+         <<"license_expired_v1">>,
+         <<"license_renewed_v1">>,
+         <<"license_revoked_v1">>,
+         <<"license_archived_v1">>],
+        license_lifecycle_to_licenses:interested_in())].
+
+%%====================================================================
+%% Projection Tests (author offering domain)
+%%====================================================================
+
+offering_projection_interested_in_test_() ->
+    %% Merged lifecycle projection (all offering events)
+    [?_assertEqual(
+        [<<"offering_initiated_v1">>,
+         <<"offering_announced_v1">>,
+         <<"offering_published_v1">>,
+         <<"offering_amended_v1">>,
+         <<"offering_retracted_v1">>,
+         <<"offering_archived_v1">>],
+        offering_lifecycle_to_offerings:interested_in())].
 
 %%====================================================================
 %% Projection Tests (plugin domain)
@@ -144,11 +169,19 @@ launcher_projection_interested_in_test_() ->
 
 policy_interested_in_test_() ->
     Policies = [
+        %% Plugin domain PMs
         {on_plugin_installed_register_entry, <<"plugin_installed_v1">>},
         {on_plugin_removed_unregister_entry, <<"plugin_removed_v1">>},
         {on_plugin_removed_deprovision_container, <<"plugin_removed_v1">>},
         {on_plugin_execution_stopped_stop_container, <<"plugin_execution_stopped_v1">>},
-        {on_plugin_upgraded_update_container, <<"plugin_upgraded_v1">>}
+        {on_plugin_upgraded_update_container, <<"plugin_upgraded_v1">>},
+        %% Consumer license domain PMs
+        {on_offering_terms_accepted_grant_license, <<"offering_terms_accepted_v1">>},
+        {on_license_bought_grant_license, <<"license_bought_v1">>},
+        {on_license_granted_install_plugin, <<"license_granted_v1">>},
+        %% Cross-context PMs
+        {on_offering_terms_accepted_initiate_procurement, <<"offering_terms_accepted_v1">>},
+        {on_procurement_initiated_initiate_sale, <<"procurement_initiated_v1">>}
     ],
     [?_assertEqual([EventType], Mod:interested_in())
      || {Mod, EventType} <- Policies].
@@ -158,7 +191,12 @@ policy_init_test_() ->
             on_plugin_removed_unregister_entry,
             on_plugin_removed_deprovision_container,
             on_plugin_execution_stopped_stop_container,
-            on_plugin_upgraded_update_container],
+            on_plugin_upgraded_update_container,
+            on_offering_terms_accepted_grant_license,
+            on_license_bought_grant_license,
+            on_license_granted_install_plugin,
+            on_offering_terms_accepted_initiate_procurement,
+            on_procurement_initiated_initiate_sale],
     [?_assertMatch({ok, _}, Mod:init(#{})) || Mod <- Mods].
 
 %%====================================================================
@@ -168,7 +206,7 @@ policy_init_test_() ->
 %% Verify all event_handler modules export the required callbacks
 event_handler_exports_test_() ->
     HandlerModules = pg_emitter_modules() ++ mesh_emitter_modules() ++
-                     sqlite_projection_modules() ++ policy_modules(),
+                     policy_modules(),
     lists:flatten([
         [?_assert(erlang:function_exported(Mod, interested_in, 0)),
          ?_assert(erlang:function_exported(Mod, init, 1)),
@@ -188,8 +226,7 @@ projection_exports_test_() ->
 %% Verify no refactored modules still export gen_server callbacks
 no_gen_server_exports_test_() ->
     AllModules = pg_emitter_modules() ++ mesh_emitter_modules() ++
-                 sqlite_projection_modules() ++ ets_projection_modules() ++
-                 policy_modules(),
+                 ets_projection_modules() ++ policy_modules(),
     [?_assertNot(erlang:function_exported(Mod, handle_call, 3))
      || Mod <- AllModules].
 
@@ -204,12 +241,30 @@ ensure_pg() ->
     end.
 
 pg_emitter_modules() ->
-    [license_bought_v1_to_pg, license_revoked_v1_to_pg,
-     license_archived_v1_to_pg, license_initiated_v1_to_pg,
-     license_announced_v1_to_pg, license_published_v1_to_pg,
-     license_retracted_v1_to_pg,
-     entry_registered_v1_to_pg, entry_unregistered_v1_to_pg,
+    %% Consumer license emitters
+    [license_initiated_v1_to_pg,
+     offering_terms_accepted_v1_to_pg,
+     offering_terms_rejected_v1_to_pg,
+     license_bought_v1_to_pg,
+     license_abandoned_v1_to_pg,
+     license_granted_v1_to_pg,
+     license_expired_v1_to_pg,
+     license_renewed_v1_to_pg,
+     license_revoked_v1_to_pg,
+     license_archived_v1_to_pg,
+     %% Author offering emitters
+     offering_initiated_v1_to_pg,
+     offering_announced_v1_to_pg,
+     offering_published_v1_to_pg,
+     offering_amended_v1_to_pg,
+     offering_retracted_v1_to_pg,
+     offering_archived_v1_to_pg,
+     offering_drafted_v1_to_pg,
+     %% Launcher emitters
+     entry_registered_v1_to_pg,
+     entry_unregistered_v1_to_pg,
      launcher_reorganized_v1_to_pg,
+     %% Plugin emitters
      plugin_installed_v1_to_pg, plugin_removed_v1_to_pg,
      plugin_upgraded_v1_to_pg,
      plugin_execution_started_v1_to_pg, plugin_execution_stopped_v1_to_pg,
@@ -218,29 +273,23 @@ pg_emitter_modules() ->
      oci_pull_cancelled_v1_to_pg].
 
 mesh_emitter_modules() ->
-    [license_published_v1_to_mesh].
+    [offering_published_v1_to_mesh].
 
-%% No more SQLite-backed projections — all converted to evoq_projection
-sqlite_projection_modules() ->
-    [].
-
-%% ETS-backed projections (evoq_projection, converted)
+%% ETS-backed projections (evoq_projection)
 ets_projection_modules() ->
-    %% Merged lifecycle projections (one gen_server per ETS table)
-    [plugin_lifecycle_to_plugins,
-     license_lifecycle_to_catalog,
-     launcher_lifecycle_to_launcher,
-     %% Individual license projections (each writes to separate licenses table)
-     license_bought_v1_to_licenses,
-     license_revoked_v1_to_licenses,
-     license_archived_v1_to_licenses,
-     plugin_installed_v1_to_licenses,
-     plugin_removed_v1_to_licenses,
-     plugin_upgraded_v1_to_licenses].
+    [license_lifecycle_to_licenses,
+     offering_lifecycle_to_offerings,
+     plugin_lifecycle_to_plugins,
+     launcher_lifecycle_to_launcher].
 
 policy_modules() ->
     [on_plugin_installed_register_entry,
      on_plugin_removed_unregister_entry,
      on_plugin_removed_deprovision_container,
      on_plugin_execution_stopped_stop_container,
-     on_plugin_upgraded_update_container].
+     on_plugin_upgraded_update_container,
+     on_offering_terms_accepted_grant_license,
+     on_license_bought_grant_license,
+     on_license_granted_install_plugin,
+     on_offering_terms_accepted_initiate_procurement,
+     on_procurement_initiated_initiate_sale].

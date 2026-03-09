@@ -57,11 +57,10 @@ from_map(Map) ->
     EntryId     = get_value(entry_id, Map),
     DisplayName = get_value(display_name, Map),
     Icon        = get_value(icon, Map),
-    GroupName   = get_value(group_name, Map),
-    case {EntryId, DisplayName, GroupName} of
-        {undefined, _, _} -> {error, missing_required_fields};
-        {_, undefined, _} -> {error, missing_required_fields};
-        {_, _, undefined} -> {error, missing_required_fields};
+    GroupName   = coalesce(get_value(group_name, Map), <<"APPS">>),
+    case {EntryId, DisplayName} of
+        {undefined, _} -> {error, missing_required_fields};
+        {_, undefined} -> {error, missing_required_fields};
         _ ->
             {ok, #register_entry_v1{
                 entry_id     = EntryId,
@@ -70,6 +69,13 @@ from_map(Map) ->
                 group_name   = GroupName
             }}
     end.
+
+coalesce(undefined, Default) -> Default;
+coalesce(null, Default) -> Default;
+coalesce(<<"undefined">>, Default) -> Default;
+coalesce(<<"null">>, Default) -> Default;
+coalesce(<<>>, Default) -> Default;
+coalesce(Value, _Default) -> Value.
 
 %% Accessors
 -spec get_entry_id(register_entry_v1()) -> binary().

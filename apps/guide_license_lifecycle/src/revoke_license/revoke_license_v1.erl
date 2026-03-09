@@ -1,5 +1,6 @@
 %%% @doc revoke_license_v1 command
-%%% Revokes an existing plugin license.
+%%% Revokes a granted license (enforcement action).
+%%% Required: license_id. Optional: reason.
 -module(revoke_license_v1).
 
 -export([new/1, from_map/1, validate/1, to_map/1]).
@@ -25,8 +26,7 @@ new(_) ->
     {error, missing_required_fields}.
 
 -spec validate(revoke_license_v1()) -> {ok, revoke_license_v1()} | {error, term()}.
-validate(#revoke_license_v1{license_id = LicenseId}) when
-    not is_binary(LicenseId); byte_size(LicenseId) =:= 0 ->
+validate(#revoke_license_v1{license_id = V}) when not is_binary(V); byte_size(V) =:= 0 ->
     {error, invalid_license_id};
 validate(#revoke_license_v1{} = Cmd) ->
     {ok, Cmd}.

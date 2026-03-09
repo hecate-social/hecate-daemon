@@ -1,7 +1,7 @@
 %%% @doc API handler: POST /api/appstore/licenses/buy
 %%%
-%%% Acquires a license for a marketplace plugin.
-%%% Lives in the buy_license desk for vertical slicing.
+%%% Purchases a license (paid path).
+%%% Requires license_id. Optional: payment_reference.
 %%% @end
 -module(buy_license_api).
 
@@ -24,45 +24,33 @@ handle_post(Req0, _State) ->
     end.
 
 do_buy_license(Params, Req) ->
-    UserId = hecate_api_utils:get_field(user_id, Params),
-    PluginId = hecate_api_utils:get_field(plugin_id, Params),
-    PluginName = hecate_api_utils:get_field(plugin_name, Params),
-    OciImage = hecate_api_utils:get_field(oci_image, Params),
-
-    case validate(UserId, PluginId) of
-        ok -> create_license(UserId, PluginId, PluginName, OciImage, Req);
+    LicenseId = hecate_api_utils:get_field(license_id, Params),
+    case validate(LicenseId) of
+        ok -> buy(Params, LicenseId, Req);
         {error, Reason} -> hecate_api_utils:bad_request(Reason, Req)
     end.
 
-validate(undefined, _) -> {error, <<"user_id is required">>};
-validate(UserId, _) when not is_binary(UserId); byte_size(UserId) =:= 0 ->
-    {error, <<"user_id must be a non-empty string">>};
-validate(_, undefined) -> {error, <<"plugin_id is required">>};
-validate(_, PluginId) when not is_binary(PluginId); byte_size(PluginId) =:= 0 ->
-    {error, <<"plugin_id must be a non-empty string">>};
-validate(_, _) -> ok.
+validate(undefined) -> {error, <<"license_id is required">>};
+validate(LicenseId) when not is_binary(LicenseId); byte_size(LicenseId) =:= 0 ->
+    {error, <<"license_id must be a non-empty string">>};
+validate(_) -> ok.
 
-create_license(UserId, PluginId, PluginName, OciImage, Req) ->
+buy(Params, LicenseId, Req) ->
+    PaymentRef = hecate_api_utils:get_field(payment_reference, Params, undefined),
     CmdParams = #{
-        user_id => UserId,
-        plugin_id => PluginId,
-        plugin_name => PluginName,
-        oci_image => OciImage
+        license_id => LicenseId,
+        payment_reference => PaymentRef
     },
     case buy_license_v1:new(CmdParams) of
         {ok, Cmd} -> dispatch(Cmd, Req);
-        {error, Reason} -> hecate_api_utils:bad_request(Reason, Req)
+        {error, Err} -> hecate_api_utils:bad_request(Err, Req)
     end.
 
 dispatch(Cmd, Req) ->
     case maybe_buy_license:dispatch(Cmd) of
         {ok, Version, EventMaps} ->
-            hecate_api_utils:json_ok(201, #{
+            hecate_api_utils:json_ok(200, #{
                 license_id => buy_license_v1:get_license_id(Cmd),
-                user_id => buy_license_v1:get_user_id(Cmd),
-                plugin_id => buy_license_v1:get_plugin_id(Cmd),
-                plugin_name => buy_license_v1:get_plugin_name(Cmd),
-                oci_image => buy_license_v1:get_oci_image(Cmd),
                 version => Version,
                 events => EventMaps
             }, Req);

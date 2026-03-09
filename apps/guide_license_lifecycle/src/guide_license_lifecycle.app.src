@@ -1,13 +1,14 @@
 {application, guide_license_lifecycle, [
-    {description, "License lifecycle command service"},
-    {vsn, "0.2.0"},
+    {description, "Consumer license lifecycle (CMD) - initiate, accept, buy, grant, expire, renew, revoke, archive"},
+    {vsn, "0.3.0"},
     {registered, []},
     {mod, {guide_license_lifecycle_app, []}},
     {applications, [
         kernel,
         stdlib,
         crypto,
-        evoq
+        evoq,
+        guide_plugin_lifecycle
     ]},
     {env, []},
     {modules, []},

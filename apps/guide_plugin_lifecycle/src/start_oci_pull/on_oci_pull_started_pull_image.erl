@@ -20,7 +20,7 @@
 -define(STORE_ID, plugins_store).
 -define(ETS_TABLE, plugin_pull_progress).
 -define(CANCEL_GROUP, {oci_pull_cancelled_v1, node}).
--define(RECONCILE_DELAY_MS, 8000).
+-define(READINESS_POLL_MS, 1000).
 
 -record(state, {
     pulls :: #{binary() => pid()}
@@ -36,12 +36,18 @@ init([]) ->
         #{subscriber_pid => self()}),
     ensure_pg_scope(),
     pg:join(pg, ?CANCEL_GROUP, self()),
-    erlang:send_after(?RECONCILE_DELAY_MS, self(), reconcile),
+    erlang:send_after(?READINESS_POLL_MS, self(), await_ready),
     {ok, #state{pulls = #{}}}.
 
 handle_info({events, Events}, State) ->
-    NewState = lists:foldl(fun handle_event/2, State, Events),
-    {noreply, NewState};
+    case hecate_lifecycle:get_state() of
+        running ->
+            NewState = lists:foldl(fun handle_event/2, State, Events),
+            {noreply, NewState};
+        _ ->
+            %% Skip events during replay — reconciliation handles stale pulls
+            {noreply, State}
+    end;
 
 handle_info({?CANCEL_GROUP, #evoq_event{data = Data}}, #state{pulls = Pulls} = State) ->
     PluginId = get_value(plugin_id, Data),
@@ -69,9 +75,15 @@ handle_info({pull_done, PluginId, {error, Reason}}, #state{pulls = Pulls} = Stat
     ets:insert(?ETS_TABLE, {PluginId, #{status => error, reason => Reason}}),
     {noreply, State#state{pulls = maps:remove(PluginId, Pulls)}};
 
-handle_info(reconcile, State) ->
-    NewState = reconcile_pulling_plugins(State),
-    {noreply, NewState};
+handle_info(await_ready, State) ->
+    case hecate_lifecycle:get_state() of
+        running ->
+            NewState = reconcile_pulling_plugins(State),
+            {noreply, NewState};
+        _ ->
+            erlang:send_after(?READINESS_POLL_MS, self(), await_ready),
+            {noreply, State}
+    end;
 
 handle_info({'DOWN', _Ref, process, Pid, _Reason}, #state{pulls = Pulls} = State) ->
     Remaining = maps:filter(fun(_, P) -> P =/= Pid end, Pulls),
@@ -97,24 +109,21 @@ handle_event(#evoq_event{data = Data}, #state{pulls = Pulls} = State) ->
             start_pull(PluginId, OciImage, State)
     end.
 
+start_pull(_PluginId, undefined, State) ->
+    logger:error("[pull-pm] No OCI image in event, cannot pull"),
+    State;
 start_pull(PluginId, OciImage, #state{pulls = Pulls} = State) ->
-    case resolve_oci_image(PluginId, OciImage) of
-        undefined ->
-            logger:error("[pull-pm] No OCI image for ~s", [PluginId]),
-            State;
-        Image ->
-            DaemonName = shared_podman:extract_daemon_name(Image),
-            LatestImage = <<(shared_podman:strip_tag(Image))/binary, ":latest">>,
-            provision_container(PluginId, DaemonName, Image),
-            Self = self(),
-            Pid = spawn_link(fun() ->
-                ets:insert(?ETS_TABLE, {PluginId, #{status => downloading, percent => 0}}),
-                shared_podman:pull_image(LatestImage, self()),
-                pull_relay(Self, PluginId)
-            end),
-            monitor(process, Pid),
-            State#state{pulls = maps:put(PluginId, Pid, Pulls)}
-    end.
+    DaemonName = shared_podman:extract_daemon_name(OciImage),
+    LatestImage = <<(shared_podman:strip_tag(OciImage))/binary, ":latest">>,
+    provision_container(PluginId, DaemonName, OciImage),
+    Self = self(),
+    Pid = spawn_link(fun() ->
+        ets:insert(?ETS_TABLE, {PluginId, #{status => downloading, percent => 0}}),
+        shared_podman:pull_image(LatestImage, self()),
+        pull_relay(Self, PluginId)
+    end),
+    monitor(process, Pid),
+    State#state{pulls = maps:put(PluginId, Pid, Pulls)}.
 
 pull_relay(Parent, PluginId) ->
     receive
@@ -128,20 +137,38 @@ pull_relay(Parent, PluginId) ->
 provision_container(PluginId, DaemonName, OciImage) ->
     AppsDir = shared_paths:gitops_apps_dir(),
     ok = filelib:ensure_path(AppsDir),
-    FilePath = filename:join(AppsDir, shared_podman:container_filename(DaemonName)),
+    Filename = shared_podman:container_filename(DaemonName),
+    FilePath = filename:join(AppsDir, Filename),
     case filelib:is_regular(FilePath) of
-        true -> ok;
+        true ->
+            ensure_quadlet_symlink(FilePath, Filename, PluginId);
         false ->
             PluginDataDir = filename:join(shared_paths:hecate_home(), DaemonName),
             ok = filelib:ensure_path(PluginDataDir),
             Content = shared_podman:render_container(DaemonName, OciImage),
             case file:write_file(FilePath, Content) of
                 ok ->
-                    logger:info("[pull-pm] Provisioned .container for ~s", [PluginId]);
+                    logger:info("[pull-pm] Provisioned .container for ~s", [PluginId]),
+                    ensure_quadlet_symlink(FilePath, Filename, PluginId);
                 {error, Reason} ->
                     logger:error("[pull-pm] Failed to write .container for ~s: ~p",
                                  [PluginId, Reason])
             end
+    end.
+
+ensure_quadlet_symlink(FilePath, Filename, PluginId) ->
+    QuadletDir = filename:join([os:getenv("HOME"), ".config", "containers", "systemd"]),
+    ok = filelib:ensure_path(QuadletDir),
+    LinkPath = filename:join(QuadletDir, Filename),
+    %% Remove stale symlink if it points elsewhere
+    _ = file:delete(LinkPath),
+    case file:make_symlink(FilePath, LinkPath) of
+        ok ->
+            logger:info("[pull-pm] Symlinked Quadlet for ~s: ~s -> ~s",
+                        [PluginId, LinkPath, FilePath]);
+        {error, Reason} ->
+            logger:error("[pull-pm] Failed to symlink Quadlet for ~s: ~p",
+                         [PluginId, Reason])
     end.
 
 dispatch_complete(PluginId) ->
@@ -158,14 +185,9 @@ dispatch_complete(PluginId) ->
             logger:error("[pull-pm] Invalid complete command for ~s: ~p", [PluginId, Reason])
     end.
 
-resolve_oci_image(_PluginId, OciImage) when is_binary(OciImage), byte_size(OciImage) > 0 ->
-    OciImage;
-resolve_oci_image(PluginId, _) ->
-    case project_plugins_store:get(PluginId) of
-        {ok, #{oci_image := Image}} -> Image;
-        _ -> undefined
-    end.
-
+%% NOTE: Reading from project_plugins_store here is acceptable because this runs
+%% on a timer after startup (not in the event flow). It reconciles plugins stuck
+%% in PULLING state whose pulls may have been interrupted during downtime.
 reconcile_pulling_plugins(State) ->
     try project_plugins_store:list_by_status(64) of
         {ok, Plugins} ->

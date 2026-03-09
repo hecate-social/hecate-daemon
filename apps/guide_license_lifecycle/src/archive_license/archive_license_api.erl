@@ -1,7 +1,7 @@
 %%% @doc API handler: POST /api/appstore/licenses/archive
 %%%
-%%% Archives a plugin license (walking skeleton terminal state).
-%%% Lives in the archive_license desk for vertical slicing.
+%%% Archives a license (terminal state).
+%%% Requires license_id.
 %%% @end
 -module(archive_license_api).
 

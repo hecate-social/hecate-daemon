@@ -1,0 +1,18 @@
+{application, guide_sale_lifecycle, [
+    {description, "Sale lifecycle command service (initiate/archive)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_sale_lifecycle_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        evoq,
+        guide_procurement_lifecycle,
+        project_license_offerings
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

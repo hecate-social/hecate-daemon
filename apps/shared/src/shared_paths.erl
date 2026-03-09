@@ -16,6 +16,8 @@
 -export([
     base_dir/0,
     hecate_home/0,
+    hecate_home_rel/0,
+    base_dir_rel/0,
     config_dir/0,
     config_path/1,
     sqlite_dir/0,
@@ -44,6 +46,41 @@ base_dir() ->
 -spec hecate_home() -> file:filename().
 hecate_home() ->
     filename:dirname(base_dir()).
+
+%% @doc Returns the hecate home path relative to $HOME.
+%% Used in systemd .container files where %h expands to $HOME.
+-spec hecate_home_rel() -> string().
+hecate_home_rel() ->
+    Home = os:getenv("HOME"),
+    Full = hecate_home(),
+    case lists:prefix(Home, Full) of
+        true ->
+            %% Strip $HOME prefix and leading slash
+            Rel = lists:nthtail(length(Home), Full),
+            case Rel of
+                "/" ++ Rest -> Rest;
+                _ -> Rel
+            end;
+        false ->
+            Full
+    end.
+
+%% @doc Returns the base directory path relative to $HOME.
+%% Used in systemd .container files where %h expands to $HOME.
+-spec base_dir_rel() -> string().
+base_dir_rel() ->
+    Home = os:getenv("HOME"),
+    Full = base_dir(),
+    case lists:prefix(Home, Full) of
+        true ->
+            Rel = lists:nthtail(length(Home), Full),
+            case Rel of
+                "/" ++ Rest -> Rest;
+                _ -> Rel
+            end;
+        false ->
+            Full
+    end.
 
 %% @doc Returns the shared config directory (~/.hecate/config).
 -spec config_dir() -> file:filename().

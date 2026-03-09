@@ -1,10 +1,8 @@
 %%% @doc Shared systemctl utilities for managing plugin containers.
 %%%
-%%% Uses dbus-send to communicate with the host's systemd user session.
-%%% Requires:
-%%%   - DBUS_SESSION_BUS_ADDRESS env var set
-%%%   - Host's D-Bus socket mounted into the container
-%%%   - dbus package installed in the runtime image
+%%% Uses systemctl --user to communicate with the host's systemd session.
+%%% Requires the daemon to run in the host's user systemd scope
+%%% (not inside a container).
 %%% @end
 -module(shared_systemctl).
 
@@ -15,11 +13,15 @@
 -compile(nowarn_export_all).
 -endif.
 
-%% @doc Reload systemd units and start a plugin service.
+%% @doc Reload systemd units and (re)start a plugin service.
+%% Uses restart to ensure fresh bind mounts if the container was
+%% already running with stale mounts. Restart also handles the case
+%% where the service is not yet running (acts as start).
 -spec reload_and_start(binary() | string()) -> ok | {error, term()}.
 reload_and_start(ServiceName) ->
+    _ = reset_failed(ServiceName),
     case reload() of
-        ok -> start_service(ServiceName);
+        ok -> restart_service(ServiceName);
         {error, _} = Err -> Err
     end.
 
@@ -30,34 +32,65 @@ reload_and_stop(ServiceName) ->
     reload().
 
 %% @doc Reload systemd unit files (daemon-reload).
+%% Cleans up dangling symlinks in the Quadlet directory first,
+%% because the Podman Quadlet generator aborts entirely if any
+%% symlink target is missing.
 -spec reload() -> ok | {error, term()}.
 reload() ->
-    dbus_call("Reload", []).
+    cleanup_dangling_quadlet_symlinks(),
+    Cmd = "systemctl --user daemon-reload",
+    logger:info("[systemctl] ~s", [Cmd]),
+    Port = open_port({spawn, Cmd}, [exit_status, stderr_to_stdout, binary]),
+    collect_port(Port, "daemon-reload", []).
 
 %% Internal
 
-start_service(ServiceName) ->
-    dbus_call("StartUnit", [string_arg(ServiceName), string_arg("replace")]).
+cleanup_dangling_quadlet_symlinks() ->
+    QuadletDir = filename:join([os:getenv("HOME"), ".config", "containers", "systemd"]),
+    Files = list_dir_safe(QuadletDir),
+    Paths = [filename:join(QuadletDir, F) || F <- Files],
+    Dangling = [P || P <- Paths, is_dangling_symlink(P)],
+    lists:foreach(fun remove_dangling/1, Dangling).
+
+list_dir_safe(Dir) ->
+    case file:list_dir(Dir) of
+        {ok, Files} -> Files;
+        {error, _} -> []
+    end.
+
+is_dangling_symlink(Path) ->
+    case file:read_link(Path) of
+        {ok, Target} -> not filelib:is_file(Target);
+        {error, _} -> false
+    end.
+
+remove_dangling(Path) ->
+    {ok, Target} = file:read_link(Path),
+    logger:info("[systemctl] Removing dangling symlink ~s -> ~s", [Path, Target]),
+    file:delete(Path).
+
+restart_service(ServiceName) ->
+    systemctl("restart", ServiceName, ["--no-block"]).
+
+reset_failed(ServiceName) ->
+    systemctl("reset-failed", ServiceName).
 
 stop_service(ServiceName) ->
-    dbus_call("StopUnit", [string_arg(ServiceName), string_arg("replace")]).
+    systemctl("stop", ServiceName).
 
-string_arg(V) when is_binary(V) -> ["string:", binary_to_list(V)];
-string_arg(V) when is_list(V) -> ["string:", V].
+systemctl(Action, ServiceName) ->
+    systemctl(Action, ServiceName, []).
 
-dbus_call(Method, Args) ->
-    ArgsStr = lists:flatten(lists:join(" ", [lists:flatten(A) || A <- Args])),
-    Cmd = lists:flatten([
-        "dbus-send --session --type=method_call --print-reply --dest=org.freedesktop.systemd1 ",
-        "/org/freedesktop/systemd1 org.freedesktop.systemd1.Manager.", Method,
-        case ArgsStr of
-            [] -> "";
-            _ -> [" ", ArgsStr]
-        end
-    ]),
+systemctl(Action, ServiceName, Flags) ->
+    Name = to_list(ServiceName),
+    FlagsStr = lists:flatten(lists:join(" ", Flags)),
+    Cmd = lists:flatten(["systemctl --user ", FlagsStr, " ", Action, " ", Name]),
     logger:info("[systemctl] ~s", [Cmd]),
     Port = open_port({spawn, Cmd}, [exit_status, stderr_to_stdout, binary]),
-    collect_port(Port, Method, []).
+    collect_port(Port, Action, []).
+
+to_list(V) when is_binary(V) -> binary_to_list(V);
+to_list(V) when is_list(V) -> V.
 
 collect_port(Port, Method, Acc) ->
     receive
@@ -68,7 +101,7 @@ collect_port(Port, Method, Acc) ->
         {Port, {exit_status, Code}} ->
             Output = iolist_to_binary(lists:reverse(Acc)),
             logger:error("[systemctl] ~s failed (exit ~p): ~s", [Method, Code, Output]),
-            {error, {dbus_failed, Code, Output}}
+            {error, {systemctl_failed, Code, Output}}
     after 30000 ->
         catch port_close(Port),
         logger:error("[systemctl] ~s timed out after 30s", [Method]),

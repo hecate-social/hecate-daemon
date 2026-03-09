@@ -1,5 +1,5 @@
 %%% @doc license_archived_v1 event
-%%% Emitted when a plugin license is archived (walking skeleton).
+%%% Emitted when a license is archived (terminal state).
 -module(license_archived_v1).
 
 -export([new/1, to_map/1, from_map/1]).

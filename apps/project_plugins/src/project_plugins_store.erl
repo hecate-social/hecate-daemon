@@ -7,6 +7,8 @@
 -module(project_plugins_store).
 -behaviour(gen_server).
 
+-include_lib("guide_plugin_lifecycle/include/plugin_status.hrl").
+
 -export([start_link/0]).
 -export([get/1, list_active/0, list_by_status/1, list_all/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
@@ -33,7 +35,7 @@ get(PluginId) ->
 -spec list_active() -> {ok, [map()]}.
 list_active() ->
     All = ets:tab2list(?TABLE),
-    Active = [P || {_Key, #{status := S} = P} <- All, S band 2 =:= 0],
+    Active = [P || {_Key, #{status := S} = P} <- All, evoq_bit_flags:has_not(S, ?PLG_REMOVED)],
     {ok, Active}.
 
 %% @doc List plugins matching a status bitmask (status & Mask =/= 0).

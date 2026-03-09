@@ -24,13 +24,14 @@ handle_event(_EventType, Event, _Metadata, State) ->
 
 do_handle(Data) ->
     PluginId = get_value(plugin_id, Data),
-    case lookup_oci_image(PluginId) of
-        {ok, OciImage} ->
-            deprovision(PluginId, OciImage);
-        {error, not_found} ->
-            logger:warning("[PM] Cannot find OCI image for ~s, trying plugin_id fallback",
+    OciImage = get_value(oci_image, Data),
+    case OciImage of
+        undefined ->
+            logger:warning("[PM] No oci_image in event for ~s, trying plugin_id fallback",
                            [PluginId]),
-            deprovision_by_plugin_id(PluginId)
+            deprovision_by_plugin_id(PluginId);
+        _ ->
+            deprovision(PluginId, OciImage)
     end.
 
 deprovision(PluginId, OciImage) ->
@@ -45,6 +46,8 @@ deprovision(PluginId, OciImage) ->
             logger:warning("[PM] Failed to stop service ~s: ~p (continuing with file removal)",
                            [ServiceName, Reason0])
     end,
+    Filename = container_filename(DaemonName),
+    remove_quadlet_symlink(Filename),
     case file:delete(FilePath) of
         ok ->
             logger:info("[PM] Deprovisioned container file ~s for plugin ~s",
@@ -79,13 +82,6 @@ deprovision_by_plugin_id(PluginId) ->
         _ -> ok
     end.
 
-%% @private Look up the OCI image for a plugin from the read model.
-lookup_oci_image(PluginId) ->
-    case project_plugins_store:get(PluginId) of
-        {ok, #{oci_image := OciImage}} -> {ok, OciImage};
-        _ -> {error, not_found}
-    end.
-
 %% @private Extract the daemon name from the OCI image reference.
 extract_daemon_name(OciImage) ->
     Base = strip_tag(OciImage),
@@ -111,6 +107,12 @@ split_last(Bin, Sep) ->
             {Pos, Len} = lists:last(Matches),
             {binary:part(Bin, 0, Pos), binary:part(Bin, Pos + Len, byte_size(Bin) - Pos - Len)}
     end.
+
+remove_quadlet_symlink(Filename) ->
+    QuadletDir = filename:join([os:getenv("HOME"), ".config", "containers", "systemd"]),
+    LinkPath = filename:join(QuadletDir, Filename),
+    _ = file:delete(LinkPath),
+    ok.
 
 %% @private Build the .container filename.
 container_filename(DaemonName) ->

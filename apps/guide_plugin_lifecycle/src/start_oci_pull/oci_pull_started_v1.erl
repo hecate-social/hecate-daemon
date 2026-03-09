@@ -7,7 +7,7 @@
 
 -record(oci_pull_started_v1, {
     plugin_id  :: binary(),
-    oci_image  :: binary() | undefined,
+    oci_image  :: binary(),
     started_at :: integer()
 }).
 
@@ -17,10 +17,10 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> oci_pull_started_v1().
-new(#{plugin_id := PluginId} = Params) ->
+new(#{plugin_id := PluginId, oci_image := OciImage}) ->
     #oci_pull_started_v1{
         plugin_id = PluginId,
-        oci_image = maps:get(oci_image, Params, undefined),
+        oci_image = OciImage,
         started_at = erlang:system_time(millisecond)
     }.
 
@@ -35,29 +35,24 @@ to_map(#oci_pull_started_v1{} = E) ->
 
 -spec from_map(map()) -> {ok, oci_pull_started_v1()} | {error, term()}.
 from_map(Map) ->
-    PluginId = get_value(plugin_id, Map),
-    case PluginId of
-        undefined -> {error, invalid_event};
+    PluginId = hecate_api_utils:get_field(plugin_id, Map),
+    OciImage = hecate_api_utils:get_field(oci_image, Map),
+    case {PluginId, OciImage} of
+        {undefined, _} -> {error, invalid_event};
+        {_, undefined} -> {error, invalid_event};
         _ ->
             {ok, #oci_pull_started_v1{
                 plugin_id = PluginId,
-                oci_image = get_value(oci_image, Map, undefined),
-                started_at = get_value(started_at, Map, erlang:system_time(millisecond))
+                oci_image = OciImage,
+                started_at = hecate_api_utils:get_field(started_at, Map, erlang:system_time(millisecond))
             }}
     end.
 
 -spec get_plugin_id(oci_pull_started_v1()) -> binary().
 get_plugin_id(#oci_pull_started_v1{plugin_id = V}) -> V.
 
--spec get_oci_image(oci_pull_started_v1()) -> binary() | undefined.
+-spec get_oci_image(oci_pull_started_v1()) -> binary().
 get_oci_image(#oci_pull_started_v1{oci_image = V}) -> V.
 
 -spec get_started_at(oci_pull_started_v1()) -> integer().
 get_started_at(#oci_pull_started_v1{started_at = V}) -> V.
-
-get_value(Key, Map) -> get_value(Key, Map, undefined).
-get_value(Key, Map, Default) when is_atom(Key) ->
-    case maps:find(Key, Map) of
-        {ok, V} -> V;
-        error -> maps:get(atom_to_binary(Key, utf8), Map, Default)
-    end.

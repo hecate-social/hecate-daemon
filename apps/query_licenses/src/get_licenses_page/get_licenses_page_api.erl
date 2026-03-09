@@ -1,6 +1,6 @@
 %%% @doc API handler: GET /api/appstore/licenses
 %%%
-%%% Returns all active (non-archived) licenses for the current user.
+%%% Returns all active (non-archived) licenses for the current consumer.
 %%% @end
 -module(get_licenses_page_api).
 
@@ -18,8 +18,8 @@ handle_get(Req0, _State) ->
     case cowboy_req:header(<<"x-hecate-user-id">>, Req0) of
         undefined ->
             hecate_api_utils:json_error(401, <<"Missing X-Hecate-User-Id header">>, Req0);
-        UserId ->
-            case project_licenses_store:get_licenses_for_user(UserId) of
+        ConsumerId ->
+            case project_licenses_store:get_licenses_for_user(ConsumerId) of
                 {ok, Items} ->
                     hecate_api_utils:json_ok(#{items => Items}, Req0);
                 {error, Reason} ->

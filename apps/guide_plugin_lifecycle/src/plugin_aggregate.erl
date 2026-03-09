@@ -61,11 +61,11 @@ execute(#plugin_state{status = S} = State, Payload)
         <<"install_plugin">>            -> {error, plugin_already_installed};
         <<"upgrade_plugin">>            -> execute_upgrade_plugin(Payload, State);
         <<"remove_plugin">>             -> execute_remove_plugin(Payload, State);
-        <<"start_plugin_execution">>    -> execute_start_execution(Payload);
+        <<"start_plugin_execution">>    -> execute_start_execution(Payload, State);
         <<"stop_plugin_execution">>     -> {error, plugin_not_running};
         <<"confirm_container_up">>      -> execute_confirm_up(Payload);
         <<"confirm_container_down">>    -> execute_confirm_down(Payload);
-        <<"start_oci_pull">>      -> execute_start_pull(Payload, S);
+        <<"start_oci_pull">>      -> execute_start_pull(Payload, S, State);
         <<"cancel_oci_pull">>     -> execute_cancel_pull(Payload, S);
         <<"complete_oci_pull">>   -> execute_complete_pull(Payload, S);
         _ -> {error, unknown_command}
@@ -79,7 +79,7 @@ execute(#plugin_state{status = S} = State, Payload)
         <<"upgrade_plugin">>            -> execute_upgrade_plugin(Payload, State);
         <<"remove_plugin">>             -> execute_remove_plugin(Payload, State);
         <<"start_plugin_execution">>    -> {error, plugin_already_running};
-        <<"stop_plugin_execution">>     -> execute_stop_execution(Payload);
+        <<"stop_plugin_execution">>     -> execute_stop_execution(Payload, State);
         <<"confirm_container_up">>      -> execute_confirm_up(Payload);
         <<"confirm_container_down">>    -> execute_confirm_down(Payload);
         <<"start_oci_pull">>      -> {error, plugin_already_running};
@@ -101,17 +101,17 @@ execute_upgrade_plugin(Payload, _State) ->
     {ok, Cmd} = upgrade_plugin_v1:from_map(Payload),
     convert_events(maybe_upgrade_plugin:handle(Cmd), fun plugin_upgraded_v1:to_map/1).
 
-execute_remove_plugin(Payload, _State) ->
+execute_remove_plugin(Payload, State) ->
     {ok, Cmd} = remove_plugin_v1:from_map(Payload),
-    convert_events(maybe_remove_plugin:handle(Cmd), fun plugin_removed_v1:to_map/1).
+    convert_events(maybe_remove_plugin:handle(Cmd, State), fun plugin_removed_v1:to_map/1).
 
-execute_start_execution(Payload) ->
+execute_start_execution(Payload, State) ->
     {ok, Cmd} = start_plugin_execution_v1:from_map(Payload),
-    convert_events(maybe_start_plugin_execution:handle(Cmd), fun plugin_execution_started_v1:to_map/1).
+    convert_events(maybe_start_plugin_execution:handle(Cmd, State), fun plugin_execution_started_v1:to_map/1).
 
-execute_stop_execution(Payload) ->
+execute_stop_execution(Payload, State) ->
     {ok, Cmd} = stop_plugin_execution_v1:from_map(Payload),
-    convert_events(maybe_stop_plugin_execution:handle(Cmd), fun plugin_execution_stopped_v1:to_map/1).
+    convert_events(maybe_stop_plugin_execution:handle(Cmd, State), fun plugin_execution_stopped_v1:to_map/1).
 
 execute_confirm_up(Payload) ->
     {ok, Cmd} = confirm_container_up_v1:from_map(Payload),
@@ -121,11 +121,11 @@ execute_confirm_down(Payload) ->
     {ok, Cmd} = confirm_container_down_v1:from_map(Payload),
     convert_events(maybe_confirm_container_down:handle(Cmd), fun container_confirmed_down_v1:to_map/1).
 
-execute_start_pull(Payload, Status) ->
+execute_start_pull(Payload, Status, State) ->
     case Status band ?PLG_PULLING of
         0 ->
             {ok, Cmd} = start_oci_pull_v1:from_map(Payload),
-            convert_events(maybe_start_oci_pull:handle(Cmd), fun oci_pull_started_v1:to_map/1);
+            convert_events(maybe_start_oci_pull:handle(Cmd, State), fun oci_pull_started_v1:to_map/1);
         _ ->
             {error, already_pulling}
     end.

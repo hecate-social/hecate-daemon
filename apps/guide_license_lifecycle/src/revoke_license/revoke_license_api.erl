@@ -1,7 +1,7 @@
 %%% @doc API handler: POST /api/appstore/licenses/revoke
 %%%
-%%% Revokes an existing plugin license.
-%%% Lives in the revoke_license desk for vertical slicing.
+%%% Revokes a granted license (enforcement action).
+%%% Requires license_id. Optional: reason.
 %%% @end
 -module(revoke_license_api).
 

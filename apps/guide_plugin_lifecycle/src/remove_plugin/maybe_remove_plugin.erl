@@ -3,6 +3,7 @@
 %%% Validates the command and dispatches via evoq.
 -module(maybe_remove_plugin).
 
+-include("plugin_state.hrl").
 -include_lib("evoq/include/evoq.hrl").
 
 -export([handle/1, handle/2, dispatch/1]).
@@ -16,11 +17,11 @@ handle(Cmd) ->
 %% @doc Handle with state (for aggregate pattern)
 -spec handle(remove_plugin_v1:remove_plugin_v1(), term()) ->
     {ok, [plugin_removed_v1:plugin_removed_v1()]} | {error, term()}.
-handle(Cmd, _State) ->
+handle(Cmd, State) ->
     PluginId = remove_plugin_v1:get_plugin_id(Cmd),
     case validate_command(PluginId) of
         ok ->
-            Event = create_event(Cmd),
+            Event = create_event(Cmd, State),
             {ok, [Event]};
         {error, Reason} ->
             {error, Reason}
@@ -58,7 +59,13 @@ validate_command(PluginId) when is_binary(PluginId), byte_size(PluginId) > 0 ->
 validate_command(_) ->
     {error, invalid_command}.
 
-create_event(Cmd) ->
+create_event(Cmd, #plugin_state{oci_image = OciImage}) ->
     plugin_removed_v1:new(#{
-        plugin_id => remove_plugin_v1:get_plugin_id(Cmd)
+        plugin_id => remove_plugin_v1:get_plugin_id(Cmd),
+        oci_image => OciImage
+    });
+create_event(Cmd, _State) ->
+    plugin_removed_v1:new(#{
+        plugin_id => remove_plugin_v1:get_plugin_id(Cmd),
+        oci_image => undefined
     }).

@@ -4,6 +4,7 @@
 %%%   - Must not already be pulling (PLG_PULLING not set)
 -module(maybe_start_oci_pull).
 
+-include("plugin_state.hrl").
 -include_lib("evoq/include/evoq.hrl").
 
 -export([handle/1, handle/2, dispatch/1]).
@@ -15,13 +16,21 @@ handle(Cmd) ->
 
 -spec handle(start_oci_pull_v1:start_oci_pull_v1(), term()) ->
     {ok, [oci_pull_started_v1:oci_pull_started_v1()]} | {error, term()}.
-handle(Cmd, _State) ->
+handle(Cmd, #plugin_state{oci_image = StateOciImage}) ->
     PluginId = start_oci_pull_v1:get_plugin_id(Cmd),
     CmdOciImage = start_oci_pull_v1:get_oci_image(Cmd),
     OciImage = case CmdOciImage of
-        undefined -> resolve_oci_image(PluginId);
+        undefined -> StateOciImage;
         _ -> CmdOciImage
     end,
+    Event = oci_pull_started_v1:new(#{
+        plugin_id => PluginId,
+        oci_image => OciImage
+    }),
+    {ok, [Event]};
+handle(Cmd, _State) ->
+    PluginId = start_oci_pull_v1:get_plugin_id(Cmd),
+    OciImage = start_oci_pull_v1:get_oci_image(Cmd),
     Event = oci_pull_started_v1:new(#{
         plugin_id => PluginId,
         oci_image => OciImage
@@ -48,10 +57,3 @@ dispatch(Cmd) ->
         consistency => eventual
     },
     evoq_dispatcher:dispatch(EvoqCmd, Opts).
-
-%% @private Look up OCI image from read model for event enrichment.
-resolve_oci_image(PluginId) ->
-    case project_plugins_store:get(PluginId) of
-        {ok, #{oci_image := OciImage}} -> OciImage;
-        _ -> undefined
-    end.

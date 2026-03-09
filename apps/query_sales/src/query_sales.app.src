@@ -1,0 +1,15 @@
+{application, query_sales, [
+    {description, "Sale query service (read models)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_sales_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        project_sales
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

@@ -21,14 +21,15 @@
 -define(POLL_INTERVAL_MS, 250).
 -define(TIMEOUT_MS, 30_000).
 
-%% Stores and their corresponding ETS projection tables.
-%% If a store has events, its ETS table must be populated before
-%% we consider projections ready.
+%% Stores and their PRIMARY ETS projection tables.
+%% Only list tables that MUST have data if their store has any events.
+%% Do NOT list tables that depend on specific event types which may
+%% not exist yet (e.g., `licenses` depends on license_bought_v1 which
+%% only exists after a purchase — not after initial catalog seeding).
 -define(STORE_PROJECTIONS, [
     {settings_store,          settings},
     {realm_memberships_store, realm_memberships},
-    {licenses_store,          licenses},
-    {licenses_store,          catalog},
+    {license_offerings_store, offerings},
     {plugins_store,           plugins},
     {launcher_store,          launcher_entries}
 ]).
@@ -77,20 +78,22 @@ store_ready({StoreId, EtsTable}) ->
             true;
         _ ->
             case ets:info(EtsTable, size) of
-                0 -> not store_has_events(StoreId);
+                0 ->
+                    HasEvents = store_has_events(StoreId),
+                    case HasEvents of
+                        true ->
+                            logger:info("[readiness] Waiting: ~p ETS ~p empty but store has events",
+                                        [StoreId, EtsTable]);
+                        false ->
+                            ok
+                    end,
+                    not HasEvents;
                 _ -> true
             end
     end.
 
-%% @doc Check if a reckon_db store contains at least one event.
-%% Returns `true` if store has events, `false` if empty.
-%% If the store API is unavailable (Ra not ready), returns `true`
-%% to prevent premature readiness (keep waiting).
 store_has_events(StoreId) ->
-    try esdb_gater_api:stream_forward(StoreId, <<"$all">>, 0, 1) of
-        {ok, [_ | _]} -> true;
-        {ok, []}       -> false;
-        {error, _}     -> true  %% Assume events exist if store is unavailable
+    try evoq_event_store:has_events(StoreId)
     catch
         _:_ -> true  %% Store not ready — assume it has events (keep waiting)
     end.

@@ -1,0 +1,15 @@
+{application, query_license_offerings, [
+    {description, "License offering query service (read models)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_license_offerings_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        project_license_offerings
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

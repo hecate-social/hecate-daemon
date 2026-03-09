@@ -16,7 +16,11 @@
     guide_settings_lifecycle, query_settings,
     guide_realm_memberships, query_realm_memberships,
     serve_llm,
+    guide_license_offering_lifecycle, project_license_offerings, query_license_offerings,
     guide_license_lifecycle, project_licenses, query_licenses,
+    guide_procurement_lifecycle, project_procurements, query_procurements,
+    guide_sale_lifecycle, project_sales, query_sales,
+    guide_payment_lifecycle, project_payments, query_payments,
     guide_plugin_lifecycle, project_plugins, query_plugins,
     guide_launcher_lifecycle, project_launcher, query_launcher
 ]).

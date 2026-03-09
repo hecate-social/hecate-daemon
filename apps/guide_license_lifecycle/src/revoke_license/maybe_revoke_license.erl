@@ -1,5 +1,5 @@
 %%% @doc maybe_revoke_license handler
-%%% Business logic for revoking plugin licenses.
+%%% Business logic for revoking a license.
 -module(maybe_revoke_license).
 
 -include_lib("evoq/include/evoq.hrl").

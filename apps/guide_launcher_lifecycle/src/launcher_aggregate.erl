@@ -110,7 +110,7 @@ apply_initialized(E, _State) ->
 
 apply_registered(E, #launcher_state{status = Status, groups = Groups}) ->
     EntryId = get_value(entry_id, E),
-    GroupName = get_value(group_name, E),
+    GroupName = coalesce(get_value(group_name, E), <<"APPS">>),
     NewGroups = add_entry_to_group(EntryId, GroupName, Groups),
     #launcher_state{
         status = evoq_bit_flags:set(Status, ?LNCH_CONFIGURED),
@@ -205,6 +205,13 @@ get_value(Key, Map, Default) when is_atom(Key) ->
         {ok, V} -> V;
         error -> maps:get(atom_to_binary(Key), Map, Default)
     end.
+
+coalesce(undefined, Default) -> Default;
+coalesce(null, Default) -> Default;
+coalesce(<<"undefined">>, Default) -> Default;
+coalesce(<<"null">>, Default) -> Default;
+coalesce(<<>>, Default) -> Default;
+coalesce(Value, _Default) -> Value.
 
 convert_events({ok, Events}, ToMapFn) ->
     {ok, [ToMapFn(E) || E <- Events]};

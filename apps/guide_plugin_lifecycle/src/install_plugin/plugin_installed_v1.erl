@@ -3,13 +3,14 @@
 -module(plugin_installed_v1).
 
 -export([new/1, to_map/1, from_map/1]).
--export([get_plugin_id/1, get_name/1, get_oci_image/1,
+-export([get_plugin_id/1, get_name/1, get_display_name/1, get_oci_image/1,
          get_installed_version/1, get_license_id/1, get_installed_at/1,
          get_icon/1, get_group/1]).
 
 -record(plugin_installed_v1, {
     plugin_id         :: binary(),
     name              :: binary(),
+    display_name      :: binary() | undefined,
     oci_image         :: binary(),
     installed_version :: binary(),
     license_id        :: binary() | undefined,
@@ -29,6 +30,7 @@ new(#{plugin_id := PluginId, name := Name,
     #plugin_installed_v1{
         plugin_id         = PluginId,
         name              = Name,
+        display_name      = maps:get(display_name, Params, undefined),
         oci_image         = OciImage,
         installed_version = Version,
         license_id        = maps:get(license_id, Params, undefined),
@@ -51,7 +53,8 @@ to_map(#plugin_installed_v1{} = E) ->
     %% as the string "undefined" in JSON, causing round-trip corruption.
     maybe_put(group_name, E#plugin_installed_v1.group_name,
     maybe_put(icon, E#plugin_installed_v1.icon,
-    maybe_put(license_id, E#plugin_installed_v1.license_id, Base))).
+    maybe_put(license_id, E#plugin_installed_v1.license_id,
+    maybe_put(display_name, E#plugin_installed_v1.display_name, Base)))).
 
 -spec from_map(map()) -> {ok, plugin_installed_v1()} | {error, term()}.
 from_map(Map) ->
@@ -68,6 +71,7 @@ from_map(Map) ->
             {ok, #plugin_installed_v1{
                 plugin_id         = PluginId,
                 name              = Name,
+                display_name      = get_value(display_name, Map, undefined),
                 oci_image         = OciImage,
                 installed_version = Version,
                 license_id        = get_value(license_id, Map, undefined),
@@ -83,6 +87,9 @@ get_plugin_id(#plugin_installed_v1{plugin_id = V}) -> V.
 
 -spec get_name(plugin_installed_v1()) -> binary().
 get_name(#plugin_installed_v1{name = V}) -> V.
+
+-spec get_display_name(plugin_installed_v1()) -> binary() | undefined.
+get_display_name(#plugin_installed_v1{display_name = V}) -> V.
 
 -spec get_oci_image(plugin_installed_v1()) -> binary().
 get_oci_image(#plugin_installed_v1{oci_image = V}) -> V.

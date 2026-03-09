@@ -3,13 +3,14 @@
 -module(install_plugin_v1).
 
 -export([new/1, from_map/1, validate/1, to_map/1]).
--export([get_plugin_id/1, get_name/1, get_oci_image/1,
+-export([get_plugin_id/1, get_name/1, get_display_name/1, get_oci_image/1,
          get_installed_version/1, get_license_id/1,
          get_icon/1, get_group/1]).
 
 -record(install_plugin_v1, {
     plugin_id         :: binary(),
     name              :: binary(),
+    display_name      :: binary() | undefined,
     oci_image         :: binary(),
     installed_version :: binary(),
     license_id        :: binary() | undefined,
@@ -28,6 +29,7 @@ new(#{plugin_id := PluginId, name := Name,
     {ok, #install_plugin_v1{
         plugin_id         = PluginId,
         name              = Name,
+        display_name      = maps:get(display_name, Params, undefined),
         oci_image         = OciImage,
         installed_version = Version,
         license_id        = maps:get(license_id, Params, undefined),
@@ -59,6 +61,7 @@ to_map(#install_plugin_v1{} = Cmd) ->
         <<"command_type">>       => <<"install_plugin">>,
         <<"plugin_id">>          => Cmd#install_plugin_v1.plugin_id,
         <<"name">>               => Cmd#install_plugin_v1.name,
+        <<"display_name">>       => Cmd#install_plugin_v1.display_name,
         <<"oci_image">>          => Cmd#install_plugin_v1.oci_image,
         <<"installed_version">>  => Cmd#install_plugin_v1.installed_version,
         <<"license_id">>         => Cmd#install_plugin_v1.license_id,
@@ -79,11 +82,13 @@ from_map(Map) ->
         {_, _, undefined, _} -> {error, missing_required_fields};
         {_, _, _, undefined} -> {error, missing_required_fields};
         _ ->
+            DisplayName = get_value(display_name, Map, undefined),
             Icon = get_value(icon, Map, undefined),
             GroupName = get_value(group_name, Map, undefined),
             {ok, #install_plugin_v1{
                 plugin_id         = PluginId,
                 name              = Name,
+                display_name      = DisplayName,
                 oci_image         = OciImage,
                 installed_version = Version,
                 license_id        = LicenseId,
@@ -98,6 +103,9 @@ get_plugin_id(#install_plugin_v1{plugin_id = V}) -> V.
 
 -spec get_name(install_plugin_v1()) -> binary().
 get_name(#install_plugin_v1{name = V}) -> V.
+
+-spec get_display_name(install_plugin_v1()) -> binary() | undefined.
+get_display_name(#install_plugin_v1{display_name = V}) -> V.
 
 -spec get_oci_image(install_plugin_v1()) -> binary().
 get_oci_image(#install_plugin_v1{oci_image = V}) -> V.

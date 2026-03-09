@@ -28,19 +28,24 @@ health_api_test_() ->
 setup() ->
     %% Mock dependencies
     meck:new(hecate_identity, [passthrough]),
+    meck:new(hecate_lifecycle, [passthrough]),
     meck:new(cowboy_req, [passthrough]),
-    
+
+    %% Default: daemon is running (healthy)
+    meck:expect(hecate_lifecycle, get_state, fun() -> running end),
+
     %% Mock cowboy_req:reply to capture response
     meck:expect(cowboy_req, reply, fun(Status, Headers, Body, Req) ->
         %% Store response in process dictionary for test verification
         put(last_response, {Status, Headers, Body}),
         Req
     end),
-    
+
     ok.
 
 cleanup(_) ->
     meck:unload(hecate_identity),
+    meck:unload(hecate_lifecycle),
     meck:unload(cowboy_req),
     erase(last_response),
     ok.

@@ -46,11 +46,10 @@ from_map(Map) ->
     EntryId     = get_value(entry_id, Map),
     DisplayName = get_value(display_name, Map),
     Icon        = get_value(icon, Map),
-    GroupName   = get_value(group_name, Map),
-    case {EntryId, DisplayName, GroupName} of
-        {undefined, _, _} -> {error, invalid_event};
-        {_, undefined, _} -> {error, invalid_event};
-        {_, _, undefined} -> {error, invalid_event};
+    GroupName   = coalesce(get_value(group_name, Map), <<"APPS">>),
+    case {EntryId, DisplayName} of
+        {undefined, _} -> {error, invalid_event};
+        {_, undefined} -> {error, invalid_event};
         _ ->
             {ok, #entry_registered_v1{
                 entry_id      = EntryId,
@@ -60,6 +59,13 @@ from_map(Map) ->
                 registered_at = get_value(registered_at, Map, erlang:system_time(millisecond))
             }}
     end.
+
+coalesce(undefined, Default) -> Default;
+coalesce(null, Default) -> Default;
+coalesce(<<"undefined">>, Default) -> Default;
+coalesce(<<"null">>, Default) -> Default;
+coalesce(<<>>, Default) -> Default;
+coalesce(Value, _Default) -> Value.
 
 %% Accessors
 -spec get_entry_id(entry_registered_v1()) -> binary().

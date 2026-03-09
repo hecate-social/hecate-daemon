@@ -1,5 +1,5 @@
 %%% @doc license_revoked_v1 event
-%%% Emitted when a plugin license is revoked.
+%%% Emitted when a license is revoked (enforcement action).
 -module(license_revoked_v1).
 
 -export([new/1, to_map/1, from_map/1]).

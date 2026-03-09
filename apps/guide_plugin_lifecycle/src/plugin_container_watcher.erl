@@ -13,7 +13,7 @@
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
--define(POLL_INTERVAL_MS, 5000).
+-define(POLL_INTERVAL_MS, 2000).
 
 -record(state, {
     %% plugin_id => up | down
@@ -43,30 +43,38 @@ terminate(_Reason, _State) -> ok.
 do_poll(#state{known = Known} = State) ->
     case query_installed_plugins() of
         {ok, Plugins} ->
+            logger:info("[plugin-watcher] poll: ~p active plugins", [length(Plugins)]),
             NewKnown = lists:foldl(
                 fun({PluginId, OciImage}, Acc) ->
                     check_plugin(PluginId, OciImage, Acc, Known)
                 end, Known, Plugins),
             State#state{known = NewKnown};
-        {error, _} ->
+        {error, Reason} ->
+            logger:info("[plugin-watcher] poll failed: ~p", [Reason]),
             State
     end.
 
 check_plugin(PluginId, OciImage, Acc, Known) ->
     DaemonName = extract_daemon_name(OciImage),
     SocketPath = plugin_socket_path(DaemonName),
-    CurrentStatus = case filelib:is_regular(SocketPath) of
-        true -> up;
-        false -> down
+    FileResult = file:read_file_info(SocketPath),
+    CurrentStatus = case FileResult of
+        {ok, _} -> up;
+        {error, _} -> down
     end,
     PreviousStatus = maps:get(PluginId, Known, undefined),
+    logger:info("[plugin-watcher] ~s daemon=~s path=~s file_result=~p status=~p prev=~p",
+                 [PluginId, DaemonName, SocketPath, FileResult, CurrentStatus, PreviousStatus]),
     handle_transition(PluginId, PreviousStatus, CurrentStatus),
     maps:put(PluginId, CurrentStatus, Acc).
 
 handle_transition(_PluginId, Same, Same) ->
     ok;
-handle_transition(_PluginId, undefined, _Current) ->
-    %% First poll — establish baseline, don't dispatch
+handle_transition(PluginId, undefined, up) ->
+    %% First poll and already up — confirm it
+    dispatch_confirm_up(PluginId);
+handle_transition(_PluginId, undefined, down) ->
+    %% First poll and down — establish baseline, no dispatch needed
     ok;
 handle_transition(PluginId, _Previous, up) ->
     dispatch_confirm_up(PluginId);

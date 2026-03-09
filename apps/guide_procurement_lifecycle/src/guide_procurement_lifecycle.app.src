@@ -1,0 +1,18 @@
+{application, guide_procurement_lifecycle, [
+    {description, "Procurement lifecycle command service"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_procurement_lifecycle_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        evoq,
+        guide_license_lifecycle,
+        project_licenses
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

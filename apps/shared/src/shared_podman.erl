@@ -6,7 +6,7 @@
 -module(shared_podman).
 
 -export([pull_image/2]).
--export([render_container/2, container_filename/1, extract_daemon_name/1, strip_tag/1]).
+-export([render_container/2, container_filename/1, extract_daemon_name/1, extract_plugin_name/1, strip_tag/1]).
 
 %% @doc Pull an OCI image via `podman pull`, sending progress messages to CallbackPid.
 %%
@@ -61,6 +61,11 @@ container_filename(DaemonName) ->
 -spec render_container(binary(), binary()) -> binary().
 render_container(DaemonName, OciImage) ->
     BaseImage = strip_tag(OciImage),
+    HomeRel = shared_paths:hecate_home_rel(),
+    DaemonRel = shared_paths:base_dir_rel(),
+    PluginDataDir = "%h/" ++ HomeRel ++ "/" ++ binary_to_list(DaemonName),
+    DaemonBaseDir = "%h/" ++ DaemonRel,
+    DaemonSocketDir = DaemonBaseDir ++ "/sockets",
     iolist_to_binary([
         "[Unit]\n",
         "Description=Hecate ", DaemonName, " (plugin)\n",
@@ -73,9 +78,11 @@ render_container(DaemonName, OciImage) ->
         "AutoUpdate=registry\n",
         "Network=host\n",
         "Environment=HOME=%h\n",
-        "Volume=%h/.hecate/", DaemonName, ":%h/.hecate/", DaemonName, ":Z\n",
-        "Volume=%h/.hecate/hecate-daemon/sockets:%h/.hecate/hecate-daemon/sockets:ro\n",
-        "HealthCmd=test -S %h/.hecate/", DaemonName, "/sockets/api.sock\n",
+        "Environment=HECATE_HOME=%h/", HomeRel, "\n",
+        "Environment=HECATE_DAEMON_SOCKET=", DaemonSocketDir, "/api.sock\n",
+        "Volume=", PluginDataDir, ":", PluginDataDir, ":Z\n",
+        "Volume=", DaemonBaseDir, ":", DaemonBaseDir, ":ro\n",
+        "HealthCmd=test -S ", PluginDataDir, "/sockets/api.sock\n",
         "HealthInterval=30s\n",
         "HealthRetries=3\n",
         "HealthTimeout=5s\n",
@@ -83,10 +90,29 @@ render_container(DaemonName, OciImage) ->
         "\n",
         "[Service]\n",
         "Restart=always\n",
-        "RestartSec=5s\n",
+        "RestartSec=1s\n",
         "TimeoutStartSec=60s\n",
         "\n"
     ]).
+
+%% @doc Extract plugin routing name from OCI image ref.
+%%
+%% Strips the hecate-app- prefix and d suffix from the daemon name.
+%% Example: ghcr.io/hecate-apps/hecate-app-snake-dueld:latest -> snake-duel
+-spec extract_plugin_name(binary()) -> binary().
+extract_plugin_name(OciImage) ->
+    DaemonName = extract_daemon_name(OciImage),
+    strip_daemon_affixes(DaemonName).
+
+strip_daemon_affixes(Name) ->
+    Stripped = case Name of
+        <<"hecate-app-", Rest/binary>> -> Rest;
+        _ -> Name
+    end,
+    case byte_size(Stripped) > 1 andalso binary:last(Stripped) =:= $d of
+        true -> binary:part(Stripped, 0, byte_size(Stripped) - 1);
+        false -> Stripped
+    end.
 
 %% @doc Extract daemon name from OCI image ref.
 -spec extract_daemon_name(binary()) -> binary().

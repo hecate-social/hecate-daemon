@@ -83,8 +83,11 @@ init([]) ->
           start => {evoq_event_handler, start_link, [container_confirmed_down_v1_to_pg, #{}]},
           restart => permanent, type => worker},
 
-        %% -- OCI Pull PM (runs podman pull, provisions .container) --
+        %% -- OCI Pull PMs --
 
+        #{id => on_plugin_installed_start_oci_pull,
+          start => {evoq_event_handler, start_link, [on_plugin_installed_start_oci_pull, #{}]},
+          restart => permanent, type => worker},
         #{id => on_oci_pull_started_pull_image,
           start => {on_oci_pull_started_pull_image, start_link, []},
           restart => permanent, type => worker},

@@ -1,6 +1,5 @@
 %%% @doc maybe_buy_license handler
-%%% Business logic for buying plugin licenses.
-%%% Validates the command and dispatches via evoq.
+%%% Business logic for purchasing a license (paid path).
 -module(maybe_buy_license).
 
 -include_lib("evoq/include/evoq.hrl").
@@ -18,9 +17,8 @@ handle(Cmd) ->
 -spec handle(buy_license_v1:buy_license_v1(), term()) ->
     {ok, [license_bought_v1:license_bought_v1()]} | {error, term()}.
 handle(Cmd, _State) ->
-    UserId = buy_license_v1:get_user_id(Cmd),
-    PluginId = buy_license_v1:get_plugin_id(Cmd),
-    case validate_command(UserId, PluginId) of
+    LicenseId = buy_license_v1:get_license_id(Cmd),
+    case validate_command(LicenseId) of
         ok ->
             Event = create_event(Cmd),
             {ok, [Event]};
@@ -55,21 +53,13 @@ dispatch(Cmd) ->
 
 %% Internal
 
-validate_command(UserId, PluginId) when
-    is_binary(UserId), byte_size(UserId) > 0,
-    is_binary(PluginId), byte_size(PluginId) > 0 ->
+validate_command(LicenseId) when is_binary(LicenseId), byte_size(LicenseId) > 0 ->
     ok;
-validate_command(UserId, _PluginId) when
-    not is_binary(UserId); byte_size(UserId) =:= 0 ->
-    {error, invalid_user_id};
-validate_command(_UserId, _PluginId) ->
-    {error, invalid_plugin_id}.
+validate_command(_) ->
+    {error, invalid_license_id}.
 
 create_event(Cmd) ->
     license_bought_v1:new(#{
         license_id => buy_license_v1:get_license_id(Cmd),
-        user_id => buy_license_v1:get_user_id(Cmd),
-        plugin_id => buy_license_v1:get_plugin_id(Cmd),
-        plugin_name => buy_license_v1:get_plugin_name(Cmd),
-        oci_image => buy_license_v1:get_oci_image(Cmd)
+        payment_reference => buy_license_v1:get_payment_reference(Cmd)
     }).

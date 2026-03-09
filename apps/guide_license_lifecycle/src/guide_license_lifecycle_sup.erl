@@ -1,8 +1,8 @@
 %%% @doc guide_license_lifecycle top-level supervisor
 %%%
-%%% Supervises all emitters and process managers for license lifecycle:
+%%% Supervises all emitters and process managers for consumer license lifecycle:
 %%% - PG emitters: subscribe to evoq, broadcast to pg groups (internal)
-%%% - Mesh emitters: subscribe to evoq, publish to Macula mesh (external)
+%%% - Process managers: react to domain events, dispatch cross-aggregate commands
 %%% @end
 -module(guide_license_lifecycle_sup).
 -behaviour(supervisor).
@@ -25,23 +25,29 @@ init([]) ->
     Children = [
         %% ── PG emitters (internal, subscribe via evoq -> broadcast to pg) ────
 
-        %% Seller-side emitters
         #{id => license_initiated_v1_to_pg,
           start => {evoq_event_handler, start_link, [license_initiated_v1_to_pg, #{}]},
           restart => permanent, type => worker},
-        #{id => license_announced_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_announced_v1_to_pg, #{}]},
+        #{id => offering_terms_accepted_v1_to_pg,
+          start => {evoq_event_handler, start_link, [offering_terms_accepted_v1_to_pg, #{}]},
           restart => permanent, type => worker},
-        #{id => license_published_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_published_v1_to_pg, #{}]},
+        #{id => offering_terms_rejected_v1_to_pg,
+          start => {evoq_event_handler, start_link, [offering_terms_rejected_v1_to_pg, #{}]},
           restart => permanent, type => worker},
-        #{id => license_retracted_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_retracted_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-
-        %% Buyer-side emitters
         #{id => license_bought_v1_to_pg,
           start => {evoq_event_handler, start_link, [license_bought_v1_to_pg, #{}]},
+          restart => permanent, type => worker},
+        #{id => license_abandoned_v1_to_pg,
+          start => {evoq_event_handler, start_link, [license_abandoned_v1_to_pg, #{}]},
+          restart => permanent, type => worker},
+        #{id => license_granted_v1_to_pg,
+          start => {evoq_event_handler, start_link, [license_granted_v1_to_pg, #{}]},
+          restart => permanent, type => worker},
+        #{id => license_expired_v1_to_pg,
+          start => {evoq_event_handler, start_link, [license_expired_v1_to_pg, #{}]},
+          restart => permanent, type => worker},
+        #{id => license_renewed_v1_to_pg,
+          start => {evoq_event_handler, start_link, [license_renewed_v1_to_pg, #{}]},
           restart => permanent, type => worker},
         #{id => license_revoked_v1_to_pg,
           start => {evoq_event_handler, start_link, [license_revoked_v1_to_pg, #{}]},
@@ -50,10 +56,21 @@ init([]) ->
           start => {evoq_event_handler, start_link, [license_archived_v1_to_pg, #{}]},
           restart => permanent, type => worker},
 
-        %% ── Mesh emitters (external, subscribe via evoq -> publish to mesh) ──
+        %% ── Process Managers ─────────────────────────────────────────────────
 
-        #{id => license_published_v1_to_mesh,
-          start => {evoq_event_handler, start_link, [license_published_v1_to_mesh, #{}]},
+        %% Free path: accepted terms -> auto-grant
+        #{id => on_offering_terms_accepted_grant_license,
+          start => {evoq_event_handler, start_link, [on_offering_terms_accepted_grant_license, #{}]},
+          restart => permanent, type => worker},
+
+        %% Paid path: bought -> auto-grant
+        #{id => on_license_bought_grant_license,
+          start => {evoq_event_handler, start_link, [on_license_bought_grant_license, #{}]},
+          restart => permanent, type => worker},
+
+        %% Granted -> install plugin (cross-domain)
+        #{id => on_license_granted_install_plugin,
+          start => {evoq_event_handler, start_link, [on_license_granted_install_plugin, #{}]},
           restart => permanent, type => worker}
     ],
 

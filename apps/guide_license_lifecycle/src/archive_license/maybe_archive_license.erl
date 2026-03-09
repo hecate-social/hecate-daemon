@@ -1,5 +1,5 @@
 %%% @doc maybe_archive_license handler
-%%% Business logic for archiving plugin licenses.
+%%% Business logic for archiving a license.
 -module(maybe_archive_license).
 
 -include_lib("evoq/include/evoq.hrl").

@@ -26,7 +26,7 @@ do_handle(Data) ->
     PluginId = get_value(plugin_id, Data),
     Name = get_value(name, Data),
     EntryId = Name,
-    DisplayName = Name,
+    DisplayName = coalesce(get_value(display_name, Data), Name),
     Icon = coalesce(get_value(icon, Data), <<"\xF0\x9F\x94\x8C">>),
     GroupName = coalesce(get_value(group_name, Data), <<"APPS">>),
     CmdParams = #{
