@@ -232,6 +232,7 @@ apply_installed(E, _State) ->
         license_id = get_value(license_id, E),
         icon = get_value(icon, E),
         group_name = get_value(group_name, E),
+        group_icon = get_value(group_icon, E),
         installed_at = get_value(installed_at, E),
         upgraded_at = undefined,
         removed_at = undefined,

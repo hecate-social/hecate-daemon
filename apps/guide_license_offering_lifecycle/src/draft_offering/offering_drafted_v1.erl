@@ -4,7 +4,7 @@
 
 -export([new/1, to_map/1, from_map/1]).
 -export([get_offering_id/1,
-         get_plugin_name/1, get_description/1, get_icon/1, get_group_name/1,
+         get_plugin_name/1, get_description/1, get_icon/1, get_group_name/1, get_group_icon/1,
          get_github_repo/1, get_homepage/1, get_tags/1,
          get_oci_image/1, get_org/1, get_version/1, get_manifest_tag/1,
          get_min_daemon_version/1, get_publisher_identity/1,
@@ -22,6 +22,7 @@
     description        :: binary() | undefined,
     icon               :: binary() | undefined,
     group_name         :: binary() | undefined,
+    group_icon         :: binary() | undefined,
     github_repo        :: binary() | undefined,
     homepage           :: binary() | undefined,
     tags               :: binary() | undefined,
@@ -62,6 +63,7 @@ new(#{offering_id := OfferingId} = M) ->
         description = maps:get(description, M, undefined),
         icon = maps:get(icon, M, undefined),
         group_name = maps:get(group_name, M, undefined),
+        group_icon = maps:get(group_icon, M, undefined),
         github_repo = maps:get(github_repo, M, undefined),
         homepage = maps:get(homepage, M, undefined),
         tags = maps:get(tags, M, undefined),
@@ -97,6 +99,7 @@ to_map(#offering_drafted_v1{} = E) ->
         {description,        E#offering_drafted_v1.description},
         {icon,               E#offering_drafted_v1.icon},
         {group_name,         E#offering_drafted_v1.group_name},
+        {group_icon,         E#offering_drafted_v1.group_icon},
         {github_repo,        E#offering_drafted_v1.github_repo},
         {homepage,           E#offering_drafted_v1.homepage},
         {tags,               E#offering_drafted_v1.tags},
@@ -131,6 +134,7 @@ from_map(Map) ->
                 description = hecate_api_utils:get_field(description, Map),
                 icon = hecate_api_utils:get_field(icon, Map),
                 group_name = hecate_api_utils:get_field(group_name, Map),
+                group_icon = hecate_api_utils:get_field(group_icon, Map),
                 github_repo = hecate_api_utils:get_field(github_repo, Map),
                 homepage = hecate_api_utils:get_field(homepage, Map),
                 tags = hecate_api_utils:get_field(tags, Map),
@@ -170,6 +174,9 @@ get_icon(#offering_drafted_v1{icon = V}) -> V.
 
 -spec get_group_name(offering_drafted_v1()) -> binary() | undefined.
 get_group_name(#offering_drafted_v1{group_name = V}) -> V.
+
+-spec get_group_icon(offering_drafted_v1()) -> binary() | undefined.
+get_group_icon(#offering_drafted_v1{group_icon = V}) -> V.
 
 -spec get_github_repo(offering_drafted_v1()) -> binary() | undefined.
 get_github_repo(#offering_drafted_v1{github_repo = V}) -> V.

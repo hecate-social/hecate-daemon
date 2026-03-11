@@ -36,10 +36,11 @@ project_initiated(Data, State, RM) ->
         consumer_id    => gf(consumer_id, Data),
         offering_id    => gf(offering_id, Data),
         plugin_id      => gf(plugin_id, Data),
-        status         => ?PROC_INITIATED,
-        status_label   => <<"Initiated">>,
-        initiated_at   => gf(initiated_at, Data),
-        archived_at    => undefined
+        status            => ?PROC_INITIATED,
+        status_label      => <<"Initiated">>,
+        available_actions => [<<"archive">>],
+        initiated_at      => gf(initiated_at, Data),
+        archived_at       => undefined
     },
     {ok, RM2} = evoq_read_model:put(ProcurementId, Entry, RM),
     {ok, State, RM2}.
@@ -51,9 +52,10 @@ project_archived(Data, State, RM) ->
     case evoq_read_model:get(ProcurementId, RM) of
         {ok, Existing} ->
             Updated = Existing#{
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?PROC_ARCHIVED),
-                status_label => <<"Archived">>,
-                archived_at  => gf(archived_at, Data)
+                status            => evoq_bit_flags:set(maps:get(status, Existing), ?PROC_ARCHIVED),
+                status_label      => <<"Archived">>,
+                available_actions => [],
+                archived_at       => gf(archived_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(ProcurementId, Updated, RM),
             {ok, State, RM2};

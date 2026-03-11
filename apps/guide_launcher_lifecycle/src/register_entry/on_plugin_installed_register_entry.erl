@@ -29,11 +29,13 @@ do_handle(Data) ->
     DisplayName = coalesce(get_value(display_name, Data), Name),
     Icon = coalesce(get_value(icon, Data), <<"\xF0\x9F\x94\x8C">>),
     GroupName = coalesce(get_value(group_name, Data), <<"APPS">>),
+    GroupIcon = get_value(group_icon, Data),
     CmdParams = #{
         entry_id     => EntryId,
         display_name => DisplayName,
         icon         => Icon,
-        group_name   => GroupName
+        group_name   => GroupName,
+        group_icon   => GroupIcon
     },
     case register_entry_v1:new(CmdParams) of
         {ok, Cmd} ->

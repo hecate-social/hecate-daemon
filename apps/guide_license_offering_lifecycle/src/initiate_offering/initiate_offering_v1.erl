@@ -4,7 +4,7 @@
 
 -export([new/1, from_map/1, validate/1, to_map/1]).
 -export([get_offering_id/1, get_plugin_id/1, get_author_id/1,
-         get_plugin_name/1, get_description/1, get_icon/1, get_group_name/1,
+         get_plugin_name/1, get_display_name/1, get_description/1, get_icon/1, get_group_name/1, get_group_icon/1,
          get_github_repo/1, get_homepage/1, get_tags/1,
          get_oci_image/1, get_package_url/1, get_plugin_type/1, get_callback_module/1,
          get_org/1, get_version/1, get_manifest_tag/1,
@@ -21,9 +21,11 @@
     author_id          :: binary(),
     %% Marketing
     plugin_name        :: binary() | undefined,
+    display_name       :: binary() | undefined,
     description        :: binary() | undefined,
     icon               :: binary() | undefined,
     group_name         :: binary() | undefined,
+    group_icon         :: binary() | undefined,
     github_repo        :: binary() | undefined,
     homepage           :: binary() | undefined,
     tags               :: binary() | undefined,
@@ -65,9 +67,11 @@ new(#{author_id := AuthorId, plugin_id := PluginId} = Params) ->
         plugin_id = PluginId,
         author_id = AuthorId,
         plugin_name = maps:get(plugin_name, Params, undefined),
+        display_name = maps:get(display_name, Params, undefined),
         description = maps:get(description, Params, undefined),
         icon = maps:get(icon, Params, undefined),
         group_name = maps:get(group_name, Params, undefined),
+        group_icon = maps:get(group_icon, Params, undefined),
         github_repo = maps:get(github_repo, Params, undefined),
         homepage = maps:get(homepage, Params, undefined),
         tags = maps:get(tags, Params, undefined),
@@ -113,9 +117,11 @@ to_map(#initiate_offering_v1{} = Cmd) ->
         <<"plugin_id">> => Cmd#initiate_offering_v1.plugin_id,
         <<"author_id">> => Cmd#initiate_offering_v1.author_id,
         <<"plugin_name">> => Cmd#initiate_offering_v1.plugin_name,
+        <<"display_name">> => Cmd#initiate_offering_v1.display_name,
         <<"description">> => Cmd#initiate_offering_v1.description,
         <<"icon">> => Cmd#initiate_offering_v1.icon,
         <<"group_name">> => Cmd#initiate_offering_v1.group_name,
+        <<"group_icon">> => Cmd#initiate_offering_v1.group_icon,
         <<"github_repo">> => Cmd#initiate_offering_v1.github_repo,
         <<"homepage">> => Cmd#initiate_offering_v1.homepage,
         <<"tags">> => Cmd#initiate_offering_v1.tags,
@@ -155,9 +161,11 @@ from_map(Map) ->
                 plugin_id = PluginId,
                 author_id = AuthorId,
                 plugin_name = hecate_api_utils:get_field(plugin_name, Map, undefined),
+                display_name = hecate_api_utils:get_field(display_name, Map, undefined),
                 description = hecate_api_utils:get_field(description, Map, undefined),
                 icon = hecate_api_utils:get_field(icon, Map, undefined),
                 group_name = hecate_api_utils:get_field(group_name, Map, undefined),
+                group_icon = hecate_api_utils:get_field(group_icon, Map, undefined),
                 github_repo = hecate_api_utils:get_field(github_repo, Map, undefined),
                 homepage = hecate_api_utils:get_field(homepage, Map, undefined),
                 tags = hecate_api_utils:get_field(tags, Map, undefined),
@@ -197,6 +205,9 @@ get_author_id(#initiate_offering_v1{author_id = V}) -> V.
 -spec get_plugin_name(initiate_offering_v1()) -> binary() | undefined.
 get_plugin_name(#initiate_offering_v1{plugin_name = V}) -> V.
 
+-spec get_display_name(initiate_offering_v1()) -> binary() | undefined.
+get_display_name(#initiate_offering_v1{display_name = V}) -> V.
+
 -spec get_description(initiate_offering_v1()) -> binary() | undefined.
 get_description(#initiate_offering_v1{description = V}) -> V.
 
@@ -205,6 +216,9 @@ get_icon(#initiate_offering_v1{icon = V}) -> V.
 
 -spec get_group_name(initiate_offering_v1()) -> binary() | undefined.
 get_group_name(#initiate_offering_v1{group_name = V}) -> V.
+
+-spec get_group_icon(initiate_offering_v1()) -> binary() | undefined.
+get_group_icon(#initiate_offering_v1{group_icon = V}) -> V.
 
 -spec get_github_repo(initiate_offering_v1()) -> binary() | undefined.
 get_github_repo(#initiate_offering_v1{github_repo = V}) -> V.

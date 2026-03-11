@@ -64,5 +64,6 @@ create_event(Cmd) ->
         installed_version => install_plugin_v1:get_installed_version(Cmd),
         license_id        => install_plugin_v1:get_license_id(Cmd),
         icon              => install_plugin_v1:get_icon(Cmd),
-        group_name        => install_plugin_v1:get_group(Cmd)
+        group_name        => install_plugin_v1:get_group(Cmd),
+        group_icon        => install_plugin_v1:get_group_icon(Cmd)
     }).

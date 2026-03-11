@@ -37,10 +37,11 @@ do_project(<<"sale_initiated_v1">>, Data, State, RM) ->
         procurement_id => gf(procurement_id, Data),
         offering_id    => gf(offering_id, Data),
         plugin_id      => gf(plugin_id, Data),
-        status         => ?SALE_INITIATED,
-        status_label   => <<"Initiated">>,
-        initiated_at   => gf(initiated_at, Data),
-        archived_at    => undefined
+        status            => ?SALE_INITIATED,
+        status_label      => <<"Initiated">>,
+        available_actions => [<<"archive">>],
+        initiated_at      => gf(initiated_at, Data),
+        archived_at       => undefined
     },
     {ok, RM2} = evoq_read_model:put(SaleId, Sale, RM),
     {ok, State, RM2};
@@ -52,9 +53,10 @@ do_project(<<"sale_archived_v1">>, Data, State, RM) ->
     case evoq_read_model:get(SaleId, RM) of
         {ok, #{status := S} = Existing} ->
             Updated = Existing#{
-                status       => evoq_bit_flags:set(S, ?SALE_ARCHIVED),
-                status_label => <<"Archived">>,
-                archived_at  => gf(archived_at, Data)
+                status            => evoq_bit_flags:set(S, ?SALE_ARCHIVED),
+                status_label      => <<"Archived">>,
+                available_actions => [],
+                archived_at       => gf(archived_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(SaleId, Updated, RM),
             {ok, State, RM2};

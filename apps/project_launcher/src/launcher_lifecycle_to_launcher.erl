@@ -37,6 +37,7 @@ project(#{event_type := <<"entry_registered_v1">>, data := Data},
     DisplayName = gf(display_name, Data),
     Icon = gf(icon, Data),
     GroupName = coalesce(gf(group_name, Data), <<"APPS">>),
+    GroupIcon = gf(group_icon, Data),
     RegisteredAt = gf(registered_at, Data),
     %% Ensure group exists
     GroupRM2 = case evoq_read_model:get(GroupName, GroupRM) of
@@ -45,7 +46,7 @@ project(#{event_type := <<"entry_registered_v1">>, data := Data},
             NextPos = ets:info(launcher_groups, size),
             Group = #{
                 name      => GroupName,
-                icon      => <<"\xF0\x9F\x93\x81">>,
+                icon      => coalesce(GroupIcon, <<"\xF0\x9F\x93\x81">>),
                 collapsed => false,
                 position  => NextPos
             },
@@ -60,10 +61,12 @@ project(#{event_type := <<"entry_registered_v1">>, data := Data},
         display_name  => DisplayName,
         icon          => Icon,
         group_name    => GroupName,
+        group_icon    => GroupIcon,
         position      => Pos,
-        registered_at => RegisteredAt,
-        status        => 1,
-        status_label  => <<"Active">>
+        registered_at     => RegisteredAt,
+        status            => 1,
+        status_label      => <<"Active">>,
+        available_actions => []
     },
     {ok, EntryRM2} = evoq_read_model:put(EntryId, Entry, EntryRM),
     {ok, State#{group_rm => GroupRM2}, EntryRM2};
@@ -100,9 +103,10 @@ rebuild_from_groups(Data, State, GroupRM, EntryRM) ->
                 icon          => <<"\xF0\x9F\x94\x8C">>,
                 group_name    => Name,
                 position      => EPos,
-                registered_at => undefined,
-                status        => 1,
-                status_label  => <<"Active">>
+                registered_at     => undefined,
+                status            => 1,
+                status_label      => <<"Active">>,
+                available_actions => []
             },
             {ok, ERMA2} = evoq_read_model:put(AppId, Entry, ERMA),
             {ERMA2, EPos + 1}

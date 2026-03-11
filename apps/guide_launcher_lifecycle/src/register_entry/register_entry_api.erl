@@ -20,9 +20,10 @@ do_register(Params, Req) ->
     DisplayName = hecate_api_utils:get_field(display_name, Params),
     Icon        = hecate_api_utils:get_field(icon, Params),
     GroupName   = hecate_api_utils:get_field(group_name, Params),
+    GroupIcon   = hecate_api_utils:get_field(group_icon, Params),
 
     case validate(EntryId, DisplayName, GroupName) of
-        ok -> create_and_dispatch(EntryId, DisplayName, Icon, GroupName, Req);
+        ok -> create_and_dispatch(EntryId, DisplayName, Icon, GroupName, GroupIcon, Req);
         {error, Reason} -> hecate_api_utils:bad_request(Reason, Req)
     end.
 
@@ -31,12 +32,13 @@ validate(_, undefined, _) -> {error, <<"display_name is required">>};
 validate(_, _, undefined) -> {error, <<"group_name is required">>};
 validate(_, _, _) -> ok.
 
-create_and_dispatch(EntryId, DisplayName, Icon, GroupName, Req) ->
+create_and_dispatch(EntryId, DisplayName, Icon, GroupName, GroupIcon, Req) ->
     CmdParams = #{
         entry_id     => EntryId,
         display_name => DisplayName,
         icon         => case Icon of undefined -> <<>>; _ -> Icon end,
-        group_name   => GroupName
+        group_name   => GroupName,
+        group_icon   => GroupIcon
     },
     case register_entry_v1:new(CmdParams) of
         {ok, Cmd} -> dispatch(Cmd, Req);

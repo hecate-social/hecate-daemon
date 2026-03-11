@@ -35,7 +35,8 @@ do_install(Params, Req) ->
     LicenseId      = hecate_api_utils:get_field(license_id, Params),
     Icon           = hecate_api_utils:get_field(icon, Params),
     GroupName      = hecate_api_utils:get_field(group_name, Params),
-    Name           = resolve_name(PluginType, OciImage, DisplayName),
+    GroupIcon      = hecate_api_utils:get_field(group_icon, Params),
+    Name           = resolve_name(PluginType, OciImage, PluginId, DisplayName),
 
     case validate(PluginId, Name, PluginType, OciImage, CallbackModule, Version) of
         ok ->
@@ -49,7 +50,8 @@ do_install(Params, Req) ->
                 installed_version => Version,
                 license_id        => LicenseId,
                 icon              => Icon,
-                group_name        => GroupName
+                group_name        => GroupName,
+                group_icon        => GroupIcon
             },
             case install_plugin_v1:new(CmdParams) of
                 {ok, Cmd} -> dispatch(Cmd, Req);
@@ -59,9 +61,15 @@ do_install(Params, Req) ->
             hecate_api_utils:bad_request(Reason, Req)
     end.
 
-resolve_name(<<"container">>, OciImage, _DisplayName) when is_binary(OciImage) ->
+resolve_name(<<"container">>, OciImage, _PluginId, _DisplayName) when is_binary(OciImage) ->
     shared_podman:extract_plugin_name(OciImage);
-resolve_name(_, _, DisplayName) ->
+resolve_name(<<"in_vm">>, _, PluginId, _DisplayName) when is_binary(PluginId) ->
+    %% Technical name from plugin_id (strip org prefix)
+    case binary:split(PluginId, <<"/">>) of
+        [_, Short] -> Short;
+        [Single] -> Single
+    end;
+resolve_name(_, _, _, DisplayName) ->
     DisplayName.
 
 validate(undefined, _, _, _, _, _) -> {error, <<"plugin_id is required">>};

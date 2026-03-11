@@ -11,6 +11,7 @@
     license_id        :: binary() | undefined,
     icon              :: binary() | undefined,
     group_name        :: binary() | undefined,
+    group_icon        :: binary() | undefined,
     installed_at      :: integer() | undefined,
     upgraded_at       :: integer() | undefined,
     removed_at        :: integer() | undefined,

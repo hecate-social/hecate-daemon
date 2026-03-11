@@ -30,6 +30,7 @@ make_license_granted_event_data() ->
         version         => ?VERSION,
         icon            => <<"pencil">>,
         group_name      => <<"OFFICE">>,
+        group_icon      => <<"briefcase">>,
         plugin_type     => <<"in_vm">>,
         callback_module => ?CALLBACK_MODULE,
         package_url     => ?PACKAGE_URL
@@ -48,6 +49,7 @@ make_container_granted_event_data() ->
         version         => <<"0.1.0">>,
         icon            => undefined,
         group_name      => undefined,
+        group_icon      => undefined,
         plugin_type     => <<"container">>,
         callback_module => undefined,
         package_url     => undefined
@@ -80,7 +82,8 @@ all_fields_forwarded_test() ->
     ?assertEqual(?CALLBACK_MODULE, maps:get(callback_module, CmdParams)),
     ?assertEqual(?PACKAGE_URL, maps:get(package_url, CmdParams)),
     ?assertEqual(<<"pencil">>, maps:get(icon, CmdParams)),
-    ?assertEqual(<<"OFFICE">>, maps:get(group_name, CmdParams)).
+    ?assertEqual(<<"OFFICE">>, maps:get(group_name, CmdParams)),
+    ?assertEqual(<<"briefcase">>, maps:get(group_icon, CmdParams)).
 
 %% Container plugin: name derived from OCI image
 container_name_from_oci_image_test() ->
@@ -137,6 +140,7 @@ build_cmd_params(Data) ->
         license_id        => gf(license_id, Data),
         icon              => gf(icon, Data, undefined),
         group_name        => gf(group_name, Data, undefined),
+        group_icon        => gf(group_icon, Data, undefined),
         plugin_type       => gf(plugin_type, Data, <<"container">>),
         callback_module   => gf(callback_module, Data, undefined),
         package_url       => gf(package_url, Data, undefined)

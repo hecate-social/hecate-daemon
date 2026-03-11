@@ -31,10 +31,11 @@ project_event(<<"payment_initiated_v1">>, Data, State, RM) ->
         plugin_id => gf(plugin_id, Data),
         amount_cents => gf(amount_cents, Data),
         currency => gf(currency, Data),
-        status => ?PAY_INITIATED,
-        status_label => <<"Initiated">>,
-        initiated_at => gf(initiated_at, Data),
-        archived_at => undefined
+        status            => ?PAY_INITIATED,
+        status_label      => <<"Initiated">>,
+        available_actions => [<<"archive">>],
+        initiated_at      => gf(initiated_at, Data),
+        archived_at       => undefined
     },
     {ok, RM2} = evoq_read_model:put(PaymentId, Entry, RM),
     {ok, State, RM2};
@@ -44,9 +45,10 @@ project_event(<<"payment_archived_v1">>, Data, State, RM) ->
     case evoq_read_model:get(PaymentId, RM) of
         {ok, Existing} ->
             Updated = Existing#{
-                archived_at => gf(archived_at, Data),
-                status => evoq_bit_flags:set(maps:get(status, Existing), ?PAY_ARCHIVED),
-                status_label => <<"Archived">>
+                archived_at       => gf(archived_at, Data),
+                status            => evoq_bit_flags:set(maps:get(status, Existing), ?PAY_ARCHIVED),
+                status_label      => <<"Archived">>,
+                available_actions => []
             },
             {ok, RM2} = evoq_read_model:put(PaymentId, Updated, RM),
             {ok, State, RM2};

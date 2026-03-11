@@ -7,6 +7,8 @@
 -behaviour(evoq_projection).
 -export([interested_in/0, init/1, project/4]).
 
+-include_lib("guide_realm_memberships/include/membership_status.hrl").
+
 -define(TABLE, realm_memberships).
 
 interested_in() ->
@@ -30,16 +32,19 @@ project(#{data := Data} = Event, _Metadata, State, RM) ->
 
 project_initiated(Data, State, RM) ->
     MembershipId = gf(membership_id, Data),
+    Status = ?MEMBERSHIP_INITIATED,
     Entry = #{
-        membership_id  => MembershipId,
-        realm_id       => undefined,
-        realm_url      => gf(realm_url, Data),
-        oauth_account  => undefined,
-        oauth_provider => undefined,
-        status         => <<"initiated">>,
-        initiated_at   => gf(initiated_at, Data),
-        confirmed_at   => undefined,
-        revoked_at     => undefined
+        membership_id   => MembershipId,
+        realm_id        => undefined,
+        realm_url       => gf(realm_url, Data),
+        oauth_account   => undefined,
+        oauth_provider  => undefined,
+        status          => Status,
+        status_label    => <<"Initiated">>,
+        available_actions => [<<"confirm">>],
+        initiated_at    => gf(initiated_at, Data),
+        confirmed_at    => undefined,
+        revoked_at      => undefined
     },
     {ok, RM2} = evoq_read_model:put(MembershipId, Entry, RM),
     {ok, State, RM2}.
@@ -49,13 +54,16 @@ project_initiated(Data, State, RM) ->
 project_confirmed(Data, State, RM) ->
     MembershipId = gf(membership_id, Data),
     case ets:lookup(?TABLE, MembershipId) of
-        [{_, Existing}] ->
+        [{_, #{status := OldStatus} = Existing}] ->
+            NewStatus = evoq_bit_flags:set(OldStatus, ?MEMBERSHIP_CONFIRMED),
             Updated = Existing#{
-                realm_id       => gf(realm_id, Data),
-                oauth_account  => gf(oauth_account, Data),
-                oauth_provider => gf(oauth_provider, Data),
-                status         => <<"confirmed">>,
-                confirmed_at   => gf(confirmed_at, Data)
+                realm_id          => gf(realm_id, Data),
+                oauth_account     => gf(oauth_account, Data),
+                oauth_provider    => gf(oauth_provider, Data),
+                status            => NewStatus,
+                status_label      => <<"Confirmed">>,
+                available_actions => [<<"revoke">>],
+                confirmed_at      => gf(confirmed_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(MembershipId, Updated, RM),
             hecate_web_events:broadcast(settings_changed, #{reason => realm_confirmed}),
@@ -69,10 +77,13 @@ project_confirmed(Data, State, RM) ->
 project_revoked(Data, State, RM) ->
     MembershipId = gf(membership_id, Data),
     case ets:lookup(?TABLE, MembershipId) of
-        [{_, Existing}] ->
+        [{_, #{status := OldStatus} = Existing}] ->
+            NewStatus = evoq_bit_flags:set(OldStatus, ?MEMBERSHIP_REVOKED),
             Updated = Existing#{
-                status     => <<"revoked">>,
-                revoked_at => gf(revoked_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Revoked">>,
+                available_actions => [],
+                revoked_at        => gf(revoked_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(MembershipId, Updated, RM),
             {ok, State, RM2};

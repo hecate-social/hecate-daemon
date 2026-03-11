@@ -56,6 +56,7 @@ create_event(Cmd) ->
         description => amend_offering_v1:get_description(Cmd),
         icon => amend_offering_v1:get_icon(Cmd),
         group_name => amend_offering_v1:get_group_name(Cmd),
+        group_icon => amend_offering_v1:get_group_icon(Cmd),
         github_repo => amend_offering_v1:get_github_repo(Cmd),
         homepage => amend_offering_v1:get_homepage(Cmd),
         tags => amend_offering_v1:get_tags(Cmd),

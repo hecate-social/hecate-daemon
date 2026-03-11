@@ -6,7 +6,7 @@
 -export([get_plugin_id/1, get_name/1, get_display_name/1,
          get_plugin_type/1, get_oci_image/1, get_callback_module/1,
          get_package_url/1, get_installed_version/1, get_license_id/1,
-         get_icon/1, get_group/1]).
+         get_icon/1, get_group/1, get_group_icon/1]).
 
 -record(install_plugin_v1, {
     plugin_id         :: binary(),
@@ -19,7 +19,8 @@
     installed_version :: binary(),
     license_id        :: binary() | undefined,
     icon              :: binary() | undefined,
-    group_name        :: binary() | undefined
+    group_name        :: binary() | undefined,
+    group_icon        :: binary() | undefined
 }).
 
 -export_type([install_plugin_v1/0]).
@@ -42,7 +43,8 @@ new(#{plugin_id := PluginId, name := Name,
         installed_version = Version,
         license_id        = maps:get(license_id, Params, undefined),
         icon              = maps:get(icon, Params, undefined),
-        group_name        = maps:get(group_name, Params, undefined)
+        group_name        = maps:get(group_name, Params, undefined),
+        group_icon        = maps:get(group_icon, Params, undefined)
     }};
 new(_) ->
     {error, missing_required_fields}.
@@ -87,7 +89,8 @@ to_map(#install_plugin_v1{} = Cmd) ->
     maybe_put(<<"package_url">>, Cmd#install_plugin_v1.package_url,
     maybe_put(<<"license_id">>, Cmd#install_plugin_v1.license_id,
     maybe_put(<<"icon">>, Cmd#install_plugin_v1.icon,
-    maybe_put(<<"group_name">>, Cmd#install_plugin_v1.group_name, Base))))))).
+    maybe_put(<<"group_icon">>, Cmd#install_plugin_v1.group_icon,
+    maybe_put(<<"group_name">>, Cmd#install_plugin_v1.group_name, Base)))))))).
 
 -spec from_map(map()) -> {ok, install_plugin_v1()} | {error, term()}.
 from_map(Map) ->
@@ -110,7 +113,8 @@ from_map(Map) ->
                 installed_version = Version,
                 license_id        = get_value(license_id, Map, undefined),
                 icon              = get_value(icon, Map, undefined),
-                group_name        = get_value(group_name, Map, undefined)
+                group_name        = get_value(group_name, Map, undefined),
+                group_icon        = get_value(group_icon, Map, undefined)
             }}
     end.
 
@@ -147,6 +151,9 @@ get_icon(#install_plugin_v1{icon = V}) -> V.
 
 -spec get_group(install_plugin_v1()) -> binary() | undefined.
 get_group(#install_plugin_v1{group_name = V}) -> V.
+
+-spec get_group_icon(install_plugin_v1()) -> binary() | undefined.
+get_group_icon(#install_plugin_v1{group_icon = V}) -> V.
 
 %% @private Only add key to map if value is not undefined/null.
 maybe_put(_Key, undefined, Map) -> Map;

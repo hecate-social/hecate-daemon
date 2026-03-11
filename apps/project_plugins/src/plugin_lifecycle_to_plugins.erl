@@ -21,7 +21,7 @@
 %%% @end
 -module(plugin_lifecycle_to_plugins).
 -behaviour(evoq_projection).
--export([interested_in/0, init/1, project/4]).
+-export([interested_in/0, init/1, project/4, available_actions/1]).
 
 -include_lib("guide_plugin_lifecycle/include/plugin_status.hrl").
 
@@ -62,6 +62,7 @@ do_project(<<"plugin_installed_v1">>, Data, State, RM) ->
         undefined -> Name;
         DN -> DN
     end,
+    Status = ?PLG_INSTALLED,
     Plugin = #{
         plugin_id         => PluginId,
         name              => Name,
@@ -80,10 +81,12 @@ do_project(<<"plugin_installed_v1">>, Data, State, RM) ->
         activated_at      => undefined,
         deactivated_at    => undefined,
         extracted_at      => undefined,
-        status            => ?PLG_INSTALLED,
+        status            => Status,
         status_label      => <<"Installed">>,
+        available_actions => available_actions(Status),
         icon              => gf(icon, Data),
-        group_name        => gf(group_name, Data)
+        group_name        => gf(group_name, Data),
+        group_icon        => gf(group_icon, Data)
     },
     {ok, RM2} = evoq_read_model:put(PluginId, Plugin, RM),
     {ok, State, RM2};
@@ -93,11 +96,12 @@ do_project(<<"plugin_installed_v1">>, Data, State, RM) ->
 do_project(<<"plugin_upgraded_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
-        {ok, Plugin} ->
+        {ok, #{status := S} = Plugin} ->
             Updated = Plugin#{
                 oci_image         => gf(oci_image, Data),
                 installed_version => gf(installed_version, Data),
-                upgraded_at       => gf(upgraded_at, Data)
+                upgraded_at       => gf(upgraded_at, Data),
+                available_actions => available_actions(S)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -111,10 +115,12 @@ do_project(<<"plugin_removed_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
+            NewStatus = evoq_bit_flags:set(S, ?PLG_REMOVED),
             Updated = Plugin#{
-                status       => evoq_bit_flags:set(S, ?PLG_REMOVED),
-                status_label => <<"Removed">>,
-                removed_at   => gf(removed_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Removed">>,
+                available_actions => available_actions(NewStatus),
+                removed_at        => gf(removed_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -129,19 +135,23 @@ do_project(<<"plugin_execution_started_v1">>, Data, State, RM) ->
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S, status_label := <<"Running">>} = Plugin} ->
             %% Already running (e.g. in-VM plugin) — update flags but don't regress label
+            NewStatus = evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_STOPPED), ?PLG_RUNNING),
             Updated = Plugin#{
-                status       => evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_STOPPED), ?PLG_RUNNING),
-                started_at   => gf(started_at, Data),
-                stopped_at   => undefined
+                status            => NewStatus,
+                available_actions => available_actions(NewStatus),
+                started_at        => gf(started_at, Data),
+                stopped_at        => undefined
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
         {ok, #{status := S} = Plugin} ->
+            NewStatus = evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_STOPPED), ?PLG_RUNNING),
             Updated = Plugin#{
-                status       => evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_STOPPED), ?PLG_RUNNING),
-                status_label => <<"Starting">>,
-                started_at   => gf(started_at, Data),
-                stopped_at   => undefined
+                status            => NewStatus,
+                status_label      => <<"Starting">>,
+                available_actions => available_actions(NewStatus),
+                started_at        => gf(started_at, Data),
+                stopped_at        => undefined
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -155,10 +165,12 @@ do_project(<<"plugin_execution_stopped_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
+            NewStatus = evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_RUNNING), ?PLG_STOPPED),
             Updated = Plugin#{
-                status       => evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_RUNNING), ?PLG_STOPPED),
-                status_label => <<"Stopped">>,
-                stopped_at   => gf(stopped_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Stopped">>,
+                available_actions => available_actions(NewStatus),
+                stopped_at        => gf(stopped_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -172,9 +184,11 @@ do_project(<<"container_confirmed_up_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
+            NewStatus = evoq_bit_flags:set(evoq_bit_flags:unset_all(S, [?PLG_CONFIRMED_DOWN, ?PLG_PULLING]), ?PLG_CONFIRMED_UP),
             Updated = Plugin#{
-                status       => evoq_bit_flags:set(evoq_bit_flags:unset_all(S, [?PLG_CONFIRMED_DOWN, ?PLG_PULLING]), ?PLG_CONFIRMED_UP),
-                status_label => <<"Running">>
+                status            => NewStatus,
+                status_label      => <<"Running">>,
+                available_actions => available_actions(NewStatus)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -188,9 +202,11 @@ do_project(<<"container_confirmed_down_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
+            NewStatus = evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_CONFIRMED_UP), ?PLG_CONFIRMED_DOWN),
             Updated = Plugin#{
-                status       => evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_CONFIRMED_UP), ?PLG_CONFIRMED_DOWN),
-                status_label => <<"Stopped">>
+                status            => NewStatus,
+                status_label      => <<"Stopped">>,
+                available_actions => available_actions(NewStatus)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -204,9 +220,11 @@ do_project(<<"oci_pull_started_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
+            NewStatus = evoq_bit_flags:set(S, ?PLG_PULLING),
             Updated = Plugin#{
-                status       => evoq_bit_flags:set(S, ?PLG_PULLING),
-                status_label => <<"Downloading">>
+                status            => NewStatus,
+                status_label      => <<"Downloading">>,
+                available_actions => available_actions(NewStatus)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -220,9 +238,11 @@ do_project(<<"oci_pull_cancelled_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
+            NewStatus = evoq_bit_flags:unset(S, ?PLG_PULLING),
             Updated = Plugin#{
-                status       => evoq_bit_flags:unset(S, ?PLG_PULLING),
-                status_label => <<"Installed">>
+                status            => NewStatus,
+                status_label      => <<"Installed">>,
+                available_actions => available_actions(NewStatus)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -236,9 +256,11 @@ do_project(<<"oci_pull_completed_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
+            NewStatus = evoq_bit_flags:unset(S, ?PLG_PULLING),
             Updated = Plugin#{
-                status       => evoq_bit_flags:unset(S, ?PLG_PULLING),
-                status_label => <<"Ready">>
+                status            => NewStatus,
+                status_label      => <<"Ready">>,
+                available_actions => available_actions(NewStatus)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -251,11 +273,12 @@ do_project(<<"oci_pull_completed_v1">>, Data, State, RM) ->
 do_project(<<"plugin_package_extracted_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
-        {ok, Plugin} ->
+        {ok, #{status := S} = Plugin} ->
             Updated = Plugin#{
-                extracted_at    => gf(extracted_at, Data),
-                callback_module => gf(callback_module, Data, maps:get(callback_module, Plugin, undefined)),
-                status_label    => <<"Extracted">>
+                extracted_at      => gf(extracted_at, Data),
+                callback_module   => gf(callback_module, Data, maps:get(callback_module, Plugin, undefined)),
+                status_label      => <<"Extracted">>,
+                available_actions => available_actions(S)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -269,12 +292,14 @@ do_project(<<"plugin_activated_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
+            NewStatus = evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_DEACTIVATED), ?PLG_ACTIVATED),
             Updated = Plugin#{
-                status          => evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_DEACTIVATED), ?PLG_ACTIVATED),
-                status_label    => <<"Activating">>,
-                callback_module => gf(callback_module, Data),
-                activated_at    => gf(activated_at, Data),
-                deactivated_at  => undefined
+                status            => NewStatus,
+                status_label      => <<"Activating">>,
+                available_actions => available_actions(NewStatus),
+                callback_module   => gf(callback_module, Data),
+                activated_at      => gf(activated_at, Data),
+                deactivated_at    => undefined
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -288,10 +313,12 @@ do_project(<<"plugin_deactivated_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
+            NewStatus = evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_ACTIVATED), ?PLG_DEACTIVATED),
             Updated = Plugin#{
-                status          => evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_ACTIVATED), ?PLG_DEACTIVATED),
-                status_label    => <<"Deactivated">>,
-                deactivated_at  => gf(deactivated_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Deactivated">>,
+                available_actions => available_actions(NewStatus),
+                deactivated_at    => gf(deactivated_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -305,8 +332,11 @@ do_project(<<"plugin_load_confirmed_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     logger:info("[projection] plugin_load_confirmed_v1 received for ~s", [PluginId]),
     case evoq_read_model:get(PluginId, RM) of
-        {ok, Plugin} ->
-            Updated = Plugin#{status_label => <<"Running">>},
+        {ok, #{status := S} = Plugin} ->
+            Updated = Plugin#{
+                status_label      => <<"Running">>,
+                available_actions => available_actions(S)
+            },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             logger:info("[projection] status_label set to Running for ~s", [PluginId]),
             {ok, State, RM2};
@@ -320,8 +350,11 @@ do_project(<<"plugin_load_confirmed_v1">>, Data, State, RM) ->
 do_project(<<"plugin_unload_confirmed_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
-        {ok, Plugin} ->
-            Updated = Plugin#{status_label => <<"Stopped">>},
+        {ok, #{status := S} = Plugin} ->
+            Updated = Plugin#{
+                status_label      => <<"Stopped">>,
+                available_actions => available_actions(S)
+            },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
         {error, not_found} ->
@@ -332,6 +365,37 @@ do_project(<<"plugin_unload_confirmed_v1">>, Data, State, RM) ->
 
 do_project(_Unknown, _Data, State, RM) ->
     {skip, State, RM}.
+
+%% --- Available Actions ---
+
+%% @doc Compute user-facing actions available for a given plugin status.
+available_actions(0) ->
+    [<<"install">>];
+available_actions(Status) ->
+    HasRemoved     = evoq_bit_flags:has(Status, ?PLG_REMOVED),
+    HasInstalled   = evoq_bit_flags:has(Status, ?PLG_INSTALLED),
+    HasPulling     = evoq_bit_flags:has(Status, ?PLG_PULLING),
+    HasExtracting  = evoq_bit_flags:has(Status, ?PLG_EXTRACTING),
+    HasRunning     = evoq_bit_flags:has(Status, ?PLG_RUNNING),
+    HasConfirmedUp = evoq_bit_flags:has(Status, ?PLG_CONFIRMED_UP),
+    HasConfirmedDn = evoq_bit_flags:has(Status, ?PLG_CONFIRMED_DOWN),
+    HasStopped     = evoq_bit_flags:has(Status, ?PLG_STOPPED),
+    if
+        HasRemoved, not HasInstalled ->
+            [<<"install">>];
+        HasPulling ->
+            [];
+        HasExtracting ->
+            [];
+        HasConfirmedUp ->
+            [<<"stop">>, <<"upgrade">>, <<"remove">>];
+        HasInstalled, (HasConfirmedDn orelse HasStopped orelse not HasRunning) ->
+            [<<"start">>, <<"upgrade">>, <<"remove">>];
+        HasInstalled, HasRunning ->
+            [];
+        true ->
+            []
+    end.
 
 %% --- Helpers ---
 

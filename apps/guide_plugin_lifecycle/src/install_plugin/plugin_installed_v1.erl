@@ -6,7 +6,7 @@
 -export([get_plugin_id/1, get_name/1, get_display_name/1,
          get_plugin_type/1, get_oci_image/1, get_callback_module/1,
          get_package_url/1, get_installed_version/1, get_license_id/1,
-         get_installed_at/1, get_icon/1, get_group/1]).
+         get_installed_at/1, get_icon/1, get_group/1, get_group_icon/1]).
 
 -record(plugin_installed_v1, {
     plugin_id         :: binary(),
@@ -20,6 +20,7 @@
     license_id        :: binary() | undefined,
     icon              :: binary() | undefined,
     group_name        :: binary() | undefined,
+    group_icon        :: binary() | undefined,
     installed_at      :: integer()
 }).
 
@@ -43,6 +44,7 @@ new(#{plugin_id := PluginId, name := Name,
         license_id        = maps:get(license_id, Params, undefined),
         icon              = maps:get(icon, Params, undefined),
         group_name        = maps:get(group_name, Params, undefined),
+        group_icon        = maps:get(group_icon, Params, undefined),
         installed_at      = erlang:system_time(millisecond)
     }.
 
@@ -58,13 +60,14 @@ to_map(#plugin_installed_v1{} = E) ->
     },
     %% Only include optional fields when set — atom undefined serializes
     %% as the string "undefined" in JSON, causing round-trip corruption.
+    maybe_put(group_icon, E#plugin_installed_v1.group_icon,
     maybe_put(group_name, E#plugin_installed_v1.group_name,
     maybe_put(icon, E#plugin_installed_v1.icon,
     maybe_put(license_id, E#plugin_installed_v1.license_id,
     maybe_put(callback_module, E#plugin_installed_v1.callback_module,
     maybe_put(package_url, E#plugin_installed_v1.package_url,
     maybe_put(oci_image, E#plugin_installed_v1.oci_image,
-    maybe_put(display_name, E#plugin_installed_v1.display_name, Base))))))).
+    maybe_put(display_name, E#plugin_installed_v1.display_name, Base)))))))).
 
 -spec from_map(map()) -> {ok, plugin_installed_v1()} | {error, term()}.
 from_map(Map) ->
@@ -88,6 +91,7 @@ from_map(Map) ->
                 license_id        = get_value(license_id, Map, undefined),
                 icon              = get_value(icon, Map, undefined),
                 group_name        = get_value(group_name, Map, undefined),
+                group_icon        = get_value(group_icon, Map, undefined),
                 installed_at      = get_value(installed_at, Map, erlang:system_time(millisecond))
             }}
     end.
@@ -128,6 +132,9 @@ get_icon(#plugin_installed_v1{icon = V}) -> V.
 
 -spec get_group(plugin_installed_v1()) -> binary() | undefined.
 get_group(#plugin_installed_v1{group_name = V}) -> V.
+
+-spec get_group_icon(plugin_installed_v1()) -> binary() | undefined.
+get_group_icon(#plugin_installed_v1{group_icon = V}) -> V.
 
 %% @private Only add key to map if value is not undefined/null.
 maybe_put(_Key, undefined, Map) -> Map;

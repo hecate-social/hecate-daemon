@@ -4,13 +4,14 @@
 
 -export([new/1, to_map/1, from_map/1]).
 -export([get_entry_id/1, get_display_name/1, get_icon/1,
-         get_group_name/1, get_registered_at/1]).
+         get_group_name/1, get_group_icon/1, get_registered_at/1]).
 
 -record(entry_registered_v1, {
     entry_id      :: binary(),
     display_name  :: binary(),
     icon          :: binary(),
     group_name    :: binary(),
+    group_icon    :: binary() | undefined,
     registered_at :: integer()
 }).
 
@@ -21,12 +22,13 @@
 
 -spec new(map()) -> entry_registered_v1().
 new(#{entry_id := EntryId, display_name := DisplayName,
-      icon := Icon, group_name := GroupName}) ->
+      icon := Icon, group_name := GroupName} = Params) ->
     #entry_registered_v1{
         entry_id      = EntryId,
         display_name  = DisplayName,
         icon          = Icon,
         group_name    = GroupName,
+        group_icon    = maps:get(group_icon, Params, undefined),
         registered_at = erlang:system_time(millisecond)
     }.
 
@@ -38,6 +40,7 @@ to_map(#entry_registered_v1{} = E) ->
         display_name  => E#entry_registered_v1.display_name,
         icon          => E#entry_registered_v1.icon,
         group_name    => E#entry_registered_v1.group_name,
+        group_icon    => E#entry_registered_v1.group_icon,
         registered_at => E#entry_registered_v1.registered_at
     }.
 
@@ -56,6 +59,7 @@ from_map(Map) ->
                 display_name  = DisplayName,
                 icon          = case Icon of undefined -> <<>>; _ -> Icon end,
                 group_name    = GroupName,
+                group_icon    = get_value(group_icon, Map),
                 registered_at = get_value(registered_at, Map, erlang:system_time(millisecond))
             }}
     end.
@@ -79,6 +83,9 @@ get_icon(#entry_registered_v1{icon = V}) -> V.
 
 -spec get_group_name(entry_registered_v1()) -> binary().
 get_group_name(#entry_registered_v1{group_name = V}) -> V.
+
+-spec get_group_icon(entry_registered_v1()) -> binary() | undefined.
+get_group_icon(#entry_registered_v1{group_icon = V}) -> V.
 
 -spec get_registered_at(entry_registered_v1()) -> integer().
 get_registered_at(#entry_registered_v1{registered_at = V}) -> V.

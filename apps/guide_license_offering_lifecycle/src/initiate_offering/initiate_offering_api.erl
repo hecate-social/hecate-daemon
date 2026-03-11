@@ -48,6 +48,7 @@ create_offering(Params, Req) ->
         description => hecate_api_utils:get_field(description, Params, undefined),
         icon => hecate_api_utils:get_field(icon, Params, undefined),
         group_name => hecate_api_utils:get_field(group_name, Params, undefined),
+        group_icon => hecate_api_utils:get_field(group_icon, Params, undefined),
         github_repo => hecate_api_utils:get_field(github_repo, Params, undefined),
         homepage => hecate_api_utils:get_field(homepage, Params, undefined),
         tags => hecate_api_utils:get_field(tags, Params, undefined),

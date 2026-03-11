@@ -9,6 +9,7 @@
 -module(offering_lifecycle_to_offerings).
 -behaviour(evoq_projection).
 -export([interested_in/0, init/1, project/4]).
+-export([available_actions/1]).
 
 -include_lib("guide_license_offering_lifecycle/include/offering_status.hrl").
 
@@ -49,6 +50,7 @@ project_initiated(Data, State, RM) ->
         description         => gf(description, Data),
         icon                => gf(icon, Data),
         group_name          => gf(group_name, Data),
+        group_icon          => gf(group_icon, Data),
         github_repo         => gf(github_repo, Data),
         oci_image           => gf(oci_image, Data),
         package_url         => gf(package_url, Data),
@@ -79,6 +81,7 @@ project_initiated(Data, State, RM) ->
         refreshed_at        => undefined,
         status              => ?OFF_INITIATED,
         status_label        => <<"Initiated">>,
+        available_actions   => available_actions(?OFF_INITIATED),
         retracted           => 0
     },
     {ok, RM2} = evoq_read_model:put(OfferingId, Entry, RM),
@@ -90,10 +93,12 @@ project_announced(Data, State, RM) ->
     OfferingId = gf(offering_id, Data),
     case evoq_read_model:get(OfferingId, RM) of
         {ok, Existing} ->
+            NewStatus = evoq_bit_flags:set(maps:get(status, Existing), ?OFF_ANNOUNCED),
             Updated = Existing#{
-                announced_at => gf(announced_at, Data),
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?OFF_ANNOUNCED),
-                status_label => <<"Announced">>
+                announced_at      => gf(announced_at, Data),
+                status            => NewStatus,
+                status_label      => <<"Announced">>,
+                available_actions => available_actions(NewStatus)
             },
             {ok, RM2} = evoq_read_model:put(OfferingId, Updated, RM),
             {ok, State, RM2};
@@ -107,10 +112,12 @@ project_published(Data, State, RM) ->
     OfferingId = gf(offering_id, Data),
     case evoq_read_model:get(OfferingId, RM) of
         {ok, Existing} ->
+            NewStatus = evoq_bit_flags:set(maps:get(status, Existing), ?OFF_PUBLISHED),
             Updated = Existing#{
-                published_at => gf(published_at, Data),
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?OFF_PUBLISHED),
-                status_label => <<"Published">>
+                published_at      => gf(published_at, Data),
+                status            => NewStatus,
+                status_label      => <<"Published">>,
+                available_actions => available_actions(NewStatus)
             },
             {ok, RM2} = evoq_read_model:put(OfferingId, Updated, RM),
             {ok, State, RM2};
@@ -124,7 +131,10 @@ project_amended(Data, State, RM) ->
     OfferingId = gf(offering_id, Data),
     case evoq_read_model:get(OfferingId, RM) of
         {ok, Existing} ->
-            Updated = apply_amendments(Existing, Data),
+            Amended = apply_amendments(Existing, Data),
+            Updated = Amended#{
+                available_actions => available_actions(maps:get(status, Amended))
+            },
             {ok, RM2} = evoq_read_model:put(OfferingId, Updated, RM),
             {ok, State, RM2};
         {error, not_found} ->
@@ -134,7 +144,8 @@ project_amended(Data, State, RM) ->
 apply_amendments(Entry, Data) ->
     Fields = [
         {plugin_name, name}, {description, description}, {icon, icon},
-        {group_name, group_name}, {github_repo, github_repo}, {oci_image, oci_image},
+        {group_name, group_name}, {group_icon, group_icon},
+        {github_repo, github_repo}, {oci_image, oci_image},
         {package_url, package_url},
         {plugin_type, plugin_type}, {callback_module, callback_module},
         {org, org}, {version, version}, {manifest_tag, manifest_tag},
@@ -163,11 +174,12 @@ project_retracted(Data, State, RM) ->
     case evoq_read_model:get(OfferingId, RM) of
         {ok, Existing} ->
             Updated = Existing#{
-                status       => ?OFF_INITIATED,
-                retracted    => 1,
-                status_label => <<"Retracted">>,
-                announced_at => undefined,
-                published_at => undefined
+                status            => ?OFF_INITIATED,
+                retracted         => 1,
+                status_label      => <<"Retracted">>,
+                available_actions => available_actions(?OFF_INITIATED),
+                announced_at      => undefined,
+                published_at      => undefined
             },
             {ok, RM2} = evoq_read_model:put(OfferingId, Updated, RM),
             {ok, State, RM2};
@@ -181,15 +193,28 @@ project_archived(Data, State, RM) ->
     OfferingId = gf(offering_id, Data),
     case evoq_read_model:get(OfferingId, RM) of
         {ok, Existing} ->
+            NewStatus = evoq_bit_flags:set(maps:get(status, Existing), ?OFF_ARCHIVED),
             Updated = Existing#{
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?OFF_ARCHIVED),
-                status_label => <<"Archived">>,
-                archived_at  => gf(archived_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Archived">>,
+                available_actions => available_actions(NewStatus),
+                archived_at       => gf(archived_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(OfferingId, Updated, RM),
             {ok, State, RM2};
         {error, not_found} ->
             {ok, State, RM}
+    end.
+
+%% --- Available Actions ---
+
+available_actions(Status) when is_integer(Status) ->
+    case true of
+        _ when Status band ?OFF_ARCHIVED  =/= 0 -> [];
+        _ when Status band ?OFF_PUBLISHED =/= 0 -> [<<"retract">>, <<"amend">>];
+        _ when Status band ?OFF_ANNOUNCED =/= 0 -> [<<"publish">>, <<"amend">>, <<"retract">>, <<"archive">>];
+        _ when Status band ?OFF_INITIATED =/= 0 -> [<<"announce">>, <<"draft">>, <<"amend">>, <<"archive">>];
+        _ -> []
     end.
 
 get_event_type(#{event_type := T}) -> T;

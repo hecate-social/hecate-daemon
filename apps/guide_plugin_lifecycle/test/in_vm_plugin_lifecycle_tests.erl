@@ -42,7 +42,8 @@ make_in_vm_install_payload() ->
         <<"installed_version">> => ?VERSION,
         <<"license_id">>        => ?LICENSE_ID,
         <<"icon">>              => <<"pencil">>,
-        <<"group_name">>        => <<"OFFICE">>
+        <<"group_name">>        => <<"OFFICE">>,
+        <<"group_icon">>        => <<"briefcase">>
     }.
 
 make_activate_payload() ->

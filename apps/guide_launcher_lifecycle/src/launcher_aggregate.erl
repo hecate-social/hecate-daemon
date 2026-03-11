@@ -111,7 +111,8 @@ apply_initialized(E, _State) ->
 apply_registered(E, #launcher_state{status = Status, groups = Groups}) ->
     EntryId = get_value(entry_id, E),
     GroupName = coalesce(get_value(group_name, E), <<"APPS">>),
-    NewGroups = add_entry_to_group(EntryId, GroupName, Groups),
+    GroupIcon = get_value(group_icon, E),
+    NewGroups = add_entry_to_group(EntryId, GroupName, GroupIcon, Groups),
     #launcher_state{
         status = evoq_bit_flags:set(Status, ?LNCH_CONFIGURED),
         groups = NewGroups
@@ -134,16 +135,17 @@ apply_reorganized(E, #launcher_state{status = Status}) ->
 
 %% --- Group manipulation helpers ---
 
-add_entry_to_group(EntryId, GroupName, Groups) ->
+add_entry_to_group(EntryId, GroupName, GroupIcon, Groups) ->
     case find_group(GroupName, Groups) of
         {ok, Group} ->
             Apps = maps:get(apps, Group, maps:get(<<"apps">>, Group, [])),
             UpdatedGroup = Group#{apps => Apps ++ [EntryId]},
             replace_group(GroupName, UpdatedGroup, Groups);
         not_found ->
+            DefaultIcon = <<"\xF0\x9F\x94\x8C">>,
             NewGroup = #{
                 name => GroupName,
-                icon => <<"\xF0\x9F\x94\x8C">>,
+                icon => coalesce(GroupIcon, DefaultIcon),
                 collapsed => false,
                 apps => [EntryId]
             },

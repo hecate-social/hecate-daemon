@@ -193,9 +193,11 @@ apply_initiated(E, State) ->
         plugin_id          = gf(plugin_id, E),
         %% Full offering snapshot deep-copied at birth
         plugin_name        = gf(plugin_name, E),
+        display_name       = gf(display_name, E),
         description        = gf(description, E),
         icon               = gf(icon, E),
         group_name         = gf(group_name, E),
+        group_icon         = gf(group_icon, E),
         github_repo        = gf(github_repo, E),
         oci_image          = gf(oci_image, E),
         plugin_type        = gf(plugin_type, E),

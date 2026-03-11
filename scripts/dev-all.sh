@@ -9,8 +9,9 @@
 #   ./scripts/dev-all.sh                # start both
 #   ./scripts/dev-all.sh daemon         # daemon only (same as dev-start.sh)
 #   ./scripts/dev-all.sh web            # web only (assumes daemon running)
-#   ./scripts/dev-all.sh --clear        # wipe dev data + webkit cache, then start both
-#   ./scripts/dev-all.sh --clear daemon # wipe, then daemon only
+#   ./scripts/dev-all.sh --clear        # wipe app data (preserves identity/credentials)
+#   ./scripts/dev-all.sh --clear daemon # wipe app data, then daemon only
+#   ./scripts/dev-all.sh --clear-all    # wipe EVERYTHING including identity/credentials
 #
 # Ctrl+C stops the web (foreground). Daemon is stopped via trap.
 #
@@ -25,18 +26,71 @@ WEBKIT_DATA_DIR="$HOME/.local/share/social.hecate.web"
 DEV_SOCK="$DEV_DATA_DIR/hecate-daemon/sockets/api.sock"
 
 CLEAR=false
+CLEAR_ALL=false
 MODE="all"
 
 for arg in "$@"; do
     case "$arg" in
+        --clear-all) CLEAR_ALL=true ;;
         --clear) CLEAR=true ;;
         daemon|web|all) MODE="$arg" ;;
-        *) echo "Usage: $0 [--clear] [all|daemon|web]"; exit 1 ;;
+        *) echo "Usage: $0 [--clear|--clear-all] [all|daemon|web]"; exit 1 ;;
     esac
 done
 
-clear_dev_data() {
-    echo "=== Clearing dev data ==="
+DAEMON_DATA="$DEV_DATA_DIR/hecate-daemon"
+
+# Directories that hold identity and credentials — preserved by --clear
+PRESERVE_DIRS=(
+    "$DAEMON_DATA/sqlite"
+    "$DAEMON_DATA/reckon-db/settings"
+    "$DAEMON_DATA/reckon-db/realm_memberships"
+)
+
+clear_app_data() {
+    echo "=== Clearing app data (preserving identity/credentials) ==="
+    if [ ! -d "$DEV_DATA_DIR" ]; then
+        echo "  Nothing to clear"
+        echo ""
+        return
+    fi
+
+    # Back up preserved dirs to temp
+    local backup_dir
+    backup_dir="$(mktemp -d)"
+    for dir in "${PRESERVE_DIRS[@]}"; do
+        if [ -d "$dir" ]; then
+            local rel="${dir#"$DEV_DATA_DIR"/}"
+            mkdir -p "$backup_dir/$(dirname "$rel")"
+            cp -a "$dir" "$backup_dir/$rel"
+            echo "  Preserved $rel"
+        fi
+    done
+
+    # Wipe everything
+    rm -rf "$DEV_DATA_DIR"
+    echo "  Removed $DEV_DATA_DIR"
+
+    # Restore preserved dirs
+    for dir in "${PRESERVE_DIRS[@]}"; do
+        local rel="${dir#"$DEV_DATA_DIR"/}"
+        if [ -d "$backup_dir/$rel" ]; then
+            mkdir -p "$(dirname "$dir")"
+            cp -a "$backup_dir/$rel" "$dir"
+        fi
+    done
+    rm -rf "$backup_dir"
+
+    # Clear WebKitGTK cache
+    if [ -d "$WEBKIT_DATA_DIR" ]; then
+        rm -rf "$WEBKIT_DATA_DIR"
+        echo "  Removed $WEBKIT_DATA_DIR (WebKitGTK localStorage/cache)"
+    fi
+    echo ""
+}
+
+clear_all_data() {
+    echo "=== Clearing ALL dev data (including identity/credentials) ==="
     if [ -d "$DEV_DATA_DIR" ]; then
         rm -rf "$DEV_DATA_DIR"
         echo "  Removed $DEV_DATA_DIR"
@@ -48,8 +102,10 @@ clear_dev_data() {
     echo ""
 }
 
-if [ "$CLEAR" = true ]; then
-    clear_dev_data
+if [ "$CLEAR_ALL" = true ]; then
+    clear_all_data
+elif [ "$CLEAR" = true ]; then
+    clear_app_data
 fi
 DAEMON_PID=""
 VITE_PID=""

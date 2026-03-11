@@ -6,6 +6,7 @@
 -module(license_lifecycle_to_licenses).
 -behaviour(evoq_projection).
 -export([interested_in/0, init/1, project/4]).
+-export([available_actions/1]).
 
 -include_lib("guide_license_lifecycle/include/license_status.hrl").
 
@@ -56,6 +57,7 @@ project_initiated(Data, State, RM) ->
         description        => gf(description, Data),
         icon               => gf(icon, Data),
         group_name         => gf(group_name, Data),
+        group_icon         => gf(group_icon, Data),
         github_repo        => gf(github_repo, Data),
         oci_image          => gf(oci_image, Data),
         selling_formula    => gf(selling_formula, Data),
@@ -79,6 +81,7 @@ project_initiated(Data, State, RM) ->
         oci_image_digest   => gf(oci_image_digest, Data),
         status             => ?LIC_INITIATED,
         status_label       => <<"Initiated">>,
+        available_actions  => available_actions(?LIC_INITIATED),
         initiated_at       => gf(initiated_at, Data)
     },
     {ok, RM2} = evoq_read_model:put(LicenseId, Entry, RM),
@@ -90,10 +93,12 @@ project_accepted(Data, State, RM) ->
     LicenseId = gf(license_id, Data),
     case evoq_read_model:get(LicenseId, RM) of
         {ok, Existing} ->
+            NewStatus = evoq_bit_flags:set(maps:get(status, Existing), ?LIC_ACCEPTED),
             Updated = Existing#{
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?LIC_ACCEPTED),
-                status_label => <<"Accepted">>,
-                accepted_at  => gf(accepted_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Accepted">>,
+                available_actions => available_actions(NewStatus),
+                accepted_at       => gf(accepted_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(LicenseId, Updated, RM),
             {ok, State, RM2};
@@ -107,10 +112,12 @@ project_bought(Data, State, RM) ->
     LicenseId = gf(license_id, Data),
     case evoq_read_model:get(LicenseId, RM) of
         {ok, Existing} ->
+            NewStatus = evoq_bit_flags:set(maps:get(status, Existing), ?LIC_BOUGHT),
             Updated = Existing#{
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?LIC_BOUGHT),
-                status_label => <<"Bought">>,
-                bought_at    => gf(bought_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Bought">>,
+                available_actions => available_actions(NewStatus),
+                bought_at         => gf(bought_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(LicenseId, Updated, RM),
             {ok, State, RM2};
@@ -124,10 +131,12 @@ project_granted(Data, State, RM) ->
     LicenseId = gf(license_id, Data),
     case evoq_read_model:get(LicenseId, RM) of
         {ok, Existing} ->
+            NewStatus = evoq_bit_flags:set(maps:get(status, Existing), ?LIC_GRANTED),
             Updated = Existing#{
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?LIC_GRANTED),
-                status_label => <<"Granted">>,
-                granted_at   => gf(granted_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Granted">>,
+                available_actions => available_actions(NewStatus),
+                granted_at        => gf(granted_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(LicenseId, Updated, RM),
             {ok, State, RM2};
@@ -141,10 +150,12 @@ project_expired(Data, State, RM) ->
     LicenseId = gf(license_id, Data),
     case evoq_read_model:get(LicenseId, RM) of
         {ok, Existing} ->
+            NewStatus = evoq_bit_flags:set(maps:get(status, Existing), ?LIC_EXPIRED),
             Updated = Existing#{
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?LIC_EXPIRED),
-                status_label => <<"Expired">>,
-                expired_at   => gf(expired_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Expired">>,
+                available_actions => available_actions(NewStatus),
+                expired_at        => gf(expired_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(LicenseId, Updated, RM),
             {ok, State, RM2};
@@ -158,11 +169,13 @@ project_renewed(Data, State, RM) ->
     LicenseId = gf(license_id, Data),
     case evoq_read_model:get(LicenseId, RM) of
         {ok, Existing} ->
-            NewStatus = evoq_bit_flags:unset(maps:get(status, Existing), ?LIC_EXPIRED),
+            Unset = evoq_bit_flags:unset(maps:get(status, Existing), ?LIC_EXPIRED),
+            NewStatus = evoq_bit_flags:set(Unset, ?LIC_GRANTED),
             Updated = Existing#{
-                status       => evoq_bit_flags:set(NewStatus, ?LIC_GRANTED),
-                status_label => <<"Granted">>,
-                renewed_at   => gf(renewed_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Granted">>,
+                available_actions => available_actions(NewStatus),
+                renewed_at        => gf(renewed_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(LicenseId, Updated, RM),
             {ok, State, RM2};
@@ -176,10 +189,12 @@ project_revoked(Data, State, RM) ->
     LicenseId = gf(license_id, Data),
     case evoq_read_model:get(LicenseId, RM) of
         {ok, Existing} ->
+            NewStatus = evoq_bit_flags:set(maps:get(status, Existing), ?LIC_REVOKED),
             Updated = Existing#{
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?LIC_REVOKED),
-                status_label => <<"Revoked">>,
-                revoked_at   => gf(revoked_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Revoked">>,
+                available_actions => available_actions(NewStatus),
+                revoked_at        => gf(revoked_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(LicenseId, Updated, RM),
             {ok, State, RM2};
@@ -193,10 +208,12 @@ project_archived(Data, State, RM) ->
     LicenseId = gf(license_id, Data),
     case evoq_read_model:get(LicenseId, RM) of
         {ok, Existing} ->
+            NewStatus = evoq_bit_flags:set(maps:get(status, Existing), ?LIC_ARCHIVED),
             Updated = Existing#{
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?LIC_ARCHIVED),
-                status_label => <<"Archived">>,
-                archived_at  => gf(archived_at, Data)
+                status            => NewStatus,
+                status_label      => <<"Archived">>,
+                available_actions => available_actions(NewStatus),
+                archived_at       => gf(archived_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(LicenseId, Updated, RM),
             {ok, State, RM2};
@@ -210,14 +227,30 @@ project_terminal(Data, Label, State, RM) ->
     LicenseId = gf(license_id, Data),
     case evoq_read_model:get(LicenseId, RM) of
         {ok, Existing} ->
+            NewStatus = evoq_bit_flags:set(maps:get(status, Existing), ?LIC_ARCHIVED),
             Updated = Existing#{
-                status       => evoq_bit_flags:set(maps:get(status, Existing), ?LIC_ARCHIVED),
-                status_label => Label
+                status            => NewStatus,
+                status_label      => Label,
+                available_actions => available_actions(NewStatus)
             },
             {ok, RM2} = evoq_read_model:put(LicenseId, Updated, RM),
             {ok, State, RM2};
         {error, not_found} ->
             {ok, State, RM}
+    end.
+
+%% --- Available Actions ---
+
+available_actions(Status) when is_integer(Status) ->
+    case true of
+        _ when Status band ?LIC_ARCHIVED =/= 0 -> [];
+        _ when Status band ?LIC_REVOKED  =/= 0 -> [<<"archive">>];
+        _ when Status band ?LIC_EXPIRED  =/= 0 -> [<<"renew">>, <<"archive">>];
+        _ when Status band ?LIC_GRANTED  =/= 0 -> [<<"revoke">>, <<"archive">>];
+        _ when Status band ?LIC_BOUGHT   =/= 0 -> [];
+        _ when Status band ?LIC_ACCEPTED =/= 0 -> [<<"buy">>, <<"abandon">>, <<"archive">>];
+        _ when Status band ?LIC_INITIATED =/= 0 -> [<<"accept">>, <<"reject">>, <<"archive">>];
+        _ -> []
     end.
 
 %% --- Internal ---

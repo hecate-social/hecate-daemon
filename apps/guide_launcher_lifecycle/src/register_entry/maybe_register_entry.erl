@@ -59,7 +59,8 @@ create_event(Cmd) ->
         entry_id     => register_entry_v1:get_entry_id(Cmd),
         display_name => register_entry_v1:get_display_name(Cmd),
         icon         => register_entry_v1:get_icon(Cmd),
-        group_name   => register_entry_v1:get_group_name(Cmd)
+        group_name   => register_entry_v1:get_group_name(Cmd),
+        group_icon   => register_entry_v1:get_group_icon(Cmd)
     }),
     {ok, [Event]}.
 

@@ -12,9 +12,11 @@
     status             :: non_neg_integer(),
     %% Deep-copied offering fields (snapshot at acceptance)
     plugin_name        :: binary() | undefined,
+    display_name       :: binary() | undefined,
     description        :: binary() | undefined,
     icon               :: binary() | undefined,
     group_name         :: binary() | undefined,
+    group_icon         :: binary() | undefined,
     github_repo        :: binary() | undefined,
     oci_image          :: binary() | undefined,
     plugin_type        :: binary() | undefined,

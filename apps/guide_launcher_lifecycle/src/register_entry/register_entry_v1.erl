@@ -3,13 +3,14 @@
 -module(register_entry_v1).
 
 -export([new/1, from_map/1, validate/1, to_map/1]).
--export([get_entry_id/1, get_display_name/1, get_icon/1, get_group_name/1]).
+-export([get_entry_id/1, get_display_name/1, get_icon/1, get_group_name/1, get_group_icon/1]).
 
 -record(register_entry_v1, {
     entry_id     :: binary(),
     display_name :: binary(),
     icon         :: binary(),
-    group_name   :: binary()
+    group_name   :: binary(),
+    group_icon   :: binary() | undefined
 }).
 
 -export_type([register_entry_v1/0]).
@@ -19,12 +20,13 @@
 
 -spec new(map()) -> {ok, register_entry_v1()} | {error, term()}.
 new(#{entry_id := EntryId, display_name := DisplayName,
-      icon := Icon, group_name := GroupName}) ->
+      icon := Icon, group_name := GroupName} = Params) ->
     {ok, #register_entry_v1{
         entry_id     = EntryId,
         display_name = DisplayName,
         icon         = Icon,
-        group_name   = GroupName
+        group_name   = GroupName,
+        group_icon   = maps:get(group_icon, Params, undefined)
     }};
 new(_) ->
     {error, missing_required_fields}.
@@ -49,7 +51,8 @@ to_map(#register_entry_v1{} = Cmd) ->
         <<"entry_id">>      => Cmd#register_entry_v1.entry_id,
         <<"display_name">>  => Cmd#register_entry_v1.display_name,
         <<"icon">>          => Cmd#register_entry_v1.icon,
-        <<"group_name">>    => Cmd#register_entry_v1.group_name
+        <<"group_name">>    => Cmd#register_entry_v1.group_name,
+        <<"group_icon">>    => Cmd#register_entry_v1.group_icon
     }.
 
 -spec from_map(map()) -> {ok, register_entry_v1()} | {error, term()}.
@@ -66,7 +69,8 @@ from_map(Map) ->
                 entry_id     = EntryId,
                 display_name = DisplayName,
                 icon         = case Icon of undefined -> <<>>; _ -> Icon end,
-                group_name   = GroupName
+                group_name   = GroupName,
+                group_icon   = get_value(group_icon, Map)
             }}
     end.
 
@@ -89,6 +93,9 @@ get_icon(#register_entry_v1{icon = V}) -> V.
 
 -spec get_group_name(register_entry_v1()) -> binary().
 get_group_name(#register_entry_v1{group_name = V}) -> V.
+
+-spec get_group_icon(register_entry_v1()) -> binary() | undefined.
+get_group_icon(#register_entry_v1{group_icon = V}) -> V.
 
 %% Internal helper to get value with atom or binary key
 get_value(Key, Map) ->

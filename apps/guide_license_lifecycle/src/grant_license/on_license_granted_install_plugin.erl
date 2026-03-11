@@ -24,15 +24,17 @@ handle_event(_EventType, Event, _Metadata, State) ->
 %% Internal
 
 dispatch_install(PluginId, Data) ->
+    TechName = tech_name_from_plugin_id(PluginId),
     CmdParams = #{
         plugin_id         => PluginId,
-        name              => resolve_routing_name(gf(oci_image, Data), gf(plugin_name, Data, PluginId)),
-        display_name      => gf(plugin_name, Data, PluginId),
+        name              => resolve_routing_name(gf(oci_image, Data), TechName),
+        display_name      => gf(display_name, Data, gf(plugin_name, Data, TechName)),
         oci_image         => gf(oci_image, Data),
         installed_version => gf(version, Data, <<"latest">>),
         license_id        => gf(license_id, Data),
         icon              => gf(icon, Data, undefined),
         group_name        => gf(group_name, Data, undefined),
+        group_icon        => gf(group_icon, Data, undefined),
         plugin_type       => gf(plugin_type, Data, <<"container">>),
         callback_module   => gf(callback_module, Data, undefined),
         package_url       => gf(package_url, Data, undefined)
@@ -54,6 +56,13 @@ resolve_routing_name(OciImage, _) when is_binary(OciImage), byte_size(OciImage) 
     shared_podman:extract_plugin_name(OciImage);
 resolve_routing_name(_, Fallback) ->
     Fallback.
+
+%% Extract technical name from plugin_id (e.g. "hecate-apps/hecate-app-snake-duel" -> "hecate-app-snake-duel")
+tech_name_from_plugin_id(PluginId) when is_binary(PluginId) ->
+    case binary:split(PluginId, <<"/">>, [global]) of
+        [_Org, Name] -> Name;
+        _ -> PluginId
+    end.
 
 gf(Key, Data) -> hecate_api_utils:get_field(Key, Data).
 gf(Key, Data, Default) -> hecate_api_utils:get_field(Key, Data, Default).

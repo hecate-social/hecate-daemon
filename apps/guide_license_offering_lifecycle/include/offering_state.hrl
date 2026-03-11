@@ -7,9 +7,11 @@
     status             :: non_neg_integer(),
     %% Marketing fields
     plugin_name        :: binary() | undefined,
+    display_name       :: binary() | undefined,
     description        :: binary() | undefined,
     icon               :: binary() | undefined,
     group_name         :: binary() | undefined,
+    group_icon         :: binary() | undefined,
     github_repo        :: binary() | undefined,
     homepage           :: binary() | undefined,
     tags               :: binary() | undefined,

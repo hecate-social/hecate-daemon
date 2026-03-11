@@ -41,6 +41,7 @@ make_installed_event() ->
         license_id        => <<"lic-123">>,
         icon              => <<"pencil">>,
         group_name        => <<"OFFICE">>,
+        group_icon        => <<"briefcase">>,
         installed_at      => erlang:system_time(millisecond)
     }.
 

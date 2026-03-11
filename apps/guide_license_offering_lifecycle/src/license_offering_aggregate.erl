@@ -151,9 +151,11 @@ apply_initiated(E, State) ->
         plugin_id = hecate_api_utils:get_field(plugin_id, E),
         author_id = hecate_api_utils:get_field(author_id, E),
         plugin_name = hecate_api_utils:get_field(plugin_name, E),
+        display_name = hecate_api_utils:get_field(display_name, E),
         description = hecate_api_utils:get_field(description, E),
         icon = hecate_api_utils:get_field(icon, E),
         group_name = hecate_api_utils:get_field(group_name, E),
+        group_icon = hecate_api_utils:get_field(group_icon, E),
         github_repo = hecate_api_utils:get_field(github_repo, E),
         homepage = hecate_api_utils:get_field(homepage, E),
         tags = hecate_api_utils:get_field(tags, E),
@@ -183,7 +185,7 @@ apply_initiated(E, State) ->
 
 apply_drafted(E, State) ->
     Fields = [
-        plugin_name, description, icon, group_name, github_repo, homepage, tags,
+        plugin_name, display_name, description, icon, group_name, group_icon, github_repo, homepage, tags,
         oci_image, package_url, plugin_type, callback_module,
         org, version, manifest_tag, min_daemon_version, publisher_identity,
         selling_formula, license_type, fee_cents, fee_currency,
@@ -217,7 +219,7 @@ apply_retracted(E, #offering_state{} = State) ->
 
 apply_amended(E, State) ->
     Fields = [
-        plugin_name, description, icon, group_name, github_repo, homepage, tags,
+        plugin_name, display_name, description, icon, group_name, group_icon, github_repo, homepage, tags,
         oci_image, package_url, plugin_type, callback_module,
         org, version, manifest_tag, min_daemon_version, publisher_identity,
         selling_formula, license_type, fee_cents, fee_currency,
@@ -252,9 +254,11 @@ convert_events({error, _} = Err, _) ->
 %% Selectively update an offering_state field only when Value is not undefined.
 maybe_set(_Field, undefined, State) -> State;
 maybe_set(plugin_name, V, S)        -> S#offering_state{plugin_name = V};
+maybe_set(display_name, V, S)       -> S#offering_state{display_name = V};
 maybe_set(description, V, S)        -> S#offering_state{description = V};
 maybe_set(icon, V, S)               -> S#offering_state{icon = V};
 maybe_set(group_name, V, S)         -> S#offering_state{group_name = V};
+maybe_set(group_icon, V, S)         -> S#offering_state{group_icon = V};
 maybe_set(github_repo, V, S)        -> S#offering_state{github_repo = V};
 maybe_set(homepage, V, S)           -> S#offering_state{homepage = V};
 maybe_set(tags, V, S)               -> S#offering_state{tags = V};

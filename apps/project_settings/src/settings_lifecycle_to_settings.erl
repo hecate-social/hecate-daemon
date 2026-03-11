@@ -35,9 +35,11 @@ project_initiated(Data, State, RM) ->
         linux_user     => LinuxUser,
         hostname       => Hostname,
         hecate_user_id => HecateUserId,
-        preferences    => #{},
-        status         => 1,
-        initiated_at   => gf(initiated_at, Data)
+        preferences       => #{},
+        status            => 1,
+        status_label      => <<"Initialized">>,
+        available_actions => [],
+        initiated_at      => gf(initiated_at, Data)
     },
     {ok, RM2} = evoq_read_model:put(?KEY, Entry, RM),
     {ok, State, RM2}.
