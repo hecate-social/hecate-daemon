@@ -8,6 +8,9 @@
 -module(publish_from_url_api).
 
 -export([init/2, routes/0]).
+-export([parse_github_from_raw_url/1, resolve_package_url/5,
+         compute_trust_in_vm/2, compute_trust/3, sign_checksum/1,
+         verify_package_url/1, compare_versions/2]).
 
 routes() -> [{"/api/appstore/publish-from-url", ?MODULE, []}].
 

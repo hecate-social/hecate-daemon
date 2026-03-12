@@ -131,9 +131,15 @@ project_amended(Data, State, RM) ->
     OfferingId = gf(offering_id, Data),
     case evoq_read_model:get(OfferingId, RM) of
         {ok, Existing} ->
+            OldVersion = maps:get(version, Existing, undefined),
             Amended = apply_amendments(Existing, Data),
-            Updated = Amended#{
-                available_actions => available_actions(maps:get(status, Amended))
+            NewVersion = maps:get(version, Amended, undefined),
+            WithRefresh = case NewVersion =/= undefined andalso NewVersion =/= OldVersion of
+                true -> Amended#{refreshed_at => erlang:system_time(millisecond)};
+                false -> Amended
+            end,
+            Updated = WithRefresh#{
+                available_actions => available_actions(maps:get(status, WithRefresh))
             },
             {ok, RM2} = evoq_read_model:put(OfferingId, Updated, RM),
             {ok, State, RM2};

@@ -48,6 +48,12 @@ init([]) ->
 
         #{id => offering_published_v1_to_mesh,
           start => {evoq_event_handler, start_link, [offering_published_v1_to_mesh, #{}]},
+          restart => permanent, type => worker},
+
+        %% -- Version refresh (polls GitHub Releases API) --
+
+        #{id => refresh_offering_versions,
+          start => {refresh_offering_versions, start_link, []},
           restart => permanent, type => worker}
     ],
 
