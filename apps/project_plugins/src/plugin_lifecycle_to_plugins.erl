@@ -380,6 +380,8 @@ available_actions(Status) ->
     HasConfirmedUp = evoq_bit_flags:has(Status, ?PLG_CONFIRMED_UP),
     HasConfirmedDn = evoq_bit_flags:has(Status, ?PLG_CONFIRMED_DOWN),
     HasStopped     = evoq_bit_flags:has(Status, ?PLG_STOPPED),
+    HasActivated   = evoq_bit_flags:has(Status, ?PLG_ACTIVATED),
+    HasDeactivated = evoq_bit_flags:has(Status, ?PLG_DEACTIVATED),
     if
         HasRemoved, not HasInstalled ->
             [<<"install">>];
@@ -387,9 +389,13 @@ available_actions(Status) ->
             [];
         HasExtracting ->
             [];
+        %% In-VM plugins: activated = running
+        HasActivated, not HasDeactivated ->
+            [<<"stop">>, <<"upgrade">>, <<"remove">>];
+        %% Container plugins: confirmed up = running
         HasConfirmedUp ->
             [<<"stop">>, <<"upgrade">>, <<"remove">>];
-        HasInstalled, (HasConfirmedDn orelse HasStopped orelse not HasRunning) ->
+        HasInstalled, (HasConfirmedDn orelse HasStopped orelse HasDeactivated orelse not HasRunning) ->
             [<<"start">>, <<"upgrade">>, <<"remove">>];
         HasInstalled, HasRunning ->
             [];
