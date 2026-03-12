@@ -241,9 +241,14 @@ apply_installed(E, _State) ->
 
 apply_upgraded(E, #plugin_state{} = State) ->
     State#plugin_state{
-        oci_image = get_value(oci_image, E),
+        oci_image = coalesce(get_value(oci_image, E), State#plugin_state.oci_image),
+        package_url = coalesce(get_value(package_url, E), State#plugin_state.package_url),
+        plugin_type = coalesce(get_value(plugin_type, E), State#plugin_state.plugin_type),
         installed_version = get_value(installed_version, E),
-        upgraded_at = get_value(upgraded_at, E)
+        upgraded_at = get_value(upgraded_at, E),
+        icon = coalesce(get_value(icon, E), State#plugin_state.icon),
+        group_name = coalesce(get_value(group_name, E), State#plugin_state.group_name),
+        group_icon = coalesce(get_value(group_icon, E), State#plugin_state.group_icon)
     }.
 
 apply_removed(E, #plugin_state{status = Status} = State) ->
@@ -336,3 +341,7 @@ convert_events({ok, Events}, ToMapFn) ->
     {ok, [ToMapFn(E) || E <- Events]};
 convert_events({error, _} = Err, _) ->
     Err.
+
+%% @private Use new value if defined, otherwise keep existing.
+coalesce(undefined, Existing) -> Existing;
+coalesce(New, _Existing) -> New.

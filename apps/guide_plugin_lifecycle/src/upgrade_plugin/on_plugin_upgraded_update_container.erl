@@ -17,12 +17,16 @@ init(_Config) ->
 
 handle_event(_EventType, Event, _Metadata, State) ->
     Data = maps:get(data, Event),
-    do_handle(Data),
+    PluginType = get_value(plugin_type, Data, <<"container">>),
+    do_handle(PluginType, Data),
     {ok, State}.
 
 %% Internal
 
-do_handle(Data) ->
+%% Only container plugins get Quadlet updates
+do_handle(<<"in_vm">>, _Data) ->
+    ok;
+do_handle(_, Data) ->
     PluginId = get_value(plugin_id, Data),
     OciImage = get_value(oci_image, Data),
     DaemonName = extract_daemon_name(OciImage),
@@ -101,8 +105,10 @@ service_name(DaemonName) ->
     <<DaemonName/binary, ".service">>.
 
 %% @private Get a value from a map, trying atom key first, then binary.
-get_value(Key, Map) when is_atom(Key) ->
+get_value(Key, Map) -> get_value(Key, Map, undefined).
+
+get_value(Key, Map, Default) when is_atom(Key) ->
     case maps:find(Key, Map) of
         {ok, V} -> V;
-        error -> maps:get(atom_to_binary(Key), Map, undefined)
+        error -> maps:get(atom_to_binary(Key), Map, Default)
     end.

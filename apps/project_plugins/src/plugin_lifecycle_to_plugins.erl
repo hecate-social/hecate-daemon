@@ -86,7 +86,8 @@ do_project(<<"plugin_installed_v1">>, Data, State, RM) ->
         available_actions => available_actions(Status),
         icon              => gf(icon, Data),
         group_name        => gf(group_name, Data),
-        group_icon        => gf(group_icon, Data)
+        group_icon        => gf(group_icon, Data),
+        description       => gf(description, Data)
     },
     {ok, RM2} = evoq_read_model:put(PluginId, Plugin, RM),
     {ok, State, RM2};
@@ -98,9 +99,16 @@ do_project(<<"plugin_upgraded_v1">>, Data, State, RM) ->
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
             Updated = Plugin#{
-                oci_image         => gf(oci_image, Data),
+                oci_image         => coalesce(gf(oci_image, Data), maps:get(oci_image, Plugin, undefined)),
+                package_url       => coalesce(gf(package_url, Data), maps:get(package_url, Plugin, undefined)),
+                plugin_type       => coalesce(gf(plugin_type, Data), maps:get(plugin_type, Plugin, undefined)),
                 installed_version => gf(installed_version, Data),
                 upgraded_at       => gf(upgraded_at, Data),
+                icon              => coalesce(gf(icon, Data), maps:get(icon, Plugin, undefined)),
+                group_name        => coalesce(gf(group_name, Data), maps:get(group_name, Plugin, undefined)),
+                group_icon        => coalesce(gf(group_icon, Data), maps:get(group_icon, Plugin, undefined)),
+                display_name      => coalesce(gf(display_name, Data), maps:get(display_name, Plugin, undefined)),
+                description       => coalesce(gf(description, Data), maps:get(description, Plugin, undefined)),
                 available_actions => available_actions(S)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
@@ -411,4 +419,7 @@ get_event_type(_) -> undefined.
 
 gf(Key, Data) -> hecate_api_utils:get_field(Key, Data).
 gf(Key, Data, Default) -> hecate_api_utils:get_field(Key, Data, Default).
+
+coalesce(undefined, Existing) -> Existing;
+coalesce(New, _Existing) -> New.
 
