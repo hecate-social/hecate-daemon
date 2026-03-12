@@ -19,7 +19,7 @@ init([]) ->
         },
         #{
             id => license_lifecycle_to_licenses,
-            start => {evoq_projection, start_link, [license_lifecycle_to_licenses, #{}]},
+            start => {evoq_projection, start_link, [license_lifecycle_to_licenses, #{}, #{store_id => licenses_store}]},
             restart => permanent,
             type => worker
         }

@@ -22,7 +22,7 @@ init([]) ->
         }
         | [#{
             id => Mod,
-            start => {evoq_projection, start_link, [Mod, #{}]},
+            start => {evoq_projection, start_link, [Mod, #{}, #{store_id => launcher_store}]},
             restart => permanent,
             type => worker
         } || Mod <- Projections]

@@ -17,7 +17,7 @@ init([]) ->
           restart => permanent, type => worker},
         %% Merged projection: all settings events -> settings ETS
         #{id => settings_lifecycle_to_settings,
-          start => {evoq_projection, start_link, [settings_lifecycle_to_settings, #{}]},
+          start => {evoq_projection, start_link, [settings_lifecycle_to_settings, #{}, #{store_id => settings_store}]},
           restart => permanent, type => worker}
     ],
     {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

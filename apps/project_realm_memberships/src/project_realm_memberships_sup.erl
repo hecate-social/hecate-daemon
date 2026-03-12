@@ -17,7 +17,7 @@ init([]) ->
           restart => permanent, type => worker},
         %% Merged projection: all membership events -> realm_memberships ETS
         #{id => membership_lifecycle_to_memberships,
-          start => {evoq_projection, start_link, [membership_lifecycle_to_memberships, #{}]},
+          start => {evoq_projection, start_link, [membership_lifecycle_to_memberships, #{}, #{store_id => realm_memberships_store}]},
           restart => permanent, type => worker}
     ],
     {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

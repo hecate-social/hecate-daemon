@@ -24,7 +24,7 @@ init([]) ->
         %% projections competing for the same ETS table.
         #{
             id => plugin_lifecycle_to_plugins,
-            start => {evoq_projection, start_link, [plugin_lifecycle_to_plugins, #{}]},
+            start => {evoq_projection, start_link, [plugin_lifecycle_to_plugins, #{}, #{store_id => plugins_store}]},
             restart => permanent,
             type => worker
         }
