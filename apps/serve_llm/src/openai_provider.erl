@@ -124,8 +124,7 @@ tool_to_openai_schema(#{<<"name">> := Name, <<"description">> := Desc, <<"input_
 
 normalize_model(#{<<"id">> := Id} = M) ->
     OwnedBy = maps:get(<<"owned_by">>, M, <<"unknown">>),
-    %% Filter out embedding/moderation/tts models
-    case is_chat_model(Id) of
+    case is_useful_openai_model(Id) of
         true ->
             {true, #{
                 name => Id,
@@ -140,13 +139,59 @@ normalize_model(#{<<"id">> := Id} = M) ->
 normalize_model(_) ->
     false.
 
-is_chat_model(Id) ->
-    not (binary:match(Id, <<"embedding">>) =/= nomatch
-         orelse binary:match(Id, <<"embed">>) =/= nomatch
-         orelse binary:match(Id, <<"tts">>) =/= nomatch
-         orelse binary:match(Id, <<"whisper">>) =/= nomatch
-         orelse binary:match(Id, <<"dall-e">>) =/= nomatch
-         orelse binary:match(Id, <<"moderation">>) =/= nomatch).
+%% Filter OpenAI models to production chat models only.
+%% Strategy: exclude non-chat models AND dated snapshots (keep canonical names).
+is_useful_openai_model(Id) ->
+    not is_excluded_openai_model(Id).
+
+is_excluded_openai_model(Id) ->
+    is_non_chat_openai(Id)
+    orelse is_legacy_openai(Id)
+    orelse is_dated_snapshot(Id).
+
+%% Non-chat model types (covers both OpenAI and Groq model names)
+is_non_chat_openai(Id) ->
+    lists:any(fun(Pattern) -> binary:match(Id, Pattern) =/= nomatch end, [
+        <<"embedding">>, <<"embed">>,
+        <<"tts">>, <<"whisper">>,
+        <<"dall-e">>, <<"moderation">>,
+        <<"image">>, <<"audio">>,
+        <<"realtime">>, <<"transcribe">>,
+        <<"search">>, <<"sora">>,
+        <<"codex">>,
+        %% Groq-specific non-chat models
+        <<"guard">>, <<"safeguard">>,
+        <<"orpheus">>, <<"compound">>
+    ]).
+
+%% Legacy/obsolete models
+is_legacy_openai(Id) ->
+    lists:any(fun(Pattern) -> binary:match(Id, Pattern) =/= nomatch end, [
+        <<"babbage">>, <<"davinci">>,
+        <<"gpt-3.5">>
+    ]).
+
+%% Dated snapshots like "gpt-4o-2024-08-06" — keep only canonical names.
+%% Canonical names don't end with a date pattern (YYYY-MM-DD).
+is_dated_snapshot(Id) ->
+    Size = byte_size(Id),
+    case Size >= 11 of
+        true ->
+            Suffix = binary:part(Id, Size - 10, 10),
+            is_date_pattern(Suffix);
+        false ->
+            false
+    end.
+
+%% Check if binary matches YYYY-MM-DD
+is_date_pattern(<<Y1, Y2, Y3, Y4, $-, M1, M2, $-, D1, D2>>)
+  when Y1 >= $0, Y1 =< $9, Y2 >= $0, Y2 =< $9,
+       Y3 >= $0, Y3 =< $9, Y4 >= $0, Y4 =< $9,
+       M1 >= $0, M1 =< $9, M2 >= $0, M2 =< $9,
+       D1 >= $0, D1 =< $9, D2 >= $0, D2 =< $9 ->
+    true;
+is_date_pattern(_) ->
+    false.
 
 normalize_response(#{<<"choices">> := [Choice | _]} = Resp) ->
     Message = maps:get(<<"message">>, Choice, #{}),

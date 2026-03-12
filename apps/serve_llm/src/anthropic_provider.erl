@@ -6,6 +6,7 @@
 -behaviour(llm_provider).
 
 -export([list_models/1, chat/4, chat_stream/6, health/1]).
+-export([probe_model/2]).
 
 -define(API_VERSION, <<"2023-06-01">>).
 
@@ -16,15 +17,16 @@
 -spec list_models(map()) -> {ok, [map()]} | {error, term()}.
 list_models(_Config) ->
     %% Anthropic does not have a public list-models endpoint.
-    %% Return the known production models.
+    %% Return known production models. These are validated via probe_model/2
+    %% during cache build in manage_providers so stale IDs are filtered out.
     {ok, [
-        #{name => <<"claude-opus-4-5-20251101">>,
+        #{name => <<"claude-opus-4-6">>,
           context_length => 200000, family => <<"claude">>,
           parameter_size => <<>>, format => <<"api">>},
-        #{name => <<"claude-sonnet-4-5-20250929">>,
+        #{name => <<"claude-sonnet-4-6">>,
           context_length => 200000, family => <<"claude">>,
           parameter_size => <<>>, format => <<"api">>},
-        #{name => <<"claude-haiku-3-5-20241022">>,
+        #{name => <<"claude-haiku-4-5-20251001">>,
           context_length => 200000, family => <<"claude">>,
           parameter_size => <<>>, format => <<"api">>}
     ]}.
@@ -66,7 +68,7 @@ health(Config) ->
     Url = base_url(Config) ++ "/v1/messages",
     Headers = request_headers(Config),
     Body = json:encode(#{
-        model => <<"claude-haiku-3-5-20241022">>,
+        model => <<"claude-haiku-4-5-20251001">>,
         max_tokens => 1,
         messages => [#{role => <<"user">>, content => <<"hi">>}]
     }),
@@ -74,6 +76,28 @@ health(Config) ->
         {ok, 200, _Headers, _Body} -> ok;
         {ok, 401, _Headers, _Body} -> {error, unauthorized};
         {ok, Status, _Headers, _Body} -> {error, {http_status, Status}};
+        {error, Reason} -> {error, Reason}
+    end.
+
+%% @doc Probe whether a model ID is accepted by the Anthropic API.
+%% Sends a minimal request (max_tokens=1). Returns ok if the model is valid
+%% (200 or 529/overloaded), {error, Reason} if the model ID is rejected (400/404).
+-spec probe_model(map(), binary()) -> ok | {error, term()}.
+probe_model(Config, Model) ->
+    Url = base_url(Config) ++ "/v1/messages",
+    Headers = request_headers(Config),
+    Body = json:encode(#{
+        model => Model,
+        max_tokens => 1,
+        messages => [#{role => <<"user">>, content => <<"hi">>}]
+    }),
+    case hackney:post(Url, Headers, Body, [with_body, {recv_timeout, 10000}]) of
+        {ok, 200, _H, _B} -> ok;
+        {ok, 529, _H, _B} -> ok;  %% overloaded but model is valid
+        {ok, 400, _H, RespBody} -> {error, {invalid_model, RespBody}};
+        {ok, 404, _H, _B} -> {error, model_not_found};
+        {ok, 401, _H, _B} -> {error, unauthorized};
+        {ok, Status, _H, _B} -> {error, {http_status, Status}};
         {error, Reason} -> {error, Reason}
     end.
 

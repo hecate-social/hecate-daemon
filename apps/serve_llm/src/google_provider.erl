@@ -205,9 +205,9 @@ normalize_model(#{<<"name">> := FullName} = M) ->
         [_, ShortName] -> ShortName;
         _ -> FullName
     end,
-    %% Only include generative models
     SupportedMethods = maps:get(<<"supportedGenerationMethods">>, M, []),
-    case lists:member(<<"generateContent">>, SupportedMethods) of
+    CanGenerate = lists:member(<<"generateContent">>, SupportedMethods),
+    case CanGenerate andalso is_useful_google_model(Name) of
         true ->
             InputLimit = maps:get(<<"inputTokenLimit">>, M, 0),
             OutputLimit = maps:get(<<"outputTokenLimit">>, M, 0),
@@ -223,6 +223,47 @@ normalize_model(#{<<"name">> := FullName} = M) ->
     end;
 normalize_model(_) ->
     false.
+
+%% Filter Google models to production chat models only.
+%% Excludes: TTS, image-gen, robotics, computer-use, gemma (local models),
+%% "latest" aliases (duplicates), previews with date suffixes, niche models.
+is_useful_google_model(Name) ->
+    not is_excluded_google_model(Name).
+
+is_excluded_google_model(Name) ->
+    lists:any(fun(Pattern) -> binary:match(Name, Pattern) =/= nomatch end, [
+        <<"tts">>,
+        <<"image">>,
+        <<"robotics">>,
+        <<"computer-use">>,
+        <<"nano-banana">>,
+        <<"deep-research">>,
+        <<"customtools">>
+    ])
+    orelse is_gemma_model(Name)
+    orelse is_latest_alias(Name)
+    orelse is_dated_preview(Name).
+
+is_gemma_model(<<"gemma", _/binary>>) -> true;
+is_gemma_model(_) -> false.
+
+is_latest_alias(Name) ->
+    binary:match(Name, <<"-latest">>) =/= nomatch.
+
+%% Exclude preview models with date suffixes like "preview-09-2025"
+%% but keep simple "-preview" names like "gemini-3-pro-preview"
+is_dated_preview(Name) ->
+    case binary:match(Name, <<"preview-">>) of
+        {Pos, Len} ->
+            After = binary:part(Name, Pos + Len, byte_size(Name) - Pos - Len),
+            %% If what follows starts with a digit, it's a dated preview
+            case After of
+                <<C, _/binary>> when C >= $0, C =< $9 -> true;
+                _ -> false
+            end;
+        nomatch ->
+            false
+    end.
 
 normalize_response(#{<<"candidates">> := [Candidate | _]} = Resp) ->
     Content = maps:get(<<"content">>, Candidate, #{}),

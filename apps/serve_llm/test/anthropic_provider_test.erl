@@ -42,19 +42,19 @@ list_models_returns_three_models_test() ->
 
 list_models_first_model_is_opus_test() ->
     {ok, [M1 | _]} = anthropic_provider:list_models(#{}),
-    ?assertEqual(<<"claude-opus-4-5-20251101">>, maps:get(name, M1)),
+    ?assertEqual(<<"claude-opus-4-6">>, maps:get(name, M1)),
     ?assertEqual(200000, maps:get(context_length, M1)),
     ?assertEqual(<<"claude">>, maps:get(family, M1)).
 
 list_models_second_model_is_sonnet_test() ->
     {ok, [_, M2 | _]} = anthropic_provider:list_models(#{}),
-    ?assertEqual(<<"claude-sonnet-4-5-20250929">>, maps:get(name, M2)),
+    ?assertEqual(<<"claude-sonnet-4-6">>, maps:get(name, M2)),
     ?assertEqual(200000, maps:get(context_length, M2)),
     ?assertEqual(<<"claude">>, maps:get(family, M2)).
 
 list_models_third_model_is_haiku_test() ->
     {ok, [_, _, M3]} = anthropic_provider:list_models(#{}),
-    ?assertEqual(<<"claude-haiku-3-5-20241022">>, maps:get(name, M3)),
+    ?assertEqual(<<"claude-haiku-4-5-20251001">>, maps:get(name, M3)),
     ?assertEqual(200000, maps:get(context_length, M3)),
     ?assertEqual(<<"claude">>, maps:get(family, M3)).
 

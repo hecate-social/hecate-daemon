@@ -9,7 +9,7 @@
 -behaviour(gen_server).
 
 -export([start_link/0]).
--export([list/0, add/3, remove/1, provider_for_model/1, refresh_models/0, reload/0]).
+-export([list/0, add/3, remove/1, provider_for_model/1, list_all_models/0, refresh_models/0, reload/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(SERVER, ?MODULE).
@@ -19,6 +19,7 @@
 -record(state, {
     providers :: #{binary() => map()},
     model_cache :: #{binary() => {module(), map()}},
+    models_meta :: [map()],  %% full model info for listing endpoint
     cache_updated_at :: non_neg_integer()
 }).
 
@@ -52,6 +53,12 @@ remove(Name) ->
 provider_for_model(Model) ->
     gen_server:call(?SERVER, {provider_for_model, Model}, 30000).
 
+%% @doc List all validated models from cache with provider info.
+%% Returns models that passed validation (probe) during cache build.
+-spec list_all_models() -> {ok, [map()]}.
+list_all_models() ->
+    gen_server:call(?SERVER, list_all_models, 30000).
+
 %% @doc Force refresh of the model cache.
 -spec refresh_models() -> ok.
 refresh_models() ->
@@ -74,6 +81,7 @@ init([]) ->
     {ok, #state{
         providers = ProvidersWithEnv,
         model_cache = #{},
+        models_meta = [],
         cache_updated_at = 0
     }}.
 
@@ -86,6 +94,7 @@ handle_call(reload, _From, _State) ->
     NewState = #state{
         providers = ProvidersWithEnv,
         model_cache = #{},
+        models_meta = [],
         cache_updated_at = 0
     },
     {reply, ok, NewState};
@@ -95,7 +104,7 @@ handle_call({add, Name, Type, Config}, _From, #state{providers = Providers} = St
     NewProviders = Providers#{Name => ProviderConfig},
     persist_providers(NewProviders),
     %% Invalidate model cache when providers change
-    {reply, ok, State#state{providers = NewProviders, model_cache = #{}, cache_updated_at = 0}};
+    {reply, ok, State#state{providers = NewProviders, model_cache = #{}, models_meta = [], cache_updated_at = 0}};
 
 handle_call({remove, <<"ollama">>}, _From, State) ->
     {reply, {error, cannot_remove_default}, State};
@@ -104,7 +113,7 @@ handle_call({remove, Name}, _From, #state{providers = Providers} = State) ->
         true ->
             NewProviders = maps:remove(Name, Providers),
             persist_providers(NewProviders),
-            {reply, ok, State#state{providers = NewProviders, model_cache = #{}, cache_updated_at = 0}};
+            {reply, ok, State#state{providers = NewProviders, model_cache = #{}, models_meta = [], cache_updated_at = 0}};
         false ->
             {reply, {error, not_found}, State}
     end;
@@ -113,11 +122,15 @@ handle_call({provider_for_model, Model}, _From, State) ->
     {Result, NewState} = resolve_model(Model, State),
     {reply, Result, NewState};
 
+handle_call(list_all_models, _From, State) ->
+    {_Cache, NewState} = ensure_cache(State),
+    {reply, {ok, NewState#state.models_meta}, NewState};
+
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.
 
 handle_cast(refresh_models, State) ->
-    {noreply, State#state{model_cache = #{}, cache_updated_at = 0}};
+    {noreply, State#state{model_cache = #{}, models_meta = [], cache_updated_at = 0}};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -132,46 +145,72 @@ terminate(_Reason, _State) ->
 %%% Internal
 %%% ===================================================================
 
-resolve_model(Model, #state{model_cache = Cache, cache_updated_at = CacheTime} = State) ->
+resolve_model(Model, State) ->
+    {Cache, NewState} = ensure_cache(State),
+    Result = maps:get(Model, Cache, {error, not_found}),
+    {Result, NewState}.
+
+ensure_cache(#state{model_cache = Cache, cache_updated_at = CacheTime} = State) ->
     Now = erlang:system_time(millisecond),
     CacheExpired = (Now - CacheTime) > ?MODEL_CACHE_TTL_MS,
-    case {maps:get(Model, Cache, undefined), CacheExpired} of
-        {undefined, _} ->
-            %% Not in cache, rebuild
-            NewCache = build_model_cache(State#state.providers),
-            NewState = State#state{model_cache = NewCache, cache_updated_at = Now},
-            Result = maps:get(Model, NewCache, {error, not_found}),
-            {Result, NewState};
-        {_Cached, true} ->
-            %% Cache expired, rebuild
-            NewCache = build_model_cache(State#state.providers),
-            NewState = State#state{model_cache = NewCache, cache_updated_at = Now},
-            Result = maps:get(Model, NewCache, {error, not_found}),
-            {Result, NewState};
-        {Cached, false} ->
-            {Cached, State}
+    case {map_size(Cache), CacheExpired} of
+        {0, _} ->
+            rebuild_cache(State, Now);
+        {_, true} ->
+            rebuild_cache(State, Now);
+        _ ->
+            {Cache, State}
     end.
 
+rebuild_cache(State, Now) ->
+    {NewCache, Meta} = build_model_cache(State#state.providers),
+    NewState = State#state{model_cache = NewCache, models_meta = Meta, cache_updated_at = Now},
+    {NewCache, NewState}.
+
 build_model_cache(Providers) ->
-    maps:fold(fun(ProviderName, #{type := Type, enabled := true} = Config, Acc) ->
+    maps:fold(fun(ProviderName, #{type := Type, enabled := true} = Config, {CacheAcc, MetaAcc}) ->
         Mod = llm_provider:provider_module(Type),
         case Mod:list_models(Config) of
             {ok, Models} ->
-                lists:foldl(fun(#{name := ModelName}, InnerAcc) ->
-                    %% First provider to claim a model wins
+                Validated = validate_models(Mod, Config, Models),
+                ProviderConfig = Config#{provider_name => ProviderName},
+                NewCache = lists:foldl(fun(#{name := ModelName}, InnerAcc) ->
                     case maps:is_key(ModelName, InnerAcc) of
                         true -> InnerAcc;
-                        false -> InnerAcc#{ModelName => {Mod, Config#{provider_name => ProviderName}}}
+                        false -> InnerAcc#{ModelName => {Mod, ProviderConfig}}
                     end
-                end, Acc, Models);
+                end, CacheAcc, Validated),
+                NewMeta = [M#{provider => ProviderName} || M <- Validated],
+                {NewCache, MetaAcc ++ NewMeta};
             {error, Reason} ->
                 logger:warning("[manage_providers] Failed to list models for ~s: ~p",
                     [ProviderName, Reason]),
-                Acc
+                {CacheAcc, MetaAcc}
         end;
     (_ProviderName, _DisabledConfig, Acc) ->
         Acc
-    end, #{}, Providers).
+    end, {#{}, []}, Providers).
+
+validate_models(Mod, Config, Models) ->
+    case erlang:function_exported(Mod, probe_model, 2) of
+        true ->
+            lists:filter(fun(#{name := Name}) ->
+                case Mod:probe_model(Config, Name) of
+                    ok ->
+                        true;
+                    {error, unauthorized} ->
+                        %% Bad API key — don't probe further, keep model in list
+                        %% so user sees it and can fix their key
+                        logger:warning("[manage_providers] Probe ~s: unauthorized (bad API key?)", [Name]),
+                        true;
+                    {error, Reason} ->
+                        logger:info("[manage_providers] Model ~s failed probe, excluding: ~p", [Name, Reason]),
+                        false
+                end
+            end, Models);
+        false ->
+            Models
+    end.
 
 load_providers() ->
     case file:read_file(?PROVIDERS_FILE) of
