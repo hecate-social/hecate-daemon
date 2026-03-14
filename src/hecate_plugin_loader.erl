@@ -228,18 +228,26 @@ load_steps(PluginName, CallbackModule) ->
             SId
     end,
 
-    %% 6. Initialize plugin
+    %% 6. Initialize observability
+    hecate_plugin_metrics:init(PluginName),
+    case StoreId of
+        none -> ok;
+        _ -> hecate_plugin_telemetry:attach(PluginName, StoreId)
+    end,
+
+    %% 7. Initialize plugin
     Config = #{
         plugin_name => PluginName,
         store_id => StoreId,
         data_dir => hecate_plugin_paths:base_dir(PluginName)
     },
+    logger:update_process_metadata(#{plugin_name => PluginName, plugin_version => Version}),
     {ok, _PluginState} = CallbackModule:init(Config),
 
-    %% 7. Get routes
+    %% 8. Get routes
     Routes = CallbackModule:routes(),
 
-    %% 8. Get static dir
+    %% 9. Get static dir
     StaticDir = case CallbackModule:static_dir() of
         none -> none;
         RelDir ->
@@ -252,7 +260,7 @@ load_steps(PluginName, CallbackModule) ->
             end
     end,
 
-    %% 9. Start store subscription if plugin has a store
+    %% 10. Start store subscription if plugin has a store
     case StoreId of
         none -> ok;
         _ ->
@@ -265,7 +273,7 @@ load_steps(PluginName, CallbackModule) ->
             end
     end,
 
-    %% 10. Register in ETS
+    %% 11. Register in ETS
     Record = #loaded_plugin{
         name = PluginName,
         callback = CallbackModule,
@@ -278,7 +286,7 @@ load_steps(PluginName, CallbackModule) ->
     },
     ets:insert(?TABLE, Record),
 
-    %% 11. Hot-swap cowboy dispatch to include new routes
+    %% 12. Hot-swap cowboy dispatch to include new routes
     hot_swap_routes(),
 
     logger:info("[plugin-loader] Plugin ~s loaded successfully", [PluginName]),
@@ -295,6 +303,10 @@ do_unload(RawPluginName) ->
             {error, not_loaded};
         [#loaded_plugin{callback = Mod, store_id = _StoreId}] ->
             logger:info("[plugin-loader] Unloading plugin ~s", [PluginName]),
+
+            %% Detach telemetry and clean up metrics
+            hecate_plugin_telemetry:detach(PluginName),
+            hecate_plugin_metrics:cleanup(PluginName),
 
             %% Remove from ETS first (stops route serving)
             ets:delete(?TABLE, PluginName),

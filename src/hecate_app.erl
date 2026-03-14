@@ -1,21 +1,21 @@
 %%%-------------------------------------------------------------------
 %%% @doc Hecate application module.
 %%%
-%%% Starts the Hecate agent sidecar daemon.
+%%% Starts the Hecate agent sidecar daemon with non-blocking boot.
 %%%
-%%% Startup order is CRITICAL:
+%%% Startup order:
 %%% 1. Directory layout (ensure ~/.hecate/hecate-daemon/* exists)
 %%% 2. Lifecycle files (daemon.pid, daemon.state = starting)
 %%% 3. Unix socket with minimal health-only dispatch (clients see ready:false)
 %%% 4. ReckonDB (embedded event store infrastructure)
 %%% 5. Evoq (CQRS framework)
-%%% 6. Domain event stores (one per bounded context)
-%%% 7. hecate_sup (domain services)
-%%% 8. [Domain apps start via release config]
-%%% 9. Store subscriptions (started by hecate_api_app, AFTER projections register)
+%%% 6. hecate_sup (includes boot_tracker with telemetry handler)
+%%% 7. Spawn store processes (fire-and-forget — boot_tracker listens)
+%%% 8. return {ok, SupPid} — domain apps boot via release config
 %%%
-%%% The socket becomes fully operational later when hecate_api_app
-%%% hot-swaps the full route table and sets state to `running`.
+%%% The boot_tracker receives telemetry events as stores come up and
+%%% triggers the post-boot sequence (subscriptions, routes, readiness)
+%%% once all stores are ready (or a 60s timeout fires).
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_app).
@@ -24,7 +24,23 @@
 -include_lib("reckon_db/include/reckon_db.hrl").
 
 -export([start/2, stop/1]).
--export([start_store_subscriptions/0]).
+-export([start_store_subscriptions/1]).
+
+%% Store definitions: {StoreId, SubDir, Label}
+%% Martha stores (martha_store, orchestration_store, knowledge_graph_store,
+%% retry_strategy_store, cost_budget_store) moved to hecate-app-martha plugin.
+-define(STORES, [
+    {settings_store,            "settings",            "Settings (identity, preferences)"},
+    {realm_memberships_store,   "realm_memberships",   "Realm Memberships (join, confirm, revoke)"},
+    {llm_store,                 "llm",                 "LLM (detection, status reporting)"},
+    {licenses_store,            "licenses",            "Licenses (consumer lifecycle)"},
+    {license_offerings_store,   "license_offerings",   "License Offerings (author catalog)"},
+    {procurements_store,        "procurements",        "Procurements (buying process)"},
+    {sales_store,               "sales",               "Sales (selling process)"},
+    {payments_store,            "payments",            "Payments (payment process)"},
+    {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"},
+    {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"}
+]).
 
 %%--------------------------------------------------------------------
 %% @doc Start the Hecate application.
@@ -77,45 +93,45 @@ start_early_socket() ->
             end
     end.
 
-%% @private Start Evoq (CQRS framework)
+%% @private Start Evoq (CQRS framework), then supervisor, then spawn stores.
 start_evoq() ->
     logger:info("Starting Evoq (CQRS framework)..."),
     case application:ensure_all_started(evoq) of
         {ok, _EvoqApps} ->
             logger:info("Evoq started successfully"),
-            start_event_stores();
+            start_supervisor_then_stores();
         {error, EvoqReason} ->
             logger:error("Failed to start Evoq: ~p", [EvoqReason]),
             {error, {evoq_start_failed, EvoqReason}}
     end.
 
-%% @private Start domain event stores (one per bounded context).
-%% All stores start in parallel since Ra clusters are independent.
-start_event_stores() ->
-    Stores = [
-        {settings_store,            "settings",            "Settings (identity, preferences)"},
-        {realm_memberships_store,   "realm_memberships",   "Realm Memberships (join, confirm, revoke)"},
-        {llm_store,                 "llm",                 "LLM (detection, status reporting)"},
-        {licenses_store,            "licenses",            "Licenses (consumer lifecycle)"},
-        {license_offerings_store,   "license_offerings",   "License Offerings (author catalog)"},
-        {procurements_store,        "procurements",        "Procurements (buying process)"},
-        {sales_store,               "sales",               "Sales (selling process)"},
-        {payments_store,            "payments",            "Payments (payment process)"},
-        {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"},
-        {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"}
-    ],
-    start_stores_parallel(Stores).
+%% @private Start supervisor FIRST (so boot_tracker's telemetry handler is
+%% registered), then spawn store processes fire-and-forget.
+start_supervisor_then_stores() ->
+    StoreIds = [Id || {Id, _, _} <- ?STORES],
+    logger:info("Starting Hecate supervisor..."),
+    case hecate_sup:start_link(StoreIds) of
+        {ok, SupPid} ->
+            %% Self-instrument daemon stores for /metrics
+            hecate_plugin_metrics:init(<<"hecate">>),
+            lists:foreach(fun({StoreId, _, _}) ->
+                hecate_plugin_telemetry:attach(<<"hecate">>, StoreId)
+            end, ?STORES),
 
-%% @private Start all stores concurrently using async tasks.
-%% Each Ra cluster is independent so there's no ordering dependency.
-start_stores_parallel(Stores) ->
-    logger:info("Starting ~b event stores in parallel...", [length(Stores)]),
-    StartTime = erlang:monotonic_time(millisecond),
-    %% Spawn a process per store, collect results
-    Refs = lists:map(fun({StoreId, SubDir, Label}) ->
-        Ref = make_ref(),
-        Parent = self(),
-        spawn_link(fun() ->
+            %% Supervisor (and boot_tracker) are up — safe to spawn stores
+            spawn_stores(?STORES),
+            {ok, SupPid};
+        {error, _} = Error ->
+            Error
+    end.
+
+%% @private Spawn a process per store (fire-and-forget).
+%% Uses spawn (NOT spawn_link) — a store crash shouldn't take down the
+%% app controller. Boot tracker handles failures via timeout.
+spawn_stores(Stores) ->
+    logger:info("Spawning ~b event store processes...", [length(Stores)]),
+    lists:foreach(fun({StoreId, SubDir, Label}) ->
+        spawn(fun() ->
             logger:info("Starting ~s event store (~p)...", [Label, StoreId]),
             DataDir = shared_paths:reckon_path(SubDir),
             ok = filelib:ensure_path(DataDir),
@@ -128,39 +144,9 @@ start_stores_parallel(Stores) ->
                 gateway_pool_size = 2,
                 options = #{}
             },
-            Result = start_store(Config),
-            Parent ! {store_started, Ref, StoreId, Result}
-        end),
-        {Ref, StoreId}
-    end, Stores),
-    %% Wait for all stores to complete
-    case collect_store_results(Refs, []) of
-        ok ->
-            Duration = erlang:monotonic_time(millisecond) - StartTime,
-            logger:info("All ~b event stores ready in ~bms", [length(Stores), Duration]),
-            %% NOTE: store subscriptions are started LATER by hecate_api_app:start/2,
-            %% after all domain apps (and their projections) have registered with the
-            %% type registry. This ensures historical events replayed from the $all
-            %% subscription are delivered to projections instead of being dropped.
-            start_hecate_sup();
-        {error, _} = Error ->
-            Error
-    end.
-
-%% @private Collect results from parallel store startup.
-collect_store_results([], _Acc) ->
-    ok;
-collect_store_results([{Ref, StoreId} | Rest], Acc) ->
-    receive
-        {store_started, Ref, StoreId, ok} ->
-            collect_store_results(Rest, [StoreId | Acc]);
-        {store_started, Ref, StoreId, {error, Reason}} ->
-            logger:error("Failed to start ~p: ~p", [StoreId, Reason]),
-            {error, {StoreId, Reason}}
-    after 30000 ->
-        logger:error("Timeout waiting for store ~p to start", [StoreId]),
-        {error, {StoreId, timeout}}
-    end.
+            start_store(Config)
+        end)
+    end, Stores).
 
 %% @private Start a single ReckonDB store, handling already_started.
 start_store(#store_config{store_id = StoreId} = Config) ->
@@ -172,18 +158,15 @@ start_store(#store_config{store_id = StoreId} = Config) ->
             logger:info("Event store ~p already running", [StoreId]),
             ok;
         {error, Reason} ->
+            logger:error("Failed to start event store ~p: ~p", [StoreId, Reason]),
             {error, Reason}
     end.
 
-%% @private Start store subscriptions (evoq 1.6.0 bridge).
+%% @doc Start store subscriptions for the given store IDs.
 %% Creates one evoq_store_subscription per domain store.
-%% These route events from reckon-db stores to evoq behaviours
-%% (evoq_event_handler, evoq_projection, evoq_process_manager).
-start_store_subscriptions() ->
-    Stores = [settings_store, realm_memberships_store, llm_store,
-              licenses_store, license_offerings_store,
-              procurements_store, sales_store, payments_store,
-              plugins_store, launcher_store],
+%% Called by hecate_boot_tracker after stores are ready.
+-spec start_store_subscriptions([atom()]) -> ok.
+start_store_subscriptions(StoreIds) ->
     lists:foreach(fun(StoreId) ->
         case evoq_store_subscription:start_link(StoreId) of
             {ok, _Pid} ->
@@ -192,12 +175,7 @@ start_store_subscriptions() ->
                 logger:warning("Store subscription failed for ~p: ~p",
                                [StoreId, Reason])
         end
-    end, Stores).
-
-%% @private Start Hecate supervisor
-start_hecate_sup() ->
-    logger:info("Starting Hecate supervisor..."),
-    hecate_sup:start_link().
+    end, StoreIds).
 
 %%--------------------------------------------------------------------
 %% @doc Stop the Hecate application.

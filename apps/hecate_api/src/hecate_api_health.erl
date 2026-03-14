@@ -1,5 +1,8 @@
 %%%-------------------------------------------------------------------
 %%% @doc Health check endpoint.
+%%%
+%%% During boot, includes progressive boot status from the boot tracker.
+%%% Once running, returns a lean health response.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_api_health).
@@ -10,7 +13,7 @@ routes() -> [{"/health", ?MODULE, []}].
 
 init(Req0, State) ->
     DaemonState = hecate_lifecycle:get_state(),
-    Response = #{
+    Response0 = #{
         status => lifecycle_status(DaemonState),
         ready => DaemonState =:= running,
         service => <<"hecate">>,
@@ -21,11 +24,52 @@ init(Req0, State) ->
             false -> <<"not_initialized">>
         end
     },
+    Response1 = maybe_add_boot_status(DaemonState, Response0),
+    Response = maybe_add_plugin_health(DaemonState, Response1),
     Body = json:encode(Response),
     Req = cowboy_req:reply(200, #{
         <<"content-type">> => <<"application/json">>
     }, Body, Req0),
     {ok, Req, State}.
+
+maybe_add_boot_status(running, Response) ->
+    Response;
+maybe_add_boot_status(_NotRunning, Response) ->
+    BootStatus = try hecate_boot_tracker:get_status()
+                 catch _:_ ->
+                     #{boot_phase => <<"initializing">>,
+                       stores => #{},
+                       stores_ready => 0,
+                       stores_total => 0,
+                       elapsed_ms => 0}
+                 end,
+    Response#{boot => BootStatus}.
+
+maybe_add_plugin_health(running, Response) ->
+    Plugins = try hecate_plugin_loader:loaded_plugins()
+              catch _:_ -> []
+              end,
+    PluginHealth = lists:foldl(fun(#{name := Name, callback := Cb}, Acc) ->
+        Acc#{Name => plugin_health_status(Cb)}
+    end, #{}, Plugins),
+    Response#{plugins => PluginHealth};
+maybe_add_plugin_health(_NotRunning, Response) ->
+    Response.
+
+plugin_health_status(Cb) ->
+    try check_plugin_health(Cb)
+    catch _:_ -> <<"unknown">>
+    end.
+
+check_plugin_health(Cb) ->
+    case erlang:function_exported(Cb, health, 0) of
+        false -> <<"ok">>;
+        true -> format_health(Cb:health())
+    end.
+
+format_health(ok) -> <<"ok">>;
+format_health(degraded) -> <<"degraded">>;
+format_health({unhealthy, Reason}) -> Reason.
 
 lifecycle_status(running) -> <<"healthy">>;
 lifecycle_status(starting) -> <<"starting">>;
