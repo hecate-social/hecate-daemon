@@ -101,7 +101,8 @@ plugin_routes() ->
                                 || {Path, Handler, Opts} <- Routes],
                 ManifestRoute = {Prefix ++ "/manifest", hecate_plugin_manifest_handler, #{callback => Cb}},
                 FlagMapsRoute = {Prefix ++ "/flag-maps", hecate_plugin_flag_maps_handler, #{callback => Cb}},
-                [ManifestRoute, FlagMapsRoute | PluginRoutes] ++ Acc
+                HealthRoute = {Prefix ++ "/health", hecate_plugin_health_handler, #{callback => Cb}},
+                [ManifestRoute, FlagMapsRoute, HealthRoute | PluginRoutes] ++ Acc
             end, [], ?TABLE)
     end.
 
