@@ -45,9 +45,16 @@ do_extract_with_url(PluginId, PackageUrl, CallbackModule) ->
     do_download_and_extract(PluginId, PackageUrl, BaseDir, TarPath, CallbackModule).
 
 do_download_and_extract(PluginId, PackageUrl, BaseDir, TarPath, CallbackModule) ->
+    report_progress(PluginId, #{status => downloading, percent => 0,
+                                line => <<"Downloading package...">>}),
     case ensure_tarball(PackageUrl, TarPath) of
-        ok -> do_extract_tarball(PluginId, BaseDir, TarPath, CallbackModule);
-        {error, _} = Err -> Err
+        ok ->
+            report_progress(PluginId, #{status => extracting, percent => 50,
+                                        line => <<"Extracting package...">>}),
+            do_extract_tarball(PluginId, BaseDir, TarPath, CallbackModule);
+        {error, _} = Err ->
+            report_progress(PluginId, #{status => error, reason => Err}),
+            Err
     end.
 
 ensure_tarball(PackageUrl, TarPath) ->
@@ -65,6 +72,13 @@ ensure_tarball(Url, TarPath, false) ->
             {error, {download_failed, DlReason}}
     end.
 
+%% Write progress to plugin_pull_progress ETS (shared with OCI pull status).
+%% The table is created by on_oci_pull_started_pull_image at boot.
+report_progress(PluginId, Progress) ->
+    try ets:insert(plugin_pull_progress, {PluginId, Progress})
+    catch error:badarg -> ok  %% table not yet created
+    end.
+
 do_extract_tarball(PluginId, BaseDir, TarPath, CallbackModule) ->
     logger:info("[extract] Extracting ~s to ~s", [TarPath, BaseDir]),
     case erl_tar:extract(TarPath, [compressed, {cwd, BaseDir}]) of
@@ -79,6 +93,7 @@ verify_ebin(PluginId, BaseDir, CallbackModule) ->
     case filelib:is_dir(EbinDir) of
         true ->
             logger:info("[extract] Plugin ~s extracted successfully", [PluginId]),
+            report_progress(PluginId, #{status => complete, percent => 100}),
             Event = plugin_package_extracted_v1:new(#{
                 plugin_id => PluginId,
                 callback_module => CallbackModule
@@ -86,6 +101,8 @@ verify_ebin(PluginId, BaseDir, CallbackModule) ->
             {ok, [Event]};
         false ->
             logger:error("[extract] No ebin/ after extraction of ~s", [PluginId]),
+            report_progress(PluginId, #{status => error,
+                                        reason => no_ebin_after_extraction}),
             {error, {no_ebin_after_extraction, PluginId}}
     end.
 
