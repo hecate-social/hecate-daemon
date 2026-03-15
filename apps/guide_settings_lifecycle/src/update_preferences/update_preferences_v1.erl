@@ -1,7 +1,10 @@
 %%% @doc update_preferences_v1 command
 -module(update_preferences_v1).
 
--export([new/2, to_map/1, from_map/1]).
+-behaviour(evoq_command).
+
+-export([new/1, new/2, to_map/1, from_map/1]).
+-export([command_type/0]).
 
 -record(update_preferences_v1, {
     preferences :: map(),
@@ -12,6 +15,13 @@
 -export_type([update_preferences_v1/0]).
 
 -spec new(map(), integer()) -> update_preferences_v1().
+command_type() -> update_preferences_v1.
+
+new(#{preferences := Preferences, updated_at := UpdatedAt}) ->
+    {ok, new(Preferences, UpdatedAt)};
+new(_) ->
+    {error, missing_fields}.
+
 new(Preferences, UpdatedAt) ->
     #update_preferences_v1{preferences = Preferences, updated_at = UpdatedAt}.
 

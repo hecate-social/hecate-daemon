@@ -2,7 +2,10 @@
 %%% Birth event for payment creation.
 -module(initiate_payment_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_payment_id/1, get_consumer_id/1, get_procurement_id/1,
          get_offering_id/1, get_plugin_id/1, get_amount_cents/1,
          get_currency/1]).
@@ -23,6 +26,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, initiate_payment_v1()} | {error, term()}.
+command_type() -> initiate_payment_v1.
+
 new(#{consumer_id := ConsumerId, procurement_id := ProcurementId,
       offering_id := OfferingId, plugin_id := PluginId} = Params) ->
     PaymentId = <<"payment-", ConsumerId/binary, "-", PluginId/binary>>,
@@ -57,14 +62,14 @@ validate(#initiate_payment_v1{} = Cmd) ->
 -spec to_map(initiate_payment_v1()) -> map().
 to_map(#initiate_payment_v1{} = Cmd) ->
     #{
-        <<"command_type">> => <<"initiate_payment">>,
-        <<"payment_id">> => Cmd#initiate_payment_v1.payment_id,
-        <<"consumer_id">> => Cmd#initiate_payment_v1.consumer_id,
-        <<"procurement_id">> => Cmd#initiate_payment_v1.procurement_id,
-        <<"offering_id">> => Cmd#initiate_payment_v1.offering_id,
-        <<"plugin_id">> => Cmd#initiate_payment_v1.plugin_id,
-        <<"amount_cents">> => Cmd#initiate_payment_v1.amount_cents,
-        <<"currency">> => Cmd#initiate_payment_v1.currency
+        command_type => <<"initiate_payment">>,
+        payment_id => Cmd#initiate_payment_v1.payment_id,
+        consumer_id => Cmd#initiate_payment_v1.consumer_id,
+        procurement_id => Cmd#initiate_payment_v1.procurement_id,
+        offering_id => Cmd#initiate_payment_v1.offering_id,
+        plugin_id => Cmd#initiate_payment_v1.plugin_id,
+        amount_cents => Cmd#initiate_payment_v1.amount_cents,
+        currency => Cmd#initiate_payment_v1.currency
     }.
 
 -spec from_map(map()) -> {ok, initiate_payment_v1()} | {error, term()}.

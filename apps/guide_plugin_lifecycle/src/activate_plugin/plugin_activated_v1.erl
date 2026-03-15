@@ -2,7 +2,10 @@
 %%% Emitted when an in-VM plugin is activated (code loaded, initialized, routes mounted).
 -module(plugin_activated_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_plugin_id/1, get_callback_module/1, get_activated_at/1]).
 
 -record(plugin_activated_v1, {
@@ -17,6 +20,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> plugin_activated_v1().
+event_type() -> plugin_activated_v1.
+
 new(#{plugin_id := PluginId, callback_module := CallbackModule}) ->
     #plugin_activated_v1{
         plugin_id = PluginId,

@@ -414,7 +414,6 @@ available_actions(Status) ->
 %% --- Helpers ---
 
 get_event_type(#{event_type := T}) when is_binary(T) -> T;
-get_event_type(#{<<"event_type">> := T}) when is_binary(T) -> T;
 get_event_type(_) -> undefined.
 
 gf(Key, Data) -> hecate_api_utils:get_field(Key, Data).

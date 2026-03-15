@@ -66,10 +66,11 @@ handle_chat(Req0, State) ->
 handle_sync_chat(Req0, Model, Messages, Params, _State) ->
     Opts = build_chat_opts(Model, Params),
     FormattedMessages = format_messages(Messages),
+    TranslateSchema = maps:get(<<"translate_schema">>, Params, undefined),
 
     case chat_to_llm:chat(Model, FormattedMessages, Opts) of
         {ok, Response} ->
-            hecate_api_utils:json_ok(#{response => Response}, Req0);
+            maybe_translate_response(Response, TranslateSchema, Req0);
         {error, {unknown_model, _}} ->
             hecate_api_utils:json_error(404, <<"Model not found in any provider">>, Req0);
         {error, {http_error, 429, _Body}} ->
@@ -375,3 +376,28 @@ build_pending_tool_calls(PendingMap) ->
             arguments => DecodedArgs
         }
     end || {_Idx, TC} <- Sorted].
+
+%% @doc Optionally translate the LLM response through a schema.
+%% When translate_schema is provided, extracts content from the response
+%% and runs it through translate_output for canonical structuring.
+%% Falls back to raw response on translation failure.
+maybe_translate_response(Response, undefined, Req) ->
+    hecate_api_utils:json_ok(#{response => Response}, Req);
+maybe_translate_response(Response, Schema, Req) ->
+    Content = extract_response_content_for_translate(Response),
+    case translate_output:translate(Content, Schema) of
+        {ok, Translated} ->
+            hecate_api_utils:json_ok(#{
+                response => Response,
+                translated => Translated
+            }, Req);
+        {error, _} ->
+            %% Graceful fallback — return raw response
+            hecate_api_utils:json_ok(#{response => Response}, Req)
+    end.
+
+extract_response_content_for_translate(#{<<"message">> := #{<<"content">> := C}}) -> C;
+extract_response_content_for_translate(#{message := #{content := C}}) -> C;
+extract_response_content_for_translate(#{<<"content">> := C}) -> C;
+extract_response_content_for_translate(#{content := C}) -> C;
+extract_response_content_for_translate(_) -> <<>>.

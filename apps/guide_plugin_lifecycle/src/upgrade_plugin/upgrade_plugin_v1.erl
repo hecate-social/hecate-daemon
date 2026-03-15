@@ -6,7 +6,10 @@
 %%%   in_vm:     requires package_url
 -module(upgrade_plugin_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_plugin_id/1, get_oci_image/1, get_installed_version/1,
          get_package_url/1, get_plugin_type/1,
          get_icon/1, get_group_name/1, get_group_icon/1,
@@ -32,6 +35,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, upgrade_plugin_v1()} | {error, term()}.
+command_type() -> upgrade_plugin_v1.
+
 new(#{plugin_id := PluginId, installed_version := Version} = Map) ->
     {ok, #upgrade_plugin_v1{
         plugin_id         = PluginId,
@@ -64,17 +69,17 @@ validate(#upgrade_plugin_v1{} = Cmd) ->
 -spec to_map(upgrade_plugin_v1()) -> map().
 to_map(#upgrade_plugin_v1{} = Cmd) ->
     #{
-        <<"command_type">>      => <<"upgrade_plugin">>,
-        <<"plugin_id">>         => Cmd#upgrade_plugin_v1.plugin_id,
-        <<"oci_image">>         => Cmd#upgrade_plugin_v1.oci_image,
-        <<"package_url">>       => Cmd#upgrade_plugin_v1.package_url,
-        <<"plugin_type">>       => Cmd#upgrade_plugin_v1.plugin_type,
-        <<"installed_version">> => Cmd#upgrade_plugin_v1.installed_version,
-        <<"icon">>              => Cmd#upgrade_plugin_v1.icon,
-        <<"group_name">>        => Cmd#upgrade_plugin_v1.group_name,
-        <<"group_icon">>        => Cmd#upgrade_plugin_v1.group_icon,
-        <<"display_name">>      => Cmd#upgrade_plugin_v1.display_name,
-        <<"description">>       => Cmd#upgrade_plugin_v1.description
+        command_type => <<"upgrade_plugin">>,
+        plugin_id => Cmd#upgrade_plugin_v1.plugin_id,
+        oci_image => Cmd#upgrade_plugin_v1.oci_image,
+        package_url => Cmd#upgrade_plugin_v1.package_url,
+        plugin_type => Cmd#upgrade_plugin_v1.plugin_type,
+        installed_version => Cmd#upgrade_plugin_v1.installed_version,
+        icon => Cmd#upgrade_plugin_v1.icon,
+        group_name => Cmd#upgrade_plugin_v1.group_name,
+        group_icon => Cmd#upgrade_plugin_v1.group_icon,
+        display_name => Cmd#upgrade_plugin_v1.display_name,
+        description => Cmd#upgrade_plugin_v1.description
     }.
 
 -spec from_map(map()) -> {ok, upgrade_plugin_v1()} | {error, term()}.

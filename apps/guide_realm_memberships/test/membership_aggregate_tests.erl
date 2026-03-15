@@ -8,7 +8,7 @@
 %% ===================================================================
 
 initiate_happy_test() ->
-    State = membership_aggregate:initial_state(),
+    State = membership_state:new(<<>>),
     Payload = #{
         command_type => initiate_realm_membership,
         membership_id => <<"mem-001">>,
@@ -46,7 +46,7 @@ confirm_happy_test() ->
     ?assertEqual(<<"github">>, maps:get(oauth_provider, Event)).
 
 confirm_not_initiated_test() ->
-    State = membership_aggregate:initial_state(),
+    State = membership_state:new(<<>>),
     Payload = #{
         command_type => confirm_realm_membership,
         membership_id => <<"mem-001">>,
@@ -102,7 +102,7 @@ revoke_already_revoked_test() ->
     ?assertEqual({error, already_revoked}, membership_aggregate:execute(State, Payload)).
 
 unknown_command_test() ->
-    State = membership_aggregate:initial_state(),
+    State = membership_state:new(<<>>),
     ?assertEqual({error, unknown_command},
                  membership_aggregate:execute(State, #{command_type => bogus})).
 
@@ -111,12 +111,12 @@ unknown_command_test() ->
 %% ===================================================================
 
 apply_initiated_test() ->
-    State0 = membership_aggregate:initial_state(),
+    State0 = membership_state:new(<<>>),
     Event = #{event_type => <<"realm_membership_initiated_v1">>,
               membership_id => <<"mem-001">>,
               realm_url => <<"https://macula.io">>,
               initiated_at => 1000},
-    State1 = membership_aggregate:apply_event(State0, Event),
+    State1 = membership_aggregate:apply(State0, Event),
     %% Confirm should now work
     Payload = #{command_type => confirm_realm_membership,
                 membership_id => <<"mem-001">>, realm_id => <<"io.macula">>,
@@ -130,7 +130,7 @@ apply_confirmed_test() ->
               membership_id => <<"mem-001">>, realm_id => <<"io.macula">>,
               oauth_account => <<"octocat">>, oauth_provider => <<"github">>,
               confirmed_at => 2000},
-    State1 = membership_aggregate:apply_event(State0, Event),
+    State1 = membership_aggregate:apply(State0, Event),
     %% Confirming again should fail
     Payload = #{command_type => confirm_realm_membership,
                 membership_id => <<"mem-001">>, realm_id => <<"io.macula">>,
@@ -143,30 +143,17 @@ apply_revoked_test() ->
     Event = #{event_type => <<"realm_membership_revoked_v1">>,
               membership_id => <<"mem-001">>,
               reason => <<"manual">>, revoked_at => 3000},
-    State1 = membership_aggregate:apply_event(State0, Event),
+    State1 = membership_aggregate:apply(State0, Event),
     %% Revoking again should fail
     Payload = #{command_type => revoke_realm_membership,
                 membership_id => <<"mem-001">>,
                 reason => <<"again">>, revoked_at => 4000},
     ?assertEqual({error, already_revoked}, membership_aggregate:execute(State1, Payload)).
 
-apply_binary_keys_test() ->
-    State0 = membership_aggregate:initial_state(),
-    Event = #{<<"event_type">> => <<"realm_membership_initiated_v1">>,
-              <<"membership_id">> => <<"mem-001">>,
-              <<"realm_url">> => <<"https://macula.io">>,
-              <<"initiated_at">> => 1000},
-    State1 = membership_aggregate:apply_event(State0, Event),
-    Payload = #{command_type => confirm_realm_membership,
-                membership_id => <<"mem-001">>, realm_id => <<"io.macula">>,
-                oauth_account => <<"user">>, oauth_provider => <<"github">>,
-                confirmed_at => 2000},
-    {ok, _} = membership_aggregate:execute(State1, Payload).
-
 apply_unknown_event_test() ->
-    State0 = membership_aggregate:initial_state(),
+    State0 = membership_state:new(<<>>),
     Event = #{event_type => <<"bogus_v1">>, data => <<"foo">>},
-    State1 = membership_aggregate:apply_event(State0, Event),
+    State1 = membership_aggregate:apply(State0, Event),
     ?assertEqual(State0, State1).
 
 %% ===================================================================
@@ -174,14 +161,14 @@ apply_unknown_event_test() ->
 %% ===================================================================
 
 roundtrip_full_lifecycle_test() ->
-    S0 = membership_aggregate:initial_state(),
+    S0 = membership_state:new(<<>>),
     %% Initiate
     {ok, [E1]} = membership_aggregate:execute(S0, #{
         command_type => initiate_realm_membership,
         membership_id => <<"mem-001">>,
         realm_url => <<"https://macula.io">>,
         initiated_at => 1000}),
-    S1 = membership_aggregate:apply_event(S0, E1),
+    S1 = membership_aggregate:apply(S0, E1),
     %% Confirm
     {ok, [E2]} = membership_aggregate:execute(S1, #{
         command_type => confirm_realm_membership,
@@ -190,14 +177,14 @@ roundtrip_full_lifecycle_test() ->
         oauth_account => <<"octocat">>,
         oauth_provider => <<"github">>,
         confirmed_at => 2000}),
-    S2 = membership_aggregate:apply_event(S1, E2),
+    S2 = membership_aggregate:apply(S1, E2),
     %% Revoke
     {ok, [E3]} = membership_aggregate:execute(S2, #{
         command_type => revoke_realm_membership,
         membership_id => <<"mem-001">>,
         reason => <<"manual">>,
         revoked_at => 3000}),
-    _S3 = membership_aggregate:apply_event(S2, E3),
+    _S3 = membership_aggregate:apply(S2, E3),
     %% Verify events
     ?assertEqual(<<"realm_membership_initiated_v1">>, maps:get(event_type, E1)),
     ?assertEqual(<<"realm_membership_confirmed_v1">>, maps:get(event_type, E2)),
@@ -208,12 +195,12 @@ roundtrip_full_lifecycle_test() ->
 %% ===================================================================
 
 initiated_state() ->
-    S0 = membership_aggregate:initial_state(),
+    S0 = membership_state:new(<<>>),
     Event = #{event_type => <<"realm_membership_initiated_v1">>,
               membership_id => <<"mem-001">>,
               realm_url => <<"https://macula.io">>,
               initiated_at => 1000},
-    membership_aggregate:apply_event(S0, Event).
+    membership_aggregate:apply(S0, Event).
 
 confirmed_state() ->
     S0 = initiated_state(),
@@ -223,7 +210,7 @@ confirmed_state() ->
               oauth_account => <<"octocat">>,
               oauth_provider => <<"github">>,
               confirmed_at => 2000},
-    membership_aggregate:apply_event(S0, Event).
+    membership_aggregate:apply(S0, Event).
 
 revoked_state() ->
     S0 = confirmed_state(),
@@ -231,4 +218,4 @@ revoked_state() ->
               membership_id => <<"mem-001">>,
               reason => <<"manual">>,
               revoked_at => 3000},
-    membership_aggregate:apply_event(S0, Event).
+    membership_aggregate:apply(S0, Event).

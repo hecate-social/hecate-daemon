@@ -25,12 +25,12 @@ init([]) ->
     Children = [
         %% -- PG emitters (internal, subscribe via evoq -> broadcast to pg) --
 
-        #{id => payment_initiated_v1_to_pg,
-          start => {evoq_event_handler, start_link, [payment_initiated_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => payment_archived_v1_to_pg,
-          start => {evoq_event_handler, start_link, [payment_archived_v1_to_pg, #{}]},
-          restart => permanent, type => worker}
+        emitter(payment_initiated_v1_to_pg),
+        emitter(payment_archived_v1_to_pg)
     ],
 
     {ok, {SupFlags, Children}}.
+
+emitter(Mod) ->
+    #{id => Mod, start => {evoq_event_handler, start_link, [Mod, #{}]},
+      restart => permanent, type => worker}.

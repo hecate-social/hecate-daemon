@@ -2,7 +2,10 @@
 %%% Requests activation of an in-VM plugin (loading code, initializing, mounting routes).
 -module(activate_plugin_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, to_map/1, validate/1]).
+-export([command_type/0]).
 -export([get_plugin_id/1, get_callback_module/1]).
 
 -record(activate_plugin_v1, {
@@ -16,6 +19,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, activate_plugin_v1()} | {error, term()}.
+command_type() -> activate_plugin_v1.
+
 new(#{plugin_id := PluginId, callback_module := CallbackModule})
   when is_binary(PluginId), byte_size(PluginId) > 0,
        is_binary(CallbackModule), byte_size(CallbackModule) > 0 ->
@@ -34,9 +39,9 @@ validate(_) ->
 -spec to_map(activate_plugin_v1()) -> map().
 to_map(#activate_plugin_v1{plugin_id = PluginId, callback_module = CallbackModule}) ->
     #{
-        <<"command_type">> => <<"activate_plugin">>,
-        <<"plugin_id">> => PluginId,
-        <<"callback_module">> => CallbackModule
+        command_type => <<"activate_plugin">>,
+        plugin_id => PluginId,
+        callback_module => CallbackModule
     }.
 
 -spec from_map(map()) -> {ok, activate_plugin_v1()} | {error, term()}.

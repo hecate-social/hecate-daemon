@@ -2,7 +2,10 @@
 %%% Full layout update: reorder groups, move entries, rename groups, change icons.
 -module(reorganize_launcher_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_groups/1]).
 
 -record(reorganize_launcher_v1, {
@@ -15,6 +18,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, reorganize_launcher_v1()} | {error, term()}.
+command_type() -> reorganize_launcher_v1.
+
 new(#{groups := Groups}) when is_list(Groups) ->
     {ok, #reorganize_launcher_v1{
         groups = Groups
@@ -34,8 +39,8 @@ validate(#reorganize_launcher_v1{groups = Groups} = Cmd) ->
 -spec to_map(reorganize_launcher_v1()) -> map().
 to_map(#reorganize_launcher_v1{} = Cmd) ->
     #{
-        <<"command_type">> => <<"reorganize_launcher">>,
-        <<"groups">>       => Cmd#reorganize_launcher_v1.groups
+        command_type => <<"reorganize_launcher">>,
+        groups => Cmd#reorganize_launcher_v1.groups
     }.
 
 -spec from_map(map()) -> {ok, reorganize_launcher_v1()} | {error, term()}.

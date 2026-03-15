@@ -9,6 +9,7 @@
 -export([compile/0, discover_routes/0]).
 
 %% All hecate OTP apps that may contain API handlers.
+%% Martha apps moved to hecate-app-martha plugin (routes discovered dynamically).
 -define(HECATE_APPS, [
     hecate_api,
     geo_check,

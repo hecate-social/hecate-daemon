@@ -2,7 +2,10 @@
 %%% Emitted when any optional fields are amended on an offering.
 -module(offering_amended_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_offering_id/1,
          get_plugin_name/1, get_description/1, get_icon/1, get_group_name/1, get_group_icon/1,
          get_github_repo/1, get_homepage/1, get_tags/1,
@@ -56,6 +59,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> offering_amended_v1().
+event_type() -> offering_amended_v1.
+
 new(#{offering_id := OfferingId} = M) ->
     #offering_amended_v1{
         offering_id = OfferingId,

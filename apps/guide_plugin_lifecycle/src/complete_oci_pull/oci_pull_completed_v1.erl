@@ -2,7 +2,10 @@
 %%% Emitted when an OCI image pull completes successfully.
 -module(oci_pull_completed_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_plugin_id/1, get_completed_at/1]).
 
 -record(oci_pull_completed_v1, {
@@ -16,6 +19,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> oci_pull_completed_v1().
+event_type() -> oci_pull_completed_v1.
+
 new(#{plugin_id := PluginId}) ->
     #oci_pull_completed_v1{
         plugin_id = PluginId,

@@ -2,7 +2,10 @@
 %%% Birth event for author-side offering creation.
 -module(initiate_offering_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_offering_id/1, get_plugin_id/1, get_author_id/1,
          get_plugin_name/1, get_display_name/1, get_description/1, get_icon/1, get_group_name/1, get_group_icon/1,
          get_github_repo/1, get_homepage/1, get_tags/1,
@@ -60,6 +63,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, initiate_offering_v1()} | {error, term()}.
+command_type() -> initiate_offering_v1.
+
 new(#{author_id := AuthorId, plugin_id := PluginId} = Params) ->
     OfferingId = <<"offering-", AuthorId/binary, "-", PluginId/binary>>,
     {ok, #initiate_offering_v1{
@@ -112,39 +117,39 @@ validate(#initiate_offering_v1{} = Cmd) ->
 -spec to_map(initiate_offering_v1()) -> map().
 to_map(#initiate_offering_v1{} = Cmd) ->
     #{
-        <<"command_type">> => <<"initiate_offering">>,
-        <<"offering_id">> => Cmd#initiate_offering_v1.offering_id,
-        <<"plugin_id">> => Cmd#initiate_offering_v1.plugin_id,
-        <<"author_id">> => Cmd#initiate_offering_v1.author_id,
-        <<"plugin_name">> => Cmd#initiate_offering_v1.plugin_name,
-        <<"display_name">> => Cmd#initiate_offering_v1.display_name,
-        <<"description">> => Cmd#initiate_offering_v1.description,
-        <<"icon">> => Cmd#initiate_offering_v1.icon,
-        <<"group_name">> => Cmd#initiate_offering_v1.group_name,
-        <<"group_icon">> => Cmd#initiate_offering_v1.group_icon,
-        <<"github_repo">> => Cmd#initiate_offering_v1.github_repo,
-        <<"homepage">> => Cmd#initiate_offering_v1.homepage,
-        <<"tags">> => Cmd#initiate_offering_v1.tags,
-        <<"oci_image">> => Cmd#initiate_offering_v1.oci_image,
-        <<"package_url">> => Cmd#initiate_offering_v1.package_url,
-        <<"plugin_type">> => Cmd#initiate_offering_v1.plugin_type,
-        <<"callback_module">> => Cmd#initiate_offering_v1.callback_module,
-        <<"org">> => Cmd#initiate_offering_v1.org,
-        <<"version">> => Cmd#initiate_offering_v1.version,
-        <<"manifest_tag">> => Cmd#initiate_offering_v1.manifest_tag,
-        <<"min_daemon_version">> => Cmd#initiate_offering_v1.min_daemon_version,
-        <<"publisher_identity">> => Cmd#initiate_offering_v1.publisher_identity,
-        <<"selling_formula">> => Cmd#initiate_offering_v1.selling_formula,
-        <<"license_type">> => Cmd#initiate_offering_v1.license_type,
-        <<"fee_cents">> => Cmd#initiate_offering_v1.fee_cents,
-        <<"fee_currency">> => Cmd#initiate_offering_v1.fee_currency,
-        <<"duration_days">> => Cmd#initiate_offering_v1.duration_days,
-        <<"node_limit">> => Cmd#initiate_offering_v1.node_limit,
-        <<"manifest_url">> => Cmd#initiate_offering_v1.manifest_url,
-        <<"manifest_checksum">> => Cmd#initiate_offering_v1.manifest_checksum,
-        <<"author_signature">> => Cmd#initiate_offering_v1.author_signature,
-        <<"oci_image_verified">> => Cmd#initiate_offering_v1.oci_image_verified,
-        <<"oci_image_digest">> => Cmd#initiate_offering_v1.oci_image_digest
+        command_type => <<"initiate_offering">>,
+        offering_id => Cmd#initiate_offering_v1.offering_id,
+        plugin_id => Cmd#initiate_offering_v1.plugin_id,
+        author_id => Cmd#initiate_offering_v1.author_id,
+        plugin_name => Cmd#initiate_offering_v1.plugin_name,
+        display_name => Cmd#initiate_offering_v1.display_name,
+        description => Cmd#initiate_offering_v1.description,
+        icon => Cmd#initiate_offering_v1.icon,
+        group_name => Cmd#initiate_offering_v1.group_name,
+        group_icon => Cmd#initiate_offering_v1.group_icon,
+        github_repo => Cmd#initiate_offering_v1.github_repo,
+        homepage => Cmd#initiate_offering_v1.homepage,
+        tags => Cmd#initiate_offering_v1.tags,
+        oci_image => Cmd#initiate_offering_v1.oci_image,
+        package_url => Cmd#initiate_offering_v1.package_url,
+        plugin_type => Cmd#initiate_offering_v1.plugin_type,
+        callback_module => Cmd#initiate_offering_v1.callback_module,
+        org => Cmd#initiate_offering_v1.org,
+        version => Cmd#initiate_offering_v1.version,
+        manifest_tag => Cmd#initiate_offering_v1.manifest_tag,
+        min_daemon_version => Cmd#initiate_offering_v1.min_daemon_version,
+        publisher_identity => Cmd#initiate_offering_v1.publisher_identity,
+        selling_formula => Cmd#initiate_offering_v1.selling_formula,
+        license_type => Cmd#initiate_offering_v1.license_type,
+        fee_cents => Cmd#initiate_offering_v1.fee_cents,
+        fee_currency => Cmd#initiate_offering_v1.fee_currency,
+        duration_days => Cmd#initiate_offering_v1.duration_days,
+        node_limit => Cmd#initiate_offering_v1.node_limit,
+        manifest_url => Cmd#initiate_offering_v1.manifest_url,
+        manifest_checksum => Cmd#initiate_offering_v1.manifest_checksum,
+        author_signature => Cmd#initiate_offering_v1.author_signature,
+        oci_image_verified => Cmd#initiate_offering_v1.oci_image_verified,
+        oci_image_digest => Cmd#initiate_offering_v1.oci_image_digest
     }.
 
 -spec from_map(map()) -> {ok, initiate_offering_v1()} | {error, term()}.

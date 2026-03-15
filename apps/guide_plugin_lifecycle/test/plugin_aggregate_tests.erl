@@ -21,30 +21,30 @@
 %% -- Test Helpers --
 
 fresh_state() ->
-    plugin_aggregate:initial_state().
+    plugin_state:new(<<>>).
 
 make_install_payload() ->
     #{
-        <<"command_type">>      => <<"install_plugin">>,
-        <<"plugin_id">>         => ?PLUGIN_ID,
-        <<"name">>              => ?PLUGIN_NAME,
-        <<"oci_image">>         => ?OCI_IMAGE,
-        <<"installed_version">> => ?VERSION,
-        <<"license_id">>        => ?LICENSE_ID
+        command_type      => <<"install_plugin">>,
+        plugin_id         => ?PLUGIN_ID,
+        name              => ?PLUGIN_NAME,
+        oci_image         => ?OCI_IMAGE,
+        installed_version => ?VERSION,
+        license_id        => ?LICENSE_ID
     }.
 
 make_upgrade_payload() ->
     #{
-        <<"command_type">>      => <<"upgrade_plugin">>,
-        <<"plugin_id">>         => ?PLUGIN_ID,
-        <<"oci_image">>         => ?OCI_IMAGE_V2,
-        <<"installed_version">> => ?VERSION_V2
+        command_type      => <<"upgrade_plugin">>,
+        plugin_id         => ?PLUGIN_ID,
+        oci_image         => ?OCI_IMAGE_V2,
+        installed_version => ?VERSION_V2
     }.
 
 make_remove_payload() ->
     #{
-        <<"command_type">> => <<"remove_plugin">>,
-        <<"plugin_id">>    => ?PLUGIN_ID
+        command_type => <<"remove_plugin">>,
+        plugin_id    => ?PLUGIN_ID
     }.
 
 %% Execute a command and apply the resulting events to the state

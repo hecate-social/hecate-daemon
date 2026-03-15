@@ -29,46 +29,46 @@
 %% -- Helpers --
 
 fresh_state() ->
-    plugin_aggregate:initial_state().
+    plugin_state:new(<<>>).
 
 make_in_vm_install_payload() ->
     #{
-        <<"command_type">>      => <<"install_plugin">>,
-        <<"plugin_id">>         => ?PLUGIN_ID,
-        <<"name">>              => ?PLUGIN_NAME,
-        <<"plugin_type">>       => <<"in_vm">>,
-        <<"callback_module">>   => ?CALLBACK_MODULE,
-        <<"package_url">>       => ?PACKAGE_URL,
-        <<"installed_version">> => ?VERSION,
-        <<"license_id">>        => ?LICENSE_ID,
-        <<"icon">>              => <<"pencil">>,
-        <<"group_name">>        => <<"OFFICE">>,
-        <<"group_icon">>        => <<"briefcase">>
+        command_type      => <<"install_plugin">>,
+        plugin_id         => ?PLUGIN_ID,
+        name              => ?PLUGIN_NAME,
+        plugin_type       => <<"in_vm">>,
+        callback_module   => ?CALLBACK_MODULE,
+        package_url       => ?PACKAGE_URL,
+        installed_version => ?VERSION,
+        license_id        => ?LICENSE_ID,
+        icon              => <<"pencil">>,
+        group_name        => <<"OFFICE">>,
+        group_icon        => <<"briefcase">>
     }.
 
 make_activate_payload() ->
     #{
-        <<"command_type">>      => <<"activate_plugin">>,
-        <<"plugin_id">>         => ?PLUGIN_ID,
-        <<"callback_module">>   => ?CALLBACK_MODULE
+        command_type      => <<"activate_plugin">>,
+        plugin_id         => ?PLUGIN_ID,
+        callback_module   => ?CALLBACK_MODULE
     }.
 
 make_confirm_loaded_payload() ->
     #{
-        <<"command_type">> => <<"confirm_plugin_loaded">>,
-        <<"plugin_id">>    => ?PLUGIN_ID
+        command_type => <<"confirm_plugin_loaded">>,
+        plugin_id    => ?PLUGIN_ID
     }.
 
 make_deactivate_payload() ->
     #{
-        <<"command_type">> => <<"deactivate_plugin">>,
-        <<"plugin_id">>    => ?PLUGIN_ID
+        command_type => <<"deactivate_plugin">>,
+        plugin_id    => ?PLUGIN_ID
     }.
 
 make_confirm_unloaded_payload() ->
     #{
-        <<"command_type">> => <<"confirm_plugin_unloaded">>,
-        <<"plugin_id">>    => ?PLUGIN_ID
+        command_type => <<"confirm_plugin_unloaded">>,
+        plugin_id    => ?PLUGIN_ID
     }.
 
 execute_and_apply(State, Payload) ->
@@ -210,6 +210,6 @@ start_execution_rejected_when_loaded_test() ->
 
 make_start_execution_payload() ->
     #{
-        <<"command_type">> => <<"start_plugin_execution">>,
-        <<"plugin_id">>    => ?PLUGIN_ID
+        command_type => <<"start_plugin_execution">>,
+        plugin_id    => ?PLUGIN_ID
     }.

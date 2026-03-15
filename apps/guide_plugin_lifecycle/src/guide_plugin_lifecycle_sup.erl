@@ -25,34 +25,18 @@ init([]) ->
     Children = [
         %% -- PG emitters (internal, subscribe via evoq -> broadcast to pg) --
 
-        #{id => plugin_installed_v1_to_pg,
-          start => {evoq_event_handler, start_link, [plugin_installed_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => plugin_upgraded_v1_to_pg,
-          start => {evoq_event_handler, start_link, [plugin_upgraded_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => plugin_removed_v1_to_pg,
-          start => {evoq_event_handler, start_link, [plugin_removed_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => plugin_execution_started_v1_to_pg,
-          start => {evoq_event_handler, start_link, [plugin_execution_started_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => plugin_execution_stopped_v1_to_pg,
-          start => {evoq_event_handler, start_link, [plugin_execution_stopped_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
+        emitter(plugin_installed_v1_to_pg),
+        emitter(plugin_upgraded_v1_to_pg),
+        emitter(plugin_removed_v1_to_pg),
+        emitter(plugin_execution_started_v1_to_pg),
+        emitter(plugin_execution_stopped_v1_to_pg),
 
         %% -- Process Managers (side effects) --
         %% evoq_event_handler PMs: auto-register with event type registry
 
-        #{id => on_plugin_upgraded_update_container,
-          start => {evoq_event_handler, start_link, [on_plugin_upgraded_update_container, #{}]},
-          restart => permanent, type => worker},
-        #{id => on_plugin_upgraded_reload_in_vm,
-          start => {evoq_event_handler, start_link, [on_plugin_upgraded_reload_in_vm, #{}]},
-          restart => permanent, type => worker},
-        #{id => on_plugin_removed_deprovision_container,
-          start => {evoq_event_handler, start_link, [on_plugin_removed_deprovision_container, #{}]},
-          restart => permanent, type => worker},
+        emitter(on_plugin_upgraded_update_container),
+        emitter(on_plugin_upgraded_reload_in_vm),
+        emitter(on_plugin_removed_deprovision_container),
 
         %% gen_server PMs: kept as gen_server due to handle_info patterns
         %% (reconcile timers, pg cancel messages, pull progress/done messages)
@@ -61,36 +45,22 @@ init([]) ->
         #{id => on_plugin_execution_started_start_container,
           start => {on_plugin_execution_started_start_container, start_link, []},
           restart => permanent, type => worker},
-        #{id => on_plugin_execution_stopped_stop_container,
-          start => {evoq_event_handler, start_link, [on_plugin_execution_stopped_stop_container, #{}]},
-          restart => permanent, type => worker},
+        emitter(on_plugin_execution_stopped_stop_container),
 
         %% -- OCI pull emitters --
 
-        #{id => oci_pull_started_v1_to_pg,
-          start => {evoq_event_handler, start_link, [oci_pull_started_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => oci_pull_cancelled_v1_to_pg,
-          start => {evoq_event_handler, start_link, [oci_pull_cancelled_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => oci_pull_completed_v1_to_pg,
-          start => {evoq_event_handler, start_link, [oci_pull_completed_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
+        emitter(oci_pull_started_v1_to_pg),
+        emitter(oci_pull_cancelled_v1_to_pg),
+        emitter(oci_pull_completed_v1_to_pg),
 
         %% -- Container confirmation emitters --
 
-        #{id => container_confirmed_up_v1_to_pg,
-          start => {evoq_event_handler, start_link, [container_confirmed_up_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => container_confirmed_down_v1_to_pg,
-          start => {evoq_event_handler, start_link, [container_confirmed_down_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
+        emitter(container_confirmed_up_v1_to_pg),
+        emitter(container_confirmed_down_v1_to_pg),
 
         %% -- OCI Pull PMs --
 
-        #{id => on_plugin_installed_start_oci_pull,
-          start => {evoq_event_handler, start_link, [on_plugin_installed_start_oci_pull, #{}]},
-          restart => permanent, type => worker},
+        emitter(on_plugin_installed_start_oci_pull),
         #{id => on_oci_pull_started_pull_image,
           start => {on_oci_pull_started_pull_image, start_link, []},
           restart => permanent, type => worker},
@@ -103,36 +73,22 @@ init([]) ->
 
         %% -- In-VM plugin emitters --
 
-        #{id => plugin_package_extracted_v1_to_pg,
-          start => {evoq_event_handler, start_link, [plugin_package_extracted_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => plugin_activated_v1_to_pg,
-          start => {evoq_event_handler, start_link, [plugin_activated_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => plugin_deactivated_v1_to_pg,
-          start => {evoq_event_handler, start_link, [plugin_deactivated_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => plugin_load_confirmed_v1_to_pg,
-          start => {evoq_event_handler, start_link, [plugin_load_confirmed_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => plugin_unload_confirmed_v1_to_pg,
-          start => {evoq_event_handler, start_link, [plugin_unload_confirmed_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
+        emitter(plugin_package_extracted_v1_to_pg),
+        emitter(plugin_activated_v1_to_pg),
+        emitter(plugin_deactivated_v1_to_pg),
+        emitter(plugin_load_confirmed_v1_to_pg),
+        emitter(plugin_unload_confirmed_v1_to_pg),
 
         %% -- In-VM plugin process managers --
 
-        #{id => on_plugin_installed_extract_package,
-          start => {evoq_event_handler, start_link, [on_plugin_installed_extract_package, #{}]},
-          restart => permanent, type => worker},
-        #{id => on_plugin_package_extracted_activate_plugin,
-          start => {evoq_event_handler, start_link, [on_plugin_package_extracted_activate_plugin, #{}]},
-          restart => permanent, type => worker},
-        #{id => on_plugin_activated_load_plugin,
-          start => {evoq_event_handler, start_link, [on_plugin_activated_load_plugin, #{}]},
-          restart => permanent, type => worker},
-        #{id => on_plugin_deactivated_unload_plugin,
-          start => {evoq_event_handler, start_link, [on_plugin_deactivated_unload_plugin, #{}]},
-          restart => permanent, type => worker}
+        emitter(on_plugin_installed_extract_package),
+        emitter(on_plugin_package_extracted_activate_plugin),
+        emitter(on_plugin_activated_load_plugin),
+        emitter(on_plugin_deactivated_unload_plugin)
     ],
 
     {ok, {SupFlags, Children}}.
+
+emitter(Mod) ->
+    #{id => Mod, start => {evoq_event_handler, start_link, [Mod, #{}]},
+      restart => permanent, type => worker}.

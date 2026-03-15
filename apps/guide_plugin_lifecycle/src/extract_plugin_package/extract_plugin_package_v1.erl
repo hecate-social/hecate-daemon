@@ -2,7 +2,10 @@
 %%% Requests extracting a .tar.gz plugin package to ~/.hecate/plugins/{name}/.
 -module(extract_plugin_package_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, to_map/1, validate/1]).
+-export([command_type/0]).
 -export([get_plugin_id/1, get_package_url/1, get_callback_module/1]).
 
 -record(extract_plugin_package_v1, {
@@ -17,6 +20,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, extract_plugin_package_v1()} | {error, term()}.
+command_type() -> extract_plugin_package_v1.
+
 new(#{plugin_id := PluginId, package_url := PackageUrl} = Params)
   when is_binary(PluginId), byte_size(PluginId) > 0,
        is_binary(PackageUrl), byte_size(PackageUrl) > 0 ->
@@ -35,10 +40,10 @@ to_map(#extract_plugin_package_v1{
     callback_module = CallbackModule
 }) ->
     #{
-        <<"command_type">> => <<"extract_plugin_package">>,
-        <<"plugin_id">> => PluginId,
-        <<"package_url">> => PackageUrl,
-        <<"callback_module">> => CallbackModule
+        command_type => <<"extract_plugin_package">>,
+        plugin_id => PluginId,
+        package_url => PackageUrl,
+        callback_module => CallbackModule
     }.
 
 -spec from_map(map()) -> {ok, extract_plugin_package_v1()} | {error, term()}.

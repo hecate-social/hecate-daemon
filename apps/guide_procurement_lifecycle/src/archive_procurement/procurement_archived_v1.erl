@@ -2,7 +2,10 @@
 %%% Emitted when a procurement is archived (walking skeleton).
 -module(procurement_archived_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_procurement_id/1, get_archived_at/1]).
 
 -record(procurement_archived_v1, {
@@ -16,6 +19,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> procurement_archived_v1().
+event_type() -> procurement_archived_v1.
+
 new(#{procurement_id := ProcurementId}) ->
     #procurement_archived_v1{
         procurement_id = ProcurementId,

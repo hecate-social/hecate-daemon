@@ -1,7 +1,10 @@
 %%% @doc revoke_realm_membership_v1 command
 -module(revoke_realm_membership_v1).
 
--export([new/3, to_map/1, from_map/1]).
+-behaviour(evoq_command).
+
+-export([new/1, new/3, to_map/1, from_map/1]).
+-export([command_type/0]).
 
 -record(revoke_realm_membership_v1, {
     membership_id :: binary(),
@@ -13,6 +16,13 @@
 -export_type([revoke_realm_membership_v1/0]).
 
 -spec new(binary(), binary(), integer()) -> revoke_realm_membership_v1().
+command_type() -> revoke_realm_membership_v1.
+
+new(#{membership_id := MembershipId, reason := Reason, revoked_at := RevokedAt}) ->
+    {ok, new(MembershipId, Reason, RevokedAt)};
+new(_) ->
+    {error, missing_fields}.
+
 new(MembershipId, Reason, RevokedAt) ->
     #revoke_realm_membership_v1{
         membership_id = MembershipId,

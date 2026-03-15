@@ -7,7 +7,9 @@
 %%% ├── hecate_store         - SQLite persistence
 %%% ├── hecate_identity      - MRI + keypair
 %%% ├── hecate_realm_session - Realm join flow
-%%% └── hecate_ucan          - UCAN wallet
+%%% ├── hecate_ucan          - UCAN wallet
+%%% ├── hecate_plugin_loader - In-VM plugin loader
+%%% └── hecate_boot_tracker  - Telemetry-driven boot tracker
 %%% '''
 %%%
 %%% Note: hecate_mesh and hecate_api are now umbrella apps started
@@ -17,36 +19,36 @@
 -module(hecate_sup).
 -behaviour(supervisor).
 
--export([start_link/0]).
+-export([start_link/1]).
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
 
 %%--------------------------------------------------------------------
-%% @doc Start the supervisor.
+%% @doc Start the supervisor with expected store IDs for boot tracking.
 %% @end
 %%--------------------------------------------------------------------
--spec start_link() -> {ok, Pid} | {error, Reason} when
+-spec start_link([atom()]) -> {ok, Pid} | {error, Reason} when
     Pid :: pid(),
     Reason :: term().
-start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+start_link(StoreIds) ->
+    supervisor:start_link({local, ?SERVER}, ?MODULE, StoreIds).
 
 %%--------------------------------------------------------------------
 %% @doc Initialize supervisor with child specs.
 %% @end
 %%--------------------------------------------------------------------
 -spec init(Args) -> {ok, {SupFlags, ChildSpecs}} when
-    Args :: term(),
+    Args :: [atom()],
     SupFlags :: supervisor:sup_flags(),
     ChildSpecs :: [supervisor:child_spec()].
-init([]) ->
+init(StoreIds) ->
     SupFlags = #{
         strategy => one_for_one,
         intensity => 10,
         period => 60
     },
-    
+
     ChildSpecs = [
         %% SQLite store - must start first
         #{
@@ -55,7 +57,7 @@ init([]) ->
             restart => permanent,
             type => worker
         },
-        
+
         %% Identity management
         #{
             id => hecate_identity,
@@ -63,7 +65,7 @@ init([]) ->
             restart => permanent,
             type => worker
         },
-        
+
         %% Realm join session
         #{
             id => hecate_realm_session,
@@ -86,7 +88,17 @@ init([]) ->
             start => {hecate_plugin_loader, start_link, []},
             restart => permanent,
             type => worker
+        },
+
+        %% Boot tracker — telemetry-driven store readiness tracking.
+        %% Must start BEFORE stores are spawned so telemetry handler
+        %% is registered to catch [reckon_db, store, started] events.
+        #{
+            id => hecate_boot_tracker,
+            start => {hecate_boot_tracker, start_link, [StoreIds]},
+            restart => permanent,
+            type => worker
         }
     ],
-    
+
     {ok, {SupFlags, ChildSpecs}}.

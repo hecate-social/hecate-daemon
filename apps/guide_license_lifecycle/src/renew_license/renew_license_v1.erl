@@ -3,7 +3,10 @@
 %%% Required: license_id.
 -module(renew_license_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_license_id/1]).
 
 -record(renew_license_v1, {
@@ -16,6 +19,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, renew_license_v1()} | {error, term()}.
+command_type() -> renew_license_v1.
+
 new(#{license_id := LicenseId}) ->
     {ok, #renew_license_v1{
         license_id = LicenseId
@@ -32,8 +37,8 @@ validate(#renew_license_v1{} = Cmd) ->
 -spec to_map(renew_license_v1()) -> map().
 to_map(#renew_license_v1{} = Cmd) ->
     #{
-        <<"command_type">> => <<"renew_license">>,
-        <<"license_id">> => Cmd#renew_license_v1.license_id
+        command_type => <<"renew_license">>,
+        license_id => Cmd#renew_license_v1.license_id
     }.
 
 -spec from_map(map()) -> {ok, renew_license_v1()} | {error, term()}.

@@ -110,13 +110,17 @@ fi
 DAEMON_PID=""
 VITE_PID=""
 
-cleanup() {
+cleanup_vite() {
     if [ -n "$VITE_PID" ] && kill -0 "$VITE_PID" 2>/dev/null; then
         echo ""
         echo "Stopping Vite dev server (PID $VITE_PID)..."
         kill "$VITE_PID" 2>/dev/null || true
         wait "$VITE_PID" 2>/dev/null || true
     fi
+}
+
+cleanup_all() {
+    cleanup_vite
     if [ -n "$DAEMON_PID" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
         echo ""
         echo "Stopping dev daemon (PID $DAEMON_PID)..."
@@ -126,7 +130,10 @@ cleanup() {
         echo "Dev daemon stopped."
     fi
 }
-trap cleanup EXIT
+
+# Only clean up on explicit Ctrl+C, NOT on EXIT.
+# cargo tauri dev exits and restarts on rebuilds — EXIT trap kills everything.
+trap cleanup_all INT TERM
 
 start_daemon() {
     echo "=== Starting dev daemon ==="

@@ -3,7 +3,10 @@
 %%% Required: license_id. Optional: reason.
 -module(revoke_license_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_license_id/1, get_reason/1]).
 
 -record(revoke_license_v1, {
@@ -17,6 +20,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, revoke_license_v1()} | {error, term()}.
+command_type() -> revoke_license_v1.
+
 new(#{license_id := LicenseId} = Params) ->
     {ok, #revoke_license_v1{
         license_id = LicenseId,
@@ -34,9 +39,9 @@ validate(#revoke_license_v1{} = Cmd) ->
 -spec to_map(revoke_license_v1()) -> map().
 to_map(#revoke_license_v1{} = Cmd) ->
     #{
-        <<"command_type">> => <<"revoke_license">>,
-        <<"license_id">> => Cmd#revoke_license_v1.license_id,
-        <<"reason">> => Cmd#revoke_license_v1.reason
+        command_type => <<"revoke_license">>,
+        license_id => Cmd#revoke_license_v1.license_id,
+        reason => Cmd#revoke_license_v1.reason
     }.
 
 -spec from_map(map()) -> {ok, revoke_license_v1()} | {error, term()}.

@@ -2,7 +2,10 @@
 %%% Removes an installed plugin from this node.
 -module(remove_plugin_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_plugin_id/1]).
 
 -record(remove_plugin_v1, {
@@ -15,6 +18,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, remove_plugin_v1()} | {error, term()}.
+command_type() -> remove_plugin_v1.
+
 new(#{plugin_id := PluginId}) ->
     {ok, #remove_plugin_v1{
         plugin_id = PluginId
@@ -32,8 +37,8 @@ validate(#remove_plugin_v1{} = Cmd) ->
 -spec to_map(remove_plugin_v1()) -> map().
 to_map(#remove_plugin_v1{} = Cmd) ->
     #{
-        <<"command_type">> => <<"remove_plugin">>,
-        <<"plugin_id">>    => Cmd#remove_plugin_v1.plugin_id
+        command_type => <<"remove_plugin">>,
+        plugin_id => Cmd#remove_plugin_v1.plugin_id
     }.
 
 -spec from_map(map()) -> {ok, remove_plugin_v1()} | {error, term()}.

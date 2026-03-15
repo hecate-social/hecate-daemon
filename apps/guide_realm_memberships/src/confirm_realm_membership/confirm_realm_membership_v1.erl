@@ -1,7 +1,10 @@
 %%% @doc confirm_realm_membership_v1 command
 -module(confirm_realm_membership_v1).
 
--export([new/5, to_map/1, from_map/1]).
+-behaviour(evoq_command).
+
+-export([new/1, new/5, to_map/1, from_map/1]).
+-export([command_type/0]).
 
 -record(confirm_realm_membership_v1, {
     membership_id  :: binary(),
@@ -15,6 +18,15 @@
 -export_type([confirm_realm_membership_v1/0]).
 
 -spec new(binary(), binary(), binary(), binary(), integer()) -> confirm_realm_membership_v1().
+command_type() -> confirm_realm_membership_v1.
+
+new(#{membership_id := MembershipId, realm_id := RealmId,
+     oauth_account := OAuthAccount, oauth_provider := OAuthProvider,
+     confirmed_at := ConfirmedAt}) ->
+    {ok, new(MembershipId, RealmId, OAuthAccount, OAuthProvider, ConfirmedAt)};
+new(_) ->
+    {error, missing_fields}.
+
 new(MembershipId, RealmId, OAuthAccount, OAuthProvider, ConfirmedAt) ->
     #confirm_realm_membership_v1{
         membership_id = MembershipId,

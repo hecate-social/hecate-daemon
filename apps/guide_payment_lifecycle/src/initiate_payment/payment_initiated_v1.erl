@@ -2,7 +2,10 @@
 %%% Emitted when a payment is initiated.
 -module(payment_initiated_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_payment_id/1, get_consumer_id/1, get_procurement_id/1,
          get_offering_id/1, get_plugin_id/1, get_amount_cents/1,
          get_currency/1, get_initiated_at/1]).
@@ -24,6 +27,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> payment_initiated_v1().
+event_type() -> payment_initiated_v1.
+
 new(#{payment_id := PaymentId, consumer_id := ConsumerId,
       procurement_id := ProcurementId, offering_id := OfferingId,
       plugin_id := PluginId} = Params) ->

@@ -2,7 +2,10 @@
 %%% Removes an app entry from the launcher sidebar.
 -module(unregister_entry_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_entry_id/1]).
 
 -record(unregister_entry_v1, {
@@ -15,6 +18,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, unregister_entry_v1()} | {error, term()}.
+command_type() -> unregister_entry_v1.
+
 new(#{entry_id := EntryId}) ->
     {ok, #unregister_entry_v1{
         entry_id = EntryId
@@ -32,8 +37,8 @@ validate(#unregister_entry_v1{} = Cmd) ->
 -spec to_map(unregister_entry_v1()) -> map().
 to_map(#unregister_entry_v1{} = Cmd) ->
     #{
-        <<"command_type">> => <<"unregister_entry">>,
-        <<"entry_id">>     => Cmd#unregister_entry_v1.entry_id
+        command_type => <<"unregister_entry">>,
+        entry_id => Cmd#unregister_entry_v1.entry_id
     }.
 
 -spec from_map(map()) -> {ok, unregister_entry_v1()} | {error, term()}.

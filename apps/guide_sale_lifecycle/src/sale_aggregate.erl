@@ -14,12 +14,14 @@
 -include("sale_status.hrl").
 -include("sale_state.hrl").
 
--export([init/1, execute/2, apply/2]).
--export([initial_state/0, apply_event/2]).
+-export([state_module/0, init/1, execute/2, apply/2]).
 -export([flag_map/0]).
 
 -type state() :: #sale_state{}.
 -export_type([state/0]).
+
+-spec state_module() -> module().
+state_module() -> sale_state.
 
 -spec flag_map() -> evoq_bit_flags:flag_map().
 flag_map() -> ?SALE_FLAG_MAP.
@@ -27,12 +29,8 @@ flag_map() -> ?SALE_FLAG_MAP.
 %% --- Callbacks ---
 
 -spec init(binary()) -> {ok, state()}.
-init(_AggregateId) ->
-    {ok, initial_state()}.
-
--spec initial_state() -> state().
-initial_state() ->
-    #sale_state{status = 0}.
+init(AggregateId) ->
+    {ok, sale_state:new(AggregateId)}.
 
 %% --- Execute ---
 %% NOTE: evoq calls execute(State, Payload) - State FIRST!
@@ -71,52 +69,17 @@ execute_archive_sale(Payload) ->
     convert_events(maybe_archive_sale:handle(Cmd), fun sale_archived_v1:to_map/1).
 
 %% --- Apply ---
-%% NOTE: evoq calls apply(State, Event) - State FIRST!
+%% Delegates to sale_state module (evoq_state behaviour).
 
 -spec apply(state(), map()) -> state().
 apply(State, Event) ->
-    apply_event(Event, State).
-
--spec apply_event(map(), state()) -> state().
-
-apply_event(#{<<"event_type">> := <<"sale_initiated_v1">>} = E, S) -> apply_initiated(E, S);
-apply_event(#{event_type := <<"sale_initiated_v1">>} = E, S)      -> apply_initiated(E, S);
-apply_event(#{<<"event_type">> := <<"sale_archived_v1">>} = E, S)  -> apply_archived(E, S);
-apply_event(#{event_type := <<"sale_archived_v1">>} = E, S)        -> apply_archived(E, S);
-%% Unknown — ignore
-apply_event(_E, S) -> S.
-
-%% --- Apply helpers ---
-
-apply_initiated(E, _State) ->
-    #sale_state{
-        sale_id        = get_value(sale_id, E),
-        seller_id      = get_value(seller_id, E),
-        procurement_id = get_value(procurement_id, E),
-        offering_id    = get_value(offering_id, E),
-        plugin_id      = get_value(plugin_id, E),
-        status         = evoq_bit_flags:set(0, ?SALE_INITIATED),
-        initiated_at   = get_value(initiated_at, E)
-    }.
-
-apply_archived(E, #sale_state{status = Status} = State) ->
-    State#sale_state{
-        status      = evoq_bit_flags:set(Status, ?SALE_ARCHIVED),
-        archived_at = get_value(archived_at, E)
-    }.
+    sale_state:apply_event(State, Event).
 
 %% --- Internal ---
 
-get_command_type(#{<<"command_type">> := T}) -> T;
 get_command_type(#{command_type := T}) when is_binary(T) -> T;
 get_command_type(#{command_type := T}) when is_atom(T) -> atom_to_binary(T);
 get_command_type(_) -> undefined.
-
-get_value(Key, Map) when is_atom(Key) ->
-    case maps:find(Key, Map) of
-        {ok, V} -> V;
-        error -> maps:get(atom_to_binary(Key), Map, undefined)
-    end.
 
 convert_events({ok, Events}, ToMapFn) ->
     {ok, [ToMapFn(E) || E <- Events]};

@@ -5,7 +5,10 @@
 %%% Offering fields are deep-copied as a point-in-time snapshot.
 -module(initiate_license_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_license_id/1, get_consumer_id/1, get_plugin_id/1, get_offering_id/1,
          get_plugin_name/1, get_display_name/1, get_description/1, get_icon/1, get_group_name/1, get_group_icon/1,
          get_github_repo/1, get_oci_image/1, get_selling_formula/1, get_author_id/1,
@@ -61,6 +64,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, initiate_license_v1()} | {error, term()}.
+command_type() -> initiate_license_v1.
+
 new(#{consumer_id := ConsumerId, plugin_id := PluginId, offering_id := OfferingId} = P) ->
     LicenseId = <<"license-", ConsumerId/binary, "-", PluginId/binary>>,
     {ok, #initiate_license_v1{
@@ -115,41 +120,41 @@ validate(#initiate_license_v1{} = Cmd) ->
 -spec to_map(initiate_license_v1()) -> map().
 to_map(#initiate_license_v1{} = C) ->
     #{
-        <<"command_type">>      => <<"initiate_license">>,
-        <<"license_id">>        => C#initiate_license_v1.license_id,
-        <<"consumer_id">>       => C#initiate_license_v1.consumer_id,
-        <<"plugin_id">>         => C#initiate_license_v1.plugin_id,
-        <<"offering_id">>       => C#initiate_license_v1.offering_id,
-        <<"plugin_name">>       => C#initiate_license_v1.plugin_name,
-        <<"display_name">>      => C#initiate_license_v1.display_name,
-        <<"description">>       => C#initiate_license_v1.description,
-        <<"icon">>              => C#initiate_license_v1.icon,
-        <<"group_name">>        => C#initiate_license_v1.group_name,
-        <<"group_icon">>        => C#initiate_license_v1.group_icon,
-        <<"github_repo">>       => C#initiate_license_v1.github_repo,
-        <<"oci_image">>         => C#initiate_license_v1.oci_image,
-        <<"plugin_type">>       => C#initiate_license_v1.plugin_type,
-        <<"callback_module">>   => C#initiate_license_v1.callback_module,
-        <<"package_url">>       => C#initiate_license_v1.package_url,
-        <<"selling_formula">>   => C#initiate_license_v1.selling_formula,
-        <<"author_id">>         => C#initiate_license_v1.author_id,
-        <<"license_type">>      => C#initiate_license_v1.license_type,
-        <<"fee_cents">>         => C#initiate_license_v1.fee_cents,
-        <<"fee_currency">>      => C#initiate_license_v1.fee_currency,
-        <<"duration_days">>     => C#initiate_license_v1.duration_days,
-        <<"node_limit">>        => C#initiate_license_v1.node_limit,
-        <<"org">>               => C#initiate_license_v1.org,
-        <<"version">>           => C#initiate_license_v1.version,
-        <<"manifest_tag">>      => C#initiate_license_v1.manifest_tag,
-        <<"tags">>              => C#initiate_license_v1.tags,
-        <<"homepage">>          => C#initiate_license_v1.homepage,
-        <<"min_daemon_version">> => C#initiate_license_v1.min_daemon_version,
-        <<"publisher_identity">> => C#initiate_license_v1.publisher_identity,
-        <<"manifest_url">>      => C#initiate_license_v1.manifest_url,
-        <<"manifest_checksum">> => C#initiate_license_v1.manifest_checksum,
-        <<"author_signature">>  => C#initiate_license_v1.author_signature,
-        <<"oci_image_verified">> => C#initiate_license_v1.oci_image_verified,
-        <<"oci_image_digest">>  => C#initiate_license_v1.oci_image_digest
+        command_type => <<"initiate_license">>,
+        license_id => C#initiate_license_v1.license_id,
+        consumer_id => C#initiate_license_v1.consumer_id,
+        plugin_id => C#initiate_license_v1.plugin_id,
+        offering_id => C#initiate_license_v1.offering_id,
+        plugin_name => C#initiate_license_v1.plugin_name,
+        display_name => C#initiate_license_v1.display_name,
+        description => C#initiate_license_v1.description,
+        icon => C#initiate_license_v1.icon,
+        group_name => C#initiate_license_v1.group_name,
+        group_icon => C#initiate_license_v1.group_icon,
+        github_repo => C#initiate_license_v1.github_repo,
+        oci_image => C#initiate_license_v1.oci_image,
+        plugin_type => C#initiate_license_v1.plugin_type,
+        callback_module => C#initiate_license_v1.callback_module,
+        package_url => C#initiate_license_v1.package_url,
+        selling_formula => C#initiate_license_v1.selling_formula,
+        author_id => C#initiate_license_v1.author_id,
+        license_type => C#initiate_license_v1.license_type,
+        fee_cents => C#initiate_license_v1.fee_cents,
+        fee_currency => C#initiate_license_v1.fee_currency,
+        duration_days => C#initiate_license_v1.duration_days,
+        node_limit => C#initiate_license_v1.node_limit,
+        org => C#initiate_license_v1.org,
+        version => C#initiate_license_v1.version,
+        manifest_tag => C#initiate_license_v1.manifest_tag,
+        tags => C#initiate_license_v1.tags,
+        homepage => C#initiate_license_v1.homepage,
+        min_daemon_version => C#initiate_license_v1.min_daemon_version,
+        publisher_identity => C#initiate_license_v1.publisher_identity,
+        manifest_url => C#initiate_license_v1.manifest_url,
+        manifest_checksum => C#initiate_license_v1.manifest_checksum,
+        author_signature => C#initiate_license_v1.author_signature,
+        oci_image_verified => C#initiate_license_v1.oci_image_verified,
+        oci_image_digest => C#initiate_license_v1.oci_image_digest
     }.
 
 -spec from_map(map()) -> {ok, initiate_license_v1()} | {error, term()}.

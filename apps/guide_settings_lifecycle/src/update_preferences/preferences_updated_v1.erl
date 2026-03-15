@@ -1,7 +1,10 @@
 %%% @doc preferences_updated_v1 event
 -module(preferences_updated_v1).
 
--export([new/2, to_map/1, from_map/1]).
+-behaviour(evoq_event).
+
+-export([new/1, new/2, to_map/1, from_map/1]).
+-export([event_type/0]).
 
 -record(preferences_updated_v1, {
     preferences :: map(),
@@ -12,6 +15,11 @@
 -export_type([preferences_updated_v1/0]).
 
 -spec new(map(), integer()) -> preferences_updated_v1().
+event_type() -> preferences_updated_v1.
+
+new(#{preferences := Preferences, updated_at := UpdatedAt}) ->
+    new(Preferences, UpdatedAt).
+
 new(Preferences, UpdatedAt) ->
     #preferences_updated_v1{preferences = Preferences, updated_at = UpdatedAt}.
 

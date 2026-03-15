@@ -10,27 +10,23 @@
 
 -behaviour(evoq_aggregate).
 
--export([init/1, execute/2, apply/2]).
--export([initial_state/0, apply_event/2]).
+-include("llm_usage_state.hrl").
 
--record(llm_usage_state, {
-    call_count = 0 :: non_neg_integer()
-}).
+-export([state_module/0, init/1, execute/2, apply/2]).
 
 -type state() :: #llm_usage_state{}.
 -export_type([state/0]).
 
--spec init(binary()) -> {ok, state()}.
-init(_AggregateId) ->
-    {ok, initial_state()}.
+-spec state_module() -> module().
+state_module() -> llm_usage_state.
 
--spec initial_state() -> state().
-initial_state() ->
-    #llm_usage_state{}.
+-spec init(binary()) -> {ok, state()}.
+init(AggregateId) ->
+    {ok, llm_usage_state:new(AggregateId)}.
 
 %% Execute: always accept track_llm_call commands
 -spec execute(state(), map()) -> {ok, [map()]} | {error, term()}.
-execute(_State, #{<<"command_type">> := <<"track_llm_call">>} = Payload) ->
+execute(_State, #{command_type := <<"track_llm_call">>} = Payload) ->
     {ok, Cmd} = track_llm_call_v1:from_map(Payload),
     case maybe_track_llm_call:handle(Cmd) of
         {ok, Events} ->
@@ -41,15 +37,8 @@ execute(_State, #{<<"command_type">> := <<"track_llm_call">>} = Payload) ->
 execute(_State, _Payload) ->
     {error, unknown_command}.
 
-%% Apply: increment call count
+%% Apply: delegate to state module
 -spec apply(state(), map()) -> state().
 apply(State, Event) ->
-    apply_event(Event, State).
+    llm_usage_state:apply_event(State, Event).
 
--spec apply_event(map(), state()) -> state().
-apply_event(#{<<"event_type">> := <<"llm_call_tracked_v1">>}, #llm_usage_state{call_count = N} = S) ->
-    S#llm_usage_state{call_count = N + 1};
-apply_event(#{event_type := <<"llm_call_tracked_v1">>}, #llm_usage_state{call_count = N} = S) ->
-    S#llm_usage_state{call_count = N + 1};
-apply_event(_, S) ->
-    S.

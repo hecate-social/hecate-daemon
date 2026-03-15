@@ -2,7 +2,10 @@
 %%% Records a single LLM API call with token counts and cost.
 -module(track_llm_call_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 
 -record(track_llm_call_v1, {
     venture_id  :: binary(),
@@ -21,6 +24,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, track_llm_call_v1()} | {error, term()}.
+command_type() -> track_llm_call_v1.
+
 new(#{model := Model, tokens_in := TokensIn, tokens_out := TokensOut} = Params) ->
     {ok, #track_llm_call_v1{
         venture_id  = maps:get(venture_id, Params, <<"default">>),
@@ -45,15 +50,15 @@ validate(#track_llm_call_v1{} = Cmd) ->
 -spec to_map(track_llm_call_v1()) -> map().
 to_map(#track_llm_call_v1{} = C) ->
     #{
-        <<"command_type">> => <<"track_llm_call">>,
-        <<"venture_id">>   => C#track_llm_call_v1.venture_id,
-        <<"division_id">>  => C#track_llm_call_v1.division_id,
-        <<"agent_id">>     => C#track_llm_call_v1.agent_id,
-        <<"task_id">>      => C#track_llm_call_v1.task_id,
-        <<"model">>        => C#track_llm_call_v1.model,
-        <<"tokens_in">>    => C#track_llm_call_v1.tokens_in,
-        <<"tokens_out">>   => C#track_llm_call_v1.tokens_out,
-        <<"cost_usd">>     => C#track_llm_call_v1.cost_usd
+        command_type => <<"track_llm_call">>,
+        venture_id => C#track_llm_call_v1.venture_id,
+        division_id => C#track_llm_call_v1.division_id,
+        agent_id => C#track_llm_call_v1.agent_id,
+        task_id => C#track_llm_call_v1.task_id,
+        model => C#track_llm_call_v1.model,
+        tokens_in => C#track_llm_call_v1.tokens_in,
+        tokens_out => C#track_llm_call_v1.tokens_out,
+        cost_usd => C#track_llm_call_v1.cost_usd
     }.
 
 -spec from_map(map()) -> {ok, track_llm_call_v1()} | {error, term()}.

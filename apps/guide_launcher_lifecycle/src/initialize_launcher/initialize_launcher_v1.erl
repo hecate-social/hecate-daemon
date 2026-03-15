@@ -2,7 +2,10 @@
 %%% Initializes the launcher singleton with default groups.
 -module(initialize_launcher_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 
 -record(initialize_launcher_v1, {
     placeholder :: undefined
@@ -14,6 +17,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, initialize_launcher_v1()} | {error, term()}.
+command_type() -> initialize_launcher_v1.
+
 new(#{}) ->
     {ok, #initialize_launcher_v1{placeholder = undefined}};
 new(_) ->
@@ -26,7 +31,7 @@ validate(#initialize_launcher_v1{} = Cmd) ->
 -spec to_map(initialize_launcher_v1()) -> map().
 to_map(#initialize_launcher_v1{}) ->
     #{
-        <<"command_type">> => <<"initialize_launcher">>
+        command_type => <<"initialize_launcher">>
     }.
 
 -spec from_map(map()) -> {ok, initialize_launcher_v1()} | {error, term()}.

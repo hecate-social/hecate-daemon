@@ -17,67 +17,67 @@
 %% ── Test Helpers ────────────────────────────────────────────────────────────
 
 fresh_state() ->
-    license_offering_aggregate:initial_state().
+    offering_state:new(<<>>).
 
 make_initiate_payload() ->
     #{
-        <<"command_type">> => <<"initiate_offering">>,
-        <<"plugin_id">> => ?PLUGIN_ID,
-        <<"author_id">> => ?AUTHOR_ID,
-        <<"plugin_name">> => <<"Trader">>,
-        <<"description">> => <<"Trading bot plugin">>,
-        <<"icon">> => <<"trader.svg">>,
-        <<"group_name">> => <<"Trading">>,
-        <<"group_icon">> => <<"trading-icon.svg">>,
-        <<"github_repo">> => <<"hecate-social/hecate-trader">>,
-        <<"oci_image">> => <<"ghcr.io/hecate-social/hecate-traderd:0.1.0">>,
-        <<"selling_formula">> => <<"free">>,
-        <<"license_type">> => <<"free">>,
-        <<"fee_cents">> => 0,
-        <<"fee_currency">> => <<"EUR">>,
-        <<"duration_days">> => 0,
-        <<"node_limit">> => 0,
-        <<"org">> => <<"hecate-social">>,
-        <<"version">> => <<"0.1.0">>,
-        <<"manifest_tag">> => <<"v0.1.0">>,
-        <<"tags">> => <<"[\"trading\",\"bot\"]">>,
-        <<"homepage">> => <<"https://hecate.social/plugins/trader">>,
-        <<"min_daemon_version">> => <<"0.8.0">>,
-        <<"publisher_identity">> => <<"did:key:z6Mk...">>
+        command_type => <<"initiate_offering">>,
+        plugin_id => ?PLUGIN_ID,
+        author_id => ?AUTHOR_ID,
+        plugin_name => <<"Trader">>,
+        description => <<"Trading bot plugin">>,
+        icon => <<"trader.svg">>,
+        group_name => <<"Trading">>,
+        group_icon => <<"trading-icon.svg">>,
+        github_repo => <<"hecate-social/hecate-trader">>,
+        oci_image => <<"ghcr.io/hecate-social/hecate-traderd:0.1.0">>,
+        selling_formula => <<"free">>,
+        license_type => <<"free">>,
+        fee_cents => 0,
+        fee_currency => <<"EUR">>,
+        duration_days => 0,
+        node_limit => 0,
+        org => <<"hecate-social">>,
+        version => <<"0.1.0">>,
+        manifest_tag => <<"v0.1.0">>,
+        tags => <<"[\"trading\",\"bot\"]">>,
+        homepage => <<"https://hecate.social/plugins/trader">>,
+        min_daemon_version => <<"0.8.0">>,
+        publisher_identity => <<"did:key:z6Mk...">>
     }.
 
 make_announce_payload() ->
     #{
-        <<"command_type">> => <<"announce_offering">>,
-        <<"offering_id">> => ?OFFERING_ID
+        command_type => <<"announce_offering">>,
+        offering_id => ?OFFERING_ID
     }.
 
 make_publish_payload() ->
     #{
-        <<"command_type">> => <<"publish_offering">>,
-        <<"offering_id">> => ?OFFERING_ID
+        command_type => <<"publish_offering">>,
+        offering_id => ?OFFERING_ID
     }.
 
 make_retract_payload() ->
     #{
-        <<"command_type">> => <<"retract_offering">>,
-        <<"offering_id">> => ?OFFERING_ID
+        command_type => <<"retract_offering">>,
+        offering_id => ?OFFERING_ID
     }.
 
 make_amend_payload() ->
     #{
-        <<"command_type">> => <<"amend_offering">>,
-        <<"offering_id">> => ?OFFERING_ID,
-        <<"description">> => <<"Pro trading bot">>,
-        <<"oci_image">> => <<"ghcr.io/hecate-social/hecate-traderd:0.2.0">>,
-        <<"fee_cents">> => 999,
-        <<"license_type">> => <<"subscription">>
+        command_type => <<"amend_offering">>,
+        offering_id => ?OFFERING_ID,
+        description => <<"Pro trading bot">>,
+        oci_image => <<"ghcr.io/hecate-social/hecate-traderd:0.2.0">>,
+        fee_cents => 999,
+        license_type => <<"subscription">>
     }.
 
 make_archive_payload() ->
     #{
-        <<"command_type">> => <<"archive_offering">>,
-        <<"offering_id">> => ?OFFERING_ID
+        command_type => <<"archive_offering">>,
+        offering_id => ?OFFERING_ID
     }.
 
 execute_and_apply(State, Payload) ->

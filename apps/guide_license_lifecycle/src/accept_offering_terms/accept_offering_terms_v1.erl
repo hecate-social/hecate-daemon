@@ -4,7 +4,10 @@
 %%% the consumer saying "I accept the terms".
 -module(accept_offering_terms_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_license_id/1]).
 
 -record(accept_offering_terms_v1, {
@@ -17,6 +20,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, accept_offering_terms_v1()} | {error, term()}.
+command_type() -> accept_offering_terms_v1.
+
 new(#{license_id := LicenseId}) ->
     {ok, #accept_offering_terms_v1{license_id = LicenseId}};
 new(_) ->
@@ -31,8 +36,8 @@ validate(#accept_offering_terms_v1{} = Cmd) ->
 -spec to_map(accept_offering_terms_v1()) -> map().
 to_map(#accept_offering_terms_v1{} = C) ->
     #{
-        <<"command_type">> => <<"accept_offering_terms">>,
-        <<"license_id">>   => C#accept_offering_terms_v1.license_id
+        command_type => <<"accept_offering_terms">>,
+        license_id => C#accept_offering_terms_v1.license_id
     }.
 
 -spec from_map(map()) -> {ok, accept_offering_terms_v1()} | {error, term()}.

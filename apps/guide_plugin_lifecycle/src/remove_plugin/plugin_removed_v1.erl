@@ -2,7 +2,10 @@
 %%% Emitted when a plugin is successfully removed from this node.
 -module(plugin_removed_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_plugin_id/1, get_oci_image/1, get_removed_at/1]).
 
 -record(plugin_removed_v1, {
@@ -17,6 +20,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> plugin_removed_v1().
+event_type() -> plugin_removed_v1.
+
 new(#{plugin_id := PluginId, oci_image := OciImage}) ->
     #plugin_removed_v1{
         plugin_id  = PluginId,

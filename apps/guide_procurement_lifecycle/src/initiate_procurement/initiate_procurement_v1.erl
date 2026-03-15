@@ -2,7 +2,10 @@
 %%% Birth event for procurement lifecycle.
 -module(initiate_procurement_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_procurement_id/1, get_consumer_id/1, get_offering_id/1, get_plugin_id/1,
          get_author_id/1]).
 
@@ -20,6 +23,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, initiate_procurement_v1()} | {error, term()}.
+command_type() -> initiate_procurement_v1.
+
 new(#{consumer_id := ConsumerId, offering_id := OfferingId,
       plugin_id := PluginId, author_id := AuthorId}) ->
     ProcurementId = <<"procurement-", ConsumerId/binary, "-", PluginId/binary>>,
@@ -49,12 +54,12 @@ validate(#initiate_procurement_v1{} = Cmd) ->
 -spec to_map(initiate_procurement_v1()) -> map().
 to_map(#initiate_procurement_v1{} = Cmd) ->
     #{
-        <<"command_type">> => <<"initiate_procurement">>,
-        <<"procurement_id">> => Cmd#initiate_procurement_v1.procurement_id,
-        <<"consumer_id">> => Cmd#initiate_procurement_v1.consumer_id,
-        <<"offering_id">> => Cmd#initiate_procurement_v1.offering_id,
-        <<"plugin_id">> => Cmd#initiate_procurement_v1.plugin_id,
-        <<"author_id">> => Cmd#initiate_procurement_v1.author_id
+        command_type => <<"initiate_procurement">>,
+        procurement_id => Cmd#initiate_procurement_v1.procurement_id,
+        consumer_id => Cmd#initiate_procurement_v1.consumer_id,
+        offering_id => Cmd#initiate_procurement_v1.offering_id,
+        plugin_id => Cmd#initiate_procurement_v1.plugin_id,
+        author_id => Cmd#initiate_procurement_v1.author_id
     }.
 
 -spec from_map(map()) -> {ok, initiate_procurement_v1()} | {error, term()}.

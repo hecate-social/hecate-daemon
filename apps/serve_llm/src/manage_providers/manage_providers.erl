@@ -9,7 +9,7 @@
 -behaviour(gen_server).
 
 -export([start_link/0]).
--export([list/0, add/3, remove/1, provider_for_model/1, list_all_models/0, refresh_models/0, reload/0]).
+-export([list/0, add/3, remove/1, get_provider/1, provider_for_model/1, list_all_models/0, refresh_models/0, reload/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(SERVER, ?MODULE).
@@ -46,6 +46,11 @@ add(Name, Type, Config) ->
 -spec remove(binary()) -> ok | {error, term()}.
 remove(Name) ->
     gen_server:call(?SERVER, {remove, Name}).
+
+%% @doc Look up a provider by name. Returns the provider module and config.
+-spec get_provider(binary()) -> {ok, {module(), map()}} | {error, not_found}.
+get_provider(Name) ->
+    gen_server:call(?SERVER, {get_provider, Name}).
 
 %% @doc Find which provider serves a given model.
 %% Returns {Module, Config} or {error, not_found}.
@@ -105,6 +110,15 @@ handle_call({add, Name, Type, Config}, _From, #state{providers = Providers} = St
     persist_providers(NewProviders),
     %% Invalidate model cache when providers change
     {reply, ok, State#state{providers = NewProviders, model_cache = #{}, models_meta = [], cache_updated_at = 0}};
+
+handle_call({get_provider, Name}, _From, #state{providers = Providers} = State) ->
+    case maps:get(Name, Providers, undefined) of
+        undefined ->
+            {reply, {error, not_found}, State};
+        #{type := Type} = Config ->
+            Module = llm_provider:provider_module(Type),
+            {reply, {ok, {Module, Config}}, State}
+    end;
 
 handle_call({remove, <<"ollama">>}, _From, State) ->
     {reply, {error, cannot_remove_default}, State};

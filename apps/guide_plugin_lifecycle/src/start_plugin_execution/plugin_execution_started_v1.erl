@@ -2,7 +2,10 @@
 %%% Emitted when a plugin execution is started on this node.
 -module(plugin_execution_started_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_plugin_id/1, get_oci_image/1, get_plugin_type/1,
          get_callback_module/1, get_name/1, get_started_at/1]).
 
@@ -21,6 +24,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> plugin_execution_started_v1().
+event_type() -> plugin_execution_started_v1.
+
 new(#{plugin_id := PluginId} = Params) ->
     #plugin_execution_started_v1{
         plugin_id = PluginId,

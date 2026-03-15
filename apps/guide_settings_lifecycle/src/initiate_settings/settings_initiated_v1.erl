@@ -1,7 +1,10 @@
 %%% @doc settings_initiated_v1 event
 -module(settings_initiated_v1).
 
--export([new/3, to_map/1, from_map/1]).
+-behaviour(evoq_event).
+
+-export([new/1, new/3, to_map/1, from_map/1]).
+-export([event_type/0]).
 
 -record(settings_initiated_v1, {
     linux_user   :: binary(),
@@ -13,6 +16,11 @@
 -export_type([settings_initiated_v1/0]).
 
 -spec new(binary(), binary(), integer()) -> settings_initiated_v1().
+event_type() -> settings_initiated_v1.
+
+new(#{linux_user := LinuxUser, hostname := Hostname, initiated_at := InitiatedAt}) ->
+    new(LinuxUser, Hostname, InitiatedAt).
+
 new(LinuxUser, Hostname, InitiatedAt) ->
     #settings_initiated_v1{
         linux_user = LinuxUser,

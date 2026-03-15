@@ -1,7 +1,10 @@
 %%% @doc realm_membership_revoked_v1 event
 -module(realm_membership_revoked_v1).
 
--export([new/3, to_map/1, from_map/1]).
+-behaviour(evoq_event).
+
+-export([new/1, new/3, to_map/1, from_map/1]).
+-export([event_type/0]).
 
 -record(realm_membership_revoked_v1, {
     membership_id :: binary(),
@@ -13,6 +16,11 @@
 -export_type([realm_membership_revoked_v1/0]).
 
 -spec new(binary(), binary(), integer()) -> realm_membership_revoked_v1().
+event_type() -> realm_membership_revoked_v1.
+
+new(#{membership_id := MembershipId, reason := Reason, revoked_at := RevokedAt}) ->
+    new(MembershipId, Reason, RevokedAt).
+
 new(MembershipId, Reason, RevokedAt) ->
     #realm_membership_revoked_v1{
         membership_id = MembershipId,

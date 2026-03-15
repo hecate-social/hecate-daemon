@@ -4,7 +4,10 @@
 %%% Carries fee_cents echoed from state so the auto-grant PM can decide free vs paid.
 -module(offering_terms_accepted_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_license_id/1, get_consumer_id/1, get_offering_id/1,
          get_plugin_id/1, get_author_id/1, get_fee_cents/1, get_accepted_at/1]).
 
@@ -24,6 +27,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> offering_terms_accepted_v1().
+event_type() -> offering_terms_accepted_v1.
+
 new(#{license_id := LicenseId} = P) ->
     #offering_terms_accepted_v1{
         license_id  = LicenseId,

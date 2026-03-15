@@ -2,7 +2,10 @@
 %%% Installs a plugin on this node.
 -module(install_plugin_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_plugin_id/1, get_name/1, get_display_name/1,
          get_plugin_type/1, get_oci_image/1, get_callback_module/1,
          get_package_url/1, get_installed_version/1, get_license_id/1,
@@ -29,6 +32,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, install_plugin_v1()} | {error, term()}.
+command_type() -> install_plugin_v1.
+
 new(#{plugin_id := PluginId, name := Name,
       installed_version := Version} = Params) ->
     PluginType = maps:get(plugin_type, Params, <<"container">>),
@@ -77,11 +82,11 @@ validate(#install_plugin_v1{} = Cmd) ->
 -spec to_map(install_plugin_v1()) -> map().
 to_map(#install_plugin_v1{} = Cmd) ->
     Base = #{
-        <<"command_type">>       => <<"install_plugin">>,
-        <<"plugin_id">>          => Cmd#install_plugin_v1.plugin_id,
-        <<"name">>               => Cmd#install_plugin_v1.name,
-        <<"plugin_type">>        => Cmd#install_plugin_v1.plugin_type,
-        <<"installed_version">>  => Cmd#install_plugin_v1.installed_version
+        command_type => <<"install_plugin">>,
+        plugin_id => Cmd#install_plugin_v1.plugin_id,
+        name => Cmd#install_plugin_v1.name,
+        plugin_type => Cmd#install_plugin_v1.plugin_type,
+        installed_version => Cmd#install_plugin_v1.installed_version
     },
     maybe_put(<<"display_name">>, Cmd#install_plugin_v1.display_name,
     maybe_put(<<"oci_image">>, Cmd#install_plugin_v1.oci_image,

@@ -94,7 +94,6 @@ project_revoked(Data, State, RM) ->
 %% --- Internal ---
 
 get_event_type(#{event_type := T}) -> T;
-get_event_type(#{<<"event_type">> := T}) -> T;
 get_event_type(_) -> undefined.
 
 gf(Key, Data) -> hecate_api_utils:get_field(Key, Data).

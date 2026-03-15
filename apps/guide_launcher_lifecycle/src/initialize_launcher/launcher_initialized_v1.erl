@@ -2,7 +2,10 @@
 %%% Emitted when the launcher singleton is first initialized with default groups.
 -module(launcher_initialized_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_groups/1, get_initialized_at/1]).
 
 -record(launcher_initialized_v1, {
@@ -16,6 +19,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> launcher_initialized_v1().
+event_type() -> launcher_initialized_v1.
+
 new(#{groups := Groups}) ->
     #launcher_initialized_v1{
         groups         = Groups,

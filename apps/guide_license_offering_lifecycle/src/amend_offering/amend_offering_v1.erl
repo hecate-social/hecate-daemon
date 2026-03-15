@@ -3,7 +3,10 @@
 %%% Only provided (non-undefined) fields are changed.
 -module(amend_offering_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_offering_id/1,
          get_plugin_name/1, get_description/1, get_icon/1, get_group_name/1, get_group_icon/1,
          get_github_repo/1, get_homepage/1, get_tags/1,
@@ -54,6 +57,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, amend_offering_v1()} | {error, term()}.
+command_type() -> amend_offering_v1.
+
 new(#{offering_id := OfferingId} = M) ->
     {ok, #amend_offering_v1{
         offering_id = OfferingId,
@@ -99,8 +104,8 @@ validate(#amend_offering_v1{} = Cmd) ->
 -spec to_map(amend_offering_v1()) -> map().
 to_map(#amend_offering_v1{} = Cmd) ->
     Base = #{
-        <<"command_type">> => <<"amend_offering">>,
-        <<"offering_id">> => Cmd#amend_offering_v1.offering_id
+        command_type => <<"amend_offering">>,
+        offering_id => Cmd#amend_offering_v1.offering_id
     },
     lists:foldl(fun({Key, Val}, Acc) -> maybe_put(Key, Val, Acc) end, Base, [
         {<<"plugin_name">>,        Cmd#amend_offering_v1.plugin_name},

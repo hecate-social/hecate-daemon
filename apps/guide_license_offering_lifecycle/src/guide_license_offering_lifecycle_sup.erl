@@ -25,30 +25,16 @@ init([]) ->
     Children = [
         %% -- PG emitters (internal, subscribe via evoq -> broadcast to pg) --
 
-        #{id => offering_initiated_v1_to_pg,
-          start => {evoq_event_handler, start_link, [offering_initiated_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => offering_announced_v1_to_pg,
-          start => {evoq_event_handler, start_link, [offering_announced_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => offering_published_v1_to_pg,
-          start => {evoq_event_handler, start_link, [offering_published_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => offering_retracted_v1_to_pg,
-          start => {evoq_event_handler, start_link, [offering_retracted_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => offering_amended_v1_to_pg,
-          start => {evoq_event_handler, start_link, [offering_amended_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => offering_archived_v1_to_pg,
-          start => {evoq_event_handler, start_link, [offering_archived_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
+        emitter(offering_initiated_v1_to_pg),
+        emitter(offering_announced_v1_to_pg),
+        emitter(offering_published_v1_to_pg),
+        emitter(offering_retracted_v1_to_pg),
+        emitter(offering_amended_v1_to_pg),
+        emitter(offering_archived_v1_to_pg),
 
         %% -- Mesh emitters (external, subscribe via evoq -> publish to mesh) --
 
-        #{id => offering_published_v1_to_mesh,
-          start => {evoq_event_handler, start_link, [offering_published_v1_to_mesh, #{}]},
-          restart => permanent, type => worker},
+        emitter(offering_published_v1_to_mesh),
 
         %% -- Version refresh (polls GitHub Releases API) --
 
@@ -58,3 +44,7 @@ init([]) ->
     ],
 
     {ok, {SupFlags, Children}}.
+
+emitter(Mod) ->
+    #{id => Mod, start => {evoq_event_handler, start_link, [Mod, #{}]},
+      restart => permanent, type => worker}.

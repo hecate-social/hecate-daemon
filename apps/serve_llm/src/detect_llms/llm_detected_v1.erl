@@ -1,7 +1,10 @@
 %%% @doc Event: LLM detected
 -module(llm_detected_v1).
 
--export([new/2, to_map/1, from_map/1]).
+-behaviour(evoq_event).
+
+-export([new/1, new/2, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([model_name/1, model_info/1, detected_at/1]).
 
 -record(llm_detected_v1, {
@@ -12,6 +15,11 @@
 
 -opaque t() :: #llm_detected_v1{}.
 -export_type([t/0]).
+
+event_type() -> llm_detected_v1.
+
+new(#{model_name := ModelName, model_info := ModelInfo}) ->
+    new(ModelName, ModelInfo).
 
 new(ModelName, ModelInfo) ->
     {ok, #llm_detected_v1{

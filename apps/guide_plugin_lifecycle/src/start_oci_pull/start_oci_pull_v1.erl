@@ -2,7 +2,10 @@
 %%% Requests starting an OCI image pull for an installed plugin.
 -module(start_oci_pull_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, to_map/1]).
+-export([command_type/0]).
 -export([get_plugin_id/1, get_oci_image/1]).
 
 -record(start_oci_pull_v1, {
@@ -16,6 +19,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, start_oci_pull_v1()} | {error, term()}.
+command_type() -> start_oci_pull_v1.
+
 new(#{plugin_id := PluginId} = Params) when is_binary(PluginId), byte_size(PluginId) > 0 ->
     {ok, #start_oci_pull_v1{
         plugin_id = PluginId,
@@ -27,9 +32,9 @@ new(_) ->
 -spec to_map(start_oci_pull_v1()) -> map().
 to_map(#start_oci_pull_v1{plugin_id = PluginId, oci_image = OciImage}) ->
     #{
-        <<"command_type">> => <<"start_oci_pull">>,
-        <<"plugin_id">> => PluginId,
-        <<"oci_image">> => OciImage
+        command_type => <<"start_oci_pull">>,
+        plugin_id => PluginId,
+        oci_image => OciImage
     }.
 
 -spec from_map(map()) -> {ok, start_oci_pull_v1()} | {error, term()}.

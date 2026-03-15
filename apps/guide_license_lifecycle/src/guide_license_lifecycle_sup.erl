@@ -25,53 +25,31 @@ init([]) ->
     Children = [
         %% ── PG emitters (internal, subscribe via evoq -> broadcast to pg) ────
 
-        #{id => license_initiated_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_initiated_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => offering_terms_accepted_v1_to_pg,
-          start => {evoq_event_handler, start_link, [offering_terms_accepted_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => offering_terms_rejected_v1_to_pg,
-          start => {evoq_event_handler, start_link, [offering_terms_rejected_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => license_bought_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_bought_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => license_abandoned_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_abandoned_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => license_granted_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_granted_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => license_expired_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_expired_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => license_renewed_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_renewed_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => license_revoked_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_revoked_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => license_archived_v1_to_pg,
-          start => {evoq_event_handler, start_link, [license_archived_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
+        emitter(license_initiated_v1_to_pg),
+        emitter(offering_terms_accepted_v1_to_pg),
+        emitter(offering_terms_rejected_v1_to_pg),
+        emitter(license_bought_v1_to_pg),
+        emitter(license_abandoned_v1_to_pg),
+        emitter(license_granted_v1_to_pg),
+        emitter(license_expired_v1_to_pg),
+        emitter(license_renewed_v1_to_pg),
+        emitter(license_revoked_v1_to_pg),
+        emitter(license_archived_v1_to_pg),
 
         %% ── Process Managers ─────────────────────────────────────────────────
 
         %% Free path: accepted terms -> auto-grant
-        #{id => on_offering_terms_accepted_grant_license,
-          start => {evoq_event_handler, start_link, [on_offering_terms_accepted_grant_license, #{}]},
-          restart => permanent, type => worker},
+        emitter(on_offering_terms_accepted_grant_license),
 
         %% Paid path: bought -> auto-grant
-        #{id => on_license_bought_grant_license,
-          start => {evoq_event_handler, start_link, [on_license_bought_grant_license, #{}]},
-          restart => permanent, type => worker},
+        emitter(on_license_bought_grant_license),
 
         %% Granted -> install plugin (cross-domain)
-        #{id => on_license_granted_install_plugin,
-          start => {evoq_event_handler, start_link, [on_license_granted_install_plugin, #{}]},
-          restart => permanent, type => worker}
+        emitter(on_license_granted_install_plugin)
     ],
 
     {ok, {SupFlags, Children}}.
+
+emitter(Mod) ->
+    #{id => Mod, start => {evoq_event_handler, start_link, [Mod, #{}]},
+      restart => permanent, type => worker}.

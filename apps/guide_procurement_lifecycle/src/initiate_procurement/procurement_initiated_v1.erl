@@ -2,7 +2,10 @@
 %%% Emitted when a consumer initiates a new procurement.
 -module(procurement_initiated_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_procurement_id/1, get_consumer_id/1, get_offering_id/1,
          get_plugin_id/1, get_author_id/1, get_initiated_at/1]).
 
@@ -21,6 +24,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> procurement_initiated_v1().
+event_type() -> procurement_initiated_v1.
+
 new(#{procurement_id := ProcurementId, consumer_id := ConsumerId,
       offering_id := OfferingId, plugin_id := PluginId,
       author_id := AuthorId}) ->

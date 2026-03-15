@@ -22,17 +22,15 @@ init([]) ->
 
     Children = [
         %% -- PG emitters --
-        #{id => procurement_initiated_v1_to_pg,
-          start => {evoq_event_handler, start_link, [procurement_initiated_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => procurement_archived_v1_to_pg,
-          start => {evoq_event_handler, start_link, [procurement_archived_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
+        emitter(procurement_initiated_v1_to_pg),
+        emitter(procurement_archived_v1_to_pg),
 
         %% -- Cross-context process managers --
-        #{id => on_offering_terms_accepted_initiate_procurement,
-          start => {evoq_event_handler, start_link, [on_offering_terms_accepted_initiate_procurement, #{}]},
-          restart => permanent, type => worker}
+        emitter(on_offering_terms_accepted_initiate_procurement)
     ],
 
     {ok, {SupFlags, Children}}.
+
+emitter(Mod) ->
+    #{id => Mod, start => {evoq_event_handler, start_link, [Mod, #{}]},
+      restart => permanent, type => worker}.

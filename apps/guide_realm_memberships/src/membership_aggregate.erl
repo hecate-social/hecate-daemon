@@ -6,45 +6,24 @@
 -module(membership_aggregate).
 -behaviour(evoq_aggregate).
 
+-include("membership_state.hrl").
 -include("membership_status.hrl").
 
 %% Behaviour callbacks
 -export([init/1, execute/2, apply/2]).
 
-%% Internal / testing
--export([initial_state/0, apply_event/2, stream_id/1]).
+%% State module + stream routing
+-export([state_module/0, stream_id/1]).
 
--record(membership_state, {
-    membership_id  :: binary() | undefined,
-    realm_id       :: binary() | undefined,
-    realm_url      :: binary() | undefined,
-    oauth_account  :: binary() | undefined,
-    oauth_provider :: binary() | undefined,
-    initiated_at   :: integer() | undefined,
-    confirmed_at   :: integer() | undefined,
-    revoked_at     :: integer() | undefined,
-    status         :: non_neg_integer()
-}).
+-spec state_module() -> module().
+state_module() -> membership_state.
 
 %% ===================================================================
 %% Evoq callbacks
 %% ===================================================================
 
-init(_AggregateId) ->
-    {ok, initial_state()}.
-
-initial_state() ->
-    #membership_state{
-        membership_id = undefined,
-        realm_id = undefined,
-        realm_url = undefined,
-        oauth_account = undefined,
-        oauth_provider = undefined,
-        initiated_at = undefined,
-        confirmed_at = undefined,
-        revoked_at = undefined,
-        status = 0
-    }.
+init(AggregateId) ->
+    {ok, membership_state:new(AggregateId)}.
 
 -spec stream_id(binary()) -> binary().
 stream_id(MembershipId) ->
@@ -56,16 +35,9 @@ execute(State, #{command_type := CmdType} = Payload) ->
 execute(_State, _Unknown) ->
     {error, unknown_command}.
 
-%% @doc Apply event — State FIRST (evoq convention).
+%% @doc Apply event — State FIRST. Delegates to state module.
 apply(State, Event) ->
-    apply_event(State, Event).
-
-apply_event(State, #{<<"event_type">> := EventType} = Event) ->
-    do_apply(EventType, State, Event);
-apply_event(State, #{event_type := EventType} = Event) ->
-    do_apply(EventType, State, Event);
-apply_event(State, _) ->
-    State.
+    membership_state:apply_event(State, Event).
 
 %% ===================================================================
 %% Command routing
@@ -99,40 +71,3 @@ do_execute(revoke_realm_membership, State, Payload) ->
 
 do_execute(_Unknown, _State, _Payload) ->
     {error, unknown_command}.
-
-%% ===================================================================
-%% Event application
-%% ===================================================================
-
-do_apply(<<"realm_membership_initiated_v1">>, State, Event) ->
-    State#membership_state{
-        membership_id = get_field(<<"membership_id">>, membership_id, Event),
-        realm_url = get_field(<<"realm_url">>, realm_url, Event),
-        initiated_at = get_field(<<"initiated_at">>, initiated_at, Event),
-        status = State#membership_state.status bor ?MEMBERSHIP_INITIATED
-    };
-
-do_apply(<<"realm_membership_confirmed_v1">>, State, Event) ->
-    State#membership_state{
-        realm_id = get_field(<<"realm_id">>, realm_id, Event),
-        oauth_account = get_field(<<"oauth_account">>, oauth_account, Event),
-        oauth_provider = get_field(<<"oauth_provider">>, oauth_provider, Event),
-        confirmed_at = get_field(<<"confirmed_at">>, confirmed_at, Event),
-        status = State#membership_state.status bor ?MEMBERSHIP_CONFIRMED
-    };
-
-do_apply(<<"realm_membership_revoked_v1">>, State, Event) ->
-    State#membership_state{
-        revoked_at = get_field(<<"revoked_at">>, revoked_at, Event),
-        status = State#membership_state.status bor ?MEMBERSHIP_REVOKED
-    };
-
-do_apply(_UnknownType, State, _Event) ->
-    State.
-
-%% ===================================================================
-%% Internal
-%% ===================================================================
-
-get_field(BinKey, AtomKey, Event) ->
-    maps:get(BinKey, Event, maps:get(AtomKey, Event, undefined)).

@@ -22,17 +22,15 @@ init([]) ->
 
     Children = [
         %% -- PG emitters --
-        #{id => sale_initiated_v1_to_pg,
-          start => {evoq_event_handler, start_link, [sale_initiated_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => sale_archived_v1_to_pg,
-          start => {evoq_event_handler, start_link, [sale_archived_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
+        emitter(sale_initiated_v1_to_pg),
+        emitter(sale_archived_v1_to_pg),
 
         %% -- Cross-context process managers --
-        #{id => on_procurement_initiated_initiate_sale,
-          start => {evoq_event_handler, start_link, [on_procurement_initiated_initiate_sale, #{}]},
-          restart => permanent, type => worker}
+        emitter(on_procurement_initiated_initiate_sale)
     ],
 
     {ok, {SupFlags, Children}}.
+
+emitter(Mod) ->
+    #{id => Mod, start => {evoq_event_handler, start_link, [Mod, #{}]},
+      restart => permanent, type => worker}.

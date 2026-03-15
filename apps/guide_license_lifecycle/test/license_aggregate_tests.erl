@@ -20,97 +20,97 @@
 %% ── Test Helpers ────────────────────────────────────────────────────────────
 
 fresh_state() ->
-    license_aggregate:initial_state().
+    license_state:new(<<>>).
 
 make_initiate_payload() ->
     #{
-        <<"command_type">> => <<"initiate_license">>,
-        <<"license_id">> => ?LICENSE_ID,
-        <<"consumer_id">> => ?CONSUMER_ID,
-        <<"plugin_id">> => ?PLUGIN_ID,
-        <<"offering_id">> => ?OFFERING_ID,
+        command_type => <<"initiate_license">>,
+        license_id => ?LICENSE_ID,
+        consumer_id => ?CONSUMER_ID,
+        plugin_id => ?PLUGIN_ID,
+        offering_id => ?OFFERING_ID,
         %% Full offering snapshot at birth
-        <<"plugin_name">> => <<"Trader">>,
-        <<"description">> => <<"Trading bot plugin">>,
-        <<"icon">> => <<"trader.svg">>,
-        <<"group_name">> => <<"Trading">>,
-        <<"group_icon">> => <<"chart-line">>,
-        <<"github_repo">> => <<"hecate-social/hecate-trader">>,
-        <<"oci_image">> => <<"ghcr.io/hecate-social/hecate-traderd:0.1.0">>,
-        <<"selling_formula">> => <<"one_time">>,
-        <<"author_id">> => <<"author-1">>,
-        <<"license_type">> => <<"paid">>,
-        <<"fee_cents">> => 999,
-        <<"fee_currency">> => <<"EUR">>,
-        <<"duration_days">> => 30,
-        <<"node_limit">> => 3,
-        <<"org">> => <<"hecate-social">>,
-        <<"version">> => <<"0.1.0">>
+        plugin_name => <<"Trader">>,
+        description => <<"Trading bot plugin">>,
+        icon => <<"trader.svg">>,
+        group_name => <<"Trading">>,
+        group_icon => <<"chart-line">>,
+        github_repo => <<"hecate-social/hecate-trader">>,
+        oci_image => <<"ghcr.io/hecate-social/hecate-traderd:0.1.0">>,
+        selling_formula => <<"one_time">>,
+        author_id => <<"author-1">>,
+        license_type => <<"paid">>,
+        fee_cents => 999,
+        fee_currency => <<"EUR">>,
+        duration_days => 30,
+        node_limit => 3,
+        org => <<"hecate-social">>,
+        version => <<"0.1.0">>
     }.
 
 make_initiate_free_payload() ->
     (make_initiate_payload())#{
-        <<"selling_formula">> => <<"free">>,
-        <<"license_type">> => <<"free">>,
-        <<"fee_cents">> => 0
+        selling_formula => <<"free">>,
+        license_type => <<"free">>,
+        fee_cents => 0
     }.
 
 make_accept_payload() ->
     #{
-        <<"command_type">> => <<"accept_offering_terms">>,
-        <<"license_id">> => ?LICENSE_ID
+        command_type => <<"accept_offering_terms">>,
+        license_id => ?LICENSE_ID
     }.
 
 make_reject_payload() ->
     #{
-        <<"command_type">> => <<"reject_offering_terms">>,
-        <<"license_id">> => ?LICENSE_ID,
-        <<"rejection_reason">> => <<"too expensive">>
+        command_type => <<"reject_offering_terms">>,
+        license_id => ?LICENSE_ID,
+        rejection_reason => <<"too expensive">>
     }.
 
 make_buy_payload() ->
     #{
-        <<"command_type">> => <<"buy_license">>,
-        <<"license_id">> => ?LICENSE_ID,
-        <<"payment_reference">> => <<"pay-ref-123">>
+        command_type => <<"buy_license">>,
+        license_id => ?LICENSE_ID,
+        payment_reference => <<"pay-ref-123">>
     }.
 
 make_abandon_payload() ->
     #{
-        <<"command_type">> => <<"abandon_license">>,
-        <<"license_id">> => ?LICENSE_ID
+        command_type => <<"abandon_license">>,
+        license_id => ?LICENSE_ID
     }.
 
 make_grant_payload() ->
     #{
-        <<"command_type">> => <<"grant_license">>,
-        <<"license_id">> => ?LICENSE_ID,
-        <<"grant_reason">> => <<"free_offering">>
+        command_type => <<"grant_license">>,
+        license_id => ?LICENSE_ID,
+        grant_reason => <<"free_offering">>
     }.
 
 make_expire_payload() ->
     #{
-        <<"command_type">> => <<"expire_license">>,
-        <<"license_id">> => ?LICENSE_ID
+        command_type => <<"expire_license">>,
+        license_id => ?LICENSE_ID
     }.
 
 make_renew_payload() ->
     #{
-        <<"command_type">> => <<"renew_license">>,
-        <<"license_id">> => ?LICENSE_ID
+        command_type => <<"renew_license">>,
+        license_id => ?LICENSE_ID
     }.
 
 make_revoke_payload() ->
     #{
-        <<"command_type">> => <<"revoke_license">>,
-        <<"license_id">> => ?LICENSE_ID,
-        <<"revoke_reason">> => <<"terms_violation">>
+        command_type => <<"revoke_license">>,
+        license_id => ?LICENSE_ID,
+        revoke_reason => <<"terms_violation">>
     }.
 
 make_archive_payload() ->
     #{
-        <<"command_type">> => <<"archive_license">>,
-        <<"license_id">> => ?LICENSE_ID
+        command_type => <<"archive_license">>,
+        license_id => ?LICENSE_ID
     }.
 
 execute_and_apply(State, Payload) ->

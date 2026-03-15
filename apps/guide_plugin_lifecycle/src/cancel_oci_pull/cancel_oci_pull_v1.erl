@@ -2,7 +2,10 @@
 %%% Requests cancelling an in-progress OCI image pull.
 -module(cancel_oci_pull_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, to_map/1]).
+-export([command_type/0]).
 -export([get_plugin_id/1]).
 
 -record(cancel_oci_pull_v1, {
@@ -15,6 +18,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, cancel_oci_pull_v1()} | {error, term()}.
+command_type() -> cancel_oci_pull_v1.
+
 new(#{plugin_id := PluginId}) when is_binary(PluginId), byte_size(PluginId) > 0 ->
     {ok, #cancel_oci_pull_v1{plugin_id = PluginId}};
 new(_) ->
@@ -23,8 +28,8 @@ new(_) ->
 -spec to_map(cancel_oci_pull_v1()) -> map().
 to_map(#cancel_oci_pull_v1{plugin_id = PluginId}) ->
     #{
-        <<"command_type">> => <<"cancel_oci_pull">>,
-        <<"plugin_id">> => PluginId
+        command_type => <<"cancel_oci_pull">>,
+        plugin_id => PluginId
     }.
 
 -spec from_map(map()) -> {ok, cancel_oci_pull_v1()} | {error, term()}.

@@ -3,7 +3,10 @@
 %%% Terminal state — license is effectively dead.
 -module(license_abandoned_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_license_id/1, get_reason/1, get_abandoned_at/1]).
 
 -record(license_abandoned_v1, {
@@ -18,6 +21,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> license_abandoned_v1().
+event_type() -> license_abandoned_v1.
+
 new(#{license_id := LicenseId} = Params) ->
     #license_abandoned_v1{
         license_id = LicenseId,

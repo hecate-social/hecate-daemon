@@ -214,17 +214,22 @@ project_archived(Data, State, RM) ->
 
 %% --- Available Actions ---
 
-available_actions(Status) when is_integer(Status) ->
-    case true of
-        _ when Status band ?OFF_ARCHIVED  =/= 0 -> [];
-        _ when Status band ?OFF_PUBLISHED =/= 0 -> [<<"retract">>, <<"amend">>];
-        _ when Status band ?OFF_ANNOUNCED =/= 0 -> [<<"publish">>, <<"amend">>, <<"retract">>, <<"archive">>];
-        _ when Status band ?OFF_INITIATED =/= 0 -> [<<"announce">>, <<"draft">>, <<"amend">>, <<"archive">>];
-        _ -> []
+available_actions(S) when is_integer(S) ->
+    first_match(S, [
+        {?OFF_ARCHIVED,  []},
+        {?OFF_PUBLISHED, [<<"retract">>, <<"amend">>]},
+        {?OFF_ANNOUNCED, [<<"publish">>, <<"amend">>, <<"retract">>, <<"archive">>]},
+        {?OFF_INITIATED, [<<"announce">>, <<"draft">>, <<"amend">>, <<"archive">>]}
+    ]).
+
+first_match(_S, []) -> [];
+first_match(S, [{Flag, Actions} | Rest]) ->
+    case evoq_bit_flags:has(S, Flag) of
+        true  -> Actions;
+        false -> first_match(S, Rest)
     end.
 
 get_event_type(#{event_type := T}) -> T;
-get_event_type(#{<<"event_type">> := T}) -> T;
 get_event_type(_) -> undefined.
 
 gf(Key, Data) -> hecate_api_utils:get_field(Key, Data).

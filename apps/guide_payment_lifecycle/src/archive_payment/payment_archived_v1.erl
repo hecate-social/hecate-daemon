@@ -2,7 +2,10 @@
 %%% Emitted when a payment is archived (walking skeleton).
 -module(payment_archived_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_payment_id/1, get_archived_at/1]).
 
 -record(payment_archived_v1, {
@@ -16,6 +19,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> payment_archived_v1().
+event_type() -> payment_archived_v1.
+
 new(#{payment_id := PaymentId}) ->
     #payment_archived_v1{
         payment_id = PaymentId,

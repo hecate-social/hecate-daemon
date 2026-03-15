@@ -2,7 +2,10 @@
 %%% Emitted when a license is purchased (paid path).
 -module(license_bought_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_license_id/1, get_payment_reference/1, get_bought_at/1]).
 
 -record(license_bought_v1, {
@@ -17,6 +20,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> license_bought_v1().
+event_type() -> license_bought_v1.
+
 new(#{license_id := LicenseId} = Params) ->
     #license_bought_v1{
         license_id = LicenseId,

@@ -2,7 +2,10 @@
 %%% Birth event for sale creation.
 -module(initiate_sale_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_sale_id/1, get_seller_id/1, get_procurement_id/1,
          get_offering_id/1, get_plugin_id/1]).
 
@@ -20,6 +23,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, initiate_sale_v1()} | {error, term()}.
+command_type() -> initiate_sale_v1.
+
 new(#{seller_id := SellerId, procurement_id := ProcurementId,
       offering_id := OfferingId, plugin_id := PluginId}) ->
     SaleId = <<"sale-", SellerId/binary, "-", PluginId/binary>>,
@@ -52,12 +57,12 @@ validate(#initiate_sale_v1{} = Cmd) ->
 -spec to_map(initiate_sale_v1()) -> map().
 to_map(#initiate_sale_v1{} = Cmd) ->
     #{
-        <<"command_type">>    => <<"initiate_sale">>,
-        <<"sale_id">>         => Cmd#initiate_sale_v1.sale_id,
-        <<"seller_id">>       => Cmd#initiate_sale_v1.seller_id,
-        <<"procurement_id">>  => Cmd#initiate_sale_v1.procurement_id,
-        <<"offering_id">>     => Cmd#initiate_sale_v1.offering_id,
-        <<"plugin_id">>       => Cmd#initiate_sale_v1.plugin_id
+        command_type => <<"initiate_sale">>,
+        sale_id => Cmd#initiate_sale_v1.sale_id,
+        seller_id => Cmd#initiate_sale_v1.seller_id,
+        procurement_id => Cmd#initiate_sale_v1.procurement_id,
+        offering_id => Cmd#initiate_sale_v1.offering_id,
+        plugin_id => Cmd#initiate_sale_v1.plugin_id
     }.
 
 -spec from_map(map()) -> {ok, initiate_sale_v1()} | {error, term()}.

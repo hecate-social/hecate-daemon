@@ -7,6 +7,7 @@
 -behaviour(llm_provider).
 
 -export([list_models/1, chat/4, chat_stream/6, health/1]).
+-export([transcribe/3, speak/4]).
 
 %%% ===================================================================
 %%% llm_provider callbacks
@@ -64,6 +65,56 @@ health(Config) ->
         {ok, 401, _Headers, _Body} -> {error, unauthorized};
         {ok, Status, _Headers, _Body} -> {error, {http_status, Status}};
         {error, Reason} -> {error, Reason}
+    end.
+
+%%% ===================================================================
+%%% Audio API (STT / TTS)
+%%% ===================================================================
+
+%% @doc Transcribe audio to text using a Whisper-compatible endpoint.
+-spec transcribe(map(), binary(), map()) -> {ok, binary()} | {error, term()}.
+transcribe(Config, AudioBinary, Opts) ->
+    Url = base_url(Config) ++ "/v1/audio/transcriptions",
+    Model = maps:get(model, Opts, <<"whisper-large-v3-turbo">>),
+    Language = maps:get(language, Opts, undefined),
+    Parts = [
+        {file, <<"audio.webm">>, AudioBinary, [{<<"Content-Type">>, <<"audio/webm">>}]},
+        {<<"model">>, Model}
+    ] ++ case Language of
+        undefined -> [];
+        Lang -> [{<<"language">>, Lang}]
+    end,
+    Headers = auth_headers(Config),
+    case hackney:post(Url, Headers, {multipart, Parts}, [with_body]) of
+        {ok, 200, _H, Body} ->
+            Decoded = json:decode(Body),
+            {ok, maps:get(<<"text">>, Decoded, <<>>)};
+        {ok, Status, _H, Body} ->
+            {error, {http_error, Status, Body}};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+%% @doc Synthesize speech from text using a TTS endpoint.
+-spec speak(map(), binary(), binary(), map()) -> {ok, binary()} | {error, term()}.
+speak(Config, Text, Voice, Opts) ->
+    Url = base_url(Config) ++ "/v1/audio/speech",
+    Headers = [{<<"Content-Type">>, <<"application/json">>} | auth_headers(Config)],
+    Model = maps:get(model, Opts, <<"canopylabs/orpheus-v1-english">>),
+    Format = maps:get(response_format, Opts, <<"wav">>),
+    ReqBody = json:encode(#{
+        model => Model,
+        input => Text,
+        voice => Voice,
+        response_format => Format
+    }),
+    case hackney:post(Url, Headers, ReqBody, [with_body]) of
+        {ok, 200, _H, AudioBinary} ->
+            {ok, AudioBinary};
+        {ok, Status, _H, RespBody} ->
+            {error, {http_error, Status, RespBody}};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 %%% ===================================================================
@@ -215,7 +266,9 @@ normalize_response(#{<<"choices">> := [Choice | _]} = Resp) ->
             NormalizedCalls = [normalize_tool_call(TC) || TC <- ToolCalls],
             BaseResp#{tool_calls => NormalizedCalls}
     end;
-normalize_response(_) ->
+normalize_response(Unexpected) ->
+    logger:warning("[openai_provider:normalize_response/1] unexpected response structure: ~p",
+                   [Unexpected]),
     #{content => <<>>, done => true}.
 
 normalize_tool_call(#{<<"id">> := Id, <<"function">> := Func}) ->

@@ -241,22 +241,27 @@ project_terminal(Data, Label, State, RM) ->
 
 %% --- Available Actions ---
 
-available_actions(Status) when is_integer(Status) ->
-    case true of
-        _ when Status band ?LIC_ARCHIVED =/= 0 -> [];
-        _ when Status band ?LIC_REVOKED  =/= 0 -> [<<"archive">>];
-        _ when Status band ?LIC_EXPIRED  =/= 0 -> [<<"renew">>, <<"archive">>];
-        _ when Status band ?LIC_GRANTED  =/= 0 -> [<<"revoke">>, <<"archive">>];
-        _ when Status band ?LIC_BOUGHT   =/= 0 -> [];
-        _ when Status band ?LIC_ACCEPTED =/= 0 -> [<<"buy">>, <<"abandon">>, <<"archive">>];
-        _ when Status band ?LIC_INITIATED =/= 0 -> [<<"accept">>, <<"reject">>, <<"archive">>];
-        _ -> []
+available_actions(S) when is_integer(S) ->
+    first_match(S, [
+        {?LIC_ARCHIVED,  []},
+        {?LIC_REVOKED,   [<<"archive">>]},
+        {?LIC_EXPIRED,   [<<"renew">>, <<"archive">>]},
+        {?LIC_GRANTED,   [<<"revoke">>, <<"archive">>]},
+        {?LIC_BOUGHT,    []},
+        {?LIC_ACCEPTED,  [<<"buy">>, <<"abandon">>, <<"archive">>]},
+        {?LIC_INITIATED, [<<"accept">>, <<"reject">>, <<"archive">>]}
+    ]).
+
+first_match(_S, []) -> [];
+first_match(S, [{Flag, Actions} | Rest]) ->
+    case evoq_bit_flags:has(S, Flag) of
+        true  -> Actions;
+        false -> first_match(S, Rest)
     end.
 
 %% --- Internal ---
 
 get_event_type(#{event_type := T}) -> T;
-get_event_type(#{<<"event_type">> := T}) -> T;
 get_event_type(_) -> undefined.
 
 gf(Key, Data) -> hecate_api_utils:get_field(Key, Data).

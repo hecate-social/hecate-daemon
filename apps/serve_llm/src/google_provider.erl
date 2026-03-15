@@ -285,7 +285,9 @@ normalize_response(#{<<"candidates">> := [Candidate | _]} = Resp) ->
         [] -> BaseResp;
         _ -> BaseResp#{tool_calls => ToolCalls}
     end;
-normalize_response(_) ->
+normalize_response(Unexpected) ->
+    logger:warning("[google_provider:normalize_response/1] unexpected response structure: ~p",
+                   [Unexpected]),
     #{content => <<>>, done => true}.
 
 extract_text([]) -> <<>>;

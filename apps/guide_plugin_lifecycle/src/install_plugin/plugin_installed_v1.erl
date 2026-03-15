@@ -2,7 +2,10 @@
 %%% Emitted when a plugin is successfully installed on this node.
 -module(plugin_installed_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_plugin_id/1, get_name/1, get_display_name/1,
          get_plugin_type/1, get_oci_image/1, get_callback_module/1,
          get_package_url/1, get_installed_version/1, get_license_id/1,
@@ -30,6 +33,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> plugin_installed_v1().
+event_type() -> plugin_installed_v1.
+
 new(#{plugin_id := PluginId, name := Name,
       installed_version := Version} = Params) ->
     #plugin_installed_v1{

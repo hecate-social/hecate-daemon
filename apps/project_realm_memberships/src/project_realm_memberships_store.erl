@@ -7,6 +7,8 @@
 -module(project_realm_memberships_store).
 -behaviour(gen_server).
 
+-include_lib("guide_realm_memberships/include/membership_status.hrl").
+
 -export([start_link/0]).
 -export([get/1, list_confirmed/0, list_all/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
@@ -31,7 +33,8 @@ get(MembershipId) ->
 -spec list_confirmed() -> {ok, [map()]}.
 list_confirmed() ->
     All = ets:tab2list(?TABLE),
-    Confirmed = [E || {_Key, #{status := S} = E} <- All, S =:= <<"confirmed">>],
+    Confirmed = [E || {_Key, #{status := S} = E} <- All,
+                      is_integer(S), evoq_bit_flags:has(S, ?MEMBERSHIP_CONFIRMED)],
     Sorted = lists:sort(fun(#{confirmed_at := A}, #{confirmed_at := B}) ->
         compare_timestamps(A, B)
     end, Confirmed),

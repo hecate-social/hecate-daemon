@@ -1,7 +1,10 @@
 %%% @doc Event: LLM removed
 -module(llm_removed_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([model_name/1, removed_at/1]).
 
 -record(llm_removed_v1, {
@@ -11,6 +14,8 @@
 
 -opaque t() :: #llm_removed_v1{}.
 -export_type([t/0]).
+
+event_type() -> llm_removed_v1.
 
 new(ModelName) ->
     {ok, #llm_removed_v1{

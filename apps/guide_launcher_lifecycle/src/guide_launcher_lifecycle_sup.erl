@@ -26,25 +26,15 @@ init([]) ->
     Children = [
         %% -- PG emitters (internal, subscribe via evoq -> broadcast to pg) --
 
-        #{id => entry_registered_v1_to_pg,
-          start => {evoq_event_handler, start_link, [entry_registered_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => entry_unregistered_v1_to_pg,
-          start => {evoq_event_handler, start_link, [entry_unregistered_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
-        #{id => launcher_reorganized_v1_to_pg,
-          start => {evoq_event_handler, start_link, [launcher_reorganized_v1_to_pg, #{}]},
-          restart => permanent, type => worker},
+        emitter(entry_registered_v1_to_pg),
+        emitter(entry_unregistered_v1_to_pg),
+        emitter(launcher_reorganized_v1_to_pg),
 
         %% -- Process Managers (cross-domain, react to plugin events) --
         %% Started via evoq_event_handler — auto-registers with event type registry
 
-        #{id => on_plugin_installed_register_entry,
-          start => {evoq_event_handler, start_link, [on_plugin_installed_register_entry, #{}]},
-          restart => permanent, type => worker},
-        #{id => on_plugin_removed_unregister_entry,
-          start => {evoq_event_handler, start_link, [on_plugin_removed_unregister_entry, #{}]},
-          restart => permanent, type => worker},
+        emitter(on_plugin_installed_register_entry),
+        emitter(on_plugin_removed_unregister_entry),
 
         %% -- Launcher initializer (ensures birth event on startup) --
 
@@ -54,3 +44,7 @@ init([]) ->
     ],
 
     {ok, {SupFlags, Children}}.
+
+emitter(Mod) ->
+    #{id => Mod, start => {evoq_event_handler, start_link, [Mod, #{}]},
+      restart => permanent, type => worker}.

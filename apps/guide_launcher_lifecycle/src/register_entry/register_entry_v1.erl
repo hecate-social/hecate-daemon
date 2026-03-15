@@ -2,7 +2,10 @@
 %%% Adds an app entry to the launcher sidebar.
 -module(register_entry_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_entry_id/1, get_display_name/1, get_icon/1, get_group_name/1, get_group_icon/1]).
 
 -record(register_entry_v1, {
@@ -19,6 +22,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, register_entry_v1()} | {error, term()}.
+command_type() -> register_entry_v1.
+
 new(#{entry_id := EntryId, display_name := DisplayName,
       icon := Icon, group_name := GroupName} = Params) ->
     {ok, #register_entry_v1{
@@ -47,12 +52,12 @@ validate(#register_entry_v1{} = Cmd) ->
 -spec to_map(register_entry_v1()) -> map().
 to_map(#register_entry_v1{} = Cmd) ->
     #{
-        <<"command_type">>  => <<"register_entry">>,
-        <<"entry_id">>      => Cmd#register_entry_v1.entry_id,
-        <<"display_name">>  => Cmd#register_entry_v1.display_name,
-        <<"icon">>          => Cmd#register_entry_v1.icon,
-        <<"group_name">>    => Cmd#register_entry_v1.group_name,
-        <<"group_icon">>    => Cmd#register_entry_v1.group_icon
+        command_type => <<"register_entry">>,
+        entry_id => Cmd#register_entry_v1.entry_id,
+        display_name => Cmd#register_entry_v1.display_name,
+        icon => Cmd#register_entry_v1.icon,
+        group_name => Cmd#register_entry_v1.group_name,
+        group_icon => Cmd#register_entry_v1.group_icon
     }.
 
 -spec from_map(map()) -> {ok, register_entry_v1()} | {error, term()}.

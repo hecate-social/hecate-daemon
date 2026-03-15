@@ -2,7 +2,10 @@
 %%% Requests stopping execution of a running plugin.
 -module(stop_plugin_execution_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, to_map/1, validate/1]).
+-export([command_type/0]).
 -export([get_plugin_id/1]).
 
 -record(stop_plugin_execution_v1, {
@@ -15,6 +18,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, stop_plugin_execution_v1()} | {error, term()}.
+command_type() -> stop_plugin_execution_v1.
+
 new(#{plugin_id := PluginId}) when is_binary(PluginId), byte_size(PluginId) > 0 ->
     {ok, #stop_plugin_execution_v1{plugin_id = PluginId}};
 new(_) ->
@@ -29,8 +34,8 @@ validate(_) ->
 -spec to_map(stop_plugin_execution_v1()) -> map().
 to_map(#stop_plugin_execution_v1{plugin_id = PluginId}) ->
     #{
-        <<"command_type">> => <<"stop_plugin_execution">>,
-        <<"plugin_id">> => PluginId
+        command_type => <<"stop_plugin_execution">>,
+        plugin_id => PluginId
     }.
 
 -spec from_map(map()) -> {ok, stop_plugin_execution_v1()} | {error, term()}.

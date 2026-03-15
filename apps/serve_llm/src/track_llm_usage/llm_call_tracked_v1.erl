@@ -2,7 +2,10 @@
 %%% Emitted when an LLM API call is recorded with cost data.
 -module(llm_call_tracked_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 
 -record(llm_call_tracked_v1, {
     call_id     :: binary(),
@@ -23,6 +26,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> llm_call_tracked_v1().
+event_type() -> llm_call_tracked_v1.
+
 new(#{model := Model, tokens_in := TokensIn, tokens_out := TokensOut} = Params) ->
     #llm_call_tracked_v1{
         call_id     = generate_call_id(),

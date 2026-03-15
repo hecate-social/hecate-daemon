@@ -3,7 +3,10 @@
 %%% Required: license_id. Optional: grant_reason.
 -module(grant_license_v1).
 
+-behaviour(evoq_command).
+
 -export([new/1, from_map/1, validate/1, to_map/1]).
+-export([command_type/0]).
 -export([get_license_id/1, get_grant_reason/1]).
 
 -record(grant_license_v1, {
@@ -17,6 +20,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> {ok, grant_license_v1()} | {error, term()}.
+command_type() -> grant_license_v1.
+
 new(#{license_id := LicenseId} = Params) ->
     {ok, #grant_license_v1{
         license_id = LicenseId,
@@ -34,9 +39,9 @@ validate(#grant_license_v1{} = Cmd) ->
 -spec to_map(grant_license_v1()) -> map().
 to_map(#grant_license_v1{} = Cmd) ->
     #{
-        <<"command_type">> => <<"grant_license">>,
-        <<"license_id">> => Cmd#grant_license_v1.license_id,
-        <<"grant_reason">> => Cmd#grant_license_v1.grant_reason
+        command_type => <<"grant_license">>,
+        license_id => Cmd#grant_license_v1.license_id,
+        grant_reason => Cmd#grant_license_v1.grant_reason
     }.
 
 -spec from_map(map()) -> {ok, grant_license_v1()} | {error, term()}.

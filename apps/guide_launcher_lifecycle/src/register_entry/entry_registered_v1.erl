@@ -2,7 +2,10 @@
 %%% Emitted when an app entry is added to the launcher.
 -module(entry_registered_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_entry_id/1, get_display_name/1, get_icon/1,
          get_group_name/1, get_group_icon/1, get_registered_at/1]).
 
@@ -21,6 +24,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> entry_registered_v1().
+event_type() -> entry_registered_v1.
+
 new(#{entry_id := EntryId, display_name := DisplayName,
       icon := Icon, group_name := GroupName} = Params) ->
     #entry_registered_v1{

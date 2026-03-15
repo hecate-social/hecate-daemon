@@ -2,7 +2,10 @@
 %%% Emitted periodically with current model availability and performance.
 -module(llm_status_reported_v1).
 
--export([new/2, to_map/1, from_map/1]).
+-behaviour(evoq_event).
+
+-export([new/1, new/2, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([model_name/1, status/1, reported_at/1]).
 
 -record(llm_status_reported_v1, {
@@ -13,6 +16,11 @@
 
 -opaque t() :: #llm_status_reported_v1{}.
 -export_type([t/0]).
+
+event_type() -> llm_status_reported_v1.
+
+new(#{model_name := ModelName, status := Status}) ->
+    new(ModelName, Status).
 
 new(ModelName, Status) ->
     {ok, #llm_status_reported_v1{

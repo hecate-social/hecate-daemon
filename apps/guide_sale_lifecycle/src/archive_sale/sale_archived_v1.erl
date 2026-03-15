@@ -2,7 +2,10 @@
 %%% Emitted when a sale is archived (walking skeleton).
 -module(sale_archived_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_sale_id/1, get_archived_at/1]).
 
 -record(sale_archived_v1, {
@@ -16,6 +19,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> sale_archived_v1().
+event_type() -> sale_archived_v1.
+
 new(#{sale_id := SaleId}) ->
     #sale_archived_v1{
         sale_id     = SaleId,

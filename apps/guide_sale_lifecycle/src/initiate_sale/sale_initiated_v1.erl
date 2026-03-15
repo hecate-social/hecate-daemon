@@ -2,7 +2,10 @@
 %%% Emitted when a sale is initiated.
 -module(sale_initiated_v1).
 
+-behaviour(evoq_event).
+
 -export([new/1, to_map/1, from_map/1]).
+-export([event_type/0]).
 -export([get_sale_id/1, get_seller_id/1, get_procurement_id/1,
          get_offering_id/1, get_plugin_id/1, get_initiated_at/1]).
 
@@ -21,6 +24,8 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> sale_initiated_v1().
+event_type() -> sale_initiated_v1.
+
 new(#{sale_id := SaleId, seller_id := SellerId, procurement_id := ProcurementId,
       offering_id := OfferingId, plugin_id := PluginId}) ->
     #sale_initiated_v1{
