@@ -151,6 +151,27 @@ handle_call(_Req, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info({plugin_init_ok, PluginName, SupPid}, State) ->
+    logger:info("[plugin-loader] ~s init completed (sup: ~p)", [PluginName, SupPid]),
+    case ets:lookup(?TABLE, PluginName) of
+        [Plugin] ->
+            ets:insert(?TABLE, Plugin#loaded_plugin{sup_pid = SupPid});
+        [] ->
+            ok
+    end,
+    {noreply, State};
+
+handle_info({plugin_init_failed, PluginName, Reason}, State) ->
+    logger:error("[plugin-loader] ~s init failed: ~p", [PluginName, Reason]),
+    {noreply, State};
+
+handle_info({'DOWN', _Ref, process, _Pid, normal}, State) ->
+    {noreply, State};
+
+handle_info({'DOWN', _Ref, process, Pid, Reason}, State) ->
+    logger:error("[plugin-loader] Plugin init process ~p crashed: ~p", [Pid, Reason]),
+    {noreply, State};
+
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -193,7 +214,7 @@ load_steps(PluginName, CallbackModule) ->
     %% 1. Ensure plugin directories exist
     hecate_plugin_paths:ensure_layout(PluginName),
 
-    %% 2. Add code path and load all .beam files
+    %% 2. Add code path and load all .beam + .app files
     %% code:ensure_loaded/1 fails in embedded mode (releases),
     %% so we use code:load_abs/1 which works in any mode.
     EbinDir = plugin_ebin_dir(PluginName),
@@ -201,6 +222,7 @@ load_steps(PluginName, CallbackModule) ->
         true ->
             true = code:add_pathz(EbinDir),
             load_all_beams(EbinDir),
+            load_all_apps(EbinDir),
             logger:info("[plugin-loader] Code path added: ~s", [EbinDir]);
         false ->
             throw({ebin_not_found, EbinDir})
@@ -235,19 +257,10 @@ load_steps(PluginName, CallbackModule) ->
         _ -> hecate_plugin_telemetry:attach(PluginName, StoreId)
     end,
 
-    %% 7. Initialize plugin
-    Config = #{
-        plugin_name => PluginName,
-        store_id => StoreId,
-        data_dir => hecate_plugin_paths:base_dir(PluginName)
-    },
-    logger:update_process_metadata(#{plugin_name => PluginName, plugin_version => Version}),
-    {ok, _PluginState} = CallbackModule:init(Config),
-
-    %% 8. Get routes
+    %% 7. Get routes (works because step 2 loaded .app files)
     Routes = CallbackModule:routes(),
 
-    %% 9. Get static dir
+    %% 8. Get static dir
     StaticDir = case CallbackModule:static_dir() of
         none -> none;
         RelDir ->
@@ -260,20 +273,7 @@ load_steps(PluginName, CallbackModule) ->
             end
     end,
 
-    %% 10. Start store subscription if plugin has a store
-    case StoreId of
-        none -> ok;
-        _ ->
-            case evoq_store_subscription:start_link(StoreId) of
-                {ok, _} ->
-                    logger:info("[plugin-loader] Store subscription ready for ~p", [StoreId]);
-                {error, SubErr} ->
-                    logger:warning("[plugin-loader] Store subscription failed for ~p: ~p",
-                                   [StoreId, SubErr])
-            end
-    end,
-
-    %% 11. Register in ETS
+    %% 9. Register in ETS (routes are now available for serving)
     Record = #loaded_plugin{
         name = PluginName,
         callback = CallbackModule,
@@ -286,10 +286,35 @@ load_steps(PluginName, CallbackModule) ->
     },
     ets:insert(?TABLE, Record),
 
-    %% 12. Hot-swap cowboy dispatch to include new routes
+    %% 10. Hot-swap cowboy dispatch — plugin routes are now LIVE
     hot_swap_routes(),
 
-    logger:info("[plugin-loader] Plugin ~s loaded successfully", [PluginName]),
+    %% 11. Spawn plugin init asynchronously (supervision tree, stores, subscriptions)
+    %% This prevents a slow/blocking init from starving route registration.
+    LoaderPid = self(),
+    Config = #{
+        plugin_name => PluginName,
+        store_id => StoreId,
+        data_dir => hecate_plugin_paths:base_dir(PluginName)
+    },
+    {_Pid, _Ref} = spawn_monitor(fun() ->
+        logger:update_process_metadata(#{plugin_name => PluginName, plugin_version => Version}),
+        try CallbackModule:init(Config) of
+            {ok, #{sup_pid := SupPid}} ->
+                LoaderPid ! {plugin_init_ok, PluginName, SupPid};
+            {ok, _} ->
+                LoaderPid ! {plugin_init_ok, PluginName, undefined};
+            {error, Reason} ->
+                LoaderPid ! {plugin_init_failed, PluginName, Reason}
+        catch
+            Class:Reason:Stack ->
+                logger:error("[plugin-loader] ~s init crashed: ~p:~p~n~p",
+                             [PluginName, Class, Reason, Stack]),
+                LoaderPid ! {plugin_init_failed, PluginName, {Class, Reason}}
+        end
+    end),
+
+    logger:info("[plugin-loader] Plugin ~s routes live, init spawned", [PluginName]),
     ok.
 
 %%====================================================================
@@ -413,9 +438,35 @@ load_beam(BeamPath) ->
     ModName = list_to_atom(filename:basename(BeamPath, ".beam")),
     case code:load_abs(filename:rootname(BeamPath)) of
         {module, ModName} -> ok;
+        {error, not_purged} ->
+            %% Module already loaded with old code — purge and retry
+            code:purge(ModName),
+            case code:load_abs(filename:rootname(BeamPath)) of
+                {module, ModName} -> ok;
+                {error, Reason2} ->
+                    logger:warning("[plugin-loader] Failed to load ~s after purge: ~p",
+                                   [BeamPath, Reason2])
+            end;
         {error, Reason} ->
             logger:warning("[plugin-loader] Failed to load ~s: ~p", [BeamPath, Reason])
     end.
+
+%% @doc Load all .app files from a directory so application:get_key/2 works.
+%% Required for hecate_plugin_routes:discover_routes/1 which calls
+%% application:get_key(App, modules) to find route handler modules.
+load_all_apps(EbinDir) ->
+    AppFiles = filelib:wildcard(filename:join(EbinDir, "*.app")),
+    lists:foreach(fun(AppFile) ->
+        AppName = list_to_atom(filename:basename(AppFile, ".app")),
+        case application:load(AppName) of
+            ok -> ok;
+            {error, {already_loaded, _}} -> ok;
+            {error, Reason} ->
+                logger:warning("[plugin-loader] Failed to load app ~p: ~p",
+                               [AppName, Reason])
+        end
+    end, AppFiles),
+    logger:info("[plugin-loader] Loaded ~b app specs from ~s", [length(AppFiles), EbinDir]).
 
 %%====================================================================
 %% Internal — Cleanup
