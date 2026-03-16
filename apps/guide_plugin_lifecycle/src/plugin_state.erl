@@ -26,8 +26,8 @@ new(_AggregateId) ->
 apply_event(S, #{event_type := <<"plugin_installed_v1">>} = E)             -> apply_installed(E, S);
 apply_event(S, #{event_type := <<"plugin_upgraded_v1">>} = E)              -> apply_upgraded(E, S);
 apply_event(S, #{event_type := <<"plugin_removed_v1">>} = E)               -> apply_removed(E, S);
-apply_event(S, #{event_type := <<"plugin_execution_started_v1">>} = E)     -> apply_started(E, S);
-apply_event(S, #{event_type := <<"plugin_execution_stopped_v1">>} = E)     -> apply_stopped(E, S);
+apply_event(S, #{event_type := <<"plugin_execution_requested_v1">>} = E)   -> apply_started(E, S);
+apply_event(S, #{event_type := <<"plugin_termination_requested_v1">>} = E) -> apply_stopped(E, S);
 apply_event(S, #{event_type := <<"container_confirmed_up_v1">>})           -> apply_confirmed_up(S);
 apply_event(S, #{event_type := <<"container_confirmed_down_v1">>})         -> apply_confirmed_down(S);
 apply_event(S, #{event_type := <<"oci_pull_started_v1">>})                 -> apply_pull_started(S);
@@ -35,8 +35,6 @@ apply_event(S, #{event_type := <<"oci_pull_cancelled_v1">>})               -> ap
 apply_event(S, #{event_type := <<"oci_pull_completed_v1">>})               -> apply_pull_completed(S);
 %% In-VM events
 apply_event(S, #{event_type := <<"plugin_package_extracted_v1">>} = E)     -> apply_package_extracted(E, S);
-apply_event(S, #{event_type := <<"plugin_activated_v1">>} = E)             -> apply_activated(E, S);
-apply_event(S, #{event_type := <<"plugin_deactivated_v1">>} = E)           -> apply_deactivated(E, S);
 apply_event(S, #{event_type := <<"plugin_load_confirmed_v1">>})            -> apply_load_confirmed(S);
 apply_event(S, #{event_type := <<"plugin_unload_confirmed_v1">>})          -> apply_unload_confirmed(S);
 %% Unknown — ignore
@@ -61,8 +59,6 @@ to_map(#plugin_state{} = S) ->
         removed_at        => S#plugin_state.removed_at,
         started_at        => S#plugin_state.started_at,
         stopped_at        => S#plugin_state.stopped_at,
-        activated_at      => S#plugin_state.activated_at,
-        deactivated_at    => S#plugin_state.deactivated_at,
         extracted_at      => S#plugin_state.extracted_at,
         status            => S#plugin_state.status
     }.
@@ -110,7 +106,7 @@ apply_started(E, #plugin_state{status = Status} = State) ->
     NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(evoq_bit_flags:set(Status, ?PLG_RUNNING), ?PLG_PULLING), ?PLG_STOPPED),
     State#plugin_state{
         status = NewStatus,
-        started_at = get_value(started_at, E),
+        started_at = coalesce(get_value(requested_at, E), get_value(started_at, E)),
         stopped_at = undefined
     }.
 
@@ -118,7 +114,7 @@ apply_stopped(E, #plugin_state{status = Status} = State) ->
     NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_STOPPED), ?PLG_RUNNING),
     State#plugin_state{
         status = NewStatus,
-        stopped_at = get_value(stopped_at, E)
+        stopped_at = coalesce(get_value(requested_at, E), get_value(stopped_at, E))
     }.
 
 apply_confirmed_up(#plugin_state{status = Status} = State) ->
@@ -148,28 +144,12 @@ apply_package_extracted(E, #plugin_state{} = State) ->
         extracted_at = get_value(extracted_at, E)
     }.
 
-apply_activated(E, #plugin_state{status = Status} = State) ->
-    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_ACTIVATED), ?PLG_DEACTIVATED),
-    State#plugin_state{
-        status = NewStatus,
-        callback_module = get_value(callback_module, E),
-        activated_at = get_value(activated_at, E),
-        deactivated_at = undefined
-    }.
-
-apply_deactivated(E, #plugin_state{status = Status} = State) ->
-    NewStatus = evoq_bit_flags:unset(evoq_bit_flags:set(Status, ?PLG_DEACTIVATED), ?PLG_ACTIVATED),
-    State#plugin_state{
-        status = NewStatus,
-        deactivated_at = get_value(deactivated_at, E)
-    }.
-
 apply_load_confirmed(#plugin_state{} = State) ->
-    %% Load confirmed is informational — ACTIVATED flag is already set
+    %% Load confirmed is informational — RUNNING flag is already set
     State.
 
 apply_unload_confirmed(#plugin_state{} = State) ->
-    %% Unload confirmed is informational — DEACTIVATED flag is already set
+    %% Unload confirmed is informational — STOPPED flag is already set
     State.
 
 %% --- Internal ---

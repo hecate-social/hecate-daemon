@@ -18,14 +18,39 @@
 -define(GROUP, web_connections).
 -define(HEARTBEAT_MS, 30000).
 
-routes() -> [{"/api/events", ?MODULE, []}].
+routes() ->
+    [{"/api/events", ?MODULE, []},
+     {"/api/events/test", ?MODULE, [test]}].
 
+init(Req0, [test]) ->
+    case cowboy_req:method(Req0) of
+        <<"POST">> ->
+            handle_test_broadcast(Req0);
+        _ ->
+            hecate_api_utils:method_not_allowed(Req0)
+    end;
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
         <<"GET">> ->
             start_stream(Req0, State);
         _ ->
             hecate_api_utils:method_not_allowed(Req0)
+    end.
+
+%% POST /api/events/test — inject a test event for dev/debugging.
+handle_test_broadcast(Req0) ->
+    {ok, Body, Req1} = cowboy_req:read_body(Req0),
+    case json:decode(Body) of
+        #{<<"event_type">> := EventType, <<"data">> := Data} ->
+            EventAtom = binary_to_existing_atom(EventType),
+            hecate_web_events:broadcast(EventAtom, Data),
+            Resp = json:encode(#{ok => true, event_type => EventType}),
+            Req2 = cowboy_req:reply(200, #{<<"content-type">> => <<"application/json">>}, Resp, Req1),
+            {ok, Req2, []};
+        _ ->
+            Resp = json:encode(#{error => <<"expected event_type and data">>}),
+            Req2 = cowboy_req:reply(400, #{<<"content-type">> => <<"application/json">>}, Resp, Req1),
+            {ok, Req2, []}
     end.
 
 start_stream(Req0, _State) ->

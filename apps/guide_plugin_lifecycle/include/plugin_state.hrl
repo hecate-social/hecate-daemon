@@ -17,8 +17,6 @@
     removed_at        :: integer() | undefined,
     started_at        :: integer() | undefined,
     stopped_at        :: integer() | undefined,
-    activated_at      :: integer() | undefined,      %% in_vm: when code was loaded
-    deactivated_at    :: integer() | undefined,      %% in_vm: when code was unloaded
     extracted_at      :: integer() | undefined,      %% in_vm: when package was extracted
     status            :: non_neg_integer()
 }).

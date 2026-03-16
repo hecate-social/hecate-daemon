@@ -16,8 +16,6 @@
 %%%   ?PLG_CONFIRMED_DOWN = 32
 %%%   ?PLG_PULLING        = 64
 %%%   ?PLG_EXTRACTING     = 128
-%%%   ?PLG_ACTIVATED      = 256
-%%%   ?PLG_DEACTIVATED    = 512
 %%% @end
 -module(plugin_lifecycle_to_plugins).
 -behaviour(evoq_projection).
@@ -31,8 +29,8 @@ interested_in() ->
     [<<"plugin_installed_v1">>,
      <<"plugin_upgraded_v1">>,
      <<"plugin_removed_v1">>,
-     <<"plugin_execution_started_v1">>,
-     <<"plugin_execution_stopped_v1">>,
+     <<"plugin_execution_requested_v1">>,
+     <<"plugin_termination_requested_v1">>,
      <<"container_confirmed_up_v1">>,
      <<"container_confirmed_down_v1">>,
      <<"oci_pull_started_v1">>,
@@ -40,8 +38,6 @@ interested_in() ->
      <<"oci_pull_completed_v1">>,
      %% In-VM plugin events
      <<"plugin_package_extracted_v1">>,
-     <<"plugin_activated_v1">>,
-     <<"plugin_deactivated_v1">>,
      <<"plugin_load_confirmed_v1">>,
      <<"plugin_unload_confirmed_v1">>].
 
@@ -78,8 +74,6 @@ do_project(<<"plugin_installed_v1">>, Data, State, RM) ->
         removed_at        => undefined,
         started_at        => undefined,
         stopped_at        => undefined,
-        activated_at      => undefined,
-        deactivated_at    => undefined,
         extracted_at      => undefined,
         status            => Status,
         status_label      => <<"Installed">>,
@@ -136,9 +130,9 @@ do_project(<<"plugin_removed_v1">>, Data, State, RM) ->
             {skip, State, RM}
     end;
 
-%% --- plugin_execution_started_v1: set RUNNING(4), clear STOPPED(8) ---
+%% --- plugin_execution_requested_v1: set RUNNING(4), clear STOPPED(8) ---
 
-do_project(<<"plugin_execution_started_v1">>, Data, State, RM) ->
+do_project(<<"plugin_execution_requested_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S, status_label := <<"Running">>} = Plugin} ->
@@ -147,7 +141,7 @@ do_project(<<"plugin_execution_started_v1">>, Data, State, RM) ->
             Updated = Plugin#{
                 status            => NewStatus,
                 available_actions => available_actions(NewStatus),
-                started_at        => gf(started_at, Data),
+                started_at        => gf(requested_at, Data),
                 stopped_at        => undefined
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
@@ -158,7 +152,7 @@ do_project(<<"plugin_execution_started_v1">>, Data, State, RM) ->
                 status            => NewStatus,
                 status_label      => <<"Starting">>,
                 available_actions => available_actions(NewStatus),
-                started_at        => gf(started_at, Data),
+                started_at        => gf(requested_at, Data),
                 stopped_at        => undefined
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
@@ -167,9 +161,9 @@ do_project(<<"plugin_execution_started_v1">>, Data, State, RM) ->
             {skip, State, RM}
     end;
 
-%% --- plugin_execution_stopped_v1: set STOPPED(8), clear RUNNING(4) ---
+%% --- plugin_termination_requested_v1: set STOPPED(8), clear RUNNING(4) ---
 
-do_project(<<"plugin_execution_stopped_v1">>, Data, State, RM) ->
+do_project(<<"plugin_termination_requested_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
@@ -178,7 +172,7 @@ do_project(<<"plugin_execution_stopped_v1">>, Data, State, RM) ->
                 status            => NewStatus,
                 status_label      => <<"Stopped">>,
                 available_actions => available_actions(NewStatus),
-                stopped_at        => gf(stopped_at, Data)
+                stopped_at        => gf(requested_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
             {ok, State, RM2};
@@ -282,10 +276,16 @@ do_project(<<"plugin_package_extracted_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
         {ok, #{status := S} = Plugin} ->
+            %% Don't regress the label if the plugin is already running
+            %% (e.g., during an upgrade flow where extraction replays later)
+            Label = case evoq_bit_flags:has(S, ?PLG_RUNNING) of
+                true  -> maps:get(status_label, Plugin, <<"Extracted">>);
+                false -> <<"Extracted">>
+            end,
             Updated = Plugin#{
                 extracted_at      => gf(extracted_at, Data),
                 callback_module   => gf(callback_module, Data, maps:get(callback_module, Plugin, undefined)),
-                status_label      => <<"Extracted">>,
+                status_label      => Label,
                 available_actions => available_actions(S)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
@@ -294,47 +294,7 @@ do_project(<<"plugin_package_extracted_v1">>, Data, State, RM) ->
             {skip, State, RM}
     end;
 
-%% --- plugin_activated_v1: set ACTIVATED(256), clear DEACTIVATED(512) ---
-
-do_project(<<"plugin_activated_v1">>, Data, State, RM) ->
-    PluginId = gf(plugin_id, Data),
-    case evoq_read_model:get(PluginId, RM) of
-        {ok, #{status := S} = Plugin} ->
-            NewStatus = evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_DEACTIVATED), ?PLG_ACTIVATED),
-            Updated = Plugin#{
-                status            => NewStatus,
-                status_label      => <<"Activating">>,
-                available_actions => available_actions(NewStatus),
-                callback_module   => gf(callback_module, Data),
-                activated_at      => gf(activated_at, Data),
-                deactivated_at    => undefined
-            },
-            {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
-            {ok, State, RM2};
-        {error, not_found} ->
-            {skip, State, RM}
-    end;
-
-%% --- plugin_deactivated_v1: set DEACTIVATED(512), clear ACTIVATED(256) ---
-
-do_project(<<"plugin_deactivated_v1">>, Data, State, RM) ->
-    PluginId = gf(plugin_id, Data),
-    case evoq_read_model:get(PluginId, RM) of
-        {ok, #{status := S} = Plugin} ->
-            NewStatus = evoq_bit_flags:set(evoq_bit_flags:unset(S, ?PLG_ACTIVATED), ?PLG_DEACTIVATED),
-            Updated = Plugin#{
-                status            => NewStatus,
-                status_label      => <<"Deactivated">>,
-                available_actions => available_actions(NewStatus),
-                deactivated_at    => gf(deactivated_at, Data)
-            },
-            {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
-            {ok, State, RM2};
-        {error, not_found} ->
-            {skip, State, RM}
-    end;
-
-%% --- plugin_load_confirmed_v1: ACTIVATED confirmed running ---
+%% --- plugin_load_confirmed_v1: in-VM code loaded, confirmed running ---
 
 do_project(<<"plugin_load_confirmed_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
@@ -353,7 +313,7 @@ do_project(<<"plugin_load_confirmed_v1">>, Data, State, RM) ->
             {skip, State, RM}
     end;
 
-%% --- plugin_unload_confirmed_v1: DEACTIVATED confirmed unloaded ---
+%% --- plugin_unload_confirmed_v1: in-VM code unloaded, confirmed stopped ---
 
 do_project(<<"plugin_unload_confirmed_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
@@ -388,8 +348,6 @@ available_actions(Status) ->
     HasConfirmedUp = evoq_bit_flags:has(Status, ?PLG_CONFIRMED_UP),
     HasConfirmedDn = evoq_bit_flags:has(Status, ?PLG_CONFIRMED_DOWN),
     HasStopped     = evoq_bit_flags:has(Status, ?PLG_STOPPED),
-    HasActivated   = evoq_bit_flags:has(Status, ?PLG_ACTIVATED),
-    HasDeactivated = evoq_bit_flags:has(Status, ?PLG_DEACTIVATED),
     if
         HasRemoved, not HasInstalled ->
             [<<"install">>];
@@ -397,16 +355,12 @@ available_actions(Status) ->
             [];
         HasExtracting ->
             [];
-        %% In-VM plugins: activated = running
-        HasActivated, not HasDeactivated ->
+        %% Running (container or in-VM)
+        HasRunning; HasConfirmedUp ->
             [<<"stop">>, <<"upgrade">>, <<"remove">>];
-        %% Container plugins: confirmed up = running
-        HasConfirmedUp ->
-            [<<"stop">>, <<"upgrade">>, <<"remove">>];
-        HasInstalled, (HasConfirmedDn orelse HasStopped orelse HasDeactivated orelse not HasRunning) ->
+        %% Installed but stopped/down/idle
+        HasInstalled, (HasConfirmedDn orelse HasStopped orelse not HasRunning) ->
             [<<"start">>, <<"upgrade">>, <<"remove">>];
-        HasInstalled, HasRunning ->
-            [];
         true ->
             []
     end.

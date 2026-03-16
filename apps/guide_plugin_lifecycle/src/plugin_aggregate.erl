@@ -5,7 +5,7 @@
 %%%
 %%% Supports two plugin models via plugin_type field:
 %%%   container: OCI/Podman lifecycle (pull, start, stop, confirm up/down)
-%%%   in_vm:     In-VM OTP application lifecycle (extract, activate, deactivate, confirm load/unload)
+%%%   in_vm:     In-VM OTP application lifecycle (extract, start, stop, confirm load/unload)
 %%%
 %%% Common lifecycle:
 %%%   1. install_plugin (birth event)
@@ -64,9 +64,9 @@ execute(#plugin_state{status = S} = State, Payload)
         <<"install_plugin">>            -> {error, plugin_already_installed};
         <<"upgrade_plugin">>            -> execute_upgrade_plugin(Payload, State);
         <<"remove_plugin">>             -> execute_remove_plugin(Payload, State);
-        %% Container-model commands
-        <<"start_plugin_execution">>    -> execute_start_execution(Payload, State);
-        <<"stop_plugin_execution">>     -> execute_stop_execution(Payload, State);
+        %% Execution lifecycle commands
+        <<"request_plugin_execution">>  -> execute_request_execution(Payload, State);
+        <<"request_plugin_termination">> -> execute_request_termination(Payload, State);
         <<"confirm_container_up">>      -> execute_confirm_up(Payload);
         <<"confirm_container_down">>    -> execute_confirm_down(Payload);
         <<"start_oci_pull">>            -> execute_start_pull(Payload, S, State);
@@ -74,8 +74,6 @@ execute(#plugin_state{status = S} = State, Payload)
         <<"complete_oci_pull">>         -> execute_complete_pull(Payload, S);
         %% In-VM model commands
         <<"extract_plugin_package">>    -> execute_extract_package(Payload, State);
-        <<"activate_plugin">>           -> execute_activate_plugin(Payload, S);
-        <<"deactivate_plugin">>         -> execute_deactivate_plugin(Payload, S);
         <<"confirm_plugin_loaded">>     -> execute_confirm_loaded(Payload);
         <<"confirm_plugin_unloaded">>   -> execute_confirm_unloaded(Payload);
         _ -> {error, unknown_command}
@@ -98,17 +96,16 @@ execute_remove_plugin(Payload, State) ->
     {ok, Cmd} = remove_plugin_v1:from_map(Payload),
     convert_events(maybe_remove_plugin:handle(Cmd, State), fun plugin_removed_v1:to_map/1).
 
-execute_start_execution(_Payload, #plugin_state{status = S}) when S band ?PLG_ACTIVATED =/= 0 ->
+execute_request_execution(_Payload, #plugin_state{status = S})
+  when S band ?PLG_RUNNING =/= 0 ->
     {error, plugin_already_running};
-execute_start_execution(_Payload, #plugin_state{status = S}) when S band ?PLG_RUNNING =/= 0 ->
-    {error, plugin_already_running};
-execute_start_execution(Payload, State) ->
-    {ok, Cmd} = start_plugin_execution_v1:from_map(Payload),
-    convert_events(maybe_start_plugin_execution:handle(Cmd, State), fun plugin_execution_started_v1:to_map/1).
+execute_request_execution(Payload, State) ->
+    {ok, Cmd} = request_plugin_execution_v1:from_map(Payload),
+    convert_events(maybe_request_plugin_execution:handle(Cmd, State), fun plugin_execution_requested_v1:to_map/1).
 
-execute_stop_execution(Payload, State) ->
-    {ok, Cmd} = stop_plugin_execution_v1:from_map(Payload),
-    convert_events(maybe_stop_plugin_execution:handle(Cmd, State), fun plugin_execution_stopped_v1:to_map/1).
+execute_request_termination(Payload, State) ->
+    {ok, Cmd} = request_plugin_termination_v1:from_map(Payload),
+    convert_events(maybe_request_plugin_termination:handle(Cmd, State), fun plugin_termination_requested_v1:to_map/1).
 
 execute_confirm_up(Payload) ->
     {ok, Cmd} = confirm_container_up_v1:from_map(Payload),
@@ -148,23 +145,6 @@ execute_complete_pull(Payload, Status) ->
 execute_extract_package(Payload, State) ->
     {ok, Cmd} = extract_plugin_package_v1:from_map(Payload),
     convert_events(maybe_extract_plugin_package:handle(Cmd, State), fun plugin_package_extracted_v1:to_map/1).
-
-execute_activate_plugin(Payload, Status) ->
-    case Status band ?PLG_ACTIVATED of
-        0 ->
-            {ok, Cmd} = activate_plugin_v1:from_map(Payload),
-            convert_events(maybe_activate_plugin:handle(Cmd), fun plugin_activated_v1:to_map/1);
-        _ ->
-            {error, plugin_already_activated}
-    end.
-
-execute_deactivate_plugin(Payload, Status) ->
-    case Status band ?PLG_ACTIVATED of
-        0 -> {error, plugin_not_activated};
-        _ ->
-            {ok, Cmd} = deactivate_plugin_v1:from_map(Payload),
-            convert_events(maybe_deactivate_plugin:handle(Cmd), fun plugin_deactivated_v1:to_map/1)
-    end.
 
 execute_confirm_loaded(Payload) ->
     {ok, Cmd} = confirm_plugin_loaded_v1:from_map(Payload),

@@ -28,8 +28,8 @@ init([]) ->
         emitter(plugin_installed_v1_to_pg),
         emitter(plugin_upgraded_v1_to_pg),
         emitter(plugin_removed_v1_to_pg),
-        emitter(plugin_execution_started_v1_to_pg),
-        emitter(plugin_execution_stopped_v1_to_pg),
+        emitter(plugin_execution_requested_v1_to_pg),
+        emitter(plugin_termination_requested_v1_to_pg),
 
         %% -- Process Managers (side effects) --
         %% evoq_event_handler PMs: auto-register with event type registry
@@ -38,14 +38,15 @@ init([]) ->
         emitter(on_plugin_upgraded_reload_in_vm),
         emitter(on_plugin_removed_deprovision_container),
 
-        %% gen_server PMs: kept as gen_server due to handle_info patterns
-        %% (reconcile timers, pg cancel messages, pull progress/done messages)
-        %% evoq_event_handler drops all handle_info messages, so these cannot be converted.
+        %% -- Execution request PMs (split by plugin type) --
 
-        #{id => on_plugin_execution_started_start_container,
-          start => {on_plugin_execution_started_start_container, start_link, []},
-          restart => permanent, type => worker},
-        emitter(on_plugin_execution_stopped_stop_container),
+        emitter(on_plugin_execution_requested_start_container),
+        emitter(on_plugin_execution_requested_start_in_vm),
+
+        %% -- Termination request PMs (split by plugin type) --
+
+        emitter(on_plugin_termination_requested_stop_container),
+        emitter(on_plugin_termination_requested_stop_in_vm),
 
         %% -- OCI pull emitters --
 
@@ -74,17 +75,13 @@ init([]) ->
         %% -- In-VM plugin emitters --
 
         emitter(plugin_package_extracted_v1_to_pg),
-        emitter(plugin_activated_v1_to_pg),
-        emitter(plugin_deactivated_v1_to_pg),
         emitter(plugin_load_confirmed_v1_to_pg),
         emitter(plugin_unload_confirmed_v1_to_pg),
 
         %% -- In-VM plugin process managers --
 
         emitter(on_plugin_installed_extract_package),
-        emitter(on_plugin_package_extracted_activate_plugin),
-        emitter(on_plugin_activated_load_plugin),
-        emitter(on_plugin_deactivated_unload_plugin)
+        emitter(on_plugin_package_extracted_request_execution)
     ],
 
     {ok, {SupFlags, Children}}.

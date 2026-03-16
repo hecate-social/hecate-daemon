@@ -1,7 +1,7 @@
 %%% @doc Tests for the in-VM plugin lifecycle through the aggregate.
 %%%
 %%% Covers the in-VM path:
-%%%   install -> activate -> confirm_loaded -> deactivate -> confirm_unloaded
+%%%   install -> request_execution -> confirm_loaded -> request_termination -> confirm_unloaded
 %%%
 %%% NOTE: extract_plugin_package is skipped in aggregate tests because the
 %%% handler downloads a tarball (side effect). Extract is tested separately.
@@ -46,11 +46,10 @@ make_in_vm_install_payload() ->
         group_icon        => <<"briefcase">>
     }.
 
-make_activate_payload() ->
+make_request_execution_payload() ->
     #{
-        command_type      => <<"activate_plugin">>,
-        plugin_id         => ?PLUGIN_ID,
-        callback_module   => ?CALLBACK_MODULE
+        command_type => <<"request_plugin_execution">>,
+        plugin_id    => ?PLUGIN_ID
     }.
 
 make_confirm_loaded_payload() ->
@@ -59,9 +58,9 @@ make_confirm_loaded_payload() ->
         plugin_id    => ?PLUGIN_ID
     }.
 
-make_deactivate_payload() ->
+make_request_termination_payload() ->
     #{
-        command_type => <<"deactivate_plugin">>,
+        command_type => <<"request_plugin_termination">>,
         plugin_id    => ?PLUGIN_ID
     }.
 
@@ -86,12 +85,12 @@ installed_state() ->
     {ok, S, _} = execute_and_apply(fresh_state(), make_in_vm_install_payload()),
     S.
 
-activated_state() ->
-    {ok, S, _} = execute_and_apply(installed_state(), make_activate_payload()),
+running_state() ->
+    {ok, S, _} = execute_and_apply(installed_state(), make_request_execution_payload()),
     S.
 
 loaded_state() ->
-    {ok, S, _} = execute_and_apply(activated_state(), make_confirm_loaded_payload()),
+    {ok, S, _} = execute_and_apply(running_state(), make_confirm_loaded_payload()),
     S.
 
 %% ===================================================================
@@ -120,56 +119,56 @@ install_event_carries_in_vm_fields_test() ->
     ?assertEqual(?PACKAGE_URL, maps:get(package_url, Event)).
 
 %% ===================================================================
-%% Activate Tests (skipping extract — it has side effects)
+%% Request Execution Tests
 %% ===================================================================
 
-activate_after_install_test() ->
-    {ok, S, [Event]} = execute_and_apply(installed_state(), make_activate_payload()),
-    ?assertEqual(<<"plugin_activated_v1">>, maps:get(event_type, Event)),
-    ?assertNotEqual(0, S#plugin_state.status band ?PLG_ACTIVATED),
-    ?assertNotEqual(undefined, S#plugin_state.activated_at).
+request_execution_after_install_test() ->
+    {ok, S, [Event]} = execute_and_apply(installed_state(), make_request_execution_payload()),
+    ?assertEqual(<<"plugin_execution_requested_v1">>, maps:get(event_type, Event)),
+    ?assertNotEqual(0, S#plugin_state.status band ?PLG_RUNNING).
 
-%% The activate event MUST carry callback_module — the load PM needs it.
-activate_event_carries_callback_module_test() ->
-    {ok, _S, [Event]} = execute_and_apply(installed_state(), make_activate_payload()),
+%% The execution event MUST carry callback_module — the in-VM PM needs it.
+execution_event_carries_callback_module_test() ->
+    {ok, _S, [Event]} = execute_and_apply(installed_state(), make_request_execution_payload()),
     ?assertEqual(?CALLBACK_MODULE, maps:get(callback_module, Event)).
 
-%% The activate event must carry plugin_id for the load PM.
-activate_event_carries_plugin_id_test() ->
-    {ok, _S, [Event]} = execute_and_apply(installed_state(), make_activate_payload()),
+%% The execution event must carry plugin_id.
+execution_event_carries_plugin_id_test() ->
+    {ok, _S, [Event]} = execute_and_apply(installed_state(), make_request_execution_payload()),
     ?assertEqual(?PLUGIN_ID, maps:get(plugin_id, Event)).
 
-cannot_activate_twice_test() ->
-    Result = plugin_aggregate:execute(activated_state(), make_activate_payload()),
-    ?assertEqual({error, plugin_already_activated}, Result).
+%% The execution event must carry plugin_type for PM filtering.
+execution_event_carries_plugin_type_test() ->
+    {ok, _S, [Event]} = execute_and_apply(installed_state(), make_request_execution_payload()),
+    ?assertEqual(<<"in_vm">>, maps:get(plugin_type, Event)).
+
+cannot_request_execution_twice_test() ->
+    Result = plugin_aggregate:execute(running_state(), make_request_execution_payload()),
+    ?assertEqual({error, plugin_already_running}, Result).
 
 %% ===================================================================
 %% Confirm Loaded Tests
 %% ===================================================================
 
-confirm_loaded_after_activate_test() ->
-    {ok, _S, [Event]} = execute_and_apply(activated_state(), make_confirm_loaded_payload()),
+confirm_loaded_after_execution_test() ->
+    {ok, _S, [Event]} = execute_and_apply(running_state(), make_confirm_loaded_payload()),
     ?assertEqual(<<"plugin_load_confirmed_v1">>, maps:get(event_type, Event)).
 
 %% ===================================================================
-%% Deactivate + Confirm Unloaded Tests
+%% Request Termination + Confirm Unloaded Tests
 %% ===================================================================
 
-deactivate_after_loaded_test() ->
-    {ok, S, [Event]} = execute_and_apply(loaded_state(), make_deactivate_payload()),
-    ?assertEqual(<<"plugin_deactivated_v1">>, maps:get(event_type, Event)),
-    ?assertNotEqual(0, S#plugin_state.status band ?PLG_DEACTIVATED),
-    %% ACTIVATED flag must be cleared
-    ?assertEqual(0, S#plugin_state.status band ?PLG_ACTIVATED).
+request_termination_after_running_test() ->
+    {ok, S, [Event]} = execute_and_apply(running_state(), make_request_termination_payload()),
+    ?assertEqual(<<"plugin_termination_requested_v1">>, maps:get(event_type, Event)),
+    ?assertNotEqual(0, S#plugin_state.status band ?PLG_STOPPED),
+    %% RUNNING flag must be cleared
+    ?assertEqual(0, S#plugin_state.status band ?PLG_RUNNING).
 
-confirm_unloaded_after_deactivate_test() ->
-    {ok, S1, _} = execute_and_apply(loaded_state(), make_deactivate_payload()),
+confirm_unloaded_after_termination_test() ->
+    {ok, S1, _} = execute_and_apply(running_state(), make_request_termination_payload()),
     {ok, _S2, [Event]} = execute_and_apply(S1, make_confirm_unloaded_payload()),
     ?assertEqual(<<"plugin_unload_confirmed_v1">>, maps:get(event_type, Event)).
-
-cannot_deactivate_when_not_activated_test() ->
-    Result = plugin_aggregate:execute(installed_state(), make_deactivate_payload()),
-    ?assertEqual({error, plugin_not_activated}, Result).
 
 %% ===================================================================
 %% Full Lifecycle Test
@@ -178,38 +177,31 @@ cannot_deactivate_when_not_activated_test() ->
 full_in_vm_lifecycle_test() ->
     S0 = fresh_state(),
     {ok, S1, _} = execute_and_apply(S0, make_in_vm_install_payload()),
-    {ok, S2, _} = execute_and_apply(S1, make_activate_payload()),
+    {ok, S2, _} = execute_and_apply(S1, make_request_execution_payload()),
     {ok, S3, _} = execute_and_apply(S2, make_confirm_loaded_payload()),
 
-    %% At this point: INSTALLED + ACTIVATED, name is clean
+    %% At this point: INSTALLED + RUNNING, name is clean
     ?assertNotEqual(0, S3#plugin_state.status band ?PLG_INSTALLED),
-    ?assertNotEqual(0, S3#plugin_state.status band ?PLG_ACTIVATED),
+    ?assertNotEqual(0, S3#plugin_state.status band ?PLG_RUNNING),
     ?assertEqual(?PLUGIN_NAME, S3#plugin_state.name),
     ?assertEqual(?CALLBACK_MODULE, S3#plugin_state.callback_module),
 
-    %% Deactivate + unload
-    {ok, S4, _} = execute_and_apply(S3, make_deactivate_payload()),
+    %% Terminate + unload
+    {ok, S4, _} = execute_and_apply(S3, make_request_termination_payload()),
     {ok, S5, _} = execute_and_apply(S4, make_confirm_unloaded_payload()),
 
-    ?assertNotEqual(0, S5#plugin_state.status band ?PLG_DEACTIVATED),
-    ?assertEqual(0, S5#plugin_state.status band ?PLG_ACTIVATED).
+    ?assertNotEqual(0, S5#plugin_state.status band ?PLG_STOPPED),
+    ?assertEqual(0, S5#plugin_state.status band ?PLG_RUNNING).
 
 %% ===================================================================
-%% Guard: start_plugin_execution rejected for activated in-VM plugins
+%% Guard: request_plugin_execution rejected when already running
 %% ===================================================================
 
-start_execution_rejected_when_activated_test() ->
-    %% After activate, start_plugin_execution must be rejected
-    Result = plugin_aggregate:execute(activated_state(), make_start_execution_payload()),
+start_execution_rejected_when_running_test() ->
+    Result = plugin_aggregate:execute(running_state(), make_request_execution_payload()),
     ?assertEqual({error, plugin_already_running}, Result).
 
 start_execution_rejected_when_loaded_test() ->
-    %% After confirm_loaded, start_plugin_execution must still be rejected
-    Result = plugin_aggregate:execute(loaded_state(), make_start_execution_payload()),
+    %% After confirm_loaded, request_plugin_execution must still be rejected
+    Result = plugin_aggregate:execute(loaded_state(), make_request_execution_payload()),
     ?assertEqual({error, plugin_already_running}, Result).
-
-make_start_execution_payload() ->
-    #{
-        command_type => <<"start_plugin_execution">>,
-        plugin_id    => ?PLUGIN_ID
-    }.

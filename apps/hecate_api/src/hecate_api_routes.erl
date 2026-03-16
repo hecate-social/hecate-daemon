@@ -23,7 +23,8 @@
     guide_sale_lifecycle, project_sales, query_sales,
     guide_payment_lifecycle, project_payments, query_payments,
     guide_plugin_lifecycle, project_plugins, query_plugins,
-    guide_launcher_lifecycle, project_launcher, query_launcher
+    guide_launcher_lifecycle, project_launcher, query_launcher,
+    query_observer
 ]).
 
 -spec compile() -> cowboy_router:dispatch_rules().

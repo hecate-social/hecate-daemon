@@ -45,12 +45,13 @@ make_installed_event() ->
         installed_at      => erlang:system_time(millisecond)
     }.
 
-make_activated_event() ->
+make_execution_requested_event() ->
     #{
-        event_type      => <<"plugin_activated_v1">>,
+        event_type      => <<"plugin_execution_requested_v1">>,
         plugin_id       => ?PLUGIN_ID,
+        plugin_type     => <<"in_vm">>,
         callback_module => ?CALLBACK_MODULE,
-        activated_at    => erlang:system_time(millisecond)
+        requested_at    => erlang:system_time(millisecond)
     }.
 
 make_load_confirmed_event() ->
@@ -59,11 +60,12 @@ make_load_confirmed_event() ->
         plugin_id  => ?PLUGIN_ID
     }.
 
-make_deactivated_event() ->
+make_termination_requested_event() ->
     #{
-        event_type     => <<"plugin_deactivated_v1">>,
-        plugin_id      => ?PLUGIN_ID,
-        deactivated_at => erlang:system_time(millisecond)
+        event_type   => <<"plugin_termination_requested_v1">>,
+        plugin_id    => ?PLUGIN_ID,
+        plugin_type  => <<"in_vm">>,
+        requested_at => erlang:system_time(millisecond)
     }.
 
 make_unload_confirmed_event() ->
@@ -122,14 +124,14 @@ installed_status_label_test() ->
         cleanup(RM)
     end.
 
-activated_status_label_test() ->
+execution_requested_sets_starting_test() ->
     RM = setup(),
     try
         {ok, S1, RM1} = project(make_installed_event(), #{}, RM),
-        {ok, _S2, RM2} = project(make_activated_event(), S1, RM1),
+        {ok, _S2, RM2} = project(make_execution_requested_event(), S1, RM1),
         {ok, Plugin} = evoq_read_model:get(?PLUGIN_ID, RM2),
-        ?assertEqual(<<"Activating">>, maps:get(status_label, Plugin)),
-        ?assertNotEqual(0, maps:get(status, Plugin) band ?PLG_ACTIVATED)
+        ?assertEqual(<<"Starting">>, maps:get(status_label, Plugin)),
+        ?assertNotEqual(0, maps:get(status, Plugin) band ?PLG_RUNNING)
     after
         cleanup(RM)
     end.
@@ -140,7 +142,7 @@ load_confirmed_sets_running_test() ->
     RM = setup(),
     try
         {ok, S1, RM1} = project(make_installed_event(), #{}, RM),
-        {ok, S2, RM2} = project(make_activated_event(), S1, RM1),
+        {ok, S2, RM2} = project(make_execution_requested_event(), S1, RM1),
         {ok, _S3, RM3} = project(make_load_confirmed_event(), S2, RM2),
         {ok, Plugin} = evoq_read_model:get(?PLUGIN_ID, RM3),
         ?assertEqual(<<"Running">>, maps:get(status_label, Plugin))
@@ -148,15 +150,15 @@ load_confirmed_sets_running_test() ->
         cleanup(RM)
     end.
 
-deactivated_status_label_test() ->
+termination_requested_sets_stopped_test() ->
     RM = setup(),
     try
         {ok, S1, RM1} = project(make_installed_event(), #{}, RM),
-        {ok, S2, RM2} = project(make_activated_event(), S1, RM1),
+        {ok, S2, RM2} = project(make_execution_requested_event(), S1, RM1),
         {ok, S3, RM3} = project(make_load_confirmed_event(), S2, RM2),
-        {ok, _S4, RM4} = project(make_deactivated_event(), S3, RM3),
+        {ok, _S4, RM4} = project(make_termination_requested_event(), S3, RM3),
         {ok, Plugin} = evoq_read_model:get(?PLUGIN_ID, RM4),
-        ?assertEqual(<<"Deactivated">>, maps:get(status_label, Plugin))
+        ?assertEqual(<<"Stopped">>, maps:get(status_label, Plugin))
     after
         cleanup(RM)
     end.
@@ -165,9 +167,9 @@ unload_confirmed_sets_stopped_test() ->
     RM = setup(),
     try
         {ok, S1, RM1} = project(make_installed_event(), #{}, RM),
-        {ok, S2, RM2} = project(make_activated_event(), S1, RM1),
+        {ok, S2, RM2} = project(make_execution_requested_event(), S1, RM1),
         {ok, S3, RM3} = project(make_load_confirmed_event(), S2, RM2),
-        {ok, S4, RM4} = project(make_deactivated_event(), S3, RM3),
+        {ok, S4, RM4} = project(make_termination_requested_event(), S3, RM3),
         {ok, _S5, RM5} = project(make_unload_confirmed_event(), S4, RM4),
         {ok, Plugin} = evoq_read_model:get(?PLUGIN_ID, RM5),
         ?assertEqual(<<"Stopped">>, maps:get(status_label, Plugin))
@@ -195,10 +197,10 @@ in_vm_fields_stored_test() ->
 %% Missing Event (not_found handling)
 %% ===================================================================
 
-activate_before_install_skips_test() ->
+execution_before_install_skips_test() ->
     RM = setup(),
     try
-        {skip, _S, _RM1} = project(make_activated_event(), #{}, RM)
+        {skip, _S, _RM1} = project(make_execution_requested_event(), #{}, RM)
     after
         cleanup(RM)
     end.

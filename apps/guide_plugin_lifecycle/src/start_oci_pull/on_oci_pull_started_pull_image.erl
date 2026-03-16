@@ -1,26 +1,25 @@
 %%% @doc Process Manager: On OCI pull started, pull the OCI image.
 %%%
-%%% Subscribes to oci_pull_started_v1 events from plugins_store.
+%%% Subscribes to oci_pull_started_v1 events via pg group (internal).
 %%% Runs `podman pull` via shared_podman, tracks progress in ETS,
 %%% provisions .container file, and dispatches complete_oci_pull_v1.
 %%%
 %%% Also listens for cancel events via pg to kill in-progress pulls.
-%%% On startup, reconciles plugins stuck in PULLING state.
-%%% @end
+%%%
+%%% This PM is a gen_server (not evoq_event_handler) because it needs
+%%% handle_info for pull worker progress, completion, and monitor messages.
+%%% Events arrive via pg groups, which are fed by the orthodox
+%%% evoq_event_handler emitters (oci_pull_started_v1_to_pg,
+%%% oci_pull_cancelled_v1_to_pg).
 -module(on_oci_pull_started_pull_image).
 -behaviour(gen_server).
-
--include_lib("evoq/include/evoq_types.hrl").
 
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
--define(EVENT_TYPE, <<"oci_pull_started_v1">>).
--define(SUB_NAME, <<"on_oci_pull_started_pull_image">>).
--define(STORE_ID, plugins_store).
 -define(ETS_TABLE, plugin_pull_progress).
+-define(PULL_GROUP, {oci_pull_started_v1, node}).
 -define(CANCEL_GROUP, {oci_pull_cancelled_v1, node}).
--define(READINESS_POLL_MS, 1000).
 
 -record(state, {
     pulls :: #{binary() => pid()}
@@ -31,25 +30,27 @@ start_link() ->
 
 init([]) ->
     ets:new(?ETS_TABLE, [public, named_table, set, {read_concurrency, true}]),
-    {ok, _} = evoq_subscriptions:subscribe(
-        ?STORE_ID, event_type, ?EVENT_TYPE, ?SUB_NAME,
-        #{subscriber_pid => self()}),
     ensure_pg_scope(),
+    pg:join(pg, ?PULL_GROUP, self()),
     pg:join(pg, ?CANCEL_GROUP, self()),
-    erlang:send_after(?READINESS_POLL_MS, self(), await_ready),
     {ok, #state{pulls = #{}}}.
 
-handle_info({events, Events}, State) ->
-    case hecate_lifecycle:get_state() of
-        running ->
-            NewState = lists:foldl(fun handle_event/2, State, Events),
-            {noreply, NewState};
-        _ ->
-            %% Skip events during replay — reconciliation handles stale pulls
-            {noreply, State}
+%% -- Event delivery via pg groups --
+
+handle_info({?PULL_GROUP, Event}, State) ->
+    Data = maps:get(data, Event),
+    PluginId = get_value(plugin_id, Data),
+    OciImage = get_value(oci_image, Data),
+    case maps:is_key(PluginId, State#state.pulls) of
+        true ->
+            logger:warning("[pull-pm] Already pulling ~s, ignoring", [PluginId]),
+            {noreply, State};
+        false ->
+            {noreply, start_pull(PluginId, OciImage, State)}
     end;
 
-handle_info({?CANCEL_GROUP, #evoq_event{data = Data}}, #state{pulls = Pulls} = State) ->
+handle_info({?CANCEL_GROUP, Event}, #state{pulls = Pulls} = State) ->
+    Data = maps:get(data, Event),
     PluginId = get_value(plugin_id, Data),
     case maps:find(PluginId, Pulls) of
         {ok, Pid} ->
@@ -60,6 +61,8 @@ handle_info({?CANCEL_GROUP, #evoq_event{data = Data}}, #state{pulls = Pulls} = S
         error ->
             {noreply, State}
     end;
+
+%% -- Pull worker messages --
 
 handle_info({pull_progress, PluginId, Progress}, State) ->
     ets:insert(?ETS_TABLE, {PluginId, Progress}),
@@ -75,16 +78,6 @@ handle_info({pull_done, PluginId, {error, Reason}}, #state{pulls = Pulls} = Stat
     ets:insert(?ETS_TABLE, {PluginId, #{status => error, reason => Reason}}),
     {noreply, State#state{pulls = maps:remove(PluginId, Pulls)}};
 
-handle_info(await_ready, State) ->
-    case hecate_lifecycle:get_state() of
-        running ->
-            NewState = reconcile_pulling_plugins(State),
-            {noreply, NewState};
-        _ ->
-            erlang:send_after(?READINESS_POLL_MS, self(), await_ready),
-            {noreply, State}
-    end;
-
 handle_info({'DOWN', _Ref, process, Pid, _Reason}, #state{pulls = Pulls} = State) ->
     Remaining = maps:filter(fun(_, P) -> P =/= Pid end, Pulls),
     {noreply, State#state{pulls = Remaining}};
@@ -96,18 +89,7 @@ handle_call(_Req, _From, State) -> {reply, ok, State}.
 handle_cast(_Msg, State) -> {noreply, State}.
 terminate(_Reason, _State) -> ok.
 
-%% Internal
-
-handle_event(#evoq_event{data = Data}, #state{pulls = Pulls} = State) ->
-    PluginId = get_value(plugin_id, Data),
-    OciImage = get_value(oci_image, Data),
-    case maps:is_key(PluginId, Pulls) of
-        true ->
-            logger:warning("[pull-pm] Already pulling ~s, ignoring", [PluginId]),
-            State;
-        false ->
-            start_pull(PluginId, OciImage, State)
-    end.
+%% -- Pull orchestration --
 
 start_pull(_PluginId, undefined, State) ->
     logger:error("[pull-pm] No OCI image in event, cannot pull"),
@@ -133,6 +115,8 @@ pull_relay(Parent, PluginId) ->
         {pull_done, Result} ->
             Parent ! {pull_done, PluginId, Result}
     end.
+
+%% -- Container provisioning --
 
 provision_container(PluginId, DaemonName, OciImage) ->
     AppsDir = shared_paths:gitops_apps_dir(),
@@ -160,7 +144,6 @@ ensure_quadlet_symlink(FilePath, Filename, PluginId) ->
     QuadletDir = filename:join([os:getenv("HOME"), ".config", "containers", "systemd"]),
     ok = filelib:ensure_path(QuadletDir),
     LinkPath = filename:join(QuadletDir, Filename),
-    %% Remove stale symlink if it points elsewhere
     _ = file:delete(LinkPath),
     case file:make_symlink(FilePath, LinkPath) of
         ok ->
@@ -170,6 +153,8 @@ ensure_quadlet_symlink(FilePath, Filename, PluginId) ->
             logger:error("[pull-pm] Failed to symlink Quadlet for ~s: ~p",
                          [PluginId, Reason])
     end.
+
+%% -- Command dispatch --
 
 dispatch_complete(PluginId) ->
     case complete_oci_pull_v1:new(#{plugin_id => PluginId}) of
@@ -185,26 +170,7 @@ dispatch_complete(PluginId) ->
             logger:error("[pull-pm] Invalid complete command for ~s: ~p", [PluginId, Reason])
     end.
 
-%% NOTE: Reading from project_plugins_store here is acceptable because this runs
-%% on a timer after startup (not in the event flow). It reconciles plugins stuck
-%% in PULLING state whose pulls may have been interrupted during downtime.
-reconcile_pulling_plugins(State) ->
-    try project_plugins_store:list_by_status(64) of
-        {ok, Plugins} ->
-            lists:foldl(fun(#{plugin_id := PId, oci_image := Img, status := S}, Acc) ->
-                case S band 2 =:= 0 andalso not maps:is_key(PId, Acc#state.pulls) of
-                    true ->
-                        logger:info("[pull-pm] Reconciling stale pull for ~s", [PId]),
-                        start_pull(PId, Img, Acc);
-                    false ->
-                        Acc
-                end
-            end, State, Plugins);
-        {error, _} ->
-            State
-    catch
-        error:badarg -> State
-    end.
+%% -- Helpers --
 
 get_value(Key, Map) when is_atom(Key) ->
     case maps:find(Key, Map) of

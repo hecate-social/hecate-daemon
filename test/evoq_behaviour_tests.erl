@@ -44,8 +44,8 @@ pg_emitter_interested_in_test_() ->
         {plugin_installed_v1_to_pg, <<"plugin_installed_v1">>},
         {plugin_removed_v1_to_pg, <<"plugin_removed_v1">>},
         {plugin_upgraded_v1_to_pg, <<"plugin_upgraded_v1">>},
-        {plugin_execution_started_v1_to_pg, <<"plugin_execution_started_v1">>},
-        {plugin_execution_stopped_v1_to_pg, <<"plugin_execution_stopped_v1">>},
+        {plugin_execution_requested_v1_to_pg, <<"plugin_execution_requested_v1">>},
+        {plugin_termination_requested_v1_to_pg, <<"plugin_termination_requested_v1">>},
         {container_confirmed_up_v1_to_pg, <<"container_confirmed_up_v1">>},
         {container_confirmed_down_v1_to_pg, <<"container_confirmed_down_v1">>},
         {oci_pull_started_v1_to_pg, <<"oci_pull_started_v1">>},
@@ -146,13 +146,13 @@ plugin_projection_interested_in_test_() ->
     %% Merged lifecycle projection (all plugin events in single gen_server)
     [?_assertEqual(
         [<<"plugin_installed_v1">>, <<"plugin_upgraded_v1">>,
-         <<"plugin_removed_v1">>, <<"plugin_execution_started_v1">>,
-         <<"plugin_execution_stopped_v1">>, <<"container_confirmed_up_v1">>,
+         <<"plugin_removed_v1">>, <<"plugin_execution_requested_v1">>,
+         <<"plugin_termination_requested_v1">>, <<"container_confirmed_up_v1">>,
          <<"container_confirmed_down_v1">>, <<"oci_pull_started_v1">>,
          <<"oci_pull_cancelled_v1">>, <<"oci_pull_completed_v1">>,
          %% In-VM plugin events
-         <<"plugin_package_extracted_v1">>, <<"plugin_activated_v1">>,
-         <<"plugin_deactivated_v1">>, <<"plugin_load_confirmed_v1">>,
+         <<"plugin_package_extracted_v1">>,
+         <<"plugin_load_confirmed_v1">>,
          <<"plugin_unload_confirmed_v1">>],
         plugin_lifecycle_to_plugins:interested_in())].
 
@@ -177,7 +177,10 @@ policy_interested_in_test_() ->
         {on_plugin_installed_register_entry, <<"plugin_installed_v1">>},
         {on_plugin_removed_unregister_entry, <<"plugin_removed_v1">>},
         {on_plugin_removed_deprovision_container, <<"plugin_removed_v1">>},
-        {on_plugin_execution_stopped_stop_container, <<"plugin_execution_stopped_v1">>},
+        {on_plugin_execution_requested_start_container, <<"plugin_execution_requested_v1">>},
+        {on_plugin_execution_requested_start_in_vm, <<"plugin_execution_requested_v1">>},
+        {on_plugin_termination_requested_stop_container, <<"plugin_termination_requested_v1">>},
+        {on_plugin_termination_requested_stop_in_vm, <<"plugin_termination_requested_v1">>},
         {on_plugin_upgraded_update_container, <<"plugin_upgraded_v1">>},
         %% Consumer license domain PMs
         {on_offering_terms_accepted_grant_license, <<"offering_terms_accepted_v1">>},
@@ -194,7 +197,10 @@ policy_init_test_() ->
     Mods = [on_plugin_installed_register_entry,
             on_plugin_removed_unregister_entry,
             on_plugin_removed_deprovision_container,
-            on_plugin_execution_stopped_stop_container,
+            on_plugin_execution_requested_start_container,
+            on_plugin_execution_requested_start_in_vm,
+            on_plugin_termination_requested_stop_container,
+            on_plugin_termination_requested_stop_in_vm,
             on_plugin_upgraded_update_container,
             on_offering_terms_accepted_grant_license,
             on_license_bought_grant_license,
@@ -271,7 +277,7 @@ pg_emitter_modules() ->
      %% Plugin emitters
      plugin_installed_v1_to_pg, plugin_removed_v1_to_pg,
      plugin_upgraded_v1_to_pg,
-     plugin_execution_started_v1_to_pg, plugin_execution_stopped_v1_to_pg,
+     plugin_execution_requested_v1_to_pg, plugin_termination_requested_v1_to_pg,
      container_confirmed_up_v1_to_pg, container_confirmed_down_v1_to_pg,
      oci_pull_started_v1_to_pg, oci_pull_completed_v1_to_pg,
      oci_pull_cancelled_v1_to_pg].
@@ -290,7 +296,10 @@ policy_modules() ->
     [on_plugin_installed_register_entry,
      on_plugin_removed_unregister_entry,
      on_plugin_removed_deprovision_container,
-     on_plugin_execution_stopped_stop_container,
+     on_plugin_execution_requested_start_container,
+     on_plugin_execution_requested_start_in_vm,
+     on_plugin_termination_requested_stop_container,
+     on_plugin_termination_requested_stop_in_vm,
      on_plugin_upgraded_update_container,
      on_offering_terms_accepted_grant_license,
      on_license_bought_grant_license,
