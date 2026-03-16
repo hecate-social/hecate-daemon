@@ -21,7 +21,17 @@ cd "$PROJECT_DIR"
 
 # Ensure dev data directory exists
 mkdir -p ~/.hecate-dev/hecate-daemon/{sqlite,reckon-db,sockets,run,connectors}
-mkdir -p ~/.hecate-dev/config
+mkdir -p ~/.hecate-dev/{config,gitops/system,searxng}
+
+# Source dev environment (mirrors production EnvironmentFile)
+DEV_ENV="$HOME/.hecate-dev/gitops/system/hecate-daemon.env"
+if [ -f "$DEV_ENV" ]; then
+    echo "Sourcing $DEV_ENV"
+    set -a
+    # shellcheck source=/dev/null
+    . "$DEV_ENV"
+    set +a
+fi
 
 # Clean stale socket
 rm -f ~/.hecate-dev/hecate-daemon/sockets/api.sock

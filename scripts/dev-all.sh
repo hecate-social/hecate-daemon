@@ -40,11 +40,13 @@ done
 
 DAEMON_DATA="$DEV_DATA_DIR/hecate-daemon"
 
-# Directories that hold identity and credentials — preserved by --clear
+# Directories that hold identity, credentials, and infrastructure config — preserved by --clear
 PRESERVE_DIRS=(
     "$DAEMON_DATA/sqlite"
     "$DAEMON_DATA/reckon-db/settings"
     "$DAEMON_DATA/reckon-db/realm_memberships"
+    "$DEV_DATA_DIR/gitops"
+    "$DEV_DATA_DIR/searxng"
 )
 
 clear_app_data() {
@@ -135,6 +137,50 @@ cleanup_all() {
 # cargo tauri dev exits and restarts on rebuilds — EXIT trap kills everything.
 trap cleanup_all INT TERM
 
+ensure_searxng() {
+    # Start SearXNG container if not already running
+    if podman ps --format '{{.Names}}' 2>/dev/null | grep -q '^searxng-dev$'; then
+        echo "  SearXNG already running"
+        return 0
+    fi
+
+    # Remove dead container if exists
+    podman rm -f searxng-dev 2>/dev/null || true
+
+    local settings_src="$DEV_DATA_DIR/gitops/system/searxng/settings.yml"
+    local settings_dst="$DEV_DATA_DIR/searxng/settings.yml"
+    mkdir -p "$DEV_DATA_DIR/searxng"
+
+    # Seed settings from gitops if not present or outdated
+    if [ -f "$settings_src" ]; then
+        cp "$settings_src" "$settings_dst"
+    fi
+
+    if [ ! -f "$settings_dst" ]; then
+        echo "  WARN: No SearXNG settings found at $settings_dst — skipping"
+        return 0
+    fi
+
+    echo "  Starting SearXNG container..."
+    podman run -d --name searxng-dev \
+        -p 127.0.0.1:8888:8080 \
+        -v "$DEV_DATA_DIR/searxng:$DEV_DATA_DIR/searxng:Z" \
+        -e "SEARXNG_SETTINGS_PATH=$DEV_DATA_DIR/searxng/settings.yml" \
+        docker.io/searxng/searxng:latest >/dev/null
+
+    # Wait for it to respond
+    echo -n "  Waiting for SearXNG on :8888"
+    for _ in $(seq 1 15); do
+        if curl -sf http://localhost:8888/healthz >/dev/null 2>&1; then
+            echo " ready!"
+            return 0
+        fi
+        echo -n "."
+        sleep 1
+    done
+    echo " TIMEOUT (web search will be unavailable)"
+}
+
 start_daemon() {
     echo "=== Starting dev daemon ==="
     "$SCRIPT_DIR/dev-start.sh" &
@@ -218,6 +264,7 @@ start_web() {
 
 case "$MODE" in
     daemon)
+        ensure_searxng
         start_daemon
         echo ""
         echo "Daemon running. Press Ctrl+C to stop."
@@ -227,6 +274,7 @@ case "$MODE" in
         start_web
         ;;
     all)
+        ensure_searxng
         start_daemon
         start_web
         ;;
