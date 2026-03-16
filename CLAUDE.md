@@ -772,7 +772,7 @@ main(_) -> usage().
         {api_port, 4444},
         {api_host, {127, 0, 0, 1}},
         {data_dir, "~/.hecate"},
-        {bootstrap, ["https://boot.macula.io:443"]},
+        {bootstrap, ["https://boot.macula.io:4433"]},
         {realm, <<"io.macula">>}
     ]},
     {kernel, [
