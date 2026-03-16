@@ -26,7 +26,7 @@
   <!-- Macula Mesh -->
   <rect x="50" y="85" width="180" height="60" rx="8" fill="url(#meshGrad2)" stroke="#9b59b6" stroke-width="2"/>
   <text x="140" y="115" text-anchor="middle" fill="#fff" font-family="monospace" font-size="12" font-weight="bold">Macula Mesh</text>
-  <text x="140" y="132" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="9">boot.macula.io:443</text>
+  <text x="140" y="132" text-anchor="middle" fill="#d4a5ff" font-family="monospace" font-size="9">boot.macula.io:4433</text>
 
   <!-- REST API -->
   <rect x="260" y="85" width="180" height="60" rx="8" fill="#1e3a5f" stroke="#3498db" stroke-width="2"/>

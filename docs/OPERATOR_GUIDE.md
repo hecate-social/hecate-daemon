@@ -114,7 +114,7 @@ Hecate looks for config in these locations (in order):
     "port": 4444
   },
   "mesh": {
-    "bootstrap": ["boot.macula.io:4433"],
+    "bootstrap": ["https://boot.macula.io:4433"],
     "realm": "io.macula",
     "identity_file": "~/.hecate/identity.pem"
   },

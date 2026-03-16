@@ -48,7 +48,7 @@ Set in `hecate_mesh.app.src`:
 
 ```erlang
 {env, [
-    {bootstrap_nodes, ["boot.macula.io:4433"]},
+    {bootstrap_nodes, ["https://boot.macula.io:4433"]},
     {realm, <<"io.macula">>},
     {agent_identity, <<"mri:agent:io.macula/hecate">>}
 ]}

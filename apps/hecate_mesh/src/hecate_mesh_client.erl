@@ -40,7 +40,7 @@ get_status() ->
 init([]) ->
     Realm = application:get_env(hecate, realm, <<"io.macula">>),
     Identity = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>),
-    Bootstrap = application:get_env(hecate, bootstrap, [<<"boot.macula.io:443">>]),
+    Bootstrap = application:get_env(hecate, bootstrap, [<<"https://boot.macula.io:4433">>]),
     BootstrapBins = [ensure_binary(B) || B <- Bootstrap],
     logger:info("[hecate_mesh] Initializing mesh client (realm: ~s, identity: ~s)", [Realm, Identity]),
     self() ! connect,
