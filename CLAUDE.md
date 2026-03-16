@@ -518,7 +518,7 @@ hecate-daemon/
 ```erlang
 {deps, [
     %% Macula mesh client
-    {macula, "0.20.8"},
+    {macula, "0.20.9"},
 
     %% HTTP server
     {cowboy, "2.12.0"},
