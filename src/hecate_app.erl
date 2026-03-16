@@ -5,13 +5,14 @@
 %%%
 %%% Startup order:
 %%% 1. Directory layout (ensure ~/.hecate/hecate-daemon/* exists)
-%%% 2. Lifecycle files (daemon.pid, daemon.state = starting)
-%%% 3. Unix socket with minimal health-only dispatch (clients see ready:false)
-%%% 4. ReckonDB (embedded event store infrastructure)
-%%% 5. Evoq (CQRS framework)
-%%% 6. hecate_sup (includes boot_tracker with telemetry handler)
-%%% 7. Spawn store processes (fire-and-forget — boot_tracker listens)
-%%% 8. return {ok, SupPid} — domain apps boot via release config
+%%% 2. hecate-agents repo (clone if missing, non-blocking on failure)
+%%% 3. Lifecycle files (daemon.pid, daemon.state = starting)
+%%% 4. Unix socket with minimal health-only dispatch (clients see ready:false)
+%%% 5. ReckonDB (embedded event store infrastructure)
+%%% 6. Evoq (CQRS framework)
+%%% 7. hecate_sup (includes boot_tracker with telemetry handler)
+%%% 8. Spawn store processes (fire-and-forget — boot_tracker listens)
+%%% 9. return {ok, SupPid} — domain apps boot via release config
 %%%
 %%% The boot_tracker receives telemetry events as stores come up and
 %%% triggers the post-boot sequence (subscriptions, routes, readiness)
@@ -57,13 +58,21 @@ start(_StartType, _StartArgs) ->
     %% 1. Create namespaced directory layout
     shared_paths:ensure_layout(),
 
-    %% 2. Write lifecycle files (daemon.pid + state = starting)
+    %% 2. Ensure hecate-agents repo is cloned (non-blocking on failure)
+    case hecate_agents_repo:ensure() of
+        {ok, AgentsPath} ->
+            logger:info("hecate-agents available at ~s", [AgentsPath]);
+        {error, _AgentsReason} ->
+            logger:warning("hecate-agents not available — some features may be limited")
+    end,
+
+    %% 3. Write lifecycle files (daemon.pid + state = starting)
     hecate_lifecycle:init(),
 
-    %% 3. Start socket with minimal health-only dispatch
+    %% 4. Start socket with minimal health-only dispatch
     start_early_socket(),
 
-    %% 4. Start ReckonDB infrastructure
+    %% 5. Start ReckonDB infrastructure
     logger:info("Starting ReckonDB infrastructure..."),
     case application:ensure_all_started(reckon_db) of
         {ok, _ReckonApps} ->
