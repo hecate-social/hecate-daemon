@@ -5,7 +5,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 %% Suppress dialyzer warnings for calls to macula (excluded from PLT)
--dialyzer({nowarn_function, [handle_call/3, terminate/2, connect_to_mesh/1, try_connect_to_bootstrap/4]}).
+-dialyzer({nowarn_function, [handle_call/3, terminate/2, spawn_connect/1, try_connect/3]}).
 
 -record(state, {
     client :: pid() | undefined,
@@ -99,11 +99,17 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info(connect, State) ->
-    connect_to_mesh(State);
+    spawn_connect(State),
+    {noreply, State};
 
 handle_info({reconnect, Delay}, State) ->
-    timer:sleep(Delay),
-    connect_to_mesh(State);
+    erlang:send_after(Delay, self(), connect),
+    {noreply, State};
+
+handle_info({connected, Client}, State) ->
+    erlang:monitor(process, Client),
+    logger:info("[hecate_mesh] Connected to mesh"),
+    {noreply, State#state{client = Client}};
 
 handle_info({'DOWN', _Ref, process, Pid, Reason}, #state{client = Pid} = State) ->
     logger:warning("[hecate_mesh] Connection lost: ~p, reconnecting...", [Reason]),
@@ -121,29 +127,57 @@ terminate(_Reason, #state{client = Client}) ->
 
 %% Internal
 
-connect_to_mesh(#state{realm = Realm, identity = Identity, bootstrap = Bootstrap} = State) ->
-    logger:info("[hecate_mesh] Connecting to mesh (realm: ~s)...", [Realm]),
-    try_connect_to_bootstrap(Bootstrap, Realm, Identity, State).
+%% Spawn connection attempt so the gen_server remains responsive to calls
+%% (e.g., subscribe) while the QUIC handshake is in progress.
+spawn_connect(#state{realm = Realm, identity = Identity, bootstrap = Bootstrap}) ->
+    Self = self(),
+    spawn(fun() ->
+        logger:info("[hecate_mesh] Connecting to mesh (realm: ~s)...", [Realm]),
+        case try_connect(Bootstrap, Realm, Identity) of
+            {ok, Client} ->
+                Self ! {connected, Client};
+            {error, _} ->
+                Self ! {reconnect, 5000}
+        end
+    end).
 
-try_connect_to_bootstrap([], _Realm, _Identity, State) ->
+try_connect([], _Realm, _Identity) ->
     logger:warning("[hecate_mesh] All bootstrap servers failed, retrying in 5s..."),
-    self() ! {reconnect, 5000},
-    {noreply, State};
-try_connect_to_bootstrap([BootstrapUrl | Rest], Realm, Identity, State) ->
+    {error, all_failed};
+try_connect([BootstrapUrl | Rest], Realm, Identity) ->
     Url = build_url(BootstrapUrl),
     Opts = #{
         realm => Realm,
         identity => Identity
     },
     logger:info("[hecate_mesh] Trying bootstrap: ~s", [Url]),
-    case macula:connect(Url, Opts) of
+    case connect_with_timeout(Url, Opts, 15000) of
         {ok, Client} ->
-            erlang:monitor(process, Client),
             logger:info("[hecate_mesh] Connected to mesh via ~s", [Url]),
-            {noreply, State#state{client = Client}};
+            {ok, Client};
         {error, Reason} ->
             logger:warning("[hecate_mesh] Failed to connect to ~s: ~p", [Url, Reason]),
-            try_connect_to_bootstrap(Rest, Realm, Identity, State)
+            try_connect(Rest, Realm, Identity)
+    end.
+
+%% macula:connect/2 can block indefinitely if the QUIC handshake is slow
+%% or macula_peer:init times out internally. Wrap with a timeout.
+connect_with_timeout(Url, Opts, Timeout) ->
+    Self = self(),
+    Ref = make_ref(),
+    Pid = spawn(fun() ->
+        Result = try
+            macula:connect(Url, Opts)
+        catch
+            _:Reason -> {error, {crashed, Reason}}
+        end,
+        Self ! {Ref, Result}
+    end),
+    receive
+        {Ref, Result} -> Result
+    after Timeout ->
+        exit(Pid, kill),
+        {error, connect_timeout}
     end.
 
 build_url(BootstrapUrl) when is_binary(BootstrapUrl) ->

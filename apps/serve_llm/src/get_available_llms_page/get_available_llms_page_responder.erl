@@ -17,8 +17,8 @@ start_link() ->
 init([]) ->
     AgentIdentity = get_agent_identity(),
     Topic = build_topic(AgentIdentity, <<"list">>),
-    SubRef = subscribe(Topic),
-    {ok, #state{subscription_ref = SubRef, agent_identity = AgentIdentity}}.
+    self() ! {try_subscribe, Topic},
+    {ok, #state{subscription_ref = undefined, agent_identity = AgentIdentity}}.
 
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.
@@ -26,6 +26,17 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info({try_subscribe, Topic}, #state{subscription_ref = undefined} = State) ->
+    case subscribe(Topic) of
+        undefined ->
+            erlang:send_after(3000, self(), {try_subscribe, Topic}),
+            {noreply, State};
+        SubRef ->
+            logger:info("[get_available_llms_page_responder] Subscribed to mesh topic"),
+            {noreply, State#state{subscription_ref = SubRef}}
+    end;
+handle_info({try_subscribe, _Topic}, State) ->
+    {noreply, State};
 handle_info({mesh_message, _Topic, Payload}, State) ->
     spawn(fun() -> handle_request(Payload) end),
     {noreply, State};
