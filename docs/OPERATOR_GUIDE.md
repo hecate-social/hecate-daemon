@@ -114,7 +114,7 @@ Hecate looks for config in these locations (in order):
     "port": 4444
   },
   "mesh": {
-    "bootstrap": ["https://boot.macula.io:4433"],
+    "bootstrap": ["https://boot.macula.io:443"],
     "realm": "io.macula",
     "identity_file": "~/.hecate/identity.pem"
   },
@@ -809,7 +809,7 @@ error: mesh_connection_failed
 
 ```bash
 # Check network connectivity
-curl -v https://boot.macula.io:4433
+curl -v https://boot.macula.io:443
 
 # Check DNS resolution
 dig boot.macula.io

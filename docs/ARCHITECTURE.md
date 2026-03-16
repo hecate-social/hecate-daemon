@@ -789,7 +789,7 @@ User Query → Controller → Query → Provider → Caches/DB → Response
 
 **Connection:**
 - HTTP/3 (QUIC) transport
-- Bootstrap: `boot.macula.io:4433`
+- Bootstrap: `boot.macula.io:443`
 - Realm: `io.macula` (configurable)
 
 **Operations:**

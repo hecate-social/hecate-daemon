@@ -75,13 +75,13 @@ On init, `hecate_mesh_client` reads configuration from the `hecate` app (not `he
 ```erlang
 Realm     = application:get_env(hecate, realm, <<"io.macula">>),
 Identity  = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate-dev">>),
-Bootstrap = application:get_env(hecate, bootstrap, [<<"https://boot.macula.io:4433">>])
+Bootstrap = application:get_env(hecate, bootstrap, [<<"https://boot.macula.io:443">>])
 ```
 
 It then self-sends a `connect` message, deferring the actual connection to `handle_info`. This makes startup **non-blocking** -- other apps continue starting while the mesh connects.
 
 **Connection attempt:**
-1. Try each bootstrap URL in order (e.g., `https://boot.macula.io:4433`)
+1. Try each bootstrap URL in order (e.g., `https://boot.macula.io:443`)
 2. Call `macula:connect(Url, #{realm => Realm, identity => Identity})`
 3. On success: monitor client PID, store in state
 4. On failure: retry after 5 seconds
@@ -254,7 +254,7 @@ Sends response back via mesh
 | `api_port` | hecate | 4444 | REST API port |
 | `api_host` | hecate | `{127,0,0,1}` | API bind address |
 | `data_dir` | hecate | `~/.hecate` | SQLite + data directory |
-| `bootstrap` | hecate | `["https://boot.macula.io:4433"]` | Mesh bootstrap servers |
+| `bootstrap` | hecate | `["https://boot.macula.io:443"]` | Mesh bootstrap servers |
 | `realm` | hecate | `<<"io.macula">>` | Realm identifier |
 | `gateway_identity` | hecate | `<<"mri:agent:io.macula/hecate-dev">>` | Gateway MRI |
 | `managed_identities` | hecate | `[gateway_identity]` | Identity filter list |
@@ -288,7 +288,7 @@ Call `POST /identity/init` or use the TUI to initialize.
 ```
 [hecate_mesh] All bootstrap servers failed, retrying in 5s...
 ```
-Check that `boot.macula.io:4433` is reachable. The daemon retries indefinitely. Domain services continue to operate locally.
+Check that `boot.macula.io:443` is reachable. The daemon retries indefinitely. Domain services continue to operate locally.
 
 **Ollama not responding:**
 ```

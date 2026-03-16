@@ -153,7 +153,7 @@ api_port = 4444
 api_host = 127.0.0.1
 
 [mesh]
-bootstrap = ["https://boot.macula.io:4433"]
+bootstrap = ["https://boot.macula.io:443"]
 
 [logging]
 level = info

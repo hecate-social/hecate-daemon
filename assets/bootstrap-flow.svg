@@ -78,7 +78,7 @@
 
   <rect x="50" y="385" width="240" height="50" class="mesh-box" />
   <text x="170" y="405" text-anchor="middle" class="component">hecate_mesh_client</text>
-  <text x="170" y="420" text-anchor="middle" class="detail">Connects to boot.macula.io:4433</text>
+  <text x="170" y="420" text-anchor="middle" class="detail">Connects to boot.macula.io:443</text>
 
   <line x1="290" y1="410" x2="330" y2="410" class="arrow" />
 
