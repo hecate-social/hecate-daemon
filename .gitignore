@@ -41,3 +41,6 @@ data/
 # Local config
 *.local
 rebar3.crashdump
+
+# Lock files (rebuilt from deps)
+rebar.lock
