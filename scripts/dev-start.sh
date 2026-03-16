@@ -25,6 +25,11 @@ mkdir -p ~/.hecate-dev/{config,gitops/system,searxng}
 
 # Source dev environment (mirrors production EnvironmentFile)
 DEV_ENV="$HOME/.hecate-dev/gitops/system/hecate-daemon.env"
+REPO_ENV="$PROJECT_DIR/../hecate-gitops/quadlet/system/hecate-daemon.env"
+if [ ! -f "$DEV_ENV" ] && [ -f "$REPO_ENV" ]; then
+    cp "$REPO_ENV" "$DEV_ENV"
+    echo "Seeded $DEV_ENV from hecate-gitops repo"
+fi
 if [ -f "$DEV_ENV" ]; then
     echo "Sourcing $DEV_ENV"
     set -a

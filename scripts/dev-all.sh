@@ -147,13 +147,19 @@ ensure_searxng() {
     # Remove dead container if exists
     podman rm -f searxng-dev 2>/dev/null || true
 
-    local settings_src="$DEV_DATA_DIR/gitops/system/searxng/settings.yml"
     local settings_dst="$DEV_DATA_DIR/searxng/settings.yml"
     mkdir -p "$DEV_DATA_DIR/searxng"
 
-    # Seed settings from gitops if not present or outdated
+    # Seed settings: prefer dev gitops, fall back to hecate-gitops repo
+    local settings_src="$DEV_DATA_DIR/gitops/system/searxng/settings.yml"
+    local settings_repo="$DAEMON_DIR/../hecate-gitops/quadlet/system/searxng/settings.yml"
     if [ -f "$settings_src" ]; then
         cp "$settings_src" "$settings_dst"
+    elif [ -f "$settings_repo" ]; then
+        mkdir -p "$DEV_DATA_DIR/gitops/system/searxng"
+        cp "$settings_repo" "$settings_dst"
+        cp "$settings_repo" "$settings_src"
+        echo "  Seeded SearXNG settings from hecate-gitops repo"
     fi
 
     if [ ! -f "$settings_dst" ]; then
