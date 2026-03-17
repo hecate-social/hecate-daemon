@@ -3,6 +3,11 @@
 %%% Subscribes to plugin_upgraded_v1 events via evoq_event_handler.
 %%% Only acts when plugin_type == <<"in_vm">> and package_url is set.
 %%%
+%%% Idempotency: Tracks which plugin_ids have been processed this session.
+%%% During catch-up replay, multiple historical plugin_upgraded_v1 events
+%%% may exist for the same plugin. Only the first one triggers a reload;
+%%% subsequent duplicates are skipped.
+%%%
 %%% Orchestration:
 %%%   1. Unload current .beam files (synchronous side effect)
 %%%   2. Delete stale tarball (so ensure_tarball re-downloads)
@@ -19,25 +24,32 @@ interested_in() ->
     [<<"plugin_upgraded_v1">>].
 
 init(_Config) ->
-    {ok, #{}}.
+    {ok, #{processed => #{}}}.
 
-handle_event(_EventType, Event, _Metadata, State) ->
+handle_event(_EventType, Event, _Metadata, #{processed := Processed} = State) ->
     Data = maps:get(data, Event),
+    PluginId = get_value(plugin_id, Data),
     PluginType = get_value(plugin_type, Data, <<"container">>),
     PackageUrl = get_value(package_url, Data),
-    do_handle(PluginType, PackageUrl, Data),
-    {ok, State}.
+    case maps:is_key(PluginId, Processed) of
+        true ->
+            %% Already processed this plugin this session — skip.
+            %% Prevents unload/reload storms from catch-up replay of
+            %% multiple historical plugin_upgraded_v1 events.
+            {ok, State};
+        false ->
+            do_handle(PluginType, PackageUrl, PluginId, Data),
+            {ok, State#{processed := Processed#{PluginId => true}}}
+    end.
 
 %% Only in-VM plugins with a package_url need reload
-do_handle(<<"in_vm">>, PackageUrl, Data) when is_binary(PackageUrl), byte_size(PackageUrl) > 0 ->
-    PluginId = get_value(plugin_id, Data),
+do_handle(<<"in_vm">>, PackageUrl, PluginId, Data) when is_binary(PackageUrl), byte_size(PackageUrl) > 0 ->
     CallbackModule = get_value(callback_module, Data),
     logger:info("[PM] In-VM plugin ~s upgraded, reloading from ~s", [PluginId, PackageUrl]),
     unload_and_extract(PluginId, PackageUrl, CallbackModule);
-do_handle(<<"in_vm">>, _PackageUrl, Data) ->
-    PluginId = get_value(plugin_id, Data),
+do_handle(<<"in_vm">>, _PackageUrl, PluginId, _Data) ->
     logger:warning("[PM] In-VM plugin ~s upgraded but no package_url, skipping reload", [PluginId]);
-do_handle(_, _, _) ->
+do_handle(_, _, _, _) ->
     ok.
 
 unload_and_extract(PluginId, PackageUrl, CallbackModule) ->

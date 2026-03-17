@@ -43,9 +43,12 @@ dispatch_install(PluginId, Data) ->
         {ok, _, _} = Ok ->
             log_result(PluginId, "install", Ok);
         {error, plugin_already_installed} ->
-            %% Plugin exists — fall back to upgrade
-            logger:info("[PM] Plugin ~s already installed, upgrading instead", [PluginId]),
-            dispatch_upgrade(PluginId, Data);
+            %% Plugin already installed — nothing to do.
+            %% DO NOT fall back to upgrade here. This PM fires on every
+            %% replayed license_granted_v1 event at boot, and dispatching
+            %% upgrade causes an unload/reload/extract loop that prevents
+            %% the plugin from starting. Upgrades should be explicit.
+            logger:debug("[PM] Plugin ~s already installed, skipping", [PluginId]);
         {error, _} = Err ->
             log_result(PluginId, "install", Err)
     end.
@@ -54,26 +57,6 @@ do_install(CmdParams) ->
     case install_plugin_v1:new(CmdParams) of
         {ok, Cmd} -> maybe_install_plugin:dispatch(Cmd);
         {error, _} = Err -> Err
-    end.
-
-dispatch_upgrade(PluginId, Data) ->
-    UpgradeParams = #{
-        plugin_id         => PluginId,
-        oci_image         => gf(oci_image, Data),
-        package_url       => gf(package_url, Data, undefined),
-        plugin_type       => gf(plugin_type, Data, <<"container">>),
-        installed_version => gf(version, Data, <<"latest">>),
-        icon              => gf(icon, Data, undefined),
-        group_name        => gf(group_name, Data, undefined),
-        group_icon        => gf(group_icon, Data, undefined),
-        display_name      => gf(display_name, Data, gf(plugin_name, Data, undefined)),
-        description       => gf(description, Data, undefined)
-    },
-    case upgrade_plugin_v1:new(UpgradeParams) of
-        {ok, Cmd} ->
-            log_result(PluginId, "upgrade", maybe_upgrade_plugin:dispatch(Cmd));
-        {error, _} = Err ->
-            log_result(PluginId, "upgrade", Err)
     end.
 
 log_result(PluginId, Action, {ok, _, _}) ->
