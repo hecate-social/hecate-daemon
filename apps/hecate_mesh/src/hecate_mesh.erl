@@ -6,7 +6,8 @@
     unsubscribe/1,
     get_client/0,
     get_status/0,
-    is_connected/0
+    is_connected/0,
+    discover_subscribers/1
 ]).
 
 -spec publish(binary(), map()) -> ok | {error, term()}.
@@ -35,3 +36,7 @@ is_connected() ->
         {ok, Pid} when is_pid(Pid) -> true;
         _ -> false
     end.
+
+-spec discover_subscribers(binary()) -> {ok, list()} | {error, term()}.
+discover_subscribers(Topic) ->
+    hecate_mesh_client:discover_subscribers(Topic).

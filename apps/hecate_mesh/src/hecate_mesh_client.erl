@@ -1,11 +1,12 @@
 -module(hecate_mesh_client).
 -behaviour(gen_server).
 
--export([start_link/0, get_client/0, get_status/0, publish/2, subscribe/2, unsubscribe/1]).
+-export([start_link/0, get_client/0, get_status/0, publish/2, subscribe/2, unsubscribe/1,
+         discover_subscribers/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 %% Suppress dialyzer warnings for calls to macula (excluded from PLT)
--dialyzer({nowarn_function, [handle_call/3, terminate/2, spawn_connect/1, try_connect/3]}).
+-dialyzer({nowarn_function, [handle_call/3, terminate/2, spawn_connect/1, try_connect/3, get_node_id/1]}).
 
 -record(state, {
     client :: pid() | undefined,
@@ -35,6 +36,9 @@ unsubscribe(SubRef) ->
 get_status() ->
     gen_server:call(?MODULE, get_status).
 
+discover_subscribers(Topic) ->
+    gen_server:call(?MODULE, {discover_subscribers, Topic}).
+
 %% Callbacks
 
 init([]) ->
@@ -57,15 +61,30 @@ handle_call(get_client, _From, #state{client = Client} = State) ->
 
 handle_call(get_status, _From, #state{client = Client, realm = Realm,
                                        identity = Identity,
+                                       bootstrap = Bootstrap,
                                        subscriptions = Subs} = State) ->
     Connected = is_pid(Client),
+    NodeId = case Connected of
+        true -> get_node_id(Client);
+        false -> null
+    end,
+    Topics = lists:usort(maps:values(Subs)),
     Status = #{
         connected => Connected,
         realm => Realm,
         identity => Identity,
-        subscription_count => maps:size(Subs)
+        node_id => NodeId,
+        subscriptions => Topics,
+        subscription_count => maps:size(Subs),
+        bootstrap => Bootstrap
     },
     {reply, {ok, Status}, State};
+
+handle_call({discover_subscribers, _Topic}, _From, #state{client = undefined} = State) ->
+    {reply, {error, not_connected}, State};
+handle_call({discover_subscribers, Topic}, _From, #state{client = Client} = State) ->
+    Result = macula:discover_subscribers(Client, Topic),
+    {reply, Result, State};
 
 handle_call({publish, _Topic, _Payload}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
@@ -189,3 +208,28 @@ build_url(BootstrapUrl) when is_binary(BootstrapUrl) ->
 
 ensure_binary(B) when is_binary(B) -> B;
 ensure_binary(S) when is_list(S) -> list_to_binary(S).
+
+get_node_id(Client) ->
+    try
+        Self = self(),
+        Ref = make_ref(),
+        Pid = spawn(fun() ->
+            Result = try macula:get_node_id(Client)
+                     catch _:_ -> {error, failed}
+                     end,
+            Self ! {Ref, Result}
+        end),
+        receive
+            {Ref, {ok, NodeIdBin}} when is_binary(NodeIdBin) ->
+                binary:encode_hex(NodeIdBin);
+            {Ref, NodeIdBin} when is_binary(NodeIdBin) ->
+                binary:encode_hex(NodeIdBin);
+            {Ref, _} ->
+                null
+        after 2000 ->
+            exit(Pid, kill),
+            null
+        end
+    catch
+        _:_ -> null
+    end.

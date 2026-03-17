@@ -42,5 +42,4 @@ data/
 *.local
 rebar3.crashdump
 
-# Lock files (rebuilt from deps)
-rebar.lock
+# Lock files are tracked for reproducible builds
