@@ -38,8 +38,24 @@ if [ -f "$DEV_ENV" ]; then
     set +a
 fi
 
+# Override socket path for dev (env file has REPLACE_ME placeholder)
+export HECATE_SOCKET_PATH="$HOME/.hecate-dev/hecate-daemon/sockets/api.sock"
+
+# MACULA_BOOTSTRAP_PEERS is intentionally NOT set here.
+# hecate_mesh_client handles its own connection to boot.macula.io via macula:connect().
+# Setting MACULA_BOOTSTRAP_PEERS causes macula_root to create a SECOND peer connection
+# to the same endpoint, competing for the boot server's rate limit budget (5/10s).
+# With two connections retrying simultaneously, neither can establish reliably.
+
+# MaxMind GeoIP: extract license key from GeoIP.conf if not already set
+if [ -z "${MAXMIND_LICENSE_KEY:-}" ] && [ -f "$HOME/.config/maxmind/GeoIP.conf" ]; then
+    MAXMIND_LICENSE_KEY="$(grep '^LicenseKey' "$HOME/.config/maxmind/GeoIP.conf" | awk '{print $2}')"
+    export MAXMIND_LICENSE_KEY
+    echo "Loaded MAXMIND_LICENSE_KEY from ~/.config/maxmind/GeoIP.conf"
+fi
+
 # Clean stale socket
-rm -f ~/.hecate-dev/hecate-daemon/sockets/api.sock
+rm -f "$HECATE_SOCKET_PATH"
 
 # Kill stale BEAM/epmd holding the dev node name
 if pgrep -f 'sname hecate_dev' > /dev/null 2>&1; then
