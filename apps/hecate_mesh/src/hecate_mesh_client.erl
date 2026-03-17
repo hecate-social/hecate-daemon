@@ -5,15 +5,19 @@
          discover_subscribers/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
-%% Suppress dialyzer warnings for calls to macula (excluded from PLT)
--dialyzer({nowarn_function, [handle_call/3, terminate/2, spawn_connect/1, try_connect/3, get_node_id/1]}).
+-dialyzer({nowarn_function, [handle_call/3, terminate/2, try_connect/3, get_node_id/1]}).
+
+-define(INITIAL_BACKOFF_MS, 2000).
+-define(MAX_BACKOFF_MS, 120000).
 
 -record(state, {
     client :: pid() | undefined,
     realm :: binary(),
     identity :: binary(),
     bootstrap :: [binary()],
-    subscriptions :: #{reference() => binary()}
+    subscriptions :: #{reference() => binary()},
+    backoff_ms :: pos_integer(),
+    connecting :: boolean()
 }).
 
 %% API
@@ -53,28 +57,25 @@ init([]) ->
         realm = Realm,
         identity = Identity,
         bootstrap = BootstrapBins,
-        subscriptions = #{}
+        subscriptions = #{},
+        backoff_ms = ?INITIAL_BACKOFF_MS,
+        connecting = false
     }}.
 
 handle_call(get_client, _From, #state{client = Client} = State) ->
     {reply, {ok, Client}, State};
 
 handle_call(get_status, _From, #state{client = Client, realm = Realm,
-                                       identity = Identity,
-                                       bootstrap = Bootstrap,
+                                       identity = Identity, bootstrap = Bootstrap,
                                        subscriptions = Subs} = State) ->
     Connected = is_pid(Client),
-    NodeId = case Connected of
-        true -> get_node_id(Client);
-        false -> null
-    end,
-    Topics = lists:usort(maps:values(Subs)),
+    NodeId = case Connected of true -> get_node_id(Client); false -> null end,
     Status = #{
         connected => Connected,
         realm => Realm,
         identity => Identity,
         node_id => NodeId,
-        subscriptions => Topics,
+        subscriptions => lists:usort(maps:values(Subs)),
         subscription_count => maps:size(Subs),
         bootstrap => Bootstrap
     },
@@ -83,14 +84,12 @@ handle_call(get_status, _From, #state{client = Client, realm = Realm,
 handle_call({discover_subscribers, _Topic}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
 handle_call({discover_subscribers, Topic}, _From, #state{client = Client} = State) ->
-    Result = macula:discover_subscribers(Client, Topic),
-    {reply, Result, State};
+    {reply, macula:discover_subscribers(Client, Topic), State};
 
 handle_call({publish, _Topic, _Payload}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
 handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) ->
-    Result = macula:publish(Client, Topic, Payload),
-    {reply, Result, State};
+    {reply, macula:publish(Client, Topic, Payload), State};
 
 handle_call({subscribe, _Topic, _Callback}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
@@ -101,8 +100,7 @@ handle_call({subscribe, Topic, CallbackPid}, _From, #state{client = Client, subs
     end,
     case macula:subscribe(Client, Topic, CallbackFun) of
         {ok, SubRef} ->
-            NewSubs = Subs#{SubRef => Topic},
-            {reply, {ok, SubRef}, State#state{subscriptions = NewSubs}};
+            {reply, {ok, SubRef}, State#state{subscriptions = Subs#{SubRef => Topic}}};
         {error, Reason} ->
             {reply, {error, Reason}, State}
     end;
@@ -111,100 +109,68 @@ handle_call({unsubscribe, _SubRef}, _From, #state{client = undefined} = State) -
     {reply, {error, not_connected}, State};
 handle_call({unsubscribe, SubRef}, _From, #state{client = Client, subscriptions = Subs} = State) ->
     Result = macula:unsubscribe(Client, SubRef),
-    NewSubs = maps:remove(SubRef, Subs),
-    {reply, Result, State#state{subscriptions = NewSubs}}.
+    {reply, Result, State#state{subscriptions = maps:remove(SubRef, Subs)}}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+%% Already connecting — ignore
+handle_info(connect, #state{connecting = true} = State) ->
+    {noreply, State};
+%% Already connected — ignore
+handle_info(connect, #state{client = Pid} = State) when is_pid(Pid) ->
+    {noreply, State};
 handle_info(connect, State) ->
-    spawn_connect(State),
-    {noreply, State};
+    Self = self(),
+    spawn(fun() ->
+        Result = try_connect(State#state.bootstrap, State#state.realm, State#state.identity),
+        Self ! {connect_result, Result}
+    end),
+    {noreply, State#state{connecting = true}};
 
-handle_info({reconnect, Delay}, State) ->
-    erlang:send_after(Delay, self(), connect),
-    {noreply, State};
-
-handle_info({connected, Client}, State) ->
+handle_info({connect_result, {ok, Client}}, State) ->
     erlang:monitor(process, Client),
     logger:info("[hecate_mesh] Connected to mesh"),
-    {noreply, State#state{client = Client}};
+    {noreply, State#state{client = Client, connecting = false, backoff_ms = ?INITIAL_BACKOFF_MS}};
+
+handle_info({connect_result, {error, Reason}}, #state{backoff_ms = Backoff} = State) ->
+    logger:warning("[hecate_mesh] Connection failed: ~p, retrying in ~.1fs", [Reason, Backoff / 1000]),
+    erlang:send_after(Backoff, self(), connect),
+    {noreply, State#state{connecting = false, backoff_ms = min(Backoff * 2, ?MAX_BACKOFF_MS)}};
 
 handle_info({'DOWN', _Ref, process, Pid, Reason}, #state{client = Pid} = State) ->
     logger:warning("[hecate_mesh] Connection lost: ~p, reconnecting...", [Reason]),
-    self() ! {reconnect, 1000},
-    {noreply, State#state{client = undefined, subscriptions = #{}}};
+    erlang:send_after(?INITIAL_BACKOFF_MS, self(), connect),
+    {noreply, State#state{client = undefined, subscriptions = #{}, connecting = false,
+                          backoff_ms = ?INITIAL_BACKOFF_MS}};
 
 handle_info(_Info, State) ->
     {noreply, State}.
 
-terminate(_Reason, #state{client = undefined}) ->
-    ok;
+terminate(_Reason, #state{client = undefined}) -> ok;
 terminate(_Reason, #state{client = Client}) ->
     macula:disconnect(Client),
     ok.
 
 %% Internal
 
-%% Spawn connection attempt so the gen_server remains responsive to calls
-%% (e.g., subscribe) while the QUIC handshake is in progress.
-spawn_connect(#state{realm = Realm, identity = Identity, bootstrap = Bootstrap}) ->
-    Self = self(),
-    spawn(fun() ->
-        logger:info("[hecate_mesh] Connecting to mesh (realm: ~s)...", [Realm]),
-        case try_connect(Bootstrap, Realm, Identity) of
-            {ok, Client} ->
-                Self ! {connected, Client};
-            {error, _} ->
-                Self ! {reconnect, 5000}
-        end
-    end).
-
 try_connect([], _Realm, _Identity) ->
-    logger:warning("[hecate_mesh] All bootstrap servers failed, retrying in 5s..."),
-    {error, all_failed};
+    {error, all_bootstrap_servers_failed};
 try_connect([BootstrapUrl | Rest], Realm, Identity) ->
     Url = build_url(BootstrapUrl),
-    Opts = #{
-        realm => Realm,
-        identity => Identity
-    },
     logger:info("[hecate_mesh] Trying bootstrap: ~s", [Url]),
-    case connect_with_timeout(Url, Opts, 15000) of
+    case macula:connect(Url, #{realm => Realm, identity => Identity}) of
         {ok, Client} ->
-            logger:info("[hecate_mesh] Connected to mesh via ~s", [Url]),
+            logger:info("[hecate_mesh] Connected via ~s", [Url]),
             {ok, Client};
         {error, Reason} ->
             logger:warning("[hecate_mesh] Failed to connect to ~s: ~p", [Url, Reason]),
             try_connect(Rest, Realm, Identity)
     end.
 
-%% macula:connect/2 can block indefinitely if the QUIC handshake is slow
-%% or macula_peer:init times out internally. Wrap with a timeout.
-connect_with_timeout(Url, Opts, Timeout) ->
-    Self = self(),
-    Ref = make_ref(),
-    Pid = spawn(fun() ->
-        Result = try
-            macula:connect(Url, Opts)
-        catch
-            _:Reason -> {error, {crashed, Reason}}
-        end,
-        Self ! {Ref, Result}
-    end),
-    receive
-        {Ref, Result} -> Result
-    after Timeout ->
-        exit(Pid, kill),
-        {error, connect_timeout}
-    end.
-
-build_url(BootstrapUrl) when is_binary(BootstrapUrl) ->
-    case BootstrapUrl of
-        <<"quic://", _/binary>> -> BootstrapUrl;
-        <<"https://", _/binary>> -> BootstrapUrl;
-        _ -> <<"https://", BootstrapUrl/binary>>
-    end.
+build_url(<<"quic://", _/binary>> = Url) -> Url;
+build_url(<<"https://", _/binary>> = Url) -> Url;
+build_url(Url) -> <<"https://", Url/binary>>.
 
 ensure_binary(B) when is_binary(B) -> B;
 ensure_binary(S) when is_list(S) -> list_to_binary(S).
@@ -214,22 +180,15 @@ get_node_id(Client) ->
         Self = self(),
         Ref = make_ref(),
         Pid = spawn(fun() ->
-            Result = try macula:get_node_id(Client)
-                     catch _:_ -> {error, failed}
-                     end,
+            Result = try macula:get_node_id(Client) catch _:_ -> {error, failed} end,
             Self ! {Ref, Result}
         end),
         receive
-            {Ref, {ok, NodeIdBin}} when is_binary(NodeIdBin) ->
-                binary:encode_hex(NodeIdBin);
-            {Ref, NodeIdBin} when is_binary(NodeIdBin) ->
-                binary:encode_hex(NodeIdBin);
-            {Ref, _} ->
-                null
+            {Ref, {ok, NodeIdBin}} when is_binary(NodeIdBin) -> binary:encode_hex(NodeIdBin);
+            {Ref, NodeIdBin} when is_binary(NodeIdBin) -> binary:encode_hex(NodeIdBin);
+            {Ref, _} -> null
         after 2000 ->
-            exit(Pid, kill),
-            null
+            exit(Pid, kill), null
         end
-    catch
-        _:_ -> null
+    catch _:_ -> null
     end.

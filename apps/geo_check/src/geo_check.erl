@@ -14,6 +14,8 @@
     check_local/0,
     check_ip/1,
     get_country/1,
+    get_location/1,
+    get_asn/1,
     get_public_ip/0,
     reload_config/0,
     status/0
@@ -81,11 +83,69 @@ get_country(IP) when is_list(IP) ->
         {error, Reason} -> {error, Reason}
     end;
 get_country(IP) when is_tuple(IP) ->
-    case locus:lookup(geo_db, IP) of
+    case locus:lookup(geo_city, IP) of
         {ok, #{<<"country">> := #{<<"iso_code">> := CountryCode}}} ->
             {ok, CountryCode};
         {ok, _Other} ->
             {error, no_country_data};
+        not_found ->
+            {error, not_found};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+%% @doc Get location details (city, country, lat/lng) for an IP address
+-spec get_location(ip_address()) -> {ok, map()} | {error, term()}.
+get_location(IP) when is_binary(IP) ->
+    case inet:parse_address(binary_to_list(IP)) of
+        {ok, IPTuple} -> get_location(IPTuple);
+        {error, Reason} -> {error, Reason}
+    end;
+get_location(IP) when is_list(IP) ->
+    case inet:parse_address(IP) of
+        {ok, IPTuple} -> get_location(IPTuple);
+        {error, Reason} -> {error, Reason}
+    end;
+get_location(IP) when is_tuple(IP) ->
+    case locus:lookup(geo_city, IP) of
+        {ok, Entry} ->
+            Location = #{
+                country => deep_get([<<"country">>, <<"iso_code">>], Entry),
+                country_name => deep_get([<<"country">>, <<"names">>, <<"en">>], Entry),
+                city => deep_get([<<"city">>, <<"names">>, <<"en">>], Entry),
+                lat => deep_get([<<"location">>, <<"latitude">>], Entry),
+                lng => deep_get([<<"location">>, <<"longitude">>], Entry),
+                continent => deep_get([<<"continent">>, <<"code">>], Entry)
+            },
+            {ok, Location};
+        not_found ->
+            {error, not_found};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+%% @doc Get ASN (Autonomous System) info for an IP address
+-spec get_asn(ip_address()) -> {ok, map()} | {error, term()}.
+get_asn(IP) when is_binary(IP) ->
+    case inet:parse_address(binary_to_list(IP)) of
+        {ok, IPTuple} -> get_asn(IPTuple);
+        {error, Reason} -> {error, Reason}
+    end;
+get_asn(IP) when is_list(IP) ->
+    case inet:parse_address(IP) of
+        {ok, IPTuple} -> get_asn(IPTuple);
+        {error, Reason} -> {error, Reason}
+    end;
+get_asn(IP) when is_tuple(IP) ->
+    case locus:lookup(geo_asn, IP) of
+        {ok, #{<<"autonomous_system_number">> := ASN} = Entry} ->
+            Info = #{
+                asn => ASN,
+                organization => maps:get(<<"autonomous_system_organization">>, Entry, undefined)
+            },
+            {ok, Info};
+        {ok, _Other} ->
+            {error, no_asn_data};
         not_found ->
             {error, not_found};
         {error, Reason} ->
@@ -113,7 +173,8 @@ reload_config() ->
 status() ->
     #{
         enabled => application:get_env(geo_check, enabled, true),
-        database_loaded => is_database_loaded(),
+        city_loaded => is_loader_ready(geo_city),
+        asn_loaded => is_loader_ready(geo_asn),
         config => geo_check_config:get_config(),
         local_check => check_local()
     }.
@@ -159,10 +220,19 @@ try_ip_services([Url | Rest]) ->
             try_ip_services(Rest)
     end.
 
-%% @private Check if the locus database is loaded
-is_database_loaded() ->
-    case locus:await_loader(geo_db, 0) of
+%% @private Check if a locus loader is ready
+is_loader_ready(LoaderId) ->
+    case locus:await_loader(LoaderId, 0) of
         {ok, _Version} -> true;
         {error, timeout} -> false;
         {error, _} -> false
     end.
+
+%% @private Safely navigate nested maps
+deep_get([], Value) -> Value;
+deep_get([Key | Rest], Map) when is_map(Map) ->
+    case maps:get(Key, Map, undefined) of
+        undefined -> undefined;
+        Value -> deep_get(Rest, Value)
+    end;
+deep_get(_, _) -> undefined.

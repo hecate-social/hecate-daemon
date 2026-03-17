@@ -13,7 +13,10 @@
         {enabled, true},
         {config_file, "config/geo_restrictions.yaml"},
         {recheck_interval_ms, 3600000},  %% 1 hour
-        {db_source, {maxmind, "GeoLite2-Country"}}
+        {databases, [
+            {geo_city, {maxmind, "GeoLite2-City"}},
+            {geo_asn, {maxmind, "GeoLite2-ASN"}}
+        ]}
     ]},
     {modules, []},
     {licenses, ["Apache-2.0"]},

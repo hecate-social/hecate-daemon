@@ -6,7 +6,9 @@
     {applications, [
         kernel,
         stdlib,
-        project_license_offerings
+        project_license_offerings,
+        project_plugins,
+        project_licenses
     ]},
     {env, []},
     {modules, []},

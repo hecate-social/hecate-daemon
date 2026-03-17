@@ -37,6 +37,7 @@ init([]) ->
         emitter(on_plugin_upgraded_update_container),
         emitter(on_plugin_upgraded_reload_in_vm),
         emitter(on_plugin_removed_deprovision_container),
+        emitter(on_plugin_removed_unload_in_vm),
 
         %% -- Execution request PMs (split by plugin type) --
 
