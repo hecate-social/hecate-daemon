@@ -1,308 +1,281 @@
-%%% @doc Tests for project_briefcase_store query functions.
-%%%
-%%% Creates ETS tables directly (bypassing gen_server) to test
-%%% the query API: list_folders, get_folder, list_files, get_file,
-%%% count_files_in_folder, and filter logic.
-%%% @end
 -module(project_briefcase_store_tests).
-
+-compile({no_auto_import, [put/2]}).
 -include_lib("eunit/include/eunit.hrl").
 
--define(FOLDER_TABLE, briefcase_folder_tree).
--define(FILE_TABLE, briefcase_file_index).
+-define(TABLE, briefcase_items).
+-define(ARCHIVED, 8).
 
-%% -- Setup / Teardown --
+%% ===================================================================
+%% Setup / Teardown
+%% ===================================================================
 
 setup() ->
-    ets:new(?FOLDER_TABLE, [set, public, named_table, {read_concurrency, true}]),
-    ets:new(?FILE_TABLE, [set, public, named_table, {read_concurrency, true}]),
+    catch ets:delete(?TABLE),
+    ?TABLE = ets:new(?TABLE, [set, public, named_table, {read_concurrency, true}]),
     ok.
 
-cleanup(_) ->
-    catch ets:delete(?FOLDER_TABLE),
-    catch ets:delete(?FILE_TABLE),
+cleanup() ->
+    catch ets:delete(?TABLE),
     ok.
 
-%% -- Helpers --
+%% ===================================================================
+%% Helpers
+%% ===================================================================
 
-make_folder(Id, Name) ->
-    make_folder(Id, Name, undefined).
+make_item(Id, Name, Kind, ParentId) ->
+    make_item(Id, Name, Kind, ParentId, #{}).
 
-make_folder(Id, Name, ParentId) ->
-    #{
-        folder_id  => Id,
-        name       => Name,
-        parent_id  => ParentId,
-        icon       => <<"folder">>,
-        status     => 1,
-        created_at => erlang:system_time(millisecond),
-        updated_at => erlang:system_time(millisecond)
-    }.
-
-make_file(Id, Name, FolderId) ->
-    make_file(Id, Name, FolderId, #{}).
-
-make_file(Id, Name, FolderId, Overrides) ->
+make_item(Id, Name, Kind, ParentId, Overrides) ->
     Base = #{
-        file_id    => Id,
+        item_id    => Id,
         name       => Name,
-        folder_id  => FolderId,
-        file_type  => <<"document">>,
-        plugin     => <<"hecate-app-scribe">>,
-        icon       => <<"file-text">>,
-        blob_id    => undefined,
-        size       => 0,
+        kind       => Kind,
+        parent_id  => ParentId,
+        plugin     => undefined,
+        file_type  => undefined,
+        icon       => undefined,
+        path       => undefined,
         mime_type  => undefined,
+        size       => 0,
         starred    => false,
         status     => 1,
-        created_at => erlang:system_time(millisecond),
-        updated_at => erlang:system_time(millisecond)
+        created_at => 1000,
+        updated_at => 1000
     },
     maps:merge(Base, Overrides).
 
+put(Id, Item) ->
+    project_briefcase_store:put_item(Id, Item).
+
 %% ===================================================================
-%% Folder Tests
+%% Put / Get Tests
 %% ===================================================================
 
-put_and_get_folder_test() ->
+put_and_get_item_test() ->
     setup(),
     try
-        Folder = make_folder(<<"f-1">>, <<"Documents">>),
-        ok = project_briefcase_store:put_folder(<<"f-1">>, Folder),
-        ?assertEqual({ok, Folder}, project_briefcase_store:get_folder(<<"f-1">>))
+        Item = make_item(<<"i1">>, <<"Docs">>, <<"folder">>, undefined),
+        ok = put(<<"i1">>, Item),
+        ?assertEqual({ok, Item}, project_briefcase_store:get_item(<<"i1">>))
     after
-        cleanup(ok)
+        cleanup()
     end.
 
-get_missing_folder_test() ->
+get_missing_test() ->
     setup(),
     try
-        ?assertEqual({error, not_found}, project_briefcase_store:get_folder(<<"nonexistent">>))
+        ?assertEqual({error, not_found}, project_briefcase_store:get_item(<<"nope">>))
     after
-        cleanup(ok)
+        cleanup()
     end.
+
+%% ===================================================================
+%% List Items Tests
+%% ===================================================================
+
+list_items_all_test() ->
+    setup(),
+    try
+        ok = put(<<"i1">>, make_item(<<"i1">>, <<"A">>, <<"folder">>, undefined, #{updated_at => 1000})),
+        ok = put(<<"i2">>, make_item(<<"i2">>, <<"B">>, <<"blob">>, <<"i1">>, #{updated_at => 2000})),
+        ok = put(<<"i3">>, make_item(<<"i3">>, <<"C">>, <<"blob">>, <<"i1">>, #{updated_at => 3000})),
+        {ok, Items} = project_briefcase_store:list_items(#{}),
+        ?assertEqual(3, length(Items)),
+        %% Sorted by updated_at descending
+        [First | _] = Items,
+        ?assertEqual(<<"i3">>, maps:get(item_id, First))
+    after
+        cleanup()
+    end.
+
+list_items_by_parent_test() ->
+    setup(),
+    try
+        ok = put(<<"i1">>, make_item(<<"i1">>, <<"Root">>, <<"folder">>, undefined)),
+        ok = put(<<"i2">>, make_item(<<"i2">>, <<"Child1">>, <<"blob">>, <<"i1">>)),
+        ok = put(<<"i3">>, make_item(<<"i3">>, <<"Child2">>, <<"blob">>, <<"i1">>)),
+        ok = put(<<"i4">>, make_item(<<"i4">>, <<"Other">>, <<"blob">>, <<"other">>)),
+        {ok, Items} = project_briefcase_store:list_items(#{parent_id => <<"i1">>}),
+        ?assertEqual(2, length(Items)),
+        Ids = [maps:get(item_id, I) || I <- Items],
+        ?assert(lists:member(<<"i2">>, Ids)),
+        ?assert(lists:member(<<"i3">>, Ids))
+    after
+        cleanup()
+    end.
+
+list_items_parent_all_filter_test() ->
+    setup(),
+    try
+        ok = put(<<"i1">>, make_item(<<"i1">>, <<"A">>, <<"folder">>, undefined)),
+        ok = put(<<"i2">>, make_item(<<"i2">>, <<"B">>, <<"blob">>, <<"i1">>)),
+        {ok, Items} = project_briefcase_store:list_items(#{parent_id => <<"all">>}),
+        ?assertEqual(2, length(Items))
+    after
+        cleanup()
+    end.
+
+list_items_starred_test() ->
+    setup(),
+    try
+        ok = put(<<"i1">>, make_item(<<"i1">>, <<"A">>, <<"folder">>, undefined, #{starred => true})),
+        ok = put(<<"i2">>, make_item(<<"i2">>, <<"B">>, <<"blob">>, undefined, #{starred => false})),
+        ok = put(<<"i3">>, make_item(<<"i3">>, <<"C">>, <<"blob">>, undefined, #{starred => true})),
+        {ok, Items} = project_briefcase_store:list_items(#{starred => true}),
+        ?assertEqual(2, length(Items)),
+        Ids = [maps:get(item_id, I) || I <- Items],
+        ?assert(lists:member(<<"i1">>, Ids)),
+        ?assert(lists:member(<<"i3">>, Ids))
+    after
+        cleanup()
+    end.
+
+list_items_search_test() ->
+    setup(),
+    try
+        ok = put(<<"i1">>, make_item(<<"i1">>, <<"Meeting Notes">>, <<"blob">>, undefined)),
+        ok = put(<<"i2">>, make_item(<<"i2">>, <<"Photos">>, <<"folder">>, undefined)),
+        ok = put(<<"i3">>, make_item(<<"i3">>, <<"Daily Notes">>, <<"blob">>, undefined)),
+        {ok, Items} = project_briefcase_store:list_items(#{search => <<"notes">>}),
+        ?assertEqual(2, length(Items)),
+        Ids = [maps:get(item_id, I) || I <- Items],
+        ?assert(lists:member(<<"i1">>, Ids)),
+        ?assert(lists:member(<<"i3">>, Ids))
+    after
+        cleanup()
+    end.
+
+list_items_by_kind_test() ->
+    setup(),
+    try
+        ok = put(<<"i1">>, make_item(<<"i1">>, <<"F1">>, <<"folder">>, undefined)),
+        ok = put(<<"i2">>, make_item(<<"i2">>, <<"B1">>, <<"blob">>, undefined)),
+        ok = put(<<"i3">>, make_item(<<"i3">>, <<"F2">>, <<"folder">>, undefined)),
+        {ok, Items} = project_briefcase_store:list_items(#{kind => <<"folder">>}),
+        ?assertEqual(2, length(Items))
+    after
+        cleanup()
+    end.
+
+list_items_by_file_type_test() ->
+    setup(),
+    try
+        ok = put(<<"i1">>, make_item(<<"i1">>, <<"A">>, <<"blob">>, undefined, #{file_type => <<"image">>})),
+        ok = put(<<"i2">>, make_item(<<"i2">>, <<"B">>, <<"blob">>, undefined, #{file_type => <<"text">>})),
+        ok = put(<<"i3">>, make_item(<<"i3">>, <<"C">>, <<"blob">>, undefined, #{file_type => <<"image">>})),
+        {ok, Items} = project_briefcase_store:list_items(#{file_type => <<"image">>}),
+        ?assertEqual(2, length(Items))
+    after
+        cleanup()
+    end.
+
+%% ===================================================================
+%% List Folders / Children Tests
+%% ===================================================================
 
 list_folders_test() ->
     setup(),
     try
-        F1 = make_folder(<<"f-1">>, <<"Documents">>),
-        F2 = make_folder(<<"f-2">>, <<"Photos">>),
-        F3 = make_folder(<<"f-3">>, <<"Music">>),
-        ok = project_briefcase_store:put_folder(<<"f-1">>, F1),
-        ok = project_briefcase_store:put_folder(<<"f-2">>, F2),
-        ok = project_briefcase_store:put_folder(<<"f-3">>, F3),
-        Folders = project_briefcase_store:list_folders(),
-        ?assertEqual(3, length(Folders)),
-        Ids = lists:sort([maps:get(folder_id, F) || F <- Folders]),
-        ?assertEqual([<<"f-1">>, <<"f-2">>, <<"f-3">>], Ids)
+        ok = put(<<"i1">>, make_item(<<"i1">>, <<"F1">>, <<"folder">>, undefined)),
+        ok = put(<<"i2">>, make_item(<<"i2">>, <<"B1">>, <<"blob">>, undefined)),
+        ok = put(<<"i3">>, make_item(<<"i3">>, <<"F2">>, <<"folder">>, undefined)),
+        {ok, Folders} = project_briefcase_store:list_folders(),
+        ?assertEqual(2, length(Folders)),
+        Kinds = [maps:get(kind, F) || F <- Folders],
+        ?assertEqual([<<"folder">>, <<"folder">>], Kinds)
     after
-        cleanup(ok)
+        cleanup()
     end.
 
-delete_folder_test() ->
+list_children_test() ->
     setup(),
     try
-        Folder = make_folder(<<"f-1">>, <<"Documents">>),
-        ok = project_briefcase_store:put_folder(<<"f-1">>, Folder),
-        ok = project_briefcase_store:delete_folder(<<"f-1">>),
-        ?assertEqual({error, not_found}, project_briefcase_store:get_folder(<<"f-1">>))
+        ok = put(<<"p1">>, make_item(<<"p1">>, <<"Parent">>, <<"folder">>, undefined)),
+        ok = put(<<"c1">>, make_item(<<"c1">>, <<"Child1">>, <<"blob">>, <<"p1">>)),
+        ok = put(<<"c2">>, make_item(<<"c2">>, <<"Child2">>, <<"blob">>, <<"p1">>)),
+        ok = put(<<"o1">>, make_item(<<"o1">>, <<"Other">>, <<"blob">>, <<"other">>)),
+        {ok, Children} = project_briefcase_store:list_children(<<"p1">>),
+        ?assertEqual(2, length(Children))
     after
-        cleanup(ok)
+        cleanup()
     end.
 
-%% ===================================================================
-%% File Tests
-%% ===================================================================
-
-put_and_get_file_test() ->
+count_children_test() ->
     setup(),
     try
-        File = make_file(<<"file-1">>, <<"notes.md">>, <<"f-1">>),
-        ok = project_briefcase_store:put_file(<<"file-1">>, File),
-        ?assertEqual({ok, File}, project_briefcase_store:get_file(<<"file-1">>))
+        ok = put(<<"p1">>, make_item(<<"p1">>, <<"Parent">>, <<"folder">>, undefined)),
+        ok = put(<<"c1">>, make_item(<<"c1">>, <<"A">>, <<"blob">>, <<"p1">>)),
+        ok = put(<<"c2">>, make_item(<<"c2">>, <<"B">>, <<"blob">>, <<"p1">>)),
+        ok = put(<<"c3">>, make_item(<<"c3">>, <<"C">>, <<"blob">>, <<"p1">>)),
+        ?assertEqual(3, project_briefcase_store:count_children(<<"p1">>))
     after
-        cleanup(ok)
+        cleanup()
     end.
 
-get_missing_file_test() ->
+count_children_empty_test() ->
     setup(),
     try
-        ?assertEqual({error, not_found}, project_briefcase_store:get_file(<<"nonexistent">>))
+        ?assertEqual(0, project_briefcase_store:count_children(<<"empty">>))
     after
-        cleanup(ok)
-    end.
-
-delete_file_test() ->
-    setup(),
-    try
-        File = make_file(<<"file-1">>, <<"notes.md">>, <<"f-1">>),
-        ok = project_briefcase_store:put_file(<<"file-1">>, File),
-        ok = project_briefcase_store:delete_file(<<"file-1">>),
-        ?assertEqual({error, not_found}, project_briefcase_store:get_file(<<"file-1">>))
-    after
-        cleanup(ok)
+        cleanup()
     end.
 
 %% ===================================================================
-%% list_files Filter Tests
+%% Archived Items Excluded Tests
 %% ===================================================================
 
-list_files_filter_by_folder_test() ->
+archived_excluded_from_list_test() ->
     setup(),
     try
-        F1 = make_file(<<"file-1">>, <<"a.md">>, <<"folder-a">>),
-        F2 = make_file(<<"file-2">>, <<"b.md">>, <<"folder-a">>),
-        F3 = make_file(<<"file-3">>, <<"c.md">>, <<"folder-b">>),
-        ok = project_briefcase_store:put_file(<<"file-1">>, F1),
-        ok = project_briefcase_store:put_file(<<"file-2">>, F2),
-        ok = project_briefcase_store:put_file(<<"file-3">>, F3),
-        Result = project_briefcase_store:list_files(#{folder_id => <<"folder-a">>}),
-        ?assertEqual(2, length(Result)),
-        Ids = lists:sort([maps:get(file_id, F) || F <- Result]),
-        ?assertEqual([<<"file-1">>, <<"file-2">>], Ids)
+        ok = put(<<"i1">>, make_item(<<"i1">>, <<"Active">>, <<"folder">>, undefined)),
+        ok = put(<<"i2">>, make_item(<<"i2">>, <<"Archived">>, <<"folder">>, undefined,
+            #{status => 1 bor ?ARCHIVED})),
+        ok = put(<<"i3">>, make_item(<<"i3">>, <<"Also Active">>, <<"blob">>, undefined)),
+        {ok, Items} = project_briefcase_store:list_items(#{}),
+        ?assertEqual(2, length(Items)),
+        Ids = [maps:get(item_id, I) || I <- Items],
+        ?assertNot(lists:member(<<"i2">>, Ids))
     after
-        cleanup(ok)
+        cleanup()
     end.
 
-list_files_folder_all_returns_everything_test() ->
+archived_excluded_from_folders_test() ->
     setup(),
     try
-        F1 = make_file(<<"file-1">>, <<"a.md">>, <<"folder-a">>),
-        F2 = make_file(<<"file-2">>, <<"b.md">>, <<"folder-b">>),
-        ok = project_briefcase_store:put_file(<<"file-1">>, F1),
-        ok = project_briefcase_store:put_file(<<"file-2">>, F2),
-        Result = project_briefcase_store:list_files(#{folder_id => <<"all">>}),
-        ?assertEqual(2, length(Result))
+        ok = put(<<"f1">>, make_item(<<"f1">>, <<"Good">>, <<"folder">>, undefined)),
+        ok = put(<<"f2">>, make_item(<<"f2">>, <<"Dead">>, <<"folder">>, undefined,
+            #{status => 1 bor ?ARCHIVED})),
+        {ok, Folders} = project_briefcase_store:list_folders(),
+        ?assertEqual(1, length(Folders)),
+        ?assertEqual(<<"f1">>, maps:get(item_id, hd(Folders)))
     after
-        cleanup(ok)
+        cleanup()
     end.
 
-list_files_filter_starred_test() ->
+archived_excluded_from_children_test() ->
     setup(),
     try
-        F1 = make_file(<<"file-1">>, <<"a.md">>, <<"f-1">>, #{starred => true}),
-        F2 = make_file(<<"file-2">>, <<"b.md">>, <<"f-1">>, #{starred => false}),
-        F3 = make_file(<<"file-3">>, <<"c.md">>, <<"f-1">>, #{starred => true}),
-        ok = project_briefcase_store:put_file(<<"file-1">>, F1),
-        ok = project_briefcase_store:put_file(<<"file-2">>, F2),
-        ok = project_briefcase_store:put_file(<<"file-3">>, F3),
-        Result = project_briefcase_store:list_files(#{starred => true}),
-        ?assertEqual(2, length(Result)),
-        Ids = lists:sort([maps:get(file_id, F) || F <- Result]),
-        ?assertEqual([<<"file-1">>, <<"file-3">>], Ids)
+        ok = put(<<"c1">>, make_item(<<"c1">>, <<"Live">>, <<"blob">>, <<"p1">>)),
+        ok = put(<<"c2">>, make_item(<<"c2">>, <<"Dead">>, <<"blob">>, <<"p1">>,
+            #{status => 1 bor ?ARCHIVED})),
+        {ok, Children} = project_briefcase_store:list_children(<<"p1">>),
+        ?assertEqual(1, length(Children)),
+        ?assertEqual(0, project_briefcase_store:count_children(<<"p1">>) - length(Children))
     after
-        cleanup(ok)
-    end.
-
-list_files_search_test() ->
-    setup(),
-    try
-        F1 = make_file(<<"file-1">>, <<"meeting-notes.md">>, <<"f-1">>),
-        F2 = make_file(<<"file-2">>, <<"shopping-list.md">>, <<"f-1">>),
-        F3 = make_file(<<"file-3">>, <<"Meeting-agenda.md">>, <<"f-1">>),
-        ok = project_briefcase_store:put_file(<<"file-1">>, F1),
-        ok = project_briefcase_store:put_file(<<"file-2">>, F2),
-        ok = project_briefcase_store:put_file(<<"file-3">>, F3),
-        %% Case-insensitive search for "meeting"
-        Result = project_briefcase_store:list_files(#{search => <<"meeting">>}),
-        ?assertEqual(2, length(Result)),
-        Ids = lists:sort([maps:get(file_id, F) || F <- Result]),
-        ?assertEqual([<<"file-1">>, <<"file-3">>], Ids)
-    after
-        cleanup(ok)
-    end.
-
-list_files_filter_file_type_test() ->
-    setup(),
-    try
-        F1 = make_file(<<"file-1">>, <<"a.md">>, <<"f-1">>, #{file_type => <<"markdown">>}),
-        F2 = make_file(<<"file-2">>, <<"b.jpg">>, <<"f-1">>, #{file_type => <<"image">>}),
-        F3 = make_file(<<"file-3">>, <<"c.md">>, <<"f-1">>, #{file_type => <<"markdown">>}),
-        ok = project_briefcase_store:put_file(<<"file-1">>, F1),
-        ok = project_briefcase_store:put_file(<<"file-2">>, F2),
-        ok = project_briefcase_store:put_file(<<"file-3">>, F3),
-        Result = project_briefcase_store:list_files(#{file_type => <<"markdown">>}),
-        ?assertEqual(2, length(Result))
-    after
-        cleanup(ok)
-    end.
-
-list_files_excludes_archived_test() ->
-    setup(),
-    try
-        %% Status with ARCHIVED bit (8) set
-        F1 = make_file(<<"file-1">>, <<"alive.md">>, <<"f-1">>),
-        F2 = make_file(<<"file-2">>, <<"dead.md">>, <<"f-1">>, #{status => 1 bor 8}),
-        ok = project_briefcase_store:put_file(<<"file-1">>, F1),
-        ok = project_briefcase_store:put_file(<<"file-2">>, F2),
-        Result = project_briefcase_store:list_files(#{}),
-        ?assertEqual(1, length(Result)),
-        ?assertEqual(<<"file-1">>, maps:get(file_id, hd(Result)))
-    after
-        cleanup(ok)
-    end.
-
-list_files_combined_filters_test() ->
-    setup(),
-    try
-        F1 = make_file(<<"file-1">>, <<"meeting.md">>, <<"f-1">>, #{starred => true}),
-        F2 = make_file(<<"file-2">>, <<"meeting.md">>, <<"f-2">>, #{starred => true}),
-        F3 = make_file(<<"file-3">>, <<"other.md">>, <<"f-1">>, #{starred => true}),
-        ok = project_briefcase_store:put_file(<<"file-1">>, F1),
-        ok = project_briefcase_store:put_file(<<"file-2">>, F2),
-        ok = project_briefcase_store:put_file(<<"file-3">>, F3),
-        %% Filter: folder f-1 + starred + search "meeting"
-        Result = project_briefcase_store:list_files(#{
-            folder_id => <<"f-1">>,
-            starred => true,
-            search => <<"meeting">>
-        }),
-        ?assertEqual(1, length(Result)),
-        ?assertEqual(<<"file-1">>, maps:get(file_id, hd(Result)))
-    after
-        cleanup(ok)
+        cleanup()
     end.
 
 %% ===================================================================
-%% count_files_in_folder
+%% Delete Tests
 %% ===================================================================
 
-count_files_in_folder_test() ->
+delete_item_test() ->
     setup(),
     try
-        F1 = make_file(<<"file-1">>, <<"a.md">>, <<"f-1">>),
-        F2 = make_file(<<"file-2">>, <<"b.md">>, <<"f-1">>),
-        F3 = make_file(<<"file-3">>, <<"c.md">>, <<"f-2">>),
-        ok = project_briefcase_store:put_file(<<"file-1">>, F1),
-        ok = project_briefcase_store:put_file(<<"file-2">>, F2),
-        ok = project_briefcase_store:put_file(<<"file-3">>, F3),
-        ?assertEqual(2, project_briefcase_store:count_files_in_folder(<<"f-1">>)),
-        ?assertEqual(1, project_briefcase_store:count_files_in_folder(<<"f-2">>)),
-        ?assertEqual(0, project_briefcase_store:count_files_in_folder(<<"f-nonexistent">>))
+        ok = put(<<"i1">>, make_item(<<"i1">>, <<"Doomed">>, <<"blob">>, undefined)),
+        {ok, _} = project_briefcase_store:get_item(<<"i1">>),
+        ok = project_briefcase_store:delete_item(<<"i1">>),
+        ?assertEqual({error, not_found}, project_briefcase_store:get_item(<<"i1">>))
     after
-        cleanup(ok)
-    end.
-
-count_files_excludes_archived_test() ->
-    setup(),
-    try
-        F1 = make_file(<<"file-1">>, <<"a.md">>, <<"f-1">>),
-        F2 = make_file(<<"file-2">>, <<"b.md">>, <<"f-1">>, #{status => 1 bor 8}),
-        ok = project_briefcase_store:put_file(<<"file-1">>, F1),
-        ok = project_briefcase_store:put_file(<<"file-2">>, F2),
-        ?assertEqual(1, project_briefcase_store:count_files_in_folder(<<"f-1">>))
-    after
-        cleanup(ok)
-    end.
-
-count_files_in_root_folder_test() ->
-    setup(),
-    try
-        F1 = make_file(<<"file-1">>, <<"a.md">>, undefined),
-        F2 = make_file(<<"file-2">>, <<"b.md">>, <<"f-1">>),
-        ok = project_briefcase_store:put_file(<<"file-1">>, F1),
-        ok = project_briefcase_store:put_file(<<"file-2">>, F2),
-        ?assertEqual(1, project_briefcase_store:count_files_in_folder(undefined))
-    after
-        cleanup(ok)
+        cleanup()
     end.

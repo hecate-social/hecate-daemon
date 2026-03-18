@@ -1,16 +1,10 @@
 {application, guide_briefcase_lifecycle, [
-    {description, "Briefcase lifecycle command service (folders and files)"},
+    {description, "Briefcase item lifecycle (folders, blobs, symlinks)"},
     {vsn, "0.1.0"},
     {registered, []},
     {mod, {guide_briefcase_lifecycle_app, []}},
-    {applications, [
-        kernel,
-        stdlib,
-        crypto,
-        evoq
-    ]},
+    {applications, [kernel, stdlib, crypto, evoq]},
     {env, []},
     {modules, []},
-    {licenses, ["Apache-2.0"]},
-    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+    {licenses, ["Apache-2.0"]}
 ]}.
