@@ -3,11 +3,11 @@
 
 routes() -> [{"/api/briefcase/folders", ?MODULE, []}].
 
-init(Req0, State) ->
+init(Req0, _State) ->
     case cowboy_req:method(Req0) of
         <<"GET">> ->
             {ok, Folders} = project_briefcase_store:list_folders(),
-            hecate_api_utils:json_ok(#{folders => Folders}, Req0, State);
+            hecate_api_utils:json_ok(#{folders => Folders}, Req0);
         _ ->
-            hecate_api_utils:method_not_allowed(Req0, State)
+            hecate_api_utils:method_not_allowed(Req0)
     end.

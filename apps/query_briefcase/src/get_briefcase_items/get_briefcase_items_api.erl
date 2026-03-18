@@ -5,20 +5,20 @@
 
 routes() -> [{"/api/briefcase/items", ?MODULE, []}].
 
-init(Req0, State) ->
+init(Req0, _State) ->
     case cowboy_req:method(Req0) of
-        <<"GET">>  -> handle_list(Req0, State);
-        <<"POST">> -> handle_create(Req0, State);
-        _ -> hecate_api_utils:method_not_allowed(Req0, State)
+        <<"GET">>  -> handle_list(Req0);
+        <<"POST">> -> handle_create(Req0);
+        _ -> hecate_api_utils:method_not_allowed(Req0)
     end.
 
-handle_list(Req0, State) ->
+handle_list(Req0) ->
     Qs = cowboy_req:parse_qs(Req0),
     Filters = build_filters(Qs),
     {ok, Items} = project_briefcase_store:list_items(Filters),
-    hecate_api_utils:json_ok(#{items => Items, total => length(Items)}, Req0, State).
+    hecate_api_utils:json_ok(#{items => Items, total => length(Items)}, Req0).
 
-handle_create(Req0, State) ->
+handle_create(Req0) ->
     {ok, Body, Req1} = hecate_api_utils:read_json_body(Req0),
     ItemId = generate_id(),
     Payload = Body#{
@@ -34,9 +34,9 @@ handle_create(Req0, State) ->
     },
     case evoq_dispatcher:dispatch(Cmd, dispatch_opts()) of
         {ok, _, _} ->
-            hecate_api_utils:json_ok(#{item_id => ItemId}, Req1, State);
+            hecate_api_utils:json_ok(#{item_id => ItemId}, Req1);
         {error, Reason} ->
-            hecate_api_utils:json_error(400, Reason, Req1, State)
+            hecate_api_utils:json_error(400, Reason, Req1)
     end.
 
 build_filters(Qs) ->

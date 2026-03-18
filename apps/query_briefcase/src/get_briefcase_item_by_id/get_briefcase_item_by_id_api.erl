@@ -5,22 +5,22 @@
 
 routes() -> [{"/api/briefcase/items/:item_id", ?MODULE, []}].
 
-init(Req0, State) ->
+init(Req0, _State) ->
     ItemId = cowboy_req:binding(item_id, Req0),
     case cowboy_req:method(Req0) of
-        <<"GET">>    -> handle_get(ItemId, Req0, State);
-        <<"PUT">>    -> handle_update(ItemId, Req0, State);
-        <<"DELETE">> -> handle_archive(ItemId, Req0, State);
-        _ -> hecate_api_utils:method_not_allowed(Req0, State)
+        <<"GET">>    -> handle_get(ItemId, Req0);
+        <<"PUT">>    -> handle_update(ItemId, Req0);
+        <<"DELETE">> -> handle_archive(ItemId, Req0);
+        _ -> hecate_api_utils:method_not_allowed(Req0)
     end.
 
-handle_get(ItemId, Req0, State) ->
+handle_get(ItemId, Req0) ->
     case project_briefcase_store:get_item(ItemId) of
-        {ok, Item} -> hecate_api_utils:json_ok(Item, Req0, State);
-        {error, not_found} -> hecate_api_utils:json_error(404, <<"not_found">>, Req0, State)
+        {ok, Item} -> hecate_api_utils:json_ok(Item, Req0);
+        {error, not_found} -> hecate_api_utils:json_error(404, <<"not_found">>, Req0)
     end.
 
-handle_update(ItemId, Req0, State) ->
+handle_update(ItemId, Req0) ->
     {ok, Body, Req1} = hecate_api_utils:read_json_body(Req0),
     Results = lists:filtermap(fun
         ({<<"name">>, Name}) when is_binary(Name) ->
@@ -34,14 +34,14 @@ handle_update(ItemId, Req0, State) ->
         (_) -> false
     end, maps:to_list(Body)),
     case lists:filter(fun({error, _}) -> true; (_) -> false end, Results) of
-        [{error, Reason} | _] -> hecate_api_utils:json_error(400, Reason, Req1, State);
-        [] -> hecate_api_utils:json_ok(#{item_id => ItemId}, Req1, State)
+        [{error, Reason} | _] -> hecate_api_utils:json_error(400, Reason, Req1);
+        [] -> hecate_api_utils:json_ok(#{item_id => ItemId}, Req1)
     end.
 
-handle_archive(ItemId, Req0, State) ->
+handle_archive(ItemId, Req0) ->
     case dispatch_cmd(archive_briefcase_item, ItemId, #{<<"item_id">> => ItemId}) of
-        {ok, _, _} -> hecate_api_utils:json_ok(#{item_id => ItemId}, Req0, State);
-        {error, Reason} -> hecate_api_utils:json_error(400, Reason, Req0, State)
+        {ok, _, _} -> hecate_api_utils:json_ok(#{item_id => ItemId}, Req0);
+        {error, Reason} -> hecate_api_utils:json_error(400, Reason, Req0)
     end.
 
 dispatch_cmd(CmdType, ItemId, Payload) ->
