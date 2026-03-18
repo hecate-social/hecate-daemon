@@ -24,6 +24,7 @@
     guide_payment_lifecycle, project_payments, query_payments,
     guide_plugin_lifecycle, project_plugins, query_plugins,
     guide_launcher_lifecycle, project_launcher, query_launcher,
+    guide_briefcase_lifecycle, project_briefcase, query_briefcase,
     query_observer
 ]).
 

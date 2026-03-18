@@ -1,0 +1,11 @@
+{application, project_briefcase, [
+    {description, "Briefcase projections - folder tree and file index ETS read models"},
+    {vsn, "0.1.0"},
+    {registered, [project_briefcase_sup, project_briefcase_store]},
+    {mod, {project_briefcase_app, []}},
+    {applications, [kernel, stdlib, evoq, guide_briefcase_lifecycle]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

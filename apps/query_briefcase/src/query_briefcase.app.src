@@ -1,0 +1,17 @@
+{application, query_briefcase, [
+    {description, "Briefcase query service - folder tree, file listing, blob serving"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_briefcase_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        evoq,
+        project_briefcase,
+        guide_briefcase_lifecycle
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.
