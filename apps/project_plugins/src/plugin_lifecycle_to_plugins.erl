@@ -116,12 +116,14 @@ do_project(<<"plugin_upgraded_v1">>, Data, State, RM) ->
 do_project(<<"plugin_removed_v1">>, Data, State, RM) ->
     PluginId = gf(plugin_id, Data),
     case evoq_read_model:get(PluginId, RM) of
-        {ok, #{status := S} = Plugin} ->
-            NewStatus = evoq_bit_flags:set(S, ?PLG_REMOVED),
+        {ok, #{} = Plugin} ->
+            %% Clear all operational flags — only REMOVED remains
+            NewStatus = ?PLG_REMOVED,
             Updated = Plugin#{
                 status            => NewStatus,
                 status_label      => <<"Removed">>,
                 available_actions => available_actions(NewStatus),
+                installed_version => undefined,
                 removed_at        => gf(removed_at, Data)
             },
             {ok, RM2} = evoq_read_model:put(PluginId, Updated, RM),
