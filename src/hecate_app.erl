@@ -40,8 +40,7 @@
     {sales_store,               "sales",               "Sales (selling process)"},
     {payments_store,            "payments",            "Payments (payment process)"},
     {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"},
-    {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"},
-    {briefcase_store,           "briefcase",           "Briefcase (folders, files, blobs)"}
+    {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"}
 ]).
 
 %%--------------------------------------------------------------------
