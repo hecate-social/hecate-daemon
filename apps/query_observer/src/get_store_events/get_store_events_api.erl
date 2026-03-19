@@ -46,6 +46,9 @@ handle_get(Req0, _State) ->
 
 format_event(EventMap) when is_map(EventMap) ->
     sanitize_event(EventMap);
+format_event(EventRecord) when is_tuple(EventRecord) ->
+    %% Convert #evoq_event{} records to maps
+    sanitize_event(evoq_event_store:event_to_map(EventRecord));
 format_event(Other) ->
     #{raw => iolist_to_binary(io_lib:format("~P", [Other, 30]))}.
 

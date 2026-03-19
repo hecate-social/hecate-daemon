@@ -41,9 +41,9 @@ handle_get(Req0, _State) ->
     end.
 
 format_event(EventMap) when is_map(EventMap) ->
-    %% event_to_map already flattens evoq_event records
-    %% Ensure all values are JSON-safe
     sanitize_event(EventMap);
+format_event(EventRecord) when is_tuple(EventRecord) ->
+    sanitize_event(evoq_event_store:event_to_map(EventRecord));
 format_event(Other) ->
     #{raw => iolist_to_binary(io_lib:format("~P", [Other, 30]))}.
 
