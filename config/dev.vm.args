@@ -1,8 +1,8 @@
-## Dev node — separate from production hecate@host
--sname hecate_dev
+## Dev node — clusters with beam00.lab, beam01.lab (Site A)
+-name hecate_dev@host00.lab
 
-## Different cookie to avoid cluster conflicts
--setcookie hecate_dev_cookie
+## Shared cookie with Site A beam nodes
+-setcookie 9ExkyysakEt8gR0SMQvI
 
 ## No heartbeat in dev (don't auto-restart on crash)
 ## -heart
