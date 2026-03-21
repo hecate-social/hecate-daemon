@@ -1,5 +1,8 @@
 %%%-------------------------------------------------------------------
 %%% @doc Tests for hecate_ucan module.
+%%%
+%%% UCAN is now in-memory only (no SQLite).
+%%% Identity uses encrypted file persistence.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_ucan_tests).
@@ -36,35 +39,17 @@ setup() ->
     ok = filelib:ensure_dir(filename:join(TempDir, "dummy")),
     application:set_env(hecate, data_dir, TempDir),
 
-    {ok, _} = application:ensure_all_started(esqlite),
-
-    %% Ensure clean state — stop any leftover processes from previous test
     catch gen_server:stop(hecate_ucan),
     catch gen_server:stop(hecate_identity),
-    catch gen_server:stop(hecate_store),
-
-    {ok, StorePid} = hecate_store:start_link(),
-
-    %% Pre-seed identity so hecate_identity loads it from store
-    %% instead of auto-generating a random MRI
-    {PubKey, PrivKey} = crypto:generate_key(eddsa, ed25519),
-    ok = hecate_store:put(<<"identity">>, <<"identity">>, #{
-        mri => <<"mri:agent:test.realm/test/ucan-test">>,
-        realm => <<"test.realm">>,
-        public_key => PubKey,
-        private_key => PrivKey,
-        created_at => erlang:system_time(second)
-    }),
 
     {ok, IdentityPid} = hecate_identity:start_link(),
     {ok, UcanPid} = hecate_ucan:start_link(),
 
-    {StorePid, IdentityPid, UcanPid, TempDir}.
+    {IdentityPid, UcanPid, TempDir}.
 
-cleanup({_StorePid, _IdentityPid, _UcanPid, TempDir}) ->
+cleanup({_IdentityPid, _UcanPid, TempDir}) ->
     catch gen_server:stop(hecate_ucan),
     catch gen_server:stop(hecate_identity),
-    catch gen_server:stop(hecate_store),
     os:cmd("rm -rf " ++ TempDir),
     ok.
 
@@ -81,7 +66,6 @@ grant_capability() ->
         <<"mesh/publish">>,
         <<"topic:events.*">>
     ),
-    
     ?assert(is_binary(Id)),
     ?assert(byte_size(Id) > 0).
 
@@ -89,7 +73,6 @@ grant_unique_ids() ->
     {ok, Id1} = hecate_ucan:grant(<<"a">>, <<"can1">>, <<"res1">>),
     {ok, Id2} = hecate_ucan:grant(<<"b">>, <<"can2">>, <<"res2">>),
     {ok, Id3} = hecate_ucan:grant(<<"c">>, <<"can3">>, <<"res3">>),
-    
     ?assertNotEqual(Id1, Id2),
     ?assertNotEqual(Id2, Id3),
     ?assertNotEqual(Id1, Id3).
@@ -98,21 +81,17 @@ grant_fields() ->
     To = <<"mri:agent:test.realm/recipient/agent">>,
     Can = <<"mesh/rpc">>,
     Resource = <<"procedure:echo">>,
-    
+
     {ok, Id} = hecate_ucan:grant(To, Can, Resource),
-    
     [Cap] = hecate_ucan:list(),
-    
+
     ?assertEqual(Id, maps:get(id, Cap)),
-    ?assertEqual(<<"mri:agent:test.realm/test/ucan-test">>, maps:get(iss, Cap)),
     ?assertEqual(To, maps:get(aud, Cap)),
-    
-    %% Check attestations
+
     [Att] = maps:get(att, Cap),
     ?assertEqual(Resource, maps:get(with, Att)),
     ?assertEqual(Can, maps:get(can, Att)),
-    
-    %% Check expiration is in the future (7 days default)
+
     Exp = maps:get(exp, Cap),
     Now = erlang:system_time(second),
     ?assert(Exp > Now),
@@ -121,7 +100,6 @@ grant_fields() ->
 revoke_capability() ->
     {ok, Id} = hecate_ucan:grant(<<"a">>, <<"b">>, <<"c">>),
     ?assertEqual(1, length(hecate_ucan:list())),
-    
     ?assertEqual(ok, hecate_ucan:revoke(Id)),
     ?assertEqual(0, length(hecate_ucan:list())).
 
@@ -132,11 +110,10 @@ list_capabilities() ->
     {ok, _} = hecate_ucan:grant(<<"a">>, <<"can1">>, <<"res1">>),
     {ok, _} = hecate_ucan:grant(<<"b">>, <<"can2">>, <<"res2">>),
     {ok, _} = hecate_ucan:grant(<<"c">>, <<"can3">>, <<"res3">>),
-    
+
     Caps = hecate_ucan:list(),
     ?assertEqual(3, length(Caps)),
-    
-    %% All should be maps with required fields
+
     lists:foreach(fun(Cap) ->
         ?assert(maps:is_key(id, Cap)),
         ?assert(maps:is_key(iss, Cap)),
@@ -147,14 +124,10 @@ list_capabilities() ->
 
 capability_signature() ->
     {ok, _} = hecate_ucan:grant(<<"a">>, <<"b">>, <<"c">>),
-    
     [Cap] = hecate_ucan:list(),
-    
     ?assert(maps:is_key(signature, Cap)),
     Sig = maps:get(signature, Cap),
     ?assert(is_binary(Sig)),
-    
-    %% Signature should be base64 encoded (decoding should not throw)
     Decoded = base64:decode(Sig),
     ?assert(is_binary(Decoded)).
 

@@ -4,10 +4,9 @@
 %%% Supervision tree:
 %%% ```
 %%% hecate_sup (one_for_one)
-%%% ├── hecate_store         - SQLite persistence
-%%% ├── hecate_identity      - MRI + keypair
+%%% ├── hecate_identity      - MRI + keypair (encrypted file)
 %%% ├── hecate_realm_session - Realm join flow
-%%% ├── hecate_ucan          - UCAN wallet
+%%% ├── hecate_ucan          - UCAN wallet (in-memory)
 %%% ├── hecate_plugin_loader - In-VM plugin loader
 %%% └── hecate_boot_tracker  - Telemetry-driven boot tracker
 %%% '''
@@ -50,15 +49,7 @@ init(StoreIds) ->
     },
 
     ChildSpecs = [
-        %% SQLite store - must start first
-        #{
-            id => hecate_store,
-            start => {hecate_store, start_link, []},
-            restart => permanent,
-            type => worker
-        },
-
-        %% Identity management
+        %% Identity management (encrypted file, no DB dependency)
         #{
             id => hecate_identity,
             start => {hecate_identity, start_link, []},
@@ -74,7 +65,7 @@ init(StoreIds) ->
             type => worker
         },
 
-        %% UCAN wallet
+        %% UCAN wallet (in-memory)
         #{
             id => hecate_ucan,
             start => {hecate_ucan, start_link, []},

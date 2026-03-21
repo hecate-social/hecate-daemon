@@ -6,7 +6,6 @@
     {applications, [
         kernel,
         stdlib,
-        esqlite,
         evoq,
         hecate,
         guide_plugin_lifecycle

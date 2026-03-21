@@ -228,9 +228,9 @@ show_join_success() ->
     print_header(?GREEN ++ ?ICON_CHECK ++ " Joined Realm!" ++ ?RESET),
     io:format("~n"),
 
-    %% Get the new identity info
-    case hecate_store:get(<<"auth">>, <<"org_identity">>) of
-        {ok, OrgId} ->
+    %% Get the new identity info from confirmed memberships
+    case project_realm_memberships_store:list_confirmed() of
+        {ok, [#{oauth_account := OrgId} | _]} when is_binary(OrgId) ->
             print_kv("Organization", binary_to_list(OrgId));
         _ -> ok
     end,
@@ -275,8 +275,8 @@ show_status_once() ->
     
     %% Auth status
     print_section("Authentication"),
-    case hecate_store:get(<<"auth">>, <<"org_identity">>) of
-        {ok, OrgId} ->
+    case project_realm_memberships_store:list_confirmed() of
+        {ok, [#{oauth_account := OrgId} | _]} when is_binary(OrgId) ->
             print_kv("Organization", binary_to_list(OrgId)),
             print_kv("Status", ?GREEN ++ ?ICON_CHECK ++ " Joined" ++ ?RESET);
         _ ->
@@ -406,7 +406,6 @@ ensure_started() ->
     _ = application:ensure_all_started(crypto),
     _ = application:ensure_all_started(ssl),
     _ = application:ensure_all_started(hackney),
-    _ = application:ensure_all_started(esqlite),
     
     %% Try to start hecate (may fail in escript if some deps missing)
     case application:ensure_all_started(hecate) of

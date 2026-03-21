@@ -43,9 +43,7 @@
     {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"}
 ]).
 
-%% Site store — will run in cluster mode once multi-node is verified.
-%% For now, single mode to unblock development.
-%% TODO: Switch to cluster mode when beam nodes are provisioned.
+%% Site store (cluster nodes, site-level state).
 -define(SITE_STORES, [
     {site_store, "site", "Site (realm membership, cluster nodes)"}
 ]).
@@ -155,7 +153,6 @@ spawn_stores(Stores) ->
             Config = #store_config{
                 store_id = StoreId,
                 data_dir = DataDir,
-                mode = single,
                 writer_pool_size = 5,
                 reader_pool_size = 5,
                 gateway_pool_size = 2,

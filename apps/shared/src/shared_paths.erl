@@ -3,7 +3,6 @@
 %%% Provides purpose-specific path functions for the namespaced
 %%% directory layout under ~/.hecate/hecate-daemon/:
 %%%
-%%%   sqlite/       - SQLite read-model databases
 %%%   reckon-db/    - ReckonDB (Khepri/Ra) event store data
 %%%   sockets/      - Unix domain sockets
 %%%   run/          - PID and state files
@@ -20,8 +19,6 @@
     base_dir_rel/0,
     config_dir/0,
     config_path/1,
-    sqlite_dir/0,
-    sqlite_path/1,
     reckon_dir/0,
     reckon_path/1,
     socket_dir/0,
@@ -92,16 +89,6 @@ config_dir() ->
 config_path(Name) ->
     filename:join(config_dir(), Name).
 
-%% @doc Returns the directory for SQLite database files.
--spec sqlite_dir() -> file:filename().
-sqlite_dir() ->
-    filename:join(base_dir(), "sqlite").
-
-%% @doc Returns the full path for a SQLite database file.
--spec sqlite_path(string() | binary()) -> file:filename().
-sqlite_path(Name) ->
-    filename:join(sqlite_dir(), Name).
-
 %% @doc Returns the directory for ReckonDB event store data.
 -spec reckon_dir() -> file:filename().
 reckon_dir() ->
@@ -147,7 +134,6 @@ gitops_apps_dir() ->
 -spec ensure_layout() -> ok.
 ensure_layout() ->
     Dirs = [
-        sqlite_dir(),
         reckon_dir(),
         socket_dir(),
         run_dir(),

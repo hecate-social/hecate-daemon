@@ -2,6 +2,10 @@
 %%% @doc Hecate identity management.
 %%%
 %%% Handles MRI (Macula Resource Identifier) and Ed25519 keypair.
+%%% Identity is per-node and persisted as an encrypted file at
+%%% ~/.hecate/hecate-daemon/identity.enc (AES-256-GCM, cookie-derived key).
+%%%
+%%% The private key MUST NOT replicate — it stays local to this node.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_identity).
@@ -28,7 +32,7 @@
 -dialyzer({nowarn_function, [handle_call/3]}).
 
 -define(SERVER, ?MODULE).
--define(BUCKET, <<"identity">>).
+-define(IDENTITY_FILE, "identity.enc").
 
 -record(state, {
     mri :: binary() | undefined,
@@ -89,7 +93,7 @@ update_owner(NewOwner) ->
 %%%===================================================================
 
 init([]) ->
-    State = case hecate_store:get(?BUCKET, <<"identity">>) of
+    State = case load_identity() of
         {ok, Identity} ->
             logger:info("Loaded identity: ~s", [maps:get(mri, Identity)]),
             #state{
@@ -132,41 +136,22 @@ handle_call(is_initialized, _From, #state{mri = MRI} = State) ->
     {reply, MRI =/= undefined, State};
 
 handle_call({initialize, Opts}, _From, #state{mri = undefined} = _State) ->
-    %% Generate new identity
     {PubKey, PrivKey} = generate_keypair(),
-    
     Realm = maps:get(realm, Opts, <<"io.macula">>),
     Name = maps:get(name, Opts, generate_name()),
-    
-    %% Build MRI: mri:agent:realm/owner/name
     Owner = maps:get(owner, Opts, <<"anonymous">>),
-    MRI = iolist_to_binary([
-        <<"mri:agent:">>, Realm, <<"/">>, Owner, <<"/">>, Name
-    ]),
-    
+    MRI = build_mri(Realm, Owner, Name),
+
     Identity = #{
-        mri => MRI,
-        realm => Realm,
-        public_key => PubKey,
-        private_key => PrivKey,
-        created_at => erlang:system_time(second)
+        mri => MRI, realm => Realm,
+        public_key => PubKey, private_key => PrivKey
     },
-    
-    ok = hecate_store:put(?BUCKET, <<"identity">>, Identity),
-    
-    %% Log event
-    ok = hecate_store:append_event(<<"identity">>, <<"identity_created">>, #{
-        mri => MRI,
-        realm => Realm
-    }),
-    
+    save_identity(Identity),
     logger:info("Created identity: ~s", [MRI]),
-    
+
     NewState = #state{
-        mri = MRI,
-        realm = Realm,
-        public_key = PubKey,
-        private_key = PrivKey
+        mri = MRI, realm = Realm,
+        public_key = PubKey, private_key = PrivKey
     },
     {reply, ok, NewState};
 
@@ -178,18 +163,11 @@ handle_call({update_owner, NewOwner}, _From, #state{mri = MRI} = State) when MRI
         <<"anonymous">> ->
             NewMRI = replace_mri_owner(MRI, NewOwner),
             Identity = #{
-                mri => NewMRI,
-                realm => State#state.realm,
+                mri => NewMRI, realm => State#state.realm,
                 public_key => State#state.public_key,
-                private_key => State#state.private_key,
-                created_at => erlang:system_time(second)
+                private_key => State#state.private_key
             },
-            ok = hecate_store:put(?BUCKET, <<"identity">>, Identity),
-            ok = hecate_store:append_event(<<"identity">>, <<"identity_owner_updated">>, #{
-                old_mri => MRI,
-                new_mri => NewMRI,
-                owner => NewOwner
-            }),
+            save_identity(Identity),
             logger:info("Updated identity owner: ~s -> ~s", [MRI, NewMRI]),
             hecate_web_events:broadcast(identity_changed, #{mri => NewMRI}),
             {reply, ok, State#state{mri = NewMRI}};
@@ -209,6 +187,43 @@ terminate(_Reason, _State) ->
     ok.
 
 %%%===================================================================
+%%% Encrypted file persistence
+%%%===================================================================
+
+%% @private Load identity from encrypted file.
+-spec load_identity() -> {ok, map()} | not_found.
+load_identity() ->
+    Path = identity_path(),
+    case file:read_file(Path) of
+        {ok, EncData} ->
+            case hecate_crypto:decrypt(EncData) of
+                {ok, Serialized} -> {ok, binary_to_term(Serialized)};
+                {error, _} ->
+                    logger:warning("Failed to decrypt identity file — cookie may have changed"),
+                    not_found
+            end;
+        {error, enoent} ->
+            not_found;
+        {error, Reason} ->
+            logger:warning("Failed to read identity file: ~p", [Reason]),
+            not_found
+    end.
+
+%% @private Save identity to encrypted file.
+-spec save_identity(map()) -> ok.
+save_identity(Identity) ->
+    Path = identity_path(),
+    ok = filelib:ensure_dir(Path),
+    Serialized = term_to_binary(Identity),
+    {ok, EncData} = hecate_crypto:encrypt(Serialized),
+    ok = file:write_file(Path, EncData).
+
+%% @private Path to identity file.
+-spec identity_path() -> file:filename().
+identity_path() ->
+    filename:join(shared_paths:base_dir(), ?IDENTITY_FILE).
+
+%%%===================================================================
 %%% Internal functions
 %%%===================================================================
 
@@ -218,35 +233,25 @@ auto_initialize() ->
     Realm = <<"io.macula">>,
     Name = generate_name(),
     Owner = <<"anonymous">>,
-    MRI = iolist_to_binary([
-        <<"mri:agent:">>, Realm, <<"/">>, Owner, <<"/">>, Name
-    ]),
+    MRI = build_mri(Realm, Owner, Name),
     Identity = #{
-        mri => MRI,
-        realm => Realm,
-        public_key => PubKey,
-        private_key => PrivKey,
-        created_at => erlang:system_time(second)
+        mri => MRI, realm => Realm,
+        public_key => PubKey, private_key => PrivKey
     },
-    ok = hecate_store:put(?BUCKET, <<"identity">>, Identity),
-    ok = hecate_store:append_event(<<"identity">>, <<"identity_created">>, #{
-        mri => MRI,
-        realm => Realm
-    }),
+    save_identity(Identity),
     logger:info("Created identity: ~s", [MRI]),
     #state{
-        mri = MRI,
-        realm = Realm,
-        public_key = PubKey,
-        private_key = PrivKey
+        mri = MRI, realm = Realm,
+        public_key = PubKey, private_key = PrivKey
     }.
 
+build_mri(Realm, Owner, Name) ->
+    iolist_to_binary([<<"mri:agent:">>, Realm, <<"/">>, Owner, <<"/">>, Name]).
+
 generate_keypair() ->
-    {PubKey, PrivKey} = crypto:generate_key(eddsa, ed25519),
-    {PubKey, PrivKey}.
+    crypto:generate_key(eddsa, ed25519).
 
 parse_mri_owner(MRI) ->
-    %% MRI format: mri:agent:realm/owner/name
     case binary:split(MRI, <<"/">>, [global]) of
         [_, Owner, _Name] -> Owner;
         _ -> undefined
@@ -261,32 +266,23 @@ replace_mri_owner(MRI, NewOwner) ->
     end.
 
 generate_name() ->
-    %% Generate a random name like "hecate-a1b2"
     Suffix = binary:encode_hex(crypto:strong_rand_bytes(2)),
     iolist_to_binary([<<"hecate-">>, string:lowercase(Suffix)]).
 
 %% On startup, fix identities that joined a realm but still have "anonymous" owner.
-%% This handles the case where the realm was joined before the update_owner fix existed.
 maybe_fix_anonymous_owner(#state{mri = MRI} = State) when MRI =/= undefined ->
     case parse_mri_owner(MRI) of
         <<"anonymous">> ->
-            case resolve_owner_from_credentials() of
-                undefined ->
-                    State;
+            case resolve_owner_from_memberships() of
+                undefined -> State;
                 Owner ->
                     NewMRI = replace_mri_owner(MRI, Owner),
                     Identity = #{
-                        mri => NewMRI,
-                        realm => State#state.realm,
+                        mri => NewMRI, realm => State#state.realm,
                         public_key => State#state.public_key,
-                        private_key => State#state.private_key,
-                        created_at => erlang:system_time(second)
+                        private_key => State#state.private_key
                     },
-                    ok = hecate_store:put(?BUCKET, <<"identity">>, Identity),
-                    ok = hecate_store:append_event(<<"identity">>, <<"identity_owner_updated">>, #{
-                        old_mri => MRI, new_mri => NewMRI, owner => Owner,
-                        source => <<"startup_fixup">>
-                    }),
+                    save_identity(Identity),
                     logger:info("Fixed anonymous identity on startup: ~s -> ~s", [MRI, NewMRI]),
                     hecate_web_events:broadcast(identity_changed, #{mri => NewMRI}),
                     State#state{mri = NewMRI}
@@ -297,21 +293,13 @@ maybe_fix_anonymous_owner(#state{mri = MRI} = State) when MRI =/= undefined ->
 maybe_fix_anonymous_owner(State) ->
     State.
 
-%% Scan stored auth credentials for org_identity MRIs and extract the owner.
-resolve_owner_from_credentials() ->
-    Entries = hecate_store:list(<<"auth">>),
-    resolve_owner_from_entries(Entries).
-
-resolve_owner_from_entries([]) ->
-    undefined;
-resolve_owner_from_entries([{Key, Value} | Rest]) ->
-    case binary:match(Key, <<"org_identity:">>) of
-        {0, _} when is_binary(Value) ->
-            %% Value is like "mri:org:io.macula/rgfaber"
-            case binary:split(Value, <<"/">>, [global]) of
-                [_, Owner | _] when byte_size(Owner) > 0 -> Owner;
-                _ -> resolve_owner_from_entries(Rest)
-            end;
+%% Resolve owner from confirmed realm memberships (ETS projection).
+resolve_owner_from_memberships() ->
+    try project_realm_memberships_store:list_confirmed() of
+        {ok, [#{oauth_account := Acct} | _]} when is_binary(Acct), byte_size(Acct) > 0 ->
+            Acct;
         _ ->
-            resolve_owner_from_entries(Rest)
+            undefined
+    catch
+        _:_ -> undefined  %% ETS table may not exist yet during early boot
     end.

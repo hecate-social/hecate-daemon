@@ -232,16 +232,18 @@ handle_join_confirmed(Data, #state{membership_id = MembershipId} = State) ->
     OAuthAccount = resolve_oauth_account(Data),
     OAuthProvider = maps:get(oauth_provider, Data, <<"github">>),
 
-    %% Store credentials keyed by membership ID
-    store_credential(MembershipId, <<"refresh_token">>, maps:get(refresh_token, Data, undefined)),
-    store_credential(MembershipId, <<"org_identity">>, OrgIdentity),
-    store_credential(MembershipId, <<"cert_pem">>, maps:get(cert_pem, Data, undefined)),
-
     %% Update node identity owner (anonymous -> actual username)
     update_identity_owner(OAuthAccount),
 
     %% Dispatch confirm_realm_membership command
     dispatch_confirm_membership(MembershipId, OAuthAccount, OAuthProvider, State#state.realm_url),
+
+    %% Encrypt and store credentials in ReckonDB (replicated via Ra)
+    dispatch_secure_credentials(MembershipId, #{
+        refresh_token => maps:get(refresh_token, Data, undefined),
+        org_identity => OrgIdentity,
+        cert_pem => maps:get(cert_pem, Data, undefined)
+    }),
 
     hecate_web_events:broadcast(realm_join_status, #{status => joined}),
     {noreply, State#state{status = joined}}.
@@ -296,12 +298,24 @@ update_identity_owner(Owner) ->
             ok
     end.
 
--spec store_credential(binary(), binary(), binary() | undefined) -> ok.
-store_credential(_MembershipId, _Key, undefined) ->
-    ok;
-store_credential(MembershipId, Key, Value) ->
-    StorageKey = <<Key/binary, ":", MembershipId/binary>>,
-    hecate_store:put(<<"auth">>, StorageKey, Value),
+%% @private Encrypt credentials map and dispatch as event to ReckonDB.
+-spec dispatch_secure_credentials(binary(), map()) -> ok.
+dispatch_secure_credentials(MembershipId, CredsMap) ->
+    %% Remove undefined values before encrypting
+    CleanCreds = maps:filter(fun(_K, V) -> V =/= undefined end, CredsMap),
+    Serialized = term_to_binary(CleanCreds),
+    case hecate_crypto:encrypt(Serialized) of
+        {ok, Encrypted} ->
+            Cmd = secure_realm_credentials_v1:new(MembershipId, Encrypted),
+            case maybe_secure_realm_credentials:dispatch(Cmd) of
+                {ok, _Version, _Events} ->
+                    logger:info("Realm credentials secured for ~s", [MembershipId]);
+                {error, Reason} ->
+                    logger:warning("Failed to secure credentials: ~p", [Reason])
+            end;
+        {error, Reason} ->
+            logger:error("Failed to encrypt credentials: ~p", [Reason])
+    end,
     ok.
 
 -spec generate_membership_id() -> binary().

@@ -1,8 +1,8 @@
 %%%-------------------------------------------------------------------
 %%% @doc Tests for hecate_identity module.
 %%%
-%%% Since v0.11.1, hecate_identity auto-initializes on first boot.
-%%% Tests verify auto-init behavior and pre-seeded identity loading.
+%%% Identity now persists as an encrypted file, not SQLite.
+%%% Tests verify auto-init, file persistence, and crypto operations.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_identity_tests).
@@ -22,11 +22,10 @@ identity_test_() ->
             {"auto-init creates valid MRI", fun auto_init_mri/0},
             {"auto-init uses default realm", fun auto_init_realm/0},
             {"auto-init creates Ed25519 key", fun auto_init_key/0},
-            {"loads pre-seeded identity from store", fun loads_from_store/0},
+            {"persists identity to encrypted file", fun persists_to_file/0},
             {"initialize returns already_initialized", fun initialize_already_init/0},
             {"sign and verify roundtrip", fun sign_verify_roundtrip/0},
-            {"verify with wrong signature fails", fun verify_wrong_signature/0},
-            {"MRI format with custom identity", fun mri_format_custom/0}
+            {"verify with wrong signature fails", fun verify_wrong_signature/0}
         ]
     }.
 
@@ -38,19 +37,11 @@ setup() ->
     TempDir = "/tmp/hecate_identity_test_" ++ integer_to_list(erlang:unique_integer([positive])),
     ok = filelib:ensure_dir(filename:join(TempDir, "dummy")),
     application:set_env(hecate, data_dir, TempDir),
-
-    {ok, _} = application:ensure_all_started(esqlite),
-
-    %% Ensure clean state
     catch gen_server:stop(hecate_identity),
-    catch gen_server:stop(hecate_store),
+    TempDir.
 
-    {ok, StorePid} = hecate_store:start_link(),
-    {StorePid, TempDir}.
-
-cleanup({_StorePid, TempDir}) ->
+cleanup(TempDir) ->
     catch gen_server:stop(hecate_identity),
-    catch gen_server:stop(hecate_store),
     os:cmd("rm -rf " ++ TempDir),
     ok.
 
@@ -78,24 +69,20 @@ auto_init_key() ->
     {ok, PubKey} = hecate_identity:get_public_key(),
     ?assertEqual(32, byte_size(PubKey)).
 
-loads_from_store() ->
-    %% Pre-seed identity in store
-    {PubKey, PrivKey} = crypto:generate_key(eddsa, ed25519),
-    ok = hecate_store:put(<<"identity">>, <<"identity">>, #{
-        mri => <<"mri:agent:test.realm/testowner/myagent">>,
-        realm => <<"test.realm">>,
-        public_key => PubKey,
-        private_key => PrivKey,
-        created_at => erlang:system_time(second)
-    }),
-
+persists_to_file() ->
+    %% First start creates identity and writes file
     {ok, _} = hecate_identity:start_link(),
+    {ok, MRI1} = hecate_identity:get_mri(),
+    {ok, PubKey1} = hecate_identity:get_public_key(),
+    gen_server:stop(hecate_identity),
 
-    %% Should load the pre-seeded identity, not auto-generate
-    {ok, MRI} = hecate_identity:get_mri(),
-    ?assertEqual(<<"mri:agent:test.realm/testowner/myagent">>, MRI),
-    {ok, Realm} = hecate_identity:get_realm(),
-    ?assertEqual(<<"test.realm">>, Realm).
+    %% Second start loads from encrypted file
+    {ok, _} = hecate_identity:start_link(),
+    {ok, MRI2} = hecate_identity:get_mri(),
+    {ok, PubKey2} = hecate_identity:get_public_key(),
+
+    ?assertEqual(MRI1, MRI2),
+    ?assertEqual(PubKey1, PubKey2).
 
 initialize_already_init() ->
     {ok, _} = hecate_identity:start_link(),
@@ -117,37 +104,8 @@ verify_wrong_signature() ->
     Data = <<"original data">>,
     {ok, Signature} = hecate_identity:sign(Data),
 
-    %% Verify with different data should fail
     ?assertEqual(false, hecate_identity:verify(<<"different data">>, Signature)),
 
-    %% Verify with corrupted signature should fail
     <<First, Rest/binary>> = Signature,
     CorruptedSig = <<(First bxor 255), Rest/binary>>,
     ?assertEqual(false, hecate_identity:verify(Data, CorruptedSig)).
-
-mri_format_custom() ->
-    %% Pre-seed identity with custom realm/owner/name
-    {PubKey, PrivKey} = crypto:generate_key(eddsa, ed25519),
-    ok = hecate_store:put(<<"identity">>, <<"identity">>, #{
-        mri => <<"mri:agent:test.realm/owner/agent">>,
-        realm => <<"test.realm">>,
-        public_key => PubKey,
-        private_key => PrivKey,
-        created_at => erlang:system_time(second)
-    }),
-
-    {ok, _} = hecate_identity:start_link(),
-
-    {ok, MRI} = hecate_identity:get_mri(),
-
-    %% Parse MRI format: mri:agent:realm/owner/name
-    ?assertMatch(<<"mri:agent:", _/binary>>, MRI),
-
-    <<"mri:agent:", MriRest/binary>> = MRI,
-    Parts = binary:split(MriRest, <<"/">>, [global]),
-    ?assertEqual(3, length(Parts)),
-
-    [Realm, Owner, Name] = Parts,
-    ?assertEqual(<<"test.realm">>, Realm),
-    ?assertEqual(<<"owner">>, Owner),
-    ?assertEqual(<<"agent">>, Name).

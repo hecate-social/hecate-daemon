@@ -44,7 +44,10 @@ await_projections() ->
     spawn(fun() ->
         Deadline = erlang:monotonic_time(millisecond) + ?TIMEOUT_MS,
         wait_loop(Deadline),
-        logger:info("[readiness] Projections caught up — initiating mesh proof"),
+        logger:info("[readiness] Projections caught up"),
+        %% Self-provision if headless node with replicated membership
+        hecate_cluster_provision:maybe_provision(),
+        logger:info("[readiness] Initiating mesh proof"),
         mesh_proof_coordinator:run_probes()
         %% Coordinator owns the transition to running
     end).

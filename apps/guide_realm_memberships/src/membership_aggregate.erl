@@ -59,6 +59,16 @@ do_execute(confirm_realm_membership, State, Payload) ->
             end
     end;
 
+do_execute(secure_realm_credentials, State, Payload) ->
+    case State#membership_state.status band ?MEMBERSHIP_CONFIRMED of
+        0 -> {error, not_confirmed};
+        _ ->
+            case State#membership_state.status band ?CREDENTIALS_SECURED of
+                0 -> maybe_secure_realm_credentials:handle_from_map(Payload);
+                _ -> {error, credentials_already_secured}
+            end
+    end;
+
 do_execute(revoke_realm_membership, State, Payload) ->
     case State#membership_state.status band ?MEMBERSHIP_CONFIRMED of
         0 -> {error, not_confirmed};

@@ -2,6 +2,7 @@
 %%% @doc UCAN capability wallet.
 %%%
 %%% Manages capability tokens for authorization.
+%%% In-memory only — capabilities are ephemeral and re-granted on restart.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_ucan).
@@ -20,7 +21,6 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(SERVER, ?MODULE).
--define(BUCKET, <<"ucan">>).
 
 -record(state, {
     capabilities :: map()
@@ -55,13 +55,11 @@ verify(Token) ->
 %%%===================================================================
 
 init([]) ->
-    Caps = maps:from_list(hecate_store:list(?BUCKET)),
-    {ok, #state{capabilities = Caps}}.
+    {ok, #state{capabilities = #{}}}.
 
 handle_call({grant, To, Can, Resource}, _From, #state{capabilities = Caps} = State) ->
     Id = generate_id(),
-    
-    %% Build UCAN structure
+
     {ok, Issuer} = hecate_identity:get_mri(),
     Cap = #{
         id => Id,
@@ -71,27 +69,21 @@ handle_call({grant, To, Can, Resource}, _From, #state{capabilities = Caps} = Sta
             with => Resource,
             can => Can
         }],
-        exp => erlang:system_time(second) + (7 * 24 * 3600), %% 7 days
+        exp => erlang:system_time(second) + (7 * 24 * 3600),
         granted_at => erlang:system_time(second)
     },
-    
-    %% Sign it
+
     CapBin = json:encode(Cap),
     {ok, Signature} = hecate_identity:sign(CapBin),
     SignedCap = Cap#{signature => base64:encode(Signature)},
-    
-    ok = hecate_store:put(?BUCKET, Id, SignedCap),
-    ok = hecate_store:append_event(<<"ucan">>, <<"capability_granted">>, SignedCap),
-    
+
     logger:info("Granted capability ~s to ~s: ~s on ~s", [Id, To, Can, Resource]),
-    
+
     {reply, {ok, Id}, State#state{capabilities = maps:put(Id, SignedCap, Caps)}};
 
 handle_call({revoke, Id}, _From, #state{capabilities = Caps} = State) ->
     case maps:is_key(Id, Caps) of
         true ->
-            ok = hecate_store:delete(?BUCKET, Id),
-            ok = hecate_store:append_event(<<"ucan">>, <<"capability_revoked">>, #{id => Id}),
             logger:info("Revoked capability: ~s", [Id]),
             {reply, ok, State#state{capabilities = maps:remove(Id, Caps)}};
         false ->
@@ -102,7 +94,6 @@ handle_call(list, _From, #state{capabilities = Caps} = State) ->
     {reply, maps:values(Caps), State};
 
 handle_call({verify, _Token}, _From, State) ->
-    %% TODO: Implement UCAN verification
     {reply, {error, not_implemented}, State}.
 
 handle_cast(_Msg, State) ->

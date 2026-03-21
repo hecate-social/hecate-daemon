@@ -11,6 +11,7 @@
 
 -export([start_link/0]).
 -export([get/1, list_confirmed/0, list_all/0]).
+-export([get_credentials/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(TABLE, realm_memberships).
@@ -45,12 +46,27 @@ list_all() ->
     All = ets:tab2list(?TABLE),
     {ok, [E || {_Key, E} <- All]}.
 
+%% @doc Get decrypted credentials for a membership.
+%% Returns the plaintext credentials map or not_found.
+-spec get_credentials(binary()) -> {ok, map()} | {error, not_found | term()}.
+get_credentials(MembershipId) ->
+    case ets:lookup(realm_credentials, MembershipId) of
+        [{_, #{encrypted_credentials := EncCreds}}] ->
+            case hecate_crypto:decrypt(EncCreds) of
+                {ok, Serialized} -> {ok, binary_to_term(Serialized)};
+                {error, _} = Err -> Err
+            end;
+        [] ->
+            {error, not_found}
+    end.
+
 %%====================================================================
 %% gen_server (owns the ETS table)
 %%====================================================================
 
 init([]) ->
     ?TABLE = ets:new(?TABLE, [set, public, named_table, {read_concurrency, true}]),
+    realm_credentials = ets:new(realm_credentials, [set, public, named_table, {read_concurrency, true}]),
     {ok, #{}}.
 
 handle_call(_Request, _From, State) ->

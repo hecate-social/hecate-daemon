@@ -23,9 +23,11 @@ new(_AggregateId) ->
         realm_url = undefined,
         oauth_account = undefined,
         oauth_provider = undefined,
+        encrypted_credentials = undefined,
         initiated_at = undefined,
         confirmed_at = undefined,
         revoked_at = undefined,
+        secured_at = undefined,
         status = 0
     }.
 
@@ -40,15 +42,17 @@ apply_event(State, _) ->
 -spec to_map(state()) -> map().
 to_map(#membership_state{} = S) ->
     #{
-        membership_id  => S#membership_state.membership_id,
-        realm_id       => S#membership_state.realm_id,
-        realm_url      => S#membership_state.realm_url,
-        oauth_account  => S#membership_state.oauth_account,
-        oauth_provider => S#membership_state.oauth_provider,
-        initiated_at   => S#membership_state.initiated_at,
-        confirmed_at   => S#membership_state.confirmed_at,
-        revoked_at     => S#membership_state.revoked_at,
-        status         => S#membership_state.status
+        membership_id         => S#membership_state.membership_id,
+        realm_id              => S#membership_state.realm_id,
+        realm_url             => S#membership_state.realm_url,
+        oauth_account         => S#membership_state.oauth_account,
+        oauth_provider        => S#membership_state.oauth_provider,
+        encrypted_credentials => S#membership_state.encrypted_credentials,
+        initiated_at          => S#membership_state.initiated_at,
+        confirmed_at          => S#membership_state.confirmed_at,
+        revoked_at            => S#membership_state.revoked_at,
+        secured_at            => S#membership_state.secured_at,
+        status                => S#membership_state.status
     }.
 
 %% ===================================================================
@@ -70,6 +74,13 @@ do_apply(<<"realm_membership_confirmed_v1">>, State, Event) ->
         oauth_provider = get_field(<<"oauth_provider">>, oauth_provider, Event),
         confirmed_at = get_field(<<"confirmed_at">>, confirmed_at, Event),
         status = State#membership_state.status bor ?MEMBERSHIP_CONFIRMED
+    };
+
+do_apply(<<"realm_credentials_secured_v1">>, State, Event) ->
+    State#membership_state{
+        encrypted_credentials = get_field(<<"encrypted_credentials">>, encrypted_credentials, Event),
+        secured_at = get_field(<<"secured_at">>, secured_at, Event),
+        status = State#membership_state.status bor ?CREDENTIALS_SECURED
     };
 
 do_apply(<<"realm_membership_revoked_v1">>, State, Event) ->
