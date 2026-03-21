@@ -17,6 +17,9 @@ init(Req0, State) ->
 
 handle_get(Req0, _State) ->
     PidBin = cowboy_req:binding(pid, Req0),
+    QS = cowboy_req:parse_qs(Req0),
+    IncludeBin = proplists:get_value(<<"include">>, QS, <<>>),
+    Includes = binary:split(IncludeBin, <<",">>, [global]),
     case parse_pid(PidBin) of
         {ok, Pid} ->
             InfoFields = [registered_name, initial_call, current_function,
@@ -28,7 +31,11 @@ handle_get(Req0, _State) ->
                 undefined ->
                     hecate_api_utils:not_found(Req0);
                 Info ->
-                    hecate_api_utils:json_ok(format_detail(Pid, Info), Req0)
+                    Base = format_detail(Pid, Info),
+                    WithState = maybe_include_state(Pid, Includes, Base),
+                    WithMessages = maybe_include_messages(Pid, Includes, WithState),
+                    WithStatus = maybe_include_sys_status(Pid, Includes, WithMessages),
+                    hecate_api_utils:json_ok(WithStatus, Req0)
             end;
         error ->
             hecate_api_utils:bad_request(<<"Invalid pid format. Expected: 0.123.0">>, Req0)
@@ -115,3 +122,137 @@ format_stack_entry(Other) ->
 
 format_term(Term) ->
     iolist_to_binary(io_lib:format("~P", [Term, 20])).
+
+%% --- Optional includes: state, messages, sys status ---
+
+maybe_include_state(Pid, Includes, Acc) ->
+    case lists:member(<<"state">>, Includes) of
+        false -> Acc;
+        true ->
+            try
+                State = sys:get_state(Pid, 3000),
+                Acc#{
+                    gen_state => format_state(State),
+                    gen_type => detect_gen_type(Pid)
+                }
+            catch
+                _:_ -> Acc#{gen_state => null, gen_type => null}
+            end
+    end.
+
+maybe_include_messages(Pid, Includes, Acc) ->
+    case lists:member(<<"messages">>, Includes) of
+        false -> Acc;
+        true ->
+            case erlang:process_info(Pid, messages) of
+                {messages, Msgs} ->
+                    %% Cap at 50 messages to avoid memory explosion
+                    Capped = lists:sublist(Msgs, 50),
+                    Formatted = [format_message(M) || M <- Capped],
+                    Acc#{
+                        messages => Formatted,
+                        messages_count => length(Msgs),
+                        messages_truncated => length(Msgs) > 50
+                    };
+                _ ->
+                    Acc#{messages => [], messages_count => 0, messages_truncated => false}
+            end
+    end.
+
+maybe_include_sys_status(Pid, Includes, Acc) ->
+    case lists:member(<<"status">>, Includes) of
+        false -> Acc;
+        true ->
+            try
+                {status, _Pid, {module, Mod}, StatusItems} = sys:get_status(Pid, 3000),
+                Acc#{
+                    sys_module => atom_to_binary(Mod),
+                    sys_status => format_sys_status(StatusItems)
+                }
+            catch
+                _:_ -> Acc#{sys_module => null, sys_status => null}
+            end
+    end.
+
+detect_gen_type(Pid) ->
+    case erlang:process_info(Pid, dictionary) of
+        {dictionary, Dict} ->
+            case proplists:get_value('$initial_call', Dict) of
+                {gen_server, _, _} -> <<"gen_server">>;
+                {gen_statem, _, _} -> <<"gen_statem">>;
+                {gen_event, _, _} -> <<"gen_event">>;
+                {supervisor, _, _} -> <<"supervisor">>;
+                _ ->
+                    %% Check for gen_agent or other custom behaviours
+                    case proplists:get_value('$ancestors', Dict) of
+                        undefined -> null;
+                        _ ->
+                            InitCall = proplists:get_value('$initial_call', Dict),
+                            case InitCall of
+                                {M, _, _} ->
+                                    ModBin = atom_to_binary(M),
+                                    case binary:match(ModBin, <<"gen_agent">>) of
+                                        nomatch -> <<"gen_server">>; %% default OTP guess
+                                        _ -> <<"gen_agent">>
+                                    end;
+                                _ -> null
+                            end
+                    end
+            end;
+        _ -> null
+    end.
+
+format_state(State) when is_map(State) ->
+    try
+        json:encode(State),
+        State
+    catch
+        _:_ -> #{formatted => format_term(State)}
+    end;
+format_state(State) when is_list(State) ->
+    try
+        json:encode(State),
+        State
+    catch
+        _:_ -> #{formatted => format_term(State)}
+    end;
+format_state(State) when is_tuple(State) ->
+    #{formatted => format_term(State), tuple_size => tuple_size(State)};
+format_state(State) when is_atom(State) ->
+    #{formatted => atom_to_binary(State)};
+format_state(State) when is_binary(State) ->
+    #{formatted => State};
+format_state(State) ->
+    #{formatted => format_term(State)}.
+
+format_message(Msg) when is_map(Msg) ->
+    try
+        json:encode(Msg),
+        #{type => <<"map">>, data => Msg}
+    catch
+        _:_ -> #{type => <<"term">>, data => format_term(Msg)}
+    end;
+format_message(Msg) when is_tuple(Msg) ->
+    Tag = case Msg of
+        {T, _} when is_atom(T) -> atom_to_binary(T);
+        {T, _, _} when is_atom(T) -> atom_to_binary(T);
+        {'$gen_call', _, _} -> <<"$gen_call">>;
+        {'$gen_cast', _} -> <<"$gen_cast">>;
+        _ -> <<"tuple">>
+    end,
+    #{type => Tag, data => format_term(Msg)};
+format_message(Msg) ->
+    #{type => <<"term">>, data => format_term(Msg)}.
+
+format_sys_status(StatusItems) ->
+    lists:map(fun
+        (Bin) when is_binary(Bin) -> Bin;
+        (Atom) when is_atom(Atom) -> atom_to_binary(Atom);
+        (List) when is_list(List) ->
+            try
+                iolist_to_binary(List)
+            catch _:_ ->
+                format_term(List)
+            end;
+        (Other) -> format_term(Other)
+    end, StatusItems).

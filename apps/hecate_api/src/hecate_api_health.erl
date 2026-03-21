@@ -25,7 +25,8 @@ init(Req0, State) ->
         end
     },
     Response1 = maybe_add_boot_status(DaemonState, Response0),
-    Response = maybe_add_plugin_health(DaemonState, Response1),
+    Response2 = maybe_add_mesh_proof(Response1),
+    Response = maybe_add_plugin_health(DaemonState, Response2),
     Body = json:encode(Response),
     Req = cowboy_req:reply(200, #{
         <<"content-type">> => <<"application/json">>
@@ -44,6 +45,21 @@ maybe_add_boot_status(_NotRunning, Response) ->
                        elapsed_ms => 0}
                  end,
     Response#{boot => BootStatus}.
+
+maybe_add_mesh_proof(Response) ->
+    try mesh_proof_coordinator:get_proof_results() of
+        #{proof_status := Status, probes := Probes} ->
+            Passed = maps:size(maps:filter(
+                fun(_, #{status := S}) -> S =:= passed end, Probes)),
+            Response#{mesh_proof => #{
+                status => Status,
+                passed => Passed,
+                total => maps:size(Probes)
+            }};
+        _ ->
+            Response
+    catch _:_ -> Response
+    end.
 
 maybe_add_plugin_health(running, Response) ->
     Plugins = try hecate_plugin_loader:loaded_plugins()

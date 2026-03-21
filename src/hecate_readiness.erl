@@ -44,9 +44,9 @@ await_projections() ->
     spawn(fun() ->
         Deadline = erlang:monotonic_time(millisecond) + ?TIMEOUT_MS,
         wait_loop(Deadline),
-        hecate_lifecycle:set_state(running),
-        hecate_boot_tracker:set_running(),
-        logger:info("[readiness] Projections caught up — daemon ready")
+        logger:info("[readiness] Projections caught up — initiating mesh proof"),
+        mesh_proof_coordinator:run_probes()
+        %% Coordinator owns the transition to running
     end).
 
 %%--------------------------------------------------------------------

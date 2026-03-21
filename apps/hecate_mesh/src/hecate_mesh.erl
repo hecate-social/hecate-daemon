@@ -7,7 +7,10 @@
     get_client/0,
     get_status/0,
     is_connected/0,
-    discover_subscribers/1
+    discover_subscribers/1,
+    get_peers/0,
+    get_proof_results/0,
+    rerun_proof/0
 ]).
 
 -spec publish(binary(), map()) -> ok | {error, term()}.
@@ -40,3 +43,20 @@ is_connected() ->
 -spec discover_subscribers(binary()) -> {ok, list()} | {error, term()}.
 discover_subscribers(Topic) ->
     hecate_mesh_client:discover_subscribers(Topic).
+
+-spec get_peers() -> {ok, list()}.
+get_peers() ->
+    case hecate_mesh_client:get_client() of
+        {ok, Client} when is_pid(Client) ->
+            macula:get_known_peers(Client);
+        _ ->
+            {ok, []}
+    end.
+
+-spec get_proof_results() -> map().
+get_proof_results() ->
+    mesh_proof_coordinator:get_proof_results().
+
+-spec rerun_proof() -> ok.
+rerun_proof() ->
+    mesh_proof_coordinator:rerun_probes().

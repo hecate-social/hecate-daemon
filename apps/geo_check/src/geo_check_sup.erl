@@ -9,7 +9,7 @@
 
 %% Suppress dialyzer warnings for locus calls (may not be in PLT)
 -dialyzer({nowarn_function, [init/1, start_locus_loaders/1, start_locus_loader/2,
-                             start_locus_from_file/2]}).
+                             start_locus_from_file/3, cache_path/1]}).
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
@@ -57,22 +57,28 @@ start_locus_loaders([{LoaderId, Source} | Rest]) ->
 
 %% @private Start a single locus loader
 start_locus_loader(LoaderId, {maxmind, DbName}) ->
+    CacheFile = cache_path(DbName),
     case os:getenv("MAXMIND_LICENSE_KEY") of
         false ->
             logger:warning("[geo_check] MAXMIND_LICENSE_KEY not set - trying local file for ~s", [LoaderId]),
-            start_locus_from_file(LoaderId, DbName);
+            start_locus_from_file(LoaderId, DbName, CacheFile);
         LicenseKey ->
             application:set_env(locus, license_key, LicenseKey),
-            locus:start_loader(LoaderId, {maxmind, DbName})
+            ok = filelib:ensure_dir(CacheFile),
+            logger:info("[geo_check] Starting ~s with cache: ~s", [LoaderId, CacheFile]),
+            locus:start_loader(LoaderId, {maxmind, DbName}, #{
+                database_cache_file => CacheFile
+            })
     end;
 start_locus_loader(LoaderId, {url, Url}) ->
     locus:start_loader(LoaderId, Url);
 start_locus_loader(LoaderId, {file, Path}) ->
-    locus:start_loader(LoaderId, {filesystem, Path}).
+    locus:start_loader(LoaderId, Path).
 
 %% @private Try to load from local file if MaxMind key not available
-start_locus_from_file(LoaderId, DbName) ->
+start_locus_from_file(LoaderId, DbName, CacheFile) ->
     LocalPaths = [
+        CacheFile,
         "priv/" ++ DbName ++ ".mmdb",
         "/usr/share/GeoIP/" ++ DbName ++ ".mmdb",
         "/var/lib/GeoIP/" ++ DbName ++ ".mmdb"
@@ -80,11 +86,23 @@ start_locus_from_file(LoaderId, DbName) ->
     case find_existing_file(LocalPaths) of
         {ok, Path} ->
             logger:info("[geo_check] Loading ~s from ~s", [LoaderId, Path]),
-            locus:start_loader(LoaderId, {filesystem, Path});
+            locus:start_loader(LoaderId, Path);
         not_found ->
             logger:warning("[geo_check] No ~s database found", [DbName]),
             {error, no_database}
     end.
+
+%% @private Resolve cache directory: $MAXMIND_HOME (default ~/.maxmind)
+cache_path(DbName) ->
+    Home = case os:getenv("MAXMIND_HOME") of
+        false ->
+            case os:getenv("HOME") of
+                false -> "/tmp";
+                H -> H
+            end ++ "/.maxmind";
+        Dir -> Dir
+    end,
+    Home ++ "/" ++ DbName ++ ".mmdb".
 
 %% @private Find first existing file in list
 find_existing_file([]) ->

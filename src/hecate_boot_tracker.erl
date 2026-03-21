@@ -9,7 +9,7 @@
 -module(hecate_boot_tracker).
 -behaviour(gen_server).
 
--export([start_link/1, get_status/0, set_running/0]).
+-export([start_link/1, get_status/0, set_running/0, set_phase/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 -define(SERVER, ?MODULE).
@@ -19,7 +19,7 @@
 -record(state, {
     expected_stores :: [atom()],
     ready_stores :: #{atom() => integer()},
-    boot_phase :: booting_stores | starting_subscriptions | replaying | running,
+    boot_phase :: booting_stores | starting_subscriptions | replaying | probing_mesh | running,
     start_time :: integer(),
     post_boot_triggered :: boolean()
 }).
@@ -39,6 +39,10 @@ get_status() ->
 -spec set_running() -> ok.
 set_running() ->
     gen_server:cast(?SERVER, set_running).
+
+-spec set_phase(atom()) -> ok.
+set_phase(Phase) ->
+    gen_server:cast(?SERVER, {set_phase, Phase}).
 
 %%====================================================================
 %% gen_server callbacks

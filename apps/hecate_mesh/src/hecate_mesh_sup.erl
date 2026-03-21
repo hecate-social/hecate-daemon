@@ -22,6 +22,15 @@ init([]) ->
             shutdown => 5000,
             type => worker,
             modules => [hecate_mesh_client]
+        },
+        %% Mesh proof coordinator — orchestrates proof-of-participation ceremony
+        #{
+            id => mesh_proof_coordinator_sup,
+            start => {mesh_proof_coordinator_sup, start_link, []},
+            restart => permanent,
+            shutdown => 5000,
+            type => supervisor,
+            modules => [mesh_proof_coordinator_sup]
         }
         %% NOTE: Emitters are supervised by their respective domain supervisors
         %% (vertical slicing), not here (that would be horizontal).
