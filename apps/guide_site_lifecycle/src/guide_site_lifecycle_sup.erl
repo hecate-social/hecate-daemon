@@ -11,5 +11,10 @@ start_link() ->
 
 init([]) ->
     SupFlags = #{strategy => one_for_one, intensity => 10, period => 10},
-    Children = [],
+    Children = [
+        #{id => join_code_server,
+          start => {join_code_server, start_link, []},
+          restart => permanent,
+          type => worker}
+    ],
     {ok, {SupFlags, Children}}.

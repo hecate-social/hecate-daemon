@@ -18,6 +18,8 @@ init(Req0, State) ->
         ready => DaemonState =:= running,
         service => <<"hecate">>,
         version => app_version(),
+        node_name => atom_to_binary(node()),
+        site_id => guide_site_lifecycle_app:site_id(),
         uptime_seconds => element(1, erlang:statistics(wall_clock)) div 1000,
         identity => case hecate_identity:is_initialized() of
             true -> <<"initialized">>;

@@ -1,0 +1,9 @@
+{application, discover_lan, [
+    {description, "LAN node discovery — finds machines and hecate instances on the local network"},
+    {vsn, "0.1.0"},
+    {registered, [lan_scanner]},
+    {mod, {discover_lan_app, []}},
+    {applications, [kernel, stdlib, shared]},
+    {modules, []},
+    {licenses, ["Apache-2.0"]}
+]}.

@@ -17,6 +17,7 @@
     guide_settings_lifecycle, query_settings,
     guide_realm_memberships, query_realm_memberships,
     guide_site_lifecycle, query_site,
+    discover_lan,
     serve_llm,
     guide_license_offering_lifecycle, project_license_offerings, query_license_offerings,
     guide_license_lifecycle, project_licenses, query_licenses,
