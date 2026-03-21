@@ -3,9 +3,6 @@
 %%% Subscribes to {realm}.hecate.site.node_joined on the Macula mesh.
 %%% When a remote node announces itself with the same site_id,
 %%% dispatches admit_node_v1 to add it to our local site aggregate.
-%%%
-%%% This is the mechanism that makes headless nodes appear in
-%%% the Site page after provisioning — no polling, no HTTP probing.
 %%% @end
 -module(on_site_node_announced_admit_node).
 -behaviour(gen_server).
@@ -23,19 +20,20 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    %% Subscribe after a delay — mesh may not be connected yet
     erlang:send_after(?RETRY_INTERVAL, self(), subscribe),
     {ok, #state{sub_ref = undefined}}.
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
 handle_info(subscribe, #state{sub_ref = undefined} = State) ->
     Realm = application:get_env(hecate, realm, <<"io.macula">>),
     Topic = <<Realm/binary, ".hecate.site.node_joined">>,
-    case hecate_mesh:subscribe(Topic, fun(Fact) ->
-        gen_server:cast(?MODULE, {node_announced, Fact})
-    end) of
+    %% Pass self() — hecate_mesh_client sends {mesh_fact, Topic, Data} to pid
+    case hecate_mesh:subscribe(Topic, self()) of
         {ok, Ref} ->
             logger:info("[site-pm] Subscribed to ~s", [Topic]),
             {noreply, State#state{sub_ref = Ref}};
@@ -47,13 +45,13 @@ handle_info(subscribe, #state{sub_ref = undefined} = State) ->
 handle_info(subscribe, State) ->
     {noreply, State};
 
+handle_info({mesh_fact, _Topic, EventData}, State) ->
+    Payload = maps:get(payload, EventData, maps:get(<<"payload">>, EventData, EventData)),
+    handle_fact(Payload),
+    {noreply, State};
+
 handle_info(_Info, State) ->
     {noreply, State}.
-
-handle_cast({node_announced, Fact}, State) ->
-    handle_fact(Fact),
-    {noreply, State}.
-
 
 terminate(_Reason, #state{sub_ref = Ref}) when Ref =/= undefined ->
     hecate_mesh:unsubscribe(Ref);
@@ -78,7 +76,7 @@ handle_fact_fields(RemoteSiteId, RemoteNodeName) ->
         {false, _} ->
             logger:debug("[site-pm] Ignoring node from different site: ~s", [RemoteSiteId]);
         {true, true} ->
-            ok; %% that's us
+            ok;
         {true, false} ->
             admit_remote_node(OurSiteId, RemoteNodeName)
     end.
