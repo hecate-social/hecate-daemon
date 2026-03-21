@@ -15,6 +15,10 @@ init([]) ->
         #{id => join_code_server,
           start => {join_code_server, start_link, []},
           restart => permanent,
+          type => worker},
+        #{id => on_site_node_announced_admit_node,
+          start => {on_site_node_announced_admit_node, start_link, []},
+          restart => permanent,
           type => worker}
     ],
     {ok, {SupFlags, Children}}.

@@ -48,7 +48,8 @@ auto_initiate_site() ->
             {error, Reason} ->
                 logger:warning("[site] Failed to auto-initiate site: ~p", [Reason])
         end,
-        auto_admit_self(SiteId)
+        auto_admit_self(SiteId),
+        announce_to_mesh()
     end).
 
 %% @doc Auto-admit this node into the site.
@@ -64,6 +65,11 @@ auto_admit_self(SiteId) ->
         {error, Reason} ->
             logger:warning("[site] Failed to auto-admit node: ~p", [Reason])
     end.
+
+%% @doc Announce this node to the mesh (with delay for mesh to connect).
+announce_to_mesh() ->
+    timer:sleep(10_000),
+    announce_site_node:announce().
 
 %% @doc Wait for a ReckonDB store to be ready (store manager process registered).
 wait_for_store(StoreId, MaxRetries) ->

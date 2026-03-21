@@ -135,32 +135,35 @@ build_token(DisplayCode, ExpiresAt) ->
     Cookie = atom_to_binary(erlang:get_cookie()),
     SiteId = guide_site_lifecycle_app:site_id(),
     NodeName = atom_to_binary(node()),
-    Realm = application:get_env(hecate, realm, <<"io.macula">>),
-    Bootstrap = application:get_env(hecate, mesh_bootstrap, <<"https://boot.macula.io:443">>),
+    Realm = to_binary(application:get_env(hecate, realm, <<"io.macula">>)),
+    Bootstrap = to_binary(application:get_env(hecate, mesh_bootstrap, <<"https://boot.macula.io:443">>)),
 
-    %% Extract hostname from node name for peers
     AdminHost = case binary:split(NodeName, <<"@">>) of
         [_, Host] -> Host;
         _ -> <<"localhost">>
     end,
 
-    Payload = json:encode(#{
-        cookie => Cookie,
-        site_id => SiteId,
-        admin_node => NodeName,
-        admin_host => AdminHost,
-        realm => Realm,
-        bootstrap => Bootstrap,
-        display_code => DisplayCode,
-        expires_at => ExpiresAt
-    }),
+    PayloadMap = #{
+        <<"cookie">> => Cookie,
+        <<"site_id">> => SiteId,
+        <<"admin_node">> => NodeName,
+        <<"admin_host">> => AdminHost,
+        <<"realm">> => Realm,
+        <<"bootstrap">> => Bootstrap,
+        <<"display_code">> => DisplayCode,
+        <<"expires_at">> => ExpiresAt
+    },
+    Payload = iolist_to_binary(json:encode(PayloadMap)),
 
     Signature = crypto:mac(hmac, sha256, Cookie, Payload),
     SignatureHex = binary:encode_hex(Signature),
 
-    %% Token = base64(payload.signature)
     Combined = <<Payload/binary, ".", SignatureHex/binary>>,
     base64:encode(Combined).
+
+to_binary(V) when is_binary(V) -> V;
+to_binary(V) when is_list(V) -> list_to_binary(V);
+to_binary(V) when is_atom(V) -> atom_to_binary(V).
 
 %%%===================================================================
 %%% Token decoding (static — no server call needed)
