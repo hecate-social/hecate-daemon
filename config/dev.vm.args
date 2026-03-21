@@ -1,8 +1,8 @@
-## Dev node — clusters with beam00.lab, beam01.lab (Site A)
+## Dev node — Site A (clusters with beam00, beam01)
 -name hecate_dev@host00.lab
 
-## Shared cookie with Site A beam nodes
--setcookie 9ExkyysakEt8gR0SMQvI
+## Site A cookie (shared with beam00, beam01, host00)
+-setcookie ZMFTAHTHAYKXRVMPPQIZ
 
 ## No heartbeat in dev (don't auto-restart on crash)
 ## -heart

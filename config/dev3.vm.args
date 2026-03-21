@@ -1,0 +1,8 @@
+## Dev node 3 — Site A (clusters with hecate_dev on host00.lab)
+-name hecate_dev3@host00.lab
+-setcookie ZMFTAHTHAYKXRVMPPQIZ
+-mode interactive
+-smp auto
++A 16
++P 262144
++Q 16384

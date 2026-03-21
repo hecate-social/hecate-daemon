@@ -43,6 +43,13 @@
     {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"}
 ]).
 
+%% Site store — will run in cluster mode once multi-node is verified.
+%% For now, single mode to unblock development.
+%% TODO: Switch to cluster mode when beam nodes are provisioned.
+-define(SITE_STORES, [
+    {site_store, "site", "Site (realm membership, cluster nodes)"}
+]).
+
 %%--------------------------------------------------------------------
 %% @doc Start the Hecate application.
 %% @end
@@ -117,7 +124,8 @@ start_evoq() ->
 %% @private Start supervisor FIRST (so boot_tracker's telemetry handler is
 %% registered), then spawn store processes fire-and-forget.
 start_supervisor_then_stores() ->
-    StoreIds = [Id || {Id, _, _} <- ?STORES],
+    AllStores = ?STORES ++ ?SITE_STORES,
+    StoreIds = [Id || {Id, _, _} <- AllStores],
     logger:info("Starting Hecate supervisor..."),
     case hecate_sup:start_link(StoreIds) of
         {ok, SupPid} ->
@@ -125,10 +133,10 @@ start_supervisor_then_stores() ->
             hecate_plugin_metrics:init(<<"hecate">>),
             lists:foreach(fun({StoreId, _, _}) ->
                 hecate_plugin_telemetry:attach(<<"hecate">>, StoreId)
-            end, ?STORES),
+            end, AllStores),
 
             %% Supervisor (and boot_tracker) are up — safe to spawn stores
-            spawn_stores(?STORES),
+            spawn_stores(?STORES ++ ?SITE_STORES),
             {ok, SupPid};
         {error, _} = Error ->
             Error
@@ -156,6 +164,7 @@ spawn_stores(Stores) ->
             start_store(Config)
         end)
     end, Stores).
+
 
 %% @private Start a single ReckonDB store, handling already_started.
 start_store(#store_config{store_id = StoreId} = Config) ->

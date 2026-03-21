@@ -46,6 +46,9 @@ WORKDIR /app
 # Copy release from builder
 COPY --from=builder /build/_build/prod/rel/hecate ./
 
+# Copy entrypoint (generates vm.args from env vars)
+COPY docker/entrypoint.sh /app/entrypoint.sh
+
 # Create data directory
 RUN mkdir -p /data
 
@@ -62,6 +65,6 @@ EXPOSE 4444
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget -q --spider http://localhost:4444/health || exit 1
 
-# Run
-ENTRYPOINT ["/app/bin/hecate"]
+# Run — entrypoint generates vm.args from HECATE_NODE_NAME / HECATE_ERLANG_COOKIE
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["foreground"]

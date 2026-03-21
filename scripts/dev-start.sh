@@ -58,9 +58,9 @@ fi
 rm -f "$HECATE_SOCKET_PATH"
 
 # Kill stale BEAM/epmd holding the dev node name
-if pgrep -f 'sname hecate_dev' > /dev/null 2>&1; then
+if pgrep -f 'name hecate_dev' > /dev/null 2>&1; then
     echo "Killing stale hecate_dev BEAM process..."
-    pkill -f 'sname hecate_dev' || true
+    pkill -f 'name hecate_dev' || true
     sleep 2
 fi
 
@@ -74,13 +74,14 @@ MODE="${1:-foreground}"
 export RELX_CONFIG_PATH="$PROJECT_DIR/config/dev.sys.config"
 export VMARGS_PATH="$PROJECT_DIR/config/dev.vm.args"
 
-NODE_HOST="$(cat /etc/hostname 2>/dev/null || uname -n)"
-
 echo ""
 echo "=== Hecate Dev ==="
 echo "  Data:   ~/.hecate-dev/hecate-daemon/"
 echo "  Socket: ~/.hecate-dev/hecate-daemon/sockets/api.sock"
-echo "  Node:   hecate_dev@${NODE_HOST}"
+echo "  VMARGS: $VMARGS_PATH"
+echo "  SYSCONFIG: $RELX_CONFIG_PATH"
+echo "  Contents:"
+head -2 "$VMARGS_PATH"
 echo ""
 
 exec _build/default/rel/hecate/bin/hecate "$MODE"

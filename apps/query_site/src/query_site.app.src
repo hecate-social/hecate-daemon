@@ -1,0 +1,15 @@
+{application, query_site, [
+    {description, "QRY service for site: site info, nodes, and realm read endpoints"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_site_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        project_site
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.
