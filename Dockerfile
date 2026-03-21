@@ -17,14 +17,20 @@ RUN apk add --no-cache \
 RUN curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 && \
     chmod +x /usr/local/bin/rebar3
 
-# Copy source
+# Copy dependency config first (cacheable layer)
 COPY rebar.config rebar.lock ./
+
+# Fetch dependencies (cached until rebar.config/lock changes)
+RUN rebar3 get-deps
+
+# Copy source (busts cache when code changes)
 COPY config/ config/
 COPY src/ src/
 COPY apps/ apps/
+COPY docker/ docker/
 
-# Fetch dependencies and compile
-RUN rebar3 get-deps && rebar3 compile
+# Compile
+RUN rebar3 compile
 
 # Build release
 RUN rebar3 as prod release
