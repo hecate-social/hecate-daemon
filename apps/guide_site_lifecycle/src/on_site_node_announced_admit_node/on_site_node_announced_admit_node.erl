@@ -82,12 +82,21 @@ handle_fact_fields(RemoteSiteId, RemoteNodeName) ->
     end.
 
 admit_remote_node(SiteId, NodeName) ->
+    admit_with_retry(SiteId, NodeName, 3).
+
+admit_with_retry(_SiteId, NodeName, 0) ->
+    logger:warning("[site-pm] Giving up admitting ~s after retries", [NodeName]);
+admit_with_retry(SiteId, NodeName, Retries) ->
     Cmd = admit_node_v1:new(NodeName, erlang:system_time(millisecond)),
     case maybe_admit_node:dispatch(SiteId, Cmd) of
         {ok, _V, _Events} ->
             logger:info("[site-pm] Admitted remote node via mesh: ~s", [NodeName]);
         {error, node_already_admitted} ->
             ok;
+        {error, {wrong_expected_version, _}} ->
+            logger:info("[site-pm] Version conflict admitting ~s, retrying...", [NodeName]),
+            timer:sleep(500),
+            admit_with_retry(SiteId, NodeName, Retries - 1);
         {error, Reason} ->
             logger:warning("[site-pm] Failed to admit ~s: ~p", [NodeName, Reason])
     end.

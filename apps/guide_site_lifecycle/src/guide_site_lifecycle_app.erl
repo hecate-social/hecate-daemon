@@ -67,9 +67,11 @@ auto_admit_self(SiteId) ->
     end.
 
 %% @doc Announce this node to the mesh (with delay for mesh to connect).
+%% Starts periodic re-announcement so late-joining nodes discover us.
 announce_to_mesh() ->
     timer:sleep(10_000),
-    announce_site_node:announce().
+    announce_site_node:announce(),
+    announce_site_node:start_periodic().
 
 %% @doc Wait for a ReckonDB store to be ready (store manager process registered).
 wait_for_store(StoreId, MaxRetries) ->
