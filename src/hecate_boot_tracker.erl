@@ -179,4 +179,33 @@ run_post_boot(ReadyStoreIds) ->
     gen_server:cast(?SERVER, {set_phase, replaying}),
 
     logger:info("[hecate_boot_tracker:run_post_boot/1] awaiting projection replay"),
-    hecate_readiness:await_projections().
+    hecate_readiness:await_projections(),
+
+    %% Cluster joins AFTER local readiness — never block boot on network
+    maybe_join_cluster(ReadyStoreIds).
+
+%% @private Attempt cluster joins for all stores (non-blocking, best-effort).
+%% Stores started in single mode for fast boot. Now upgrade to cluster.
+maybe_join_cluster(StoreIds) ->
+    Cookie = os:getenv("HECATE_ERLANG_COOKIE"),
+    Peers = os:getenv("HECATE_CLUSTER_PEERS"),
+    case {Cookie, Peers} of
+        {false, _} ->
+            logger:info("[boot] No cluster cookie — staying in single-node mode");
+        {_, false} ->
+            logger:info("[boot] No cluster peers — staying in single-node mode");
+        {C, P} when is_list(C), is_list(P) ->
+            logger:info("[boot] Initiating cluster joins for ~b stores", [length(StoreIds)]),
+            erlang:set_cookie(node(), list_to_atom(C)),
+            PeerNodes = [list_to_atom(string:trim(N)) || N <- string:split(P, ",", all), N =/= ""],
+            lists:foreach(fun(Peer) -> net_kernel:connect_node(Peer) end, PeerNodes),
+            lists:foreach(fun(StoreId) ->
+                spawn(fun() ->
+                    case reckon_db_store_coordinator:join_cluster(StoreId) of
+                        ok -> logger:info("[boot] Cluster join ok: ~p", [StoreId]);
+                        coordinator -> logger:info("[boot] Coordinator: ~p", [StoreId]);
+                        {error, Reason} -> logger:warning("[boot] Cluster join failed ~p: ~p", [StoreId, Reason])
+                    end
+                end)
+            end, StoreIds)
+    end.
