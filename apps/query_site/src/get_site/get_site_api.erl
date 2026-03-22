@@ -1,6 +1,8 @@
 %%% @doc API handler: GET /api/site
 %%%
-%%% Returns site identity and nodes from project_site_store.
+%%% Returns site identity from project_site_store and live BEAM
+%%% cluster membership from erlang:nodes(). NODES reflects the
+%%% real-time cluster state (Layer 2), not event-sourced admissions.
 -module(get_site_api).
 -export([init/2, routes/0]).
 
@@ -15,11 +17,11 @@ init(Req0, State) ->
 handle_get(Req0, _State) ->
     case project_site_store:get() of
         {ok, #{site_id := SiteId, status := Status, status_label := StatusLabel,
-               initiated_at := InitiatedAt, initiated_by := InitiatedBy,
-               nodes := Nodes}} ->
-            NodeList = maps:fold(fun(Name, #{admitted_at := AAt}, Acc) ->
-                [#{node_name => Name, admitted_at => AAt} | Acc]
-            end, [], Nodes),
+               initiated_at := InitiatedAt, initiated_by := InitiatedBy} = Site} ->
+            %% Live cluster nodes (Layer 2)
+            AllNodes = [node() | nodes()],
+            AdmittedNodes = maps:get(nodes, Site, #{}),
+            NodeList = [node_entry(N, AdmittedNodes) || N <- AllNodes],
             hecate_api_utils:json_ok(#{
                 site_id => SiteId,
                 status => Status,
@@ -31,4 +33,14 @@ handle_get(Req0, _State) ->
             }, Req0);
         {error, not_found} ->
             hecate_api_utils:json_error(404, <<"Site not initialized">>, Req0)
+    end.
+
+%% @private Build node entry: live cluster membership + admission metadata.
+node_entry(Node, AdmittedNodes) ->
+    Name = atom_to_binary(Node),
+    case maps:get(Name, AdmittedNodes, undefined) of
+        #{admitted_at := AAt} ->
+            #{node_name => Name, admitted_at => AAt};
+        _ ->
+            #{node_name => Name, admitted_at => erlang:system_time(millisecond)}
     end.

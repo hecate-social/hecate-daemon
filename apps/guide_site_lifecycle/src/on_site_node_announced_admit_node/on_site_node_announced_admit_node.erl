@@ -33,6 +33,7 @@ handle_info({nodeup, Node}, State) ->
 
 handle_info({nodedown, Node}, State) ->
     logger:info("[site-pm] Node left cluster: ~p", [Node]),
+    notify_web(atom_to_binary(Node)),
     {noreply, State};
 
 handle_info(admit_existing, State) ->
