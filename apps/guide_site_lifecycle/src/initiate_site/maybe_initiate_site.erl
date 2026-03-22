@@ -41,8 +41,26 @@ dispatch(Cmd) ->
         payload = CmdMap#{command_type => initiate_site},
         metadata = #{timestamp => erlang:system_time(millisecond)}
     },
-    evoq_dispatcher:dispatch(EvoqCmd, #{
+    case evoq_dispatcher:dispatch(EvoqCmd, #{
         store_id => site_store,
         adapter => reckon_evoq_adapter,
         consistency => eventual
-    }).
+    }) of
+        {ok, V, Events} ->
+            %% Auto-admit the initiating node
+            admit_self(SiteId),
+            {ok, V, Events};
+        Error ->
+            Error
+    end.
+
+%% @private Admit the local node to the newly created site.
+admit_self(SiteId) ->
+    NodeName = atom_to_binary(node()),
+    AdmitCmd = admit_node_v1:new(NodeName, erlang:system_time(millisecond)),
+    case maybe_admit_node:dispatch(SiteId, AdmitCmd) of
+        {ok, _, _} ->
+            logger:info("[site] Node admitted: ~s", [NodeName]);
+        {error, Reason} ->
+            logger:warning("[site] Failed to auto-admit self: ~p", [Reason])
+    end.

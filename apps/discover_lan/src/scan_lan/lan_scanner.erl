@@ -20,8 +20,7 @@
 
 -define(TABLE, lan_nodes).
 -define(SCAN_INTERVAL_MS, 30_000).   %% 30s between scans
--define(PROBE_TIMEOUT_MS, 2_000).    %% 2s per HTTP probe
--define(HECATE_HEALTH_PORT, 4444).   %% Default hecate API port
+-define(PROBE_TIMEOUT_MS, 2_000).    %% 2s per SSH probe
 
 -record(state, {
     timer_ref :: reference() | undefined
@@ -222,7 +221,7 @@ collect_results(Ref, Remaining, Acc) ->
 %% @private Probe a single host: resolve hostname + check for hecate.
 probe_host(#{ip := IP} = Host) ->
     Hostname = resolve_hostname(IP),
-    HecateInfo = probe_hecate(IP),
+    HecateInfo = probe_hecate(IP, Hostname),
     SSHAvailable = probe_ssh(IP),
     Host#{
         hostname => Hostname,
@@ -231,28 +230,32 @@ probe_host(#{ip := IP} = Host) ->
     }.
 
 %% @private Check if hecate-daemon is running on the host.
-%% Probes GET /health on the default port.
--spec probe_hecate(string()) -> map().
-probe_hecate(IP) ->
-    Url = "http://" ++ IP ++ ":" ++ integer_to_list(?HECATE_HEALTH_PORT) ++ "/health",
-    case httpc_get(Url) of
-        {ok, Body} ->
-            try
-                Decoded = json:decode(list_to_binary(Body)),
-                #{
-                    running => true,
-                    version => maps:get(<<"version">>, Decoded, <<"unknown">>),
-                    status => maps:get(<<"status">>, Decoded, <<"unknown">>),
-                    ready => maps:get(<<"ready">>, Decoded, false),
-                    site_id => maps:get(<<"site_id">>, Decoded, undefined),
-                    node_name => maps:get(<<"node_name">>, Decoded, undefined)
-                }
-            catch _:_ ->
-                #{running => false}
-            end;
-        {error, _} ->
+%% Checks BEAM cluster membership — no TCP probes needed.
+%% If hecate@{hostname} is in erlang:nodes(), it's running hecate.
+-spec probe_hecate(string(), binary()) -> map().
+probe_hecate(_IP, Hostname) ->
+    ClusterNodes = [node() | erlang:nodes()],
+    %% Try matching hostname variants: beam00.lab, beam00
+    Candidates = [
+        binary_to_atom(<<"hecate@", Hostname/binary>>),
+        binary_to_atom(<<"hecate@", (hd(binary:split(Hostname, <<".">>)))/binary>>)
+    ],
+    case lists:filter(fun(N) -> lists:member(N, ClusterNodes) end, Candidates) of
+        [MatchedNode | _] ->
+            #{
+                running => true,
+                version => get_cluster_node_version(MatchedNode),
+                status => <<"connected">>,
+                node_name => atom_to_binary(MatchedNode)
+            };
+        [] ->
             #{running => false}
     end.
+
+%% @private Get version from a cluster peer (best effort).
+get_cluster_node_version(_Node) ->
+    %% TODO: query version from cluster peer via rpc
+    <<"0.16.5">>.
 
 %% @private Check if SSH is available (port 22 open).
 -spec probe_ssh(string()) -> boolean().
@@ -265,18 +268,6 @@ probe_ssh(IP) ->
             false
     end.
 
-%% @private Simple HTTP GET via httpc (built into OTP).
-httpc_get(Url) ->
-    %% Ensure inets is started
-    inets:start(),
-    case httpc:request(get, {Url, []}, [{timeout, ?PROBE_TIMEOUT_MS}], [{body_format, string}]) of
-        {ok, {{_, 200, _}, _Headers, Body}} ->
-            {ok, Body};
-        {ok, {{_, Code, _}, _, _}} ->
-            {error, {http_status, Code}};
-        {error, Reason} ->
-            {error, Reason}
-    end.
 
 %%%===================================================================
 %%% Self IP
