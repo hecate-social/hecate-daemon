@@ -1,8 +1,8 @@
-%%% @doc Process Manager: on site node announced, admit node.
+%%% @doc Process Manager: on BEAM cluster nodeup, admit node to site.
 %%%
-%%% Subscribes to {realm}.hecate.site.node_joined on the Macula mesh.
-%%% When a remote node announces itself with the same site_id,
-%%% dispatches admit_node_v1 to add it to our local site aggregate.
+%%% Listens for Erlang distribution nodeup events (Layer 2).
+%%% When a new BEAM node joins the cluster, auto-admits it to the site.
+%%% No mesh/QUIC needed — this is a LAN operation.
 %%% @end
 -module(on_site_node_announced_admit_node).
 -behaviour(gen_server).
@@ -10,18 +10,13 @@
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
--define(RETRY_INTERVAL, 5_000).
-
--record(state, {
-    sub_ref :: reference() | undefined
-}).
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    erlang:send_after(?RETRY_INTERVAL, self(), subscribe),
-    {ok, #state{sub_ref = undefined}}.
+    ok = net_kernel:monitor_nodes(true),
+    logger:info("[site-pm] Monitoring BEAM cluster for new nodes"),
+    {ok, #{}}.
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
@@ -29,59 +24,29 @@ handle_call(_Request, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(subscribe, #state{sub_ref = undefined} = State) ->
-    Realm = application:get_env(hecate, realm, <<"io.macula">>),
-    Topic = <<Realm/binary, ".hecate.site.node_joined">>,
-    %% Pass self() — hecate_mesh_client sends {mesh_fact, Topic, Data} to pid
-    case hecate_mesh:subscribe(Topic, self()) of
-        {ok, Ref} ->
-            logger:info("[site-pm] Subscribed to ~s", [Topic]),
-            {noreply, State#state{sub_ref = Ref}};
-        {error, _Reason} ->
-            erlang:send_after(?RETRY_INTERVAL, self(), subscribe),
-            {noreply, State}
-    end;
-
-handle_info(subscribe, State) ->
+handle_info({nodeup, Node}, State) ->
+    logger:info("[site-pm] Node joined cluster: ~p", [Node]),
+    spawn(fun() -> maybe_admit(Node) end),
     {noreply, State};
 
-handle_info({mesh_fact, _Topic, EventData}, State) ->
-    Payload = maps:get(payload, EventData, maps:get(<<"payload">>, EventData, EventData)),
-    handle_fact(Payload),
+handle_info({nodedown, Node}, State) ->
+    logger:info("[site-pm] Node left cluster: ~p", [Node]),
     {noreply, State};
 
 handle_info(_Info, State) ->
     {noreply, State}.
 
-terminate(_Reason, #state{sub_ref = Ref}) when Ref =/= undefined ->
-    hecate_mesh:unsubscribe(Ref);
 terminate(_Reason, _State) ->
+    net_kernel:monitor_nodes(false),
     ok.
 
 %%% ===================================================================
-%%% Fact handling
+%%% Internal
 %%% ===================================================================
 
-handle_fact(#{<<"site_id">> := RemoteSiteId, <<"node_name">> := RemoteNodeName}) ->
-    handle_fact_fields(RemoteSiteId, RemoteNodeName);
-handle_fact(#{site_id := RemoteSiteId, node_name := RemoteNodeName}) ->
-    handle_fact_fields(RemoteSiteId, RemoteNodeName);
-handle_fact(Other) ->
-    logger:debug("[site-pm] Ignoring unrecognized fact: ~p", [Other]).
-
-handle_fact_fields(RemoteSiteId, RemoteNodeName) ->
-    OurSiteId = guide_site_lifecycle_app:site_id(),
-    OurNodeName = atom_to_binary(node()),
-    case {RemoteSiteId =:= OurSiteId, RemoteNodeName =:= OurNodeName} of
-        {false, _} ->
-            logger:debug("[site-pm] Ignoring node from different site: ~s", [RemoteSiteId]);
-        {true, true} ->
-            ok;
-        {true, false} ->
-            admit_remote_node(OurSiteId, RemoteNodeName)
-    end.
-
-admit_remote_node(SiteId, NodeName) ->
+maybe_admit(Node) ->
+    NodeName = atom_to_binary(Node),
+    SiteId = guide_site_lifecycle_app:site_id(),
     admit_with_retry(SiteId, NodeName, 3).
 
 admit_with_retry(_SiteId, NodeName, 0) ->
@@ -90,11 +55,10 @@ admit_with_retry(SiteId, NodeName, Retries) ->
     Cmd = admit_node_v1:new(NodeName, erlang:system_time(millisecond)),
     case maybe_admit_node:dispatch(SiteId, Cmd) of
         {ok, _V, _Events} ->
-            logger:info("[site-pm] Admitted remote node via mesh: ~s", [NodeName]);
+            logger:info("[site-pm] Admitted node: ~s", [NodeName]);
         {error, node_already_admitted} ->
             ok;
         {error, {wrong_expected_version, _}} ->
-            logger:info("[site-pm] Version conflict admitting ~s, retrying...", [NodeName]),
             timer:sleep(500),
             admit_with_retry(SiteId, NodeName, Retries - 1);
         {error, Reason} ->
