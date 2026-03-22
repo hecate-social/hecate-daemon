@@ -58,13 +58,25 @@ maybe_admit(Node) ->
     SiteId = guide_site_lifecycle_app:site_id(),
     admit_with_retry(SiteId, NodeName, 3).
 
+notify_web(NodeName) ->
+    case project_site_store:get() of
+        {ok, Site} ->
+            hecate_web_events:broadcast(site_changed, Site#{
+                reason => <<"node_admitted">>,
+                node_name => NodeName
+            });
+        _ ->
+            ok
+    end.
+
 admit_with_retry(_SiteId, NodeName, 0) ->
     logger:warning("[site-pm] Giving up admitting ~s after retries", [NodeName]);
 admit_with_retry(SiteId, NodeName, Retries) ->
     Cmd = admit_node_v1:new(NodeName, erlang:system_time(millisecond)),
     case maybe_admit_node:dispatch(SiteId, Cmd) of
         {ok, _V, _Events} ->
-            logger:info("[site-pm] Admitted node: ~s", [NodeName]);
+            logger:info("[site-pm] Admitted node: ~s", [NodeName]),
+            notify_web(NodeName);
         {error, node_already_admitted} ->
             ok;
         {error, {wrong_expected_version, _}} ->
