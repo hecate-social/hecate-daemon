@@ -16,6 +16,8 @@ start_link() ->
 init([]) ->
     ok = net_kernel:monitor_nodes(true),
     logger:info("[site-pm] Monitoring BEAM cluster for new nodes"),
+    %% Admit any nodes already in the cluster (missed nodeup during boot)
+    erlang:send_after(5000, self(), admit_existing),
     {ok, #{}}.
 
 handle_call(_Request, _From, State) ->
@@ -31,6 +33,13 @@ handle_info({nodeup, Node}, State) ->
 
 handle_info({nodedown, Node}, State) ->
     logger:info("[site-pm] Node left cluster: ~p", [Node]),
+    {noreply, State};
+
+handle_info(admit_existing, State) ->
+    lists:foreach(fun(Node) ->
+        logger:info("[site-pm] Checking existing node: ~p", [Node]),
+        spawn(fun() -> maybe_admit(Node) end)
+    end, nodes()),
     {noreply, State};
 
 handle_info(_Info, State) ->
