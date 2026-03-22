@@ -97,7 +97,11 @@ start_early_socket() ->
             logger:info("Socket path is undefined, skipping early socket");
         Path ->
             StartupDispatch = cowboy_router:compile([
-                {'_', [{"/health", hecate_api_startup_health, []}]}
+                {'_', [
+                    {"/health", hecate_api_startup_health, []},
+                    {"/api/events", web_events_stream_api, []},
+                    {"/api/health", hecate_api_startup_health, []}
+                ]}
             ]),
             case hecate_socket:start_listener(Path, StartupDispatch) of
                 ok ->
