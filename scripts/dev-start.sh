@@ -41,6 +41,12 @@ fi
 # Override socket path for dev (env file has REPLACE_ME placeholder)
 export HECATE_SOCKET_PATH="$HOME/.hecate-dev/hecate-daemon/sockets/api.sock"
 
+# Advertise LAN-reachable hostname for P2P mesh delivery.
+# Without this, subscriptions advertise "localhost" which is unreachable from other nodes.
+if [ -z "${MACULA_HOSTNAME:-}" ]; then
+    export MACULA_HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
+fi
+
 # MACULA_BOOTSTRAP_PEERS is intentionally NOT set here.
 # hecate_mesh_client handles its own connection to boot.macula.io via macula:connect().
 # Setting MACULA_BOOTSTRAP_PEERS causes macula_root to create a SECOND peer connection
