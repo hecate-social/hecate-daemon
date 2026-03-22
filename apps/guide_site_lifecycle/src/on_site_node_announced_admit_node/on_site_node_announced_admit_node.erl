@@ -28,6 +28,7 @@ handle_cast(_Msg, State) ->
 
 handle_info({nodeup, Node}, State) ->
     logger:info("[site-pm] Node joined cluster: ~p", [Node]),
+    notify_web(atom_to_binary(Node)),
     spawn(fun() -> maybe_admit(Node) end),
     {noreply, State};
 
