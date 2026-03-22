@@ -19,7 +19,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> sale_archived_v1().
-event_type() -> sale_archived_v1.
+event_type() -> <<"sale_archived_v1">>.
 
 new(#{sale_id := SaleId}) ->
     #sale_archived_v1{

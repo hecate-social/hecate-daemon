@@ -38,7 +38,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> license_granted_v1().
-event_type() -> license_granted_v1.
+event_type() -> <<"license_granted_v1">>.
 
 new(#{license_id := LicenseId} = Params) ->
     #license_granted_v1{

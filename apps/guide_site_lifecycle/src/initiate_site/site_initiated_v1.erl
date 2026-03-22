@@ -16,7 +16,7 @@
 -export_type([site_initiated_v1/0]).
 
 -spec new(binary(), binary(), integer()) -> site_initiated_v1().
-event_type() -> site_initiated_v1.
+event_type() -> <<"site_initiated_v1">>.
 
 new(#{site_id := SiteId, initiated_by := InitiatedBy, initiated_at := InitiatedAt}) ->
     new(SiteId, InitiatedBy, InitiatedAt).

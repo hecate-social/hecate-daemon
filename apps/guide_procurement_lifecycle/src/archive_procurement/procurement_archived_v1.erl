@@ -19,7 +19,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> procurement_archived_v1().
-event_type() -> procurement_archived_v1.
+event_type() -> <<"procurement_archived_v1">>.
 
 new(#{procurement_id := ProcurementId}) ->
     #procurement_archived_v1{

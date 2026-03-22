@@ -15,7 +15,7 @@
 -export_type([preferences_updated_v1/0]).
 
 -spec new(map(), integer()) -> preferences_updated_v1().
-event_type() -> preferences_updated_v1.
+event_type() -> <<"preferences_updated_v1">>.
 
 new(#{preferences := Preferences, updated_at := UpdatedAt}) ->
     new(Preferences, UpdatedAt).

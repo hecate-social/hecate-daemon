@@ -16,7 +16,7 @@
 -opaque t() :: #llm_detected_v1{}.
 -export_type([t/0]).
 
-event_type() -> llm_detected_v1.
+event_type() -> <<"llm_detected_v1">>.
 
 new(#{model_name := ModelName, model_info := ModelInfo}) ->
     new(ModelName, ModelInfo).

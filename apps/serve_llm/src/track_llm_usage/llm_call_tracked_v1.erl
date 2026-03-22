@@ -26,7 +26,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> llm_call_tracked_v1().
-event_type() -> llm_call_tracked_v1.
+event_type() -> <<"llm_call_tracked_v1">>.
 
 new(#{model := Model, tokens_in := TokensIn, tokens_out := TokensOut} = Params) ->
     #llm_call_tracked_v1{

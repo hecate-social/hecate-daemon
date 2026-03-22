@@ -15,7 +15,7 @@
 -opaque t() :: #llm_removed_v1{}.
 -export_type([t/0]).
 
-event_type() -> llm_removed_v1.
+event_type() -> <<"llm_removed_v1">>.
 
 new(ModelName) ->
     {ok, #llm_removed_v1{

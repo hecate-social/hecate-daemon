@@ -58,7 +58,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> license_initiated_v1().
-event_type() -> license_initiated_v1.
+event_type() -> <<"license_initiated_v1">>.
 
 new(#{license_id := LicenseId, consumer_id := ConsumerId,
       plugin_id := PluginId, offering_id := OfferingId} = P) ->

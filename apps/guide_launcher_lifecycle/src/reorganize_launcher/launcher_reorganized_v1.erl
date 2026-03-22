@@ -19,7 +19,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> launcher_reorganized_v1().
-event_type() -> launcher_reorganized_v1.
+event_type() -> <<"launcher_reorganized_v1">>.
 
 new(#{groups := Groups}) ->
     #launcher_reorganized_v1{

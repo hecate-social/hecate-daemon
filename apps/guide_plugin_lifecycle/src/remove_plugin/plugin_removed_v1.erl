@@ -20,7 +20,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> plugin_removed_v1().
-event_type() -> plugin_removed_v1.
+event_type() -> <<"plugin_removed_v1">>.
 
 new(#{plugin_id := PluginId, oci_image := OciImage}) ->
     #plugin_removed_v1{

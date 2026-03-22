@@ -21,7 +21,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> plugin_termination_requested_v1().
-event_type() -> plugin_termination_requested_v1.
+event_type() -> <<"plugin_termination_requested_v1">>.
 
 new(Data) ->
     #plugin_termination_requested_v1{

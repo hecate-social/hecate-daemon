@@ -66,7 +66,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> offering_initiated_v1().
-event_type() -> offering_initiated_v1.
+event_type() -> <<"offering_initiated_v1">>.
 
 new(#{offering_id := OfferingId, author_id := AuthorId, plugin_id := PluginId} = Params) ->
     #offering_initiated_v1{

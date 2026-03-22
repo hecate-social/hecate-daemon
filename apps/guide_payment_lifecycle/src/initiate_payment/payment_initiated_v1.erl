@@ -27,7 +27,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> payment_initiated_v1().
-event_type() -> payment_initiated_v1.
+event_type() -> <<"payment_initiated_v1">>.
 
 new(#{payment_id := PaymentId, consumer_id := ConsumerId,
       procurement_id := ProcurementId, offering_id := OfferingId,

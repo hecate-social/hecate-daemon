@@ -16,7 +16,7 @@
 -export_type([realm_membership_revoked_v1/0]).
 
 -spec new(binary(), binary(), integer()) -> realm_membership_revoked_v1().
-event_type() -> realm_membership_revoked_v1.
+event_type() -> <<"realm_membership_revoked_v1">>.
 
 new(#{membership_id := MembershipId, reason := Reason, revoked_at := RevokedAt}) ->
     new(MembershipId, Reason, RevokedAt).

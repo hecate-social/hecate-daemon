@@ -37,7 +37,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> plugin_upgraded_v1().
-event_type() -> plugin_upgraded_v1.
+event_type() -> <<"plugin_upgraded_v1">>.
 
 new(#{plugin_id := PluginId, installed_version := Version} = Map) ->
     #plugin_upgraded_v1{

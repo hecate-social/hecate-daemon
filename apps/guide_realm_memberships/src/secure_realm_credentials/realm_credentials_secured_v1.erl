@@ -19,7 +19,7 @@
 -opaque realm_credentials_secured_v1() :: #realm_credentials_secured_v1{}.
 -export_type([realm_credentials_secured_v1/0]).
 
-event_type() -> realm_credentials_secured_v1.
+event_type() -> <<"realm_credentials_secured_v1">>.
 
 -spec new(binary(), binary(), integer()) -> realm_credentials_secured_v1().
 new(MembershipId, EncryptedCredentials, SecuredAt) ->

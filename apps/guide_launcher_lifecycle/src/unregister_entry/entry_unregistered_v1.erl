@@ -19,7 +19,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> entry_unregistered_v1().
-event_type() -> entry_unregistered_v1.
+event_type() -> <<"entry_unregistered_v1">>.
 
 new(#{entry_id := EntryId}) ->
     #entry_unregistered_v1{

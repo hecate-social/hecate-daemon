@@ -24,7 +24,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> entry_registered_v1().
-event_type() -> entry_registered_v1.
+event_type() -> <<"entry_registered_v1">>.
 
 new(#{entry_id := EntryId, display_name := DisplayName,
       icon := Icon, group_name := GroupName} = Params) ->

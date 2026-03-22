@@ -19,7 +19,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> oci_pull_cancelled_v1().
-event_type() -> oci_pull_cancelled_v1.
+event_type() -> <<"oci_pull_cancelled_v1">>.
 
 new(#{plugin_id := PluginId}) ->
     #oci_pull_cancelled_v1{

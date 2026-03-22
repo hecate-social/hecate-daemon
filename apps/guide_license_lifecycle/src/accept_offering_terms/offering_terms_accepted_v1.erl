@@ -27,7 +27,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> offering_terms_accepted_v1().
-event_type() -> offering_terms_accepted_v1.
+event_type() -> <<"offering_terms_accepted_v1">>.
 
 new(#{license_id := LicenseId} = P) ->
     #offering_terms_accepted_v1{

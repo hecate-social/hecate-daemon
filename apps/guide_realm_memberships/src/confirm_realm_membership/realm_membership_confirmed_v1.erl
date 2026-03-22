@@ -18,7 +18,7 @@
 -export_type([realm_membership_confirmed_v1/0]).
 
 -spec new(binary(), binary(), binary(), binary(), integer()) -> realm_membership_confirmed_v1().
-event_type() -> realm_membership_confirmed_v1.
+event_type() -> <<"realm_membership_confirmed_v1">>.
 
 new(#{membership_id := MembershipId, realm_id := RealmId,
      oauth_account := OAuthAccount, oauth_provider := OAuthProvider,

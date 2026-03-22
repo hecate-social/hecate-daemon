@@ -16,7 +16,7 @@
 -export_type([realm_membership_initiated_v1/0]).
 
 -spec new(binary(), binary(), integer()) -> realm_membership_initiated_v1().
-event_type() -> realm_membership_initiated_v1.
+event_type() -> <<"realm_membership_initiated_v1">>.
 
 new(#{membership_id := MembershipId, realm_url := RealmUrl, initiated_at := InitiatedAt}) ->
     new(MembershipId, RealmUrl, InitiatedAt).

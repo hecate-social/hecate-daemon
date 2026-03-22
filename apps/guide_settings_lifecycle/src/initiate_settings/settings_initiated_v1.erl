@@ -16,7 +16,7 @@
 -export_type([settings_initiated_v1/0]).
 
 -spec new(binary(), binary(), integer()) -> settings_initiated_v1().
-event_type() -> settings_initiated_v1.
+event_type() -> <<"settings_initiated_v1">>.
 
 new(#{linux_user := LinuxUser, hostname := Hostname, initiated_at := InitiatedAt}) ->
     new(LinuxUser, Hostname, InitiatedAt).

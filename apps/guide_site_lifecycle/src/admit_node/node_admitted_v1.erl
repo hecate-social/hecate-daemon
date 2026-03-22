@@ -15,7 +15,7 @@
 -export_type([node_admitted_v1/0]).
 
 -spec new(binary(), integer()) -> node_admitted_v1().
-event_type() -> node_admitted_v1.
+event_type() -> <<"node_admitted_v1">>.
 
 new(#{node_name := NodeName, admitted_at := AdmittedAt}) ->
     new(NodeName, AdmittedAt).

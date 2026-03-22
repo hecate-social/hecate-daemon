@@ -24,7 +24,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> procurement_initiated_v1().
-event_type() -> procurement_initiated_v1.
+event_type() -> <<"procurement_initiated_v1">>.
 
 new(#{procurement_id := ProcurementId, consumer_id := ConsumerId,
       offering_id := OfferingId, plugin_id := PluginId,

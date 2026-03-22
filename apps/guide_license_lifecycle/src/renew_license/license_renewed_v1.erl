@@ -19,7 +19,7 @@
 -dialyzer({nowarn_function, [new/1, from_map/1]}).
 
 -spec new(map()) -> license_renewed_v1().
-event_type() -> license_renewed_v1.
+event_type() -> <<"license_renewed_v1">>.
 
 new(#{license_id := LicenseId}) ->
     #license_renewed_v1{

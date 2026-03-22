@@ -17,7 +17,7 @@
 -opaque t() :: #llm_status_reported_v1{}.
 -export_type([t/0]).
 
-event_type() -> llm_status_reported_v1.
+event_type() -> <<"llm_status_reported_v1">>.
 
 new(#{model_name := ModelName, status := Status}) ->
     new(ModelName, Status).

@@ -15,7 +15,7 @@
 -export_type([node_removed_v1/0]).
 
 -spec new(binary(), integer()) -> node_removed_v1().
-event_type() -> node_removed_v1.
+event_type() -> <<"node_removed_v1">>.
 
 new(#{node_name := NodeName, removed_at := RemovedAt}) ->
     new(NodeName, RemovedAt).
