@@ -191,6 +191,17 @@ ensure_searxng() {
 
 start_daemon() {
     echo "=== Starting dev daemon ==="
+
+    # Always rebuild with latest deps — lock files cause stale builds
+    echo "  Refreshing dependencies..."
+    rm -f "$DAEMON_DIR/rebar.lock"
+    rm -rf "$DAEMON_DIR/_build/default/lib/macula" \
+           "$DAEMON_DIR/_build/default/lib/reckon_db" \
+           "$DAEMON_DIR/_build/default/lib/evoq" \
+           "$DAEMON_DIR/_build/default/lib/reckon_evoq" \
+           "$DAEMON_DIR/_build/default/lib/reckon_gater"
+    (cd "$DAEMON_DIR" && rebar3 compile 2>&1 | tail -1)
+
     "$SCRIPT_DIR/dev-start.sh" &
     DAEMON_PID=$!
 
