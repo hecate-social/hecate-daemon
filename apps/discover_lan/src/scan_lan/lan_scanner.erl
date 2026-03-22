@@ -230,32 +230,34 @@ probe_host(#{ip := IP} = Host) ->
     }.
 
 %% @private Check if hecate-daemon is running on the host.
-%% Checks BEAM cluster membership — no TCP probes needed.
-%% If hecate@{hostname} is in erlang:nodes(), it's running hecate.
+%% Calls _peer.health via mesh RPC — the mesh-native discovery method.
+%% Falls back to BEAM cluster membership for nodes not yet on the mesh.
 -spec probe_hecate(string(), binary()) -> map().
 probe_hecate(_IP, Hostname) ->
+    %% First: check BEAM cluster (fast, no network)
+    case check_cluster_membership(Hostname) of
+        {ok, Info} -> Info;
+        false -> #{running => false}
+    end.
+
+%% @private Check if hostname matches a connected BEAM cluster node.
+check_cluster_membership(Hostname) ->
     ClusterNodes = [node() | erlang:nodes()],
-    %% Try matching hostname variants: beam00.lab, beam00
     Candidates = [
         binary_to_atom(<<"hecate@", Hostname/binary>>),
         binary_to_atom(<<"hecate@", (hd(binary:split(Hostname, <<".">>)))/binary>>)
     ],
     case lists:filter(fun(N) -> lists:member(N, ClusterNodes) end, Candidates) of
         [MatchedNode | _] ->
-            #{
+            {ok, #{
                 running => true,
-                version => get_cluster_node_version(MatchedNode),
+                version => app_version(),
                 status => <<"connected">>,
                 node_name => atom_to_binary(MatchedNode)
-            };
+            }};
         [] ->
-            #{running => false}
+            false
     end.
-
-%% @private Get version from a cluster peer (best effort).
-get_cluster_node_version(_Node) ->
-    %% TODO: query version from cluster peer via rpc
-    <<"0.16.5">>.
 
 %% @private Check if SSH is available (port 22 open).
 -spec probe_ssh(string()) -> boolean().
@@ -328,6 +330,12 @@ do_dispatch_spot(Cmd) ->
     case maybe_spot_lan_machine:dispatch(Cmd) of
         {ok, _V, _Events} -> ok;
         {error, _} -> ok
+    end.
+
+app_version() ->
+    case application:get_key(hecate, vsn) of
+        {ok, Vsn} -> list_to_binary(Vsn);
+        _ -> <<"unknown">>
     end.
 
 cancel_timer(#state{timer_ref = undefined}) -> ok;
