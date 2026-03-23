@@ -1,5 +1,5 @@
-## Dev node — Site A (clusters with beam00, beam01)
--name hecate_dev@host00.lab
+## Dev node
+-sname hecate_dev
 
 ## Site A cookie (shared with beam00, beam01, host00)
 -setcookie ZMFTAHTHAYKXRVMPPQIZ
@@ -9,6 +9,10 @@
 
 ## Interactive code server — required for in-VM plugin loading
 -mode interactive
+
+## Use standard EPMD for dev node discovery (overrides release's -start_epmd false)
+-start_epmd true
+-epmd_port 4369
 
 -smp auto
 +A 64

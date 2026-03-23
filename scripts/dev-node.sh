@@ -53,6 +53,9 @@ fi
 # Override socket path
 export HECATE_SOCKET_PATH="$DEV_SOCK"
 
+# Use standard EPMD for dev node discovery (not custom port range)
+unset ERL_DIST_PORT
+
 # Clean stale socket
 rm -f "$DEV_SOCK"
 

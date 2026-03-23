@@ -54,13 +54,16 @@ if [ -z "${MAXMIND_LICENSE_KEY:-}" ] && [ -f "$HOME/.config/maxmind/GeoIP.conf" 
     echo "Loaded MAXMIND_LICENSE_KEY from ~/.config/maxmind/GeoIP.conf"
 fi
 
+# Use standard EPMD for dev node discovery (not custom port range)
+unset ERL_DIST_PORT
+
 # Clean stale socket
 rm -f "$HECATE_SOCKET_PATH"
 
-# Kill stale BEAM/epmd holding the dev node name
-if pgrep -f 'name hecate_dev' > /dev/null 2>&1; then
+# Kill stale BEAM holding the dev node name (exact match, don't kill dev0/dev1/etc)
+if pgrep -f 'sname hecate_dev ' > /dev/null 2>&1; then
     echo "Killing stale hecate_dev BEAM process..."
-    pkill -f 'name hecate_dev' || true
+    pkill -f 'sname hecate_dev ' || true
     sleep 2
 fi
 

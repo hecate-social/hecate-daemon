@@ -34,6 +34,8 @@ start_link() ->
 init([]) ->
     ensure_pg(),
     pg:join(pg, mpong_lobby, self()),
+    %% Periodically try connecting to peer dev nodes (every 10s until connected)
+    erlang:send_after(3000, self(), try_connect_peers),
     logger:info("[mpong_seeker] Listening for lobbies on pg group"),
     {ok, #seeker{}}.
 
@@ -103,6 +105,16 @@ handle_info({'DOWN', _Ref, process, Pid, _Reason}, #seeker{host_pid = Pid} = Sta
     logger:info("[mpong_seeker] Host lobby process died, ready for new games"),
     reset_state(State);
 
+%% Periodic peer connection attempts
+handle_info(try_connect_peers, State) ->
+    Connected = try_connect_dev_peers(),
+    %% Retry every 10s if no peers found, stop retrying once connected
+    case Connected of
+        0 -> erlang:send_after(10000, self(), try_connect_peers);
+        _ -> ok
+    end,
+    {noreply, State};
+
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -137,3 +149,26 @@ ensure_pg() ->
         {ok, _} -> ok;
         {error, {already_started, _}} -> ok
     end.
+
+%% @private Try connecting to known dev peer nodes.
+%% Works with both -sname (short) and -name (long) modes.
+%% @private Try connecting to known dev peer nodes.
+%% Returns count of new connections made.
+try_connect_dev_peers() ->
+    OurNode = atom_to_list(node()),
+    {_Names, Host} = case string:split(OurNode, "@") of
+        [Name, H] -> {Name, H};
+        _ -> {OurNode, "localhost"}
+    end,
+    Prefixes = ["hecate_dev", "hecate_dev0", "hecate_dev1", "hecate_dev2"],
+    Candidates = [list_to_atom(P ++ "@" ++ Host) || P <- Prefixes],
+    Peers = [N || N <- Candidates, N =/= node()],
+    lists:foldl(fun(Peer, Count) ->
+        case net_kernel:connect_node(Peer) of
+            true ->
+                logger:info("[mpong_seeker] Connected to peer ~s", [Peer]),
+                Count + 1;
+            _ ->
+                Count
+        end
+    end, 0, Peers).

@@ -197,6 +197,22 @@ start_engine(#lobby{game_id = GameId, seats = Seats} = State) ->
          Modes#{WI => {bot, Personality}}}
     end, {#{}, #{}}, Seats),
 
+    %% Write game to projection store so frontend can find it
+    Players = [#{node_id => PId, wall_index => maps:get(wall_index, PInfo), alive => true,
+                 joined_at => erlang:system_time(millisecond)}
+               || {PId, PInfo} <- maps:to_list(PlayersMap)],
+    project_mpong_games_store:put(GameId, #{
+        game_id => GameId,
+        host_node_id => State#lobby.host_node,
+        players => Players,
+        max_players => State#lobby.max_players,
+        status => <<"playing">>,
+        hosted_at => erlang:system_time(millisecond),
+        started_at => erlang:system_time(millisecond),
+        ended_at => null,
+        winner_node_id => null
+    }),
+
     case run_game_engine_sup:start_engine(#{
         game_id => GameId,
         players => PlayersMap,

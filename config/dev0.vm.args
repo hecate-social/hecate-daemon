@@ -1,7 +1,12 @@
-## Dev node 0 — Site A (clusters with hecate_dev on host00.lab)
--name hecate_dev0@host00.lab
+## Dev node 0
+-sname hecate_dev0
 -setcookie ZMFTAHTHAYKXRVMPPQIZ
 -mode interactive
+
+## Use standard EPMD for dev node discovery
+-start_epmd true
+-epmd_port 4369
+
 -smp auto
 +A 16
 +P 262144
