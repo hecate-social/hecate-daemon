@@ -1,0 +1,80 @@
+%%%-------------------------------------------------------------------
+%%% @doc Listens to game state from mesh on NON-HOST nodes.
+%%%
+%%% Subscribes to mpong.game.{game_id}.state PubSub topic.
+%%% Receives game state, runs local AI, sends paddle position back.
+%%% Also forwards state to local web SSE connections via pg.
+%%%
+%%% Topic: mpong.game.{game_id}.state (subscribe)
+%%% Topic: mpong.game.{game_id}.paddle (publish)
+%%% @end
+%%%-------------------------------------------------------------------
+-module(listen_game_state).
+-behaviour(gen_server).
+
+-export([start_link/1]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+
+-record(listener, {
+    game_id    :: binary(),
+    wall_index :: non_neg_integer(),
+    arena      :: term() | undefined
+}).
+
+start_link(#{game_id := GameId, wall_index := WallIndex}) ->
+    gen_server:start_link(?MODULE, #{game_id => GameId, wall_index => WallIndex}, []).
+
+init(#{game_id := GameId, wall_index := WallIndex}) ->
+    %% Subscribe to game state on mesh
+    Topic = <<"mpong.game.", GameId/binary, ".state">>,
+    case erlang:function_exported(hecate_mesh, subscribe, 2) of
+        true ->
+            Self = self(),
+            hecate_mesh:subscribe(Topic, fun(Msg) -> Self ! {mesh_state, Msg} end);
+        false -> ok
+    end,
+    %% Join pg for local SSE forwarding
+    pg:join(pg, {mpong_game_stream, GameId}, self()),
+    logger:info("[mpong] Listener started for game ~s wall ~b", [GameId, WallIndex]),
+    {ok, #listener{game_id = GameId, wall_index = WallIndex}}.
+
+handle_call(_Req, _From, State) ->
+    {reply, {error, unknown}, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info({mesh_state, Payload}, #listener{game_id = GameId, wall_index = WI} = State) ->
+    case json:decode(Payload) of
+        #{<<"ball">> := Ball} = StateMsg ->
+            %% Forward to local SSE connections
+            Members = pg:get_members(pg, {mpong_game_stream, GameId}),
+            [Pid ! {mpong_state, GameId, StateMsg} || Pid <- Members, Pid =/= self()],
+
+            %% Run AI and send paddle position back
+            Arena = case State#listener.arena of
+                undefined -> mpong_arena:new(maps:size(maps:get(<<"paddles">>, StateMsg, #{})));
+                A -> A
+            end,
+            PaddlePos = mpong_ai:compute_paddle_position(Ball, WI, Arena),
+            send_paddle(GameId, PaddlePos),
+            {noreply, State#listener{arena = Arena}};
+        _ ->
+            {noreply, State}
+    end;
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(_Reason, #listener{game_id = GameId}) ->
+    pg:leave(pg, {mpong_game_stream, GameId}, self()),
+    ok.
+
+send_paddle(GameId, Position) ->
+    Topic = <<"mpong.game.", GameId/binary, ".paddle">>,
+    NodeId = atom_to_binary(node()),
+    Payload = json:encode(#{node_id => NodeId, position => Position}),
+    case erlang:function_exported(hecate_mesh, publish, 2) of
+        true -> hecate_mesh:publish(Topic, Payload);
+        false -> ok
+    end.

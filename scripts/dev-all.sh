@@ -40,11 +40,11 @@ done
 
 DAEMON_DATA="$DEV_DATA_DIR/hecate-daemon"
 
-# Directories that hold identity, credentials, and infrastructure config — preserved by --clear
+# Directories preserved by --clear (identity, credentials, infrastructure config).
+# NOTE: reckon-db dirs are NOT preserved — stale Khepri/Ra cluster data
+# causes slow startup when switching between cluster and single mode.
 PRESERVE_DIRS=(
     "$DAEMON_DATA/sqlite"
-    "$DAEMON_DATA/reckon-db/settings"
-    "$DAEMON_DATA/reckon-db/realm_memberships"
     "$DEV_DATA_DIR/gitops"
     "$DEV_DATA_DIR/searxng"
 )
@@ -170,10 +170,14 @@ ensure_searxng() {
     fi
 
     echo "  Starting SearXNG container..."
+    # --network=host: pasta/rootless networking broken on kernel 6.19+ (tun in userns)
+    # GRANIAN_HOST/PORT: bind directly to 127.0.0.1:8888 on host network
     podman run -d --name searxng-dev \
-        -p 127.0.0.1:8888:8080 \
+        --network=host \
         -v "$DEV_DATA_DIR/searxng:$DEV_DATA_DIR/searxng:Z" \
         -e "SEARXNG_SETTINGS_PATH=$DEV_DATA_DIR/searxng/settings.yml" \
+        -e "GRANIAN_HOST=127.0.0.1" \
+        -e "GRANIAN_PORT=8888" \
         docker.io/searxng/searxng:latest >/dev/null
 
     # Wait for it to respond

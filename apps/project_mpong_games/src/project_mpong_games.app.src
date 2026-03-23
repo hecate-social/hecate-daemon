@@ -1,0 +1,11 @@
+{application, project_mpong_games, [
+    {description, "PRJ service for MPong: ETS projection of game lifecycle events"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {project_mpong_games_app, []}},
+    {applications, [kernel, stdlib, evoq, reckon_evoq]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

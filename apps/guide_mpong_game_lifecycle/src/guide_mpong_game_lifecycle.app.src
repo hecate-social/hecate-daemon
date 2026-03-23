@@ -1,0 +1,11 @@
+{application, guide_mpong_game_lifecycle, [
+    {description, "CMD service for MPong game lifecycle: host, join, start, eliminate, end"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_mpong_game_lifecycle_app, []}},
+    {applications, [kernel, stdlib, reckon_db, evoq, reckon_evoq]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

@@ -40,7 +40,8 @@
     {sales_store,               "sales",               "Sales (selling process)"},
     {payments_store,            "payments",            "Payments (payment process)"},
     {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"},
-    {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"}
+    {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"},
+    {mpong_store,               "mpong",               "MPong (mesh pong game lifecycle)"}
 ]).
 
 %% Site store (cluster nodes, site-level state).
@@ -148,23 +149,45 @@ start_supervisor_then_stores() ->
 %% Uses spawn (NOT spawn_link) — a store crash shouldn't take down the
 %% app controller. Boot tracker handles failures via timeout.
 spawn_stores(Stores) ->
-    logger:info("Spawning ~b event store processes...", [length(Stores)]),
-    lists:foreach(fun({StoreId, SubDir, Label}) ->
-        spawn(fun() ->
-            logger:info("Starting ~s event store (~p)...", [Label, StoreId]),
-            DataDir = shared_paths:reckon_path(SubDir),
-            ok = filelib:ensure_path(DataDir),
-            Config = #store_config{
-                store_id = StoreId,
-                data_dir = DataDir,
-                writer_pool_size = 5,
-                reader_pool_size = 5,
-                gateway_pool_size = 2,
-                options = #{}
-            },
-            start_store(Config)
-        end)
-    end, Stores).
+    Mode = application:get_env(hecate, store_mode, cluster),
+    logger:info("Spawning ~b event store processes (mode=~p)...", [length(Stores), Mode]),
+    %% Start stores sequentially to avoid overwhelming Khepri/Ra.
+    %% Each store creates its own Ra system — parallel starts cause
+    %% file lock contention and resource exhaustion.
+    spawn(fun() -> start_stores_sequential(Stores, Mode) end).
+
+start_stores_sequential([], _Mode) ->
+    logger:info("All event stores spawned"),
+    ok;
+start_stores_sequential([{StoreId, SubDir, Label} | Rest], Mode) ->
+    logger:info("Starting ~s event store (~p, mode=~p)...", [Label, StoreId, Mode]),
+    DataDir = shared_paths:reckon_path(SubDir),
+    ok = filelib:ensure_path(DataDir),
+    Config = #store_config{
+        store_id = StoreId,
+        data_dir = DataDir,
+        mode = Mode,
+        writer_pool_size = 5,
+        reader_pool_size = 5,
+        gateway_pool_size = 2,
+        options = #{}
+    },
+    %% Timeout: if a store takes >10s, skip and continue
+    Parent = self(),
+    Ref = make_ref(),
+    Pid = spawn_link(fun() ->
+        start_store(Config),
+        Parent ! {store_done, Ref}
+    end),
+    receive
+        {store_done, Ref} -> ok
+    after 10000 ->
+        logger:warning("Store ~p timed out after 10s, skipping", [StoreId]),
+        unlink(Pid),
+        exit(Pid, kill)
+    end,
+    start_stores_sequential(Rest, Mode).
+
 
 
 %% @private Start a single ReckonDB store, handling already_started.
