@@ -77,8 +77,10 @@ handle_info({mpong_lobby_open, _HostPid, _LobbyInfo}, State) ->
     {noreply, State};
 
 %% Spot confirmed by host
-handle_info({spot_reserved, GameId, WallIndex}, State) ->
+handle_info({spot_reserved, GameId, WallIndex}, #seeker{host_pid = HostPid} = State) ->
     logger:info("[mpong_seeker] Spot reserved in ~s at wall ~b", [GameId, WallIndex]),
+    %% Monitor the host lobby so we know when the game ends
+    erlang:monitor(process, HostPid),
     %% Join game pg group to receive state broadcasts
     pg:join(pg, {mpong_game, GameId}, self()),
     hecate_web_events:broadcast(mpong_lobby_joined, #{game_id => GameId, wall_index => WallIndex}),

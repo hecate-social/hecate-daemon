@@ -127,8 +127,17 @@ handle_info(countdown_tick, #lobby{state = countdown, countdown = N} = State) ->
     erlang:send_after(1000, self(), countdown_tick),
     {noreply, State#lobby{countdown = N - 1}};
 
-handle_info({'DOWN', _Ref, process, Pid, _Reason}, #lobby{engine_pid = Pid} = State) ->
-    logger:info("[mpong_lobby] Engine stopped for ~s, lobby closing", [State#lobby.game_id]),
+handle_info({'DOWN', _Ref, process, Pid, _Reason}, #lobby{engine_pid = Pid, game_id = GameId} = State) ->
+    logger:info("[mpong_lobby] Engine stopped for ~s, lobby closing", [GameId]),
+    %% Update projection to mark game as ended
+    case project_mpong_games_store:get(GameId) of
+        {ok, Game} ->
+            project_mpong_games_store:put(GameId, Game#{
+                status => <<"ended">>,
+                ended_at => erlang:system_time(millisecond)
+            });
+        _ -> ok
+    end,
     {stop, normal, State};
 
 handle_info(_Info, State) ->
