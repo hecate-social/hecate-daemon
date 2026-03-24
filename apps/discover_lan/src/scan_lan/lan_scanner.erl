@@ -321,15 +321,13 @@ do_admit_peer(SiteId, NodeName) ->
         {error, _} -> ok
     end.
 
-%% @private Dispatch spot in a separate process so scanner never crashes.
+%% @private Dispatch spot synchronously (serialized per scan cycle).
+%% Catch errors so the scanner never crashes.
 dispatch_spot_safe(Cmd) ->
-    spawn(fun() -> do_dispatch_spot(Cmd) end),
-    ok.
-
-do_dispatch_spot(Cmd) ->
-    case maybe_spot_lan_machine:dispatch(Cmd) of
+    try maybe_spot_lan_machine:dispatch(Cmd) of
         {ok, _V, _Events} -> ok;
         {error, _} -> ok
+    catch _:_ -> ok
     end.
 
 app_version() ->
