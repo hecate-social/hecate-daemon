@@ -88,12 +88,8 @@ handle_call(get_status, _From, #state{client = Client, realm = Realm,
 handle_call({discover_subscribers, _Topic}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
 handle_call({discover_subscribers, Topic}, _From, #state{client = Client} = State) ->
-    %% DHT find_value can timeout (10s gen_server:call inside macula).
-    %% Catch the exit to avoid crashing the mesh client gen_server.
-    Result = try macula:discover_subscribers(Client, Topic)
-             catch exit:{timeout, _} -> {error, dht_timeout}
-             end,
-    {reply, Result, State};
+    %% macula 0.22.12+ catches DHT timeouts internally
+    {reply, macula:discover_subscribers(Client, Topic), State};
 
 handle_call({publish, _Topic, _Payload}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
