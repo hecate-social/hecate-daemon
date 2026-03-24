@@ -66,4 +66,5 @@ generate_id() ->
     binary:encode_hex(crypto:strong_rand_bytes(8), lowercase).
 
 parse_mode(<<"mesh">>) -> mesh;
+parse_mode(<<"mixed">>) -> mixed;
 parse_mode(_) -> lan.

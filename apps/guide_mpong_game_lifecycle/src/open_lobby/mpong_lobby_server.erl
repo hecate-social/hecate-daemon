@@ -26,7 +26,7 @@
     host_node     :: binary(),
     host_champion :: map(),
     max_players   :: pos_integer(),
-    mode          :: lan | mesh,
+    mode          :: lan | mesh | mixed,
     seats         :: [seat()],
     state         :: waiting | countdown | playing,
     countdown     :: non_neg_integer(),
@@ -109,26 +109,30 @@ handle_call(get_info, _From, State) ->
 handle_call(_Req, _From, State) ->
     {reply, {error, unknown}, State}.
 
-%% LAN join (with tech metadata)
+%% LAN join (with tech metadata) — accepted in lan and mixed modes
 handle_cast({reserve_spot, FromPid, ChampionData, Tech},
-            #lobby{state = waiting, mode = lan} = State) ->
+            #lobby{state = waiting, mode = Mode} = State)
+  when Mode =:= lan; Mode =:= mixed ->
     handle_reserve(FromPid, ChampionData, Tech, State);
 
-%% LAN join (legacy 3-tuple, no tech — backwards compat during transition)
+%% LAN join (legacy 3-tuple, no tech)
 handle_cast({reserve_spot, FromPid, ChampionData},
-            #lobby{state = waiting, mode = lan} = State) ->
+            #lobby{state = waiting, mode = Mode} = State)
+  when Mode =:= lan; Mode =:= mixed ->
     Tech = #{transport => lan, country => undefined, city => undefined,
              rtt_ms => 0, nat_type => undefined},
     handle_reserve(FromPid, ChampionData, Tech, State);
 
-%% Mesh join (with tech metadata)
+%% Mesh join (with tech metadata) — accepted in mesh and mixed modes
 handle_cast({mesh_join, ChampionData, NodeId, Tech},
-            #lobby{state = waiting, mode = mesh, seats = Seats} = State) ->
+            #lobby{state = waiting, mode = Mode, seats = Seats} = State)
+  when Mode =:= mesh; Mode =:= mixed ->
     handle_mesh_reserve(ChampionData, NodeId, Tech, Seats, State);
 
 %% Mesh join (legacy 3-tuple, no tech)
 handle_cast({mesh_join, ChampionData, NodeId},
-            #lobby{state = waiting, mode = mesh, seats = Seats} = State) ->
+            #lobby{state = waiting, mode = Mode, seats = Seats} = State)
+  when Mode =:= mesh; Mode =:= mixed ->
     Tech = #{transport => mesh, country => undefined, city => undefined,
              rtt_ms => undefined, nat_type => undefined},
     handle_mesh_reserve(ChampionData, NodeId, Tech, Seats, State);
@@ -136,7 +140,8 @@ handle_cast({mesh_join, ChampionData, NodeId},
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(broadcast_lobby, #lobby{state = waiting, mode = lan} = State) ->
+handle_info(broadcast_lobby, #lobby{state = waiting, mode = Mode} = State)
+  when Mode =:= lan; Mode =:= mixed ->
     Members = try pg:get_members(pg, mpong_lobby) catch _:_ -> [] end,
     Info = lobby_info(State),
     [Pid ! {mpong_lobby_open, self(), Info} || Pid <- Members, Pid =/= self()],
@@ -185,11 +190,22 @@ init_discovery(mesh, GameId, HostNode, MaxPlayers) ->
     MeshAdvRef = advertise_join_rpc(GameId),
     advertise_game:announce(#{game_id => GameId, host_node_id => HostNode,
                               max_players => MaxPlayers}),
-    {undefined, MeshAdvRef}.
+    {undefined, MeshAdvRef};
+init_discovery(mixed, GameId, HostNode, MaxPlayers) ->
+    pg:join(pg, mpong_lobby, self()),
+    Ref = erlang:send_after(?BROADCAST_MS, self(), broadcast_lobby),
+    MeshAdvRef = advertise_join_rpc(GameId),
+    advertise_game:announce(#{game_id => GameId, host_node_id => HostNode,
+                              max_players => MaxPlayers}),
+    {Ref, MeshAdvRef}.
 
 cleanup_discovery(lan, _GameId, _MeshAdvRef) ->
     pg:leave(pg, mpong_lobby, self());
 cleanup_discovery(mesh, GameId, MeshAdvRef) ->
+    unadvertise_join_rpc(MeshAdvRef),
+    advertise_game:withdraw(GameId);
+cleanup_discovery(mixed, GameId, MeshAdvRef) ->
+    pg:leave(pg, mpong_lobby, self()),
     unadvertise_join_rpc(MeshAdvRef),
     advertise_game:withdraw(GameId).
 
