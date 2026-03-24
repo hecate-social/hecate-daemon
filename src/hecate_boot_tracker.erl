@@ -105,12 +105,10 @@ handle_cast(Msg, State) ->
 
 handle_info(poll_stores, #state{boot_phase = booting_stores} = State) ->
     #state{expected_stores = Expected, ready_stores = Ready, start_time = StartTime} = State,
-    Running = try reckon_db_sup:which_stores()
-              catch Class:Reason ->
-                  logger:debug("[hecate_boot_tracker] which_stores failed: ~p:~p",
-                               [Class, Reason]),
-                  []
-              end,
+    %% Don't call reckon_db_sup:which_stores() — it does supervisor:which_children()
+    %% which blocks when the supervisor is busy starting stores.
+    %% Instead, check if each store's manager process is registered.
+    Running = [S || S <- Expected, is_store_registered(S)],
     NewlyReady = [S || S <- Running,
                        lists:member(S, Expected),
                        not maps:is_key(S, Ready)],
@@ -171,6 +169,13 @@ trigger_post_boot(#state{ready_stores = Ready, start_time = StartTime} = State) 
 
     spawn(fun() -> run_post_boot(ReadyStoreIds) end),
     {noreply, NewState}.
+
+%% @private Check if a store's manager process is registered (non-blocking).
+%% Uses reckon_db_naming convention: reckon_db_store_mgr_{StoreId}.
+-spec is_store_registered(atom()) -> boolean().
+is_store_registered(StoreId) ->
+    MgrName = reckon_db_naming:store_mgr_name(StoreId),
+    is_pid(whereis(MgrName)).
 
 run_post_boot(ReadyStoreIds) ->
     try
