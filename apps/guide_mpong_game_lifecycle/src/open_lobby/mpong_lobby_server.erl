@@ -30,7 +30,8 @@
     state        :: waiting | countdown | playing,
     countdown    :: non_neg_integer(),
     broadcast_ref :: reference() | undefined,
-    engine_pid   :: pid() | undefined
+    engine_pid   :: pid() | undefined,
+    mesh_adv_ref :: reference() | undefined
 }).
 
 -type seat() :: #{
@@ -68,13 +69,21 @@ init(#{game_id := GameId, max_players := MaxPlayers, host_champion := HostChampi
                  || I <- lists:seq(1, MaxPlayers - 1)],
     Seats = [Seat0 | OpenSeats],
 
-    %% Join lobby discovery group
+    %% Join lobby discovery group (LAN via pg)
     pg:join(pg, mpong_lobby, self()),
 
-    %% Start broadcasting
+    %% Advertise mesh RPC procedure for remote join
+    MeshAdvRef = advertise_join_rpc(GameId),
+
+    %% Announce on mesh topic so remote nodes discover us
+    advertise_game:announce(#{game_id => GameId, host_node_id => HostNode,
+                              max_players => MaxPlayers}),
+
+    %% Start broadcasting (LAN pg)
     Ref = erlang:send_after(?BROADCAST_MS, self(), broadcast_lobby),
 
-    logger:info("[mpong_lobby] Lobby opened: ~s (~b seats)", [GameId, MaxPlayers]),
+    logger:info("[mpong_lobby] Lobby opened: ~s (~b seats, mesh RPC registered)",
+                [GameId, MaxPlayers]),
 
     {ok, #lobby{
         game_id = GameId,
@@ -84,7 +93,8 @@ init(#{game_id := GameId, max_players := MaxPlayers, host_champion := HostChampi
         seats = Seats,
         state = waiting,
         countdown = 0,
-        broadcast_ref = Ref
+        broadcast_ref = Ref,
+        mesh_adv_ref = MeshAdvRef
     }}.
 
 handle_call(get_info, _From, State) ->
@@ -95,6 +105,10 @@ handle_call(_Req, _From, State) ->
 
 handle_cast({reserve_spot, FromPid, ChampionData}, #lobby{state = waiting} = State) ->
     handle_reserve(FromPid, ChampionData, State);
+
+%% Mesh join request (from RPC handler, no PID — uses node_id for tracking)
+handle_cast({mesh_join, ChampionData, NodeId}, #lobby{state = waiting, seats = Seats} = State) ->
+    handle_mesh_reserve(ChampionData, NodeId, Seats, State);
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -137,9 +151,11 @@ handle_info({'DOWN', _Ref, process, Pid, _Reason}, #lobby{engine_pid = Pid, game
 handle_info(_Info, State) ->
     {noreply, State}.
 
-terminate(_Reason, #lobby{game_id = GameId}) ->
+terminate(_Reason, #lobby{game_id = GameId, mesh_adv_ref = MeshAdvRef}) ->
     pg:leave(pg, mpong_lobby, self()),
-    logger:info("[mpong_lobby] Lobby closed: ~s", [GameId]),
+    unadvertise_join_rpc(MeshAdvRef),
+    advertise_game:withdraw(GameId),
+    logger:info("[mpong_lobby] Lobby closed: ~s (mesh cleaned up)", [GameId]),
     ok.
 
 %%====================================================================
@@ -259,4 +275,70 @@ ensure_pg() ->
     case pg:start(pg) of
         {ok, _} -> ok;
         {error, {already_started, _}} -> ok
+    end.
+
+%%====================================================================
+%% Internal: Mesh join handling
+%%====================================================================
+
+handle_mesh_reserve(ChampionData, NodeId, Seats, State) ->
+    case find_open_seat(Seats) of
+        {ok, WallIndex} ->
+            ChampionName = maps:get(<<"name">>, ChampionData,
+                           maps:get(name, ChampionData, <<"Unknown">>)),
+            NewSeat = #{wall_index => WallIndex, status => reserved,
+                        champion => ChampionData, node_id => NodeId, pid => undefined},
+            NewSeats = replace_seat(WallIndex, NewSeat, Seats),
+            State2 = State#lobby{seats = NewSeats},
+
+            logger:info("[mpong_lobby] ~s (mesh) reserved seat ~b in ~s",
+                        [ChampionName, WallIndex, State#lobby.game_id]),
+
+            hecate_web_events:broadcast(mpong_lobby, lobby_info(State2)),
+
+            case all_seats_filled(NewSeats) of
+                true ->
+                    logger:info("[mpong_lobby] All seats filled, starting countdown"),
+                    erlang:send_after(1000, self(), countdown_tick),
+                    broadcast_countdown(State2#lobby.game_id, ?COUNTDOWN_SECS),
+                    {noreply, State2#lobby{state = countdown, countdown = ?COUNTDOWN_SECS}};
+                false ->
+                    {noreply, State2}
+            end;
+        full ->
+            {noreply, State}
+    end.
+
+%%====================================================================
+%% Internal: Mesh RPC advertisement
+%%====================================================================
+
+advertise_join_rpc(GameId) ->
+    case hecate_mesh:get_client() of
+        {ok, Client} ->
+            Procedure = advertise_game:join_procedure(GameId),
+            Self = self(),
+            Handler = fun(Args) ->
+                ChampionData = maps:get(<<"champion">>, Args, #{}),
+                NodeId = maps:get(<<"node_id">>, Args, <<"unknown">>),
+                gen_server:cast(Self, {mesh_join, ChampionData, NodeId}),
+                {ok, #{status => <<"reserved">>, game_id => GameId}}
+            end,
+            case macula:advertise(Client, Procedure, Handler) of
+                {ok, Ref} ->
+                    logger:info("[mpong_lobby] Mesh RPC registered: ~s", [Procedure]),
+                    Ref;
+                {error, Reason} ->
+                    logger:warning("[mpong_lobby] Mesh RPC failed: ~p", [Reason]),
+                    undefined
+            end;
+        _ ->
+            undefined
+    end.
+
+unadvertise_join_rpc(undefined) -> ok;
+unadvertise_join_rpc(Ref) ->
+    case hecate_mesh:get_client() of
+        {ok, Client} -> macula:unadvertise(Client, Ref);
+        _ -> ok
     end.

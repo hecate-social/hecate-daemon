@@ -1,10 +1,13 @@
 %%%-------------------------------------------------------------------
-%%% @doc MPong lobby seeker — auto-joins games on the LAN cluster.
+%%% @doc MPong lobby seeker — auto-joins games on LAN and mesh.
 %%%
 %%% Runs as a permanent child of guide_mpong_game_lifecycle_sup.
-%%% Joins pg group `mpong_lobby` and listens for lobby_open broadcasts.
-%%% When an open lobby is found, reserves a spot with our champion.
-%%% When game starts, forwards state to local hecate_web_events for UI.
+%%% Discovery sources:
+%%% 1. pg group `mpong_lobby` — LAN/Erlang cluster lobbies
+%%% 2. Mesh topic `mpong.games.available` — remote mesh lobbies
+%%%
+%%% For LAN: reserves spot via direct gen_server:cast (pg PID)
+%%% For Mesh: reserves spot via mesh RPC call to join procedure
 %%% @end
 %%%-------------------------------------------------------------------
 -module(mpong_lobby_seeker).
@@ -14,10 +17,11 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -record(seeker, {
-    champion   :: map() | undefined,
+    champion    :: map() | undefined,
     joined_game :: binary() | undefined,
-    wall_index :: non_neg_integer() | undefined,
-    host_pid   :: pid() | undefined
+    wall_index  :: non_neg_integer() | undefined,
+    host_pid    :: pid() | undefined,
+    mesh_sub    :: reference() | undefined
 }).
 
 %%====================================================================
@@ -34,10 +38,14 @@ start_link() ->
 init([]) ->
     ensure_pg(),
     pg:join(pg, mpong_lobby, self()),
+
+    %% Subscribe to mesh topic for remote lobby discovery
+    MeshSub = subscribe_mesh_lobbies(),
+
     %% Periodically try connecting to peer dev nodes (every 10s until connected)
     erlang:send_after(3000, self(), try_connect_peers),
-    logger:info("[mpong_seeker] Listening for lobbies on pg group"),
-    {ok, #seeker{}}.
+    logger:info("[mpong_seeker] Listening for lobbies on pg + mesh"),
+    {ok, #seeker{mesh_sub = MeshSub}}.
 
 handle_call(_Req, _From, State) ->
     {reply, ok, State}.
@@ -45,9 +53,9 @@ handle_call(_Req, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-%% Lobby broadcast from a host node
+%% ---- LAN lobby broadcast (from pg group) ----
+
 handle_info({mpong_lobby_open, HostPid, LobbyInfo}, #seeker{joined_game = undefined} = State) ->
-    %% Not in a game yet — try to join if there's an open seat
     OpenSeats = maps:get(open_seats, LobbyInfo, 0),
     GameId = maps:get(game_id, LobbyInfo, <<>>),
     HostNode = maps:get(host_node, LobbyInfo, <<>>),
@@ -55,62 +63,60 @@ handle_info({mpong_lobby_open, HostPid, LobbyInfo}, #seeker{joined_game = undefi
 
     case {OpenSeats > 0, HostNode =/= OurNode} of
         {true, true} ->
-            %% Different node has an open lobby — try to join
             Champion = get_our_champion(),
-            case Champion of
-                undefined ->
-                    %% No champion yet, skip
-                    {noreply, State};
-                C ->
-                    logger:info("[mpong_seeker] Found lobby ~s on ~s, reserving spot",
-                                [GameId, HostNode]),
-                    gen_server:cast(HostPid, {reserve_spot, self(), C}),
-                    {noreply, State#seeker{champion = C, host_pid = HostPid}}
-            end;
+            try_lan_join(Champion, GameId, HostNode, HostPid, State);
         _ ->
-            %% Our own lobby or full — ignore
             {noreply, State}
     end;
 
-%% Already in a game — ignore other lobbies
 handle_info({mpong_lobby_open, _HostPid, _LobbyInfo}, State) ->
     {noreply, State};
 
-%% Spot confirmed by host
+%% ---- Mesh lobby announcement ----
+
+handle_info({mesh_lobby, Payload}, #seeker{joined_game = undefined} = State) ->
+    handle_mesh_lobby(Payload, State);
+
+handle_info({mesh_lobby, _Payload}, State) ->
+    {noreply, State};
+
+%% ---- Spot confirmed by LAN host ----
+
 handle_info({spot_reserved, GameId, WallIndex}, #seeker{host_pid = HostPid} = State) ->
     logger:info("[mpong_seeker] Spot reserved in ~s at wall ~b", [GameId, WallIndex]),
-    %% Monitor the host lobby so we know when the game ends
     erlang:monitor(process, HostPid),
-    %% Join game pg group to receive state broadcasts
     pg:join(pg, {mpong_game, GameId}, self()),
     hecate_web_events:broadcast(mpong_lobby_joined, #{game_id => GameId, wall_index => WallIndex}),
     {noreply, State#seeker{joined_game = GameId, wall_index = WallIndex}};
 
-%% Spot denied
 handle_info({spot_denied, GameId, Reason}, State) ->
     logger:info("[mpong_seeker] Spot denied in ~s: ~p", [GameId, Reason]),
     {noreply, State#seeker{host_pid = undefined}};
 
-%% Countdown from host
+%% ---- Game state forwarding ----
+
 handle_info({mpong_countdown, _GameId, _N}, State) ->
-    %% Frontend handles countdown display via hecate_web_events (host already broadcasts)
     {noreply, State};
 
-%% Game state from engine (via pg group)
 handle_info({mpong_state, _GameId, StateMsg}, State) ->
-    %% Forward to local web UI
     hecate_web_events:broadcast(mpong_state, StateMsg),
     {noreply, State};
 
-%% Game ended — reset seeker to listen for new games
+%% ---- Lifecycle ----
+
 handle_info({'DOWN', _Ref, process, Pid, _Reason}, #seeker{host_pid = Pid} = State) ->
     logger:info("[mpong_seeker] Host lobby process died, ready for new games"),
     reset_state(State);
 
-%% Periodic peer connection attempts
+%% Mesh join confirmation — start listening for game state over mesh
+handle_info({mesh_joined, GameId}, #seeker{} = State) ->
+    logger:info("[mpong_seeker] Mesh game joined: ~s, starting state listener", [GameId]),
+    hecate_web_events:broadcast(mpong_lobby_joined, #{game_id => GameId, wall_index => undefined}),
+    listen_game_state_sup:start_listener(#{game_id => GameId, wall_index => 1}),
+    {noreply, State#seeker{joined_game = GameId}};
+
 handle_info(try_connect_peers, State) ->
     Connected = try_connect_dev_peers(),
-    %% Retry every 10s if no peers found, stop retrying once connected
     case Connected of
         0 -> erlang:send_after(10000, self(), try_connect_peers);
         _ -> ok
@@ -120,13 +126,110 @@ handle_info(try_connect_peers, State) ->
 handle_info(_Info, State) ->
     {noreply, State}.
 
-terminate(_Reason, _State) ->
+terminate(_Reason, #seeker{mesh_sub = MeshSub}) ->
     pg:leave(pg, mpong_lobby, self()),
+    unsubscribe_mesh(MeshSub),
     ok.
 
 %%====================================================================
-%% Internal
+%% Internal: LAN join
 %%====================================================================
+
+try_lan_join(undefined, _GameId, _HostNode, _HostPid, State) ->
+    {noreply, State};
+try_lan_join(Champion, GameId, HostNode, HostPid, State) ->
+    logger:info("[mpong_seeker] Found LAN lobby ~s on ~s, reserving spot",
+                [GameId, HostNode]),
+    gen_server:cast(HostPid, {reserve_spot, self(), Champion}),
+    {noreply, State#seeker{champion = Champion, host_pid = HostPid}}.
+
+%%====================================================================
+%% Internal: Mesh join
+%%====================================================================
+
+handle_mesh_lobby(Payload, State) ->
+    Msg = decode_payload(Payload),
+    Action = maps:get(<<"action">>, Msg, undefined),
+    HostNodeId = maps:get(<<"host_node_id">>, Msg, <<>>),
+    OurNode = atom_to_binary(node()),
+    handle_mesh_action(Action, HostNodeId, OurNode, Msg, State).
+
+handle_mesh_action(<<"hosted">>, HostNodeId, OurNode, _Msg, State)
+  when HostNodeId =:= OurNode ->
+    %% Our own lobby — ignore
+    {noreply, State};
+handle_mesh_action(<<"hosted">>, _HostNodeId, _OurNode, Msg, State) ->
+    GameId = maps:get(<<"game_id">>, Msg, <<>>),
+    JoinProcedure = maps:get(<<"join_procedure">>, Msg, undefined),
+    Champion = get_our_champion(),
+    try_mesh_join(Champion, JoinProcedure, GameId, State);
+handle_mesh_action(_, _HostNodeId, _OurNode, _Msg, State) ->
+    {noreply, State}.
+
+try_mesh_join(undefined, _JoinProcedure, _GameId, State) ->
+    {noreply, State};
+try_mesh_join(_Champion, undefined, _GameId, State) ->
+    {noreply, State};
+try_mesh_join(Champion, JoinProcedure, GameId, State) ->
+    logger:info("[mpong_seeker] Found mesh lobby ~s, joining via RPC ~s",
+                [GameId, JoinProcedure]),
+    %% Spawn the mesh RPC call to avoid blocking the seeker
+    Self = self(),
+    spawn(fun() ->
+        case hecate_mesh:get_client() of
+            {ok, Client} ->
+                Args = #{
+                    <<"champion">> => Champion,
+                    <<"node_id">> => atom_to_binary(node())
+                },
+                case macula:call(Client, JoinProcedure, Args, #{timeout => 5000}) of
+                    {ok, _Result} ->
+                        logger:info("[mpong_seeker] Mesh join accepted for ~s", [GameId]),
+                        Self ! {mesh_joined, GameId};
+                    {error, Reason} ->
+                        logger:warning("[mpong_seeker] Mesh join failed for ~s: ~p",
+                                       [GameId, Reason])
+                end;
+            _ ->
+                logger:warning("[mpong_seeker] No mesh client for join RPC")
+        end
+    end),
+    {noreply, State#seeker{champion = Champion}}.
+
+%%====================================================================
+%% Internal: Mesh subscription
+%%====================================================================
+
+subscribe_mesh_lobbies() ->
+    Self = self(),
+    case erlang:function_exported(hecate_mesh, subscribe, 2) of
+        true ->
+            case hecate_mesh:subscribe(<<"mpong.games.available">>,
+                                       fun(Msg) -> Self ! {mesh_lobby, Msg}, ok end) of
+                {ok, Ref} -> Ref;
+                _ -> undefined
+            end;
+        false ->
+            undefined
+    end.
+
+unsubscribe_mesh(undefined) -> ok;
+unsubscribe_mesh(Ref) ->
+    case erlang:function_exported(hecate_mesh, unsubscribe, 1) of
+        true -> hecate_mesh:unsubscribe(Ref);
+        false -> ok
+    end.
+
+%%====================================================================
+%% Internal: Helpers
+%%====================================================================
+
+decode_payload(Payload) when is_binary(Payload) ->
+    try json:decode(Payload) catch _:_ -> #{} end;
+decode_payload(Payload) when is_map(Payload) ->
+    Payload;
+decode_payload(_) ->
+    #{}.
 
 get_our_champion() ->
     NodeId = atom_to_binary(node()),
@@ -152,8 +255,6 @@ ensure_pg() ->
         {error, {already_started, _}} -> ok
     end.
 
-%% @private Try connecting to known dev peer nodes.
-%% Works with both -sname (short) and -name (long) modes.
 %% @private Try connecting to known dev peer nodes.
 %% Returns count of new connections made.
 try_connect_dev_peers() ->
