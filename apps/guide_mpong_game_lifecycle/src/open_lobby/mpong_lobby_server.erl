@@ -90,7 +90,7 @@ init(#{game_id := GameId, max_players := MaxPlayers, host_champion := HostChampi
     logger:info("[mpong_lobby] Lobby opened: ~s (~b seats, mode=~s)",
                 [GameId, MaxPlayers, Mode]),
 
-    {ok, #lobby{
+    Lobby = #lobby{
         game_id = GameId,
         host_node = HostNode,
         host_champion = HostChampion,
@@ -101,7 +101,12 @@ init(#{game_id := GameId, max_players := MaxPlayers, host_champion := HostChampi
         countdown = 0,
         broadcast_ref = BroadcastRef,
         mesh_adv_ref = MeshAdvRef
-    }}.
+    },
+
+    %% Always broadcast initial lobby state to local web UI
+    hecate_web_events:broadcast(mpong_lobby, lobby_info(Lobby)),
+
+    {ok, Lobby}.
 
 handle_call(get_info, _From, State) ->
     {reply, lobby_info(State), State};
