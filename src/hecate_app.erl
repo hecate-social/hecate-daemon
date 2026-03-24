@@ -149,7 +149,9 @@ start_supervisor_then_stores() ->
 %% Uses spawn (NOT spawn_link) — a store crash shouldn't take down the
 %% app controller. Boot tracker handles failures via timeout.
 spawn_stores(Stores) ->
-    Mode = application:get_env(hecate, store_mode, cluster),
+    %% Start stores in single mode for fast boot. Cluster join happens
+    %% later in boot_tracker:maybe_join_cluster/1 after readiness.
+    Mode = application:get_env(hecate, store_mode, single),
     logger:info("Spawning ~b event store processes (mode=~p)...", [length(Stores), Mode]),
     %% Start stores sequentially to avoid overwhelming Khepri/Ra.
     %% Each store creates its own Ra system — parallel starts cause
