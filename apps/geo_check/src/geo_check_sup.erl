@@ -66,9 +66,9 @@ start_locus_loader(LoaderId, {maxmind, DbName}) ->
             application:set_env(locus, license_key, LicenseKey),
             ok = filelib:ensure_dir(CacheFile),
             logger:info("[geo_check] Starting ~s with cache: ~s", [LoaderId, CacheFile]),
-            locus:start_loader(LoaderId, {maxmind, DbName}, #{
-                database_cache_file => CacheFile
-            })
+            locus:start_loader(LoaderId, {maxmind, DbName}, [
+                {database_cache_file, CacheFile}
+            ])
     end;
 start_locus_loader(LoaderId, {url, Url}) ->
     locus:start_loader(LoaderId, Url);
