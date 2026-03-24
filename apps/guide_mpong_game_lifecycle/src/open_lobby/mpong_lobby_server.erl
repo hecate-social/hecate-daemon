@@ -145,6 +145,24 @@ handle_cast({mesh_join, ChampionData, NodeId},
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info({init_mesh, GameId, HostNode, MaxPlayers},
+            #lobby{state = waiting} = State) ->
+    MeshAdvRef = advertise_join_rpc(GameId),
+    case MeshAdvRef of
+        undefined ->
+            %% Mesh not ready — retry in 2 seconds
+            erlang:send_after(2000, self(), {init_mesh, GameId, HostNode, MaxPlayers}),
+            {noreply, State};
+        _ ->
+            advertise_game:announce(#{game_id => GameId, host_node_id => HostNode,
+                                      max_players => MaxPlayers}),
+            {noreply, State#lobby{mesh_adv_ref = MeshAdvRef}}
+    end;
+
+handle_info({init_mesh, _GameId, _HostNode, _MaxPlayers}, State) ->
+    %% No longer waiting — discard
+    {noreply, State};
+
 handle_info(broadcast_lobby, #lobby{state = waiting, mode = Mode} = State)
   when Mode =:= lan; Mode =:= mixed ->
     Members = try pg:get_members(pg, mpong_lobby) catch _:_ -> [] end,
@@ -192,17 +210,13 @@ init_discovery(lan, _GameId, _HostNode, _MaxPlayers) ->
     Ref = erlang:send_after(?BROADCAST_MS, self(), broadcast_lobby),
     {Ref, undefined};
 init_discovery(mesh, GameId, HostNode, MaxPlayers) ->
-    MeshAdvRef = advertise_join_rpc(GameId),
-    advertise_game:announce(#{game_id => GameId, host_node_id => HostNode,
-                              max_players => MaxPlayers}),
-    {undefined, MeshAdvRef};
+    self() ! {init_mesh, GameId, HostNode, MaxPlayers},
+    {undefined, undefined};
 init_discovery(mixed, GameId, HostNode, MaxPlayers) ->
     pg:join(pg, mpong_lobby, self()),
     Ref = erlang:send_after(?BROADCAST_MS, self(), broadcast_lobby),
-    MeshAdvRef = advertise_join_rpc(GameId),
-    advertise_game:announce(#{game_id => GameId, host_node_id => HostNode,
-                              max_players => MaxPlayers}),
-    {Ref, MeshAdvRef}.
+    self() ! {init_mesh, GameId, HostNode, MaxPlayers},
+    {Ref, undefined}.
 
 cleanup_discovery(lan, _GameId, _MeshAdvRef) ->
     pg:leave(pg, mpong_lobby, self());
@@ -389,26 +403,32 @@ format_tech(_) -> <<"partial-tech">>.
 %%====================================================================
 
 advertise_join_rpc(GameId) ->
-    case hecate_mesh:get_client() of
-        {ok, Client} ->
-            Procedure = advertise_game:join_procedure(GameId),
-            Self = self(),
-            Handler = fun(Args) ->
-                ChampionData = maps:get(<<"champion">>, Args, #{}),
-                NodeId = maps:get(<<"node_id">>, Args, <<"unknown">>),
-                Tech = maps:get(<<"tech">>, Args, #{}),
-                gen_server:cast(Self, {mesh_join, ChampionData, NodeId, Tech}),
-                {ok, #{status => <<"reserved">>, game_id => GameId}}
-            end,
-            case macula:advertise(Client, Procedure, Handler) of
-                {ok, Ref} ->
-                    logger:info("[mpong_lobby] Mesh RPC registered: ~s", [Procedure]),
-                    Ref;
-                {error, Reason} ->
-                    logger:warning("[mpong_lobby] Mesh RPC failed: ~p", [Reason]),
-                    undefined
-            end;
-        _ ->
+    try
+        case hecate_mesh:get_client() of
+            {ok, Client} ->
+                Procedure = advertise_game:join_procedure(GameId),
+                Self = self(),
+                Handler = fun(Args) ->
+                    ChampionData = maps:get(<<"champion">>, Args, #{}),
+                    NodeId = maps:get(<<"node_id">>, Args, <<"unknown">>),
+                    Tech = maps:get(<<"tech">>, Args, #{}),
+                    gen_server:cast(Self, {mesh_join, ChampionData, NodeId, Tech}),
+                    {ok, #{status => <<"reserved">>, game_id => GameId}}
+                end,
+                case macula:advertise(Client, Procedure, Handler) of
+                    {ok, Ref} ->
+                        logger:info("[mpong_lobby] Mesh RPC registered: ~s", [Procedure]),
+                        Ref;
+                    {error, Reason} ->
+                        logger:warning("[mpong_lobby] Mesh RPC failed: ~p", [Reason]),
+                        undefined
+                end;
+            _ ->
+                undefined
+        end
+    catch
+        exit:{timeout, _} ->
+            logger:warning("[mpong_lobby] Mesh advertise timed out, will retry"),
             undefined
     end.
 

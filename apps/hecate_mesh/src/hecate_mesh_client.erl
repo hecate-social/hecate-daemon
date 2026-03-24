@@ -98,17 +98,13 @@ handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) -
 
 handle_call({subscribe, _Topic, _Callback}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
-handle_call({subscribe, Topic, CallbackPid}, _From, #state{client = Client, subscriptions = Subs,
-                                                          sub_intents = Intents} = State) ->
-    CallbackFun = fun(EventData) ->
-        CallbackPid ! {mesh_fact, Topic, EventData},
-        ok
-    end,
-    case macula:subscribe(Client, Topic, CallbackFun) of
+handle_call({subscribe, Topic, Callback}, _From, #state{client = Client, subscriptions = Subs,
+                                                       sub_intents = Intents} = State) ->
+    case macula:subscribe(Client, Topic, Callback) of
         {ok, SubRef} ->
             {reply, {ok, SubRef}, State#state{
                 subscriptions = Subs#{SubRef => Topic},
-                sub_intents = Intents#{Topic => CallbackPid}
+                sub_intents = Intents#{Topic => Callback}
             }};
         {error, Reason} ->
             {reply, {error, Reason}, State}
@@ -178,12 +174,8 @@ terminate(_Reason, #state{client = Client}) ->
 
 %% @private Re-subscribe all durable intents after reconnection.
 resubscribe_intents(Client, Intents) ->
-    maps:fold(fun(Topic, CallbackPid, Acc) ->
-        CallbackFun = fun(EventData) ->
-            CallbackPid ! {mesh_fact, Topic, EventData},
-            ok
-        end,
-        case macula:subscribe(Client, Topic, CallbackFun) of
+    maps:fold(fun(Topic, Callback, Acc) ->
+        case macula:subscribe(Client, Topic, Callback) of
             {ok, SubRef} ->
                 logger:info("[hecate_mesh] Re-subscribed to ~s", [Topic]),
                 Acc#{SubRef => Topic};
