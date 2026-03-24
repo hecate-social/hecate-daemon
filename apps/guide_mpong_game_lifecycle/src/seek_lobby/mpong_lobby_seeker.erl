@@ -209,7 +209,7 @@ subscribe_mesh_lobbies() ->
     Self = self(),
     case erlang:function_exported(hecate_mesh, subscribe, 2) of
         true ->
-            case hecate_mesh:subscribe(<<"mpong.games.available">>,
+            case hecate_mesh:subscribe(advertise_game:topic(),
                                        fun(Msg) -> Self ! {mesh_lobby, Msg}, ok end) of
                 {ok, Ref} -> Ref;
                 _ -> undefined

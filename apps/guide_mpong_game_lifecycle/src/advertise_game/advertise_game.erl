@@ -9,17 +9,23 @@
 %%%-------------------------------------------------------------------
 -module(advertise_game).
 
--export([announce/1, withdraw/1, join_procedure/1]).
+-export([announce/1, withdraw/1, join_procedure/1, topic/0]).
 
 %% @doc Build the mesh RPC procedure name for joining a game.
 -spec join_procedure(binary()) -> binary().
 join_procedure(GameId) ->
     <<"hecate.mpong.join.", GameId/binary>>.
 
+%% @doc Build the realm-prefixed mesh topic for game announcements.
+-spec topic() -> binary().
+topic() ->
+    Realm = application:get_env(hecate, realm, <<"io.macula">>),
+    <<Realm/binary, ".hecate.mpong.games.available">>.
+
 -spec announce(map()) -> ok.
 announce(#{game_id := GameId, host_node_id := HostNodeId,
            max_players := MaxPlayers} = _GameInfo) ->
-    Topic = <<"mpong.games.available">>,
+    Topic = topic(),
     Payload = json:encode(#{
         action => <<"hosted">>,
         game_id => GameId,
@@ -34,7 +40,7 @@ announce(#{game_id := GameId, host_node_id := HostNodeId,
 
 -spec withdraw(binary()) -> ok.
 withdraw(GameId) ->
-    Topic = <<"mpong.games.available">>,
+    Topic = topic(),
     Payload = json:encode(#{
         action => <<"withdrawn">>,
         game_id => GameId
