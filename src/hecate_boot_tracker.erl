@@ -13,8 +13,8 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 -define(SERVER, ?MODULE).
--define(BOOT_TIMEOUT_MS, 60_000).
--define(POLL_INTERVAL_MS, 500).
+-define(BOOT_TIMEOUT_MS, 120_000).
+-define(POLL_INTERVAL_MS, 1_000).
 
 -record(state, {
     expected_stores :: [atom()],
@@ -104,8 +104,13 @@ handle_cast(Msg, State) ->
     {noreply, State}.
 
 handle_info(poll_stores, #state{boot_phase = booting_stores} = State) ->
-    #state{expected_stores = Expected, ready_stores = Ready} = State,
-    Running = try reckon_db_sup:which_stores() catch _:_ -> [] end,
+    #state{expected_stores = Expected, ready_stores = Ready, start_time = StartTime} = State,
+    Running = try reckon_db_sup:which_stores()
+              catch Class:Reason ->
+                  logger:debug("[hecate_boot_tracker] which_stores failed: ~p:~p",
+                               [Class, Reason]),
+                  []
+              end,
     NewlyReady = [S || S <- Running,
                        lists:member(S, Expected),
                        not maps:is_key(S, Ready)],
@@ -114,8 +119,9 @@ handle_info(poll_stores, #state{boot_phase = booting_stores} = State) ->
 
     %% Log each newly discovered store
     lists:foreach(fun(S) ->
-        logger:info("[hecate_boot_tracker:poll_stores] ~p ready (~b/~b)",
-                    [S, map_size(NewReady), length(Expected)])
+        Elapsed = Now - StartTime,
+        logger:info("[hecate_boot_tracker] ~p ready (~b/~b) after ~bms",
+                    [S, map_size(NewReady), length(Expected), Elapsed])
     end, NewlyReady),
 
     NewState = State#state{ready_stores = NewReady},
@@ -167,22 +173,32 @@ trigger_post_boot(#state{ready_stores = Ready, start_time = StartTime} = State) 
     {noreply, NewState}.
 
 run_post_boot(ReadyStoreIds) ->
-    logger:info("[hecate_boot_tracker:run_post_boot/1] starting subscriptions for ~b stores",
-                [length(ReadyStoreIds)]),
-    hecate_app:start_store_subscriptions(ReadyStoreIds),
+    try
+        logger:info("[boot] Starting subscriptions for ~b stores", [length(ReadyStoreIds)]),
+        hecate_app:start_store_subscriptions(ReadyStoreIds),
 
-    logger:info("[hecate_boot_tracker:run_post_boot/1] compiling routes"),
-    Dispatch = hecate_api_routes:compile(),
-    cowboy:set_env(hecate_socket_listener, dispatch, Dispatch),
-    logger:info("[hecate_boot_tracker:run_post_boot/1] routes hot-swapped"),
+        logger:info("[boot] Compiling and swapping routes"),
+        Dispatch = hecate_api_routes:compile(),
+        cowboy:set_env(hecate_socket_listener, dispatch, Dispatch),
+        logger:info("[boot] Routes hot-swapped — API ready"),
 
-    gen_server:cast(?SERVER, {set_phase, replaying}),
+        gen_server:cast(?SERVER, {set_phase, replaying}),
 
-    logger:info("[hecate_boot_tracker:run_post_boot/1] awaiting projection replay"),
-    hecate_readiness:await_projections(),
+        logger:info("[boot] Awaiting projection replay"),
+        hecate_readiness:await_projections(),
 
-    %% Cluster joins AFTER local readiness — never block boot on network
-    maybe_join_cluster(ReadyStoreIds).
+        %% Cluster joins AFTER local readiness — never block boot on network
+        maybe_join_cluster(ReadyStoreIds)
+    catch Class:Reason:Stack ->
+        logger:error("[boot] Post-boot FAILED: ~p:~p~n~p", [Class, Reason, Stack]),
+        %% Still swap routes even if subscriptions/replay failed
+        try
+            Dispatch2 = hecate_api_routes:compile(),
+            cowboy:set_env(hecate_socket_listener, dispatch, Dispatch2),
+            logger:warning("[boot] Routes swapped despite post-boot failure")
+        catch _:_ -> ok
+        end
+    end.
 
 %% @private Attempt cluster joins for all stores (non-blocking, best-effort).
 %% Stores started in single mode for fast boot. Now upgrade to cluster.

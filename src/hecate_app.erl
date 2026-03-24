@@ -172,20 +172,18 @@ start_stores_sequential([{StoreId, SubDir, Label} | Rest], Mode) ->
         gateway_pool_size = 2,
         options = #{}
     },
-    %% Timeout: if a store takes >10s, skip and continue
-    Parent = self(),
-    Ref = make_ref(),
-    Pid = spawn_link(fun() ->
-        start_store(Config),
-        Parent ! {store_done, Ref}
+    %% Fire-and-forget: start each store in its own unlinked process.
+    %% Boot tracker polls reckon_db_sup:which_stores() to detect readiness.
+    %% Do NOT kill slow stores — let them finish in the background.
+    spawn(fun() ->
+        try start_store(Config)
+        catch Class:Reason:Stack ->
+            logger:error("Store ~p crashed: ~p:~p~n~p",
+                         [StoreId, Class, Reason, Stack])
+        end
     end),
-    receive
-        {store_done, Ref} -> ok
-    after 10000 ->
-        logger:warning("Store ~p timed out after 10s, skipping", [StoreId]),
-        unlink(Pid),
-        exit(Pid, kill)
-    end,
+    %% Small delay between spawns to reduce I/O contention on slow disks
+    timer:sleep(500),
     start_stores_sequential(Rest, Mode).
 
 
