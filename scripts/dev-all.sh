@@ -128,9 +128,11 @@ cleanup_all() {
         echo "Stopping dev daemon (PID $DAEMON_PID)..."
         kill "$DAEMON_PID" 2>/dev/null || true
         wait "$DAEMON_PID" 2>/dev/null || true
-        rm -f "$DEV_SOCK"
-        echo "Dev daemon stopped."
     fi
+    # Kill any orphaned BEAM process with our dev node name
+    pkill -f 'sname hecate_dev ' 2>/dev/null || true
+    rm -f "$DEV_SOCK"
+    echo "Dev daemon stopped."
 }
 
 # Only clean up on explicit Ctrl+C, NOT on EXIT.
