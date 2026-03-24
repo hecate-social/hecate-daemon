@@ -60,10 +60,10 @@ unset ERL_DIST_PORT
 # Clean stale socket
 rm -f "$HECATE_SOCKET_PATH"
 
-# Kill stale BEAM holding the dev node name (exact match, don't kill dev0/dev1/etc)
-if pgrep -f 'sname hecate_dev ' > /dev/null 2>&1; then
+# Kill stale BEAM holding the dev node name
+if pgrep -f 'name hecate_dev[@: ]' > /dev/null 2>&1; then
     echo "Killing stale hecate_dev BEAM process..."
-    pkill -f 'sname hecate_dev ' || true
+    pkill -f 'name hecate_dev[@: ]' || true
     sleep 2
 fi
 

@@ -130,7 +130,7 @@ cleanup_all() {
         wait "$DAEMON_PID" 2>/dev/null || true
     fi
     # Kill any orphaned BEAM process with our dev node name
-    pkill -f 'sname hecate_dev ' 2>/dev/null || true
+    pkill -f 'name hecate_dev' 2>/dev/null || true
     rm -f "$DEV_SOCK"
     echo "Dev daemon stopped."
 }
