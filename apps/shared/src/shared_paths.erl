@@ -31,18 +31,29 @@
 ]).
 
 %% @doc Returns the base directory for this daemon instance.
-%% Default: ~/.hecate/hecate-daemon
+%% Resolution order:
+%%   1. HECATE_HOME env var (e.g., /fast/.hecate) → appends /hecate-daemon
+%%   2. {hecate, [{data_dir, Path}]} app env
+%%   3. Default: ~/.hecate/hecate-daemon
 -spec base_dir() -> file:filename().
 base_dir() ->
-    case application:get_env(hecate, data_dir) of
-        {ok, Dir} -> expand_path(Dir);
-        undefined -> expand_path("~/.hecate/hecate-daemon")
+    case os:getenv("HECATE_HOME") of
+        false ->
+            case application:get_env(hecate, data_dir) of
+                {ok, Dir} -> expand_path(Dir);
+                undefined -> expand_path("~/.hecate/hecate-daemon")
+            end;
+        HecateHome ->
+            filename:join(HecateHome, "hecate-daemon")
     end.
 
-%% @doc Returns the hecate home directory (~/.hecate).
+%% @doc Returns the hecate home directory (~/.hecate or $HECATE_HOME).
 -spec hecate_home() -> file:filename().
 hecate_home() ->
-    filename:dirname(base_dir()).
+    case os:getenv("HECATE_HOME") of
+        false -> filename:dirname(base_dir());
+        HecateHome -> HecateHome
+    end.
 
 %% @doc Returns the hecate home path relative to $HOME.
 %% Used in systemd .container files where %h expands to $HOME.
