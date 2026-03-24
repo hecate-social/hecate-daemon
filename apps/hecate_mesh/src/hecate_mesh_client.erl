@@ -16,6 +16,9 @@
     identity :: binary(),
     bootstrap :: [binary()],
     subscriptions :: #{reference() => binary()},
+    %% Durable subscription intents — survive reconnections.
+    %% Key = Topic, Value = CallbackPid. Re-subscribed after each reconnect.
+    sub_intents :: #{binary() => pid()},
     backoff_ms :: pos_integer(),
     connecting :: boolean()
 }).
@@ -58,6 +61,7 @@ init([]) ->
         identity = Identity,
         bootstrap = BootstrapBins,
         subscriptions = #{},
+        sub_intents = #{},
         backoff_ms = ?INITIAL_BACKOFF_MS,
         connecting = false
     }}.
@@ -84,7 +88,12 @@ handle_call(get_status, _From, #state{client = Client, realm = Realm,
 handle_call({discover_subscribers, _Topic}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
 handle_call({discover_subscribers, Topic}, _From, #state{client = Client} = State) ->
-    {reply, macula:discover_subscribers(Client, Topic), State};
+    %% DHT find_value can timeout (10s gen_server:call inside macula).
+    %% Catch the exit to avoid crashing the mesh client gen_server.
+    Result = try macula:discover_subscribers(Client, Topic)
+             catch exit:{timeout, _} -> {error, dht_timeout}
+             end,
+    {reply, Result, State};
 
 handle_call({publish, _Topic, _Payload}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
@@ -93,23 +102,35 @@ handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) -
 
 handle_call({subscribe, _Topic, _Callback}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
-handle_call({subscribe, Topic, CallbackPid}, _From, #state{client = Client, subscriptions = Subs} = State) ->
+handle_call({subscribe, Topic, CallbackPid}, _From, #state{client = Client, subscriptions = Subs,
+                                                          sub_intents = Intents} = State) ->
     CallbackFun = fun(EventData) ->
         CallbackPid ! {mesh_fact, Topic, EventData},
         ok
     end,
     case macula:subscribe(Client, Topic, CallbackFun) of
         {ok, SubRef} ->
-            {reply, {ok, SubRef}, State#state{subscriptions = Subs#{SubRef => Topic}}};
+            {reply, {ok, SubRef}, State#state{
+                subscriptions = Subs#{SubRef => Topic},
+                sub_intents = Intents#{Topic => CallbackPid}
+            }};
         {error, Reason} ->
             {reply, {error, Reason}, State}
     end;
 
 handle_call({unsubscribe, _SubRef}, _From, #state{client = undefined} = State) ->
     {reply, {error, not_connected}, State};
-handle_call({unsubscribe, SubRef}, _From, #state{client = Client, subscriptions = Subs} = State) ->
+handle_call({unsubscribe, SubRef}, _From, #state{client = Client, subscriptions = Subs,
+                                                  sub_intents = Intents} = State) ->
+    %% Remove the intent for this topic so it won't be re-subscribed
+    Topic = maps:get(SubRef, Subs, undefined),
+    NewIntents = case Topic of
+        undefined -> Intents;
+        T -> maps:remove(T, Intents)
+    end,
     Result = macula:unsubscribe(Client, SubRef),
-    {reply, Result, State#state{subscriptions = maps:remove(SubRef, Subs)}}.
+    {reply, Result, State#state{subscriptions = maps:remove(SubRef, Subs),
+                                sub_intents = NewIntents}}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -128,10 +149,13 @@ handle_info(connect, State) ->
     end),
     {noreply, State#state{connecting = true}};
 
-handle_info({connect_result, {ok, Client}}, State) ->
+handle_info({connect_result, {ok, Client}}, #state{sub_intents = Intents} = State) ->
     erlang:monitor(process, Client),
     logger:info("[hecate_mesh] Connected to mesh"),
-    {noreply, State#state{client = Client, connecting = false, backoff_ms = ?INITIAL_BACKOFF_MS}};
+    %% Re-subscribe to all durable intents
+    NewSubs = resubscribe_intents(Client, Intents),
+    {noreply, State#state{client = Client, subscriptions = NewSubs,
+                          connecting = false, backoff_ms = ?INITIAL_BACKOFF_MS}};
 
 handle_info({connect_result, {error, Reason}}, #state{backoff_ms = Backoff} = State) ->
     logger:warning("[hecate_mesh] Connection failed: ~p, retrying in ~.1fs", [Reason, Backoff / 1000]),
@@ -139,8 +163,10 @@ handle_info({connect_result, {error, Reason}}, #state{backoff_ms = Backoff} = St
     {noreply, State#state{connecting = false, backoff_ms = min(Backoff * 2, ?MAX_BACKOFF_MS)}};
 
 handle_info({'DOWN', _Ref, process, Pid, Reason}, #state{client = Pid} = State) ->
-    logger:warning("[hecate_mesh] Connection lost: ~p, reconnecting...", [Reason]),
+    logger:warning("[hecate_mesh] Connection lost: ~p, reconnecting (~b intents to restore)...",
+                   [Reason, maps:size(State#state.sub_intents)]),
     erlang:send_after(?INITIAL_BACKOFF_MS, self(), connect),
+    %% Clear active subscriptions (refs are dead) but KEEP intents for re-subscribe
     {noreply, State#state{client = undefined, subscriptions = #{}, connecting = false,
                           backoff_ms = ?INITIAL_BACKOFF_MS}};
 
@@ -153,6 +179,23 @@ terminate(_Reason, #state{client = Client}) ->
     ok.
 
 %% Internal
+
+%% @private Re-subscribe all durable intents after reconnection.
+resubscribe_intents(Client, Intents) ->
+    maps:fold(fun(Topic, CallbackPid, Acc) ->
+        CallbackFun = fun(EventData) ->
+            CallbackPid ! {mesh_fact, Topic, EventData},
+            ok
+        end,
+        case macula:subscribe(Client, Topic, CallbackFun) of
+            {ok, SubRef} ->
+                logger:info("[hecate_mesh] Re-subscribed to ~s", [Topic]),
+                Acc#{SubRef => Topic};
+            {error, Reason} ->
+                logger:warning("[hecate_mesh] Failed to re-subscribe to ~s: ~p", [Topic, Reason]),
+                Acc
+        end
+    end, #{}, Intents).
 
 try_connect([], _Realm, _Identity) ->
     {error, all_bootstrap_servers_failed};
