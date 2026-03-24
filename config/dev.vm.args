@@ -1,7 +1,7 @@
-## Dev node
--sname hecate_dev
+## Dev node (long name for cross-host clustering with beam nodes)
+-name hecate_dev@host00.lab
 
-## Site A cookie (shared with beam00, beam01, host00)
+## Site A cookie (shared with beam00-03)
 -setcookie ZMFTAHTHAYKXRVMPPQIZ
 
 ## No heartbeat in dev (don't auto-restart on crash)

@@ -1,8 +1,10 @@
-## Name of the node
--sname hecate
+## Name of the node (long name for cross-host clustering)
+## HECATE_NODE_NAME set by env file, e.g., hecate@beam00.lab
+-name ${HECATE_NODE_NAME}
 
 ## Cookie for distributed erlang
--setcookie hecate_cookie
+## HECATE_ERLANG_COOKIE set by env file (shared across cluster)
+-setcookie ${HECATE_ERLANG_COOKIE}
 
 ## Heartbeat management
 -heart
