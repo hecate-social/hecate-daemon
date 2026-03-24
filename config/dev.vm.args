@@ -1,5 +1,7 @@
 ## Dev node (long name for cross-host clustering with beam nodes)
+## inet_dist_use_interface forces Erlang to bind to beam-facing NIC
 -name hecate_dev@host00.lab
+-kernel inet_dist_use_interface '{192,168,1,100}'
 
 ## Site A cookie (shared with beam00-03)
 -setcookie ZMFTAHTHAYKXRVMPPQIZ

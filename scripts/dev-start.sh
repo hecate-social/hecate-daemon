@@ -74,8 +74,12 @@ rebar3 release
 MODE="${1:-foreground}"
 
 # Override sys.config and vm.args for dev
-export RELX_CONFIG_PATH="$PROJECT_DIR/config/dev.sys.config"
-export VMARGS_PATH="$PROJECT_DIR/config/dev.vm.args"
+# Symlink into the release dir — relx resolves paths relative to RELEASE_ROOT_DIR
+REL_DIR="$PROJECT_DIR/_build/default/rel/hecate"
+ln -sf "$PROJECT_DIR/config/dev.sys.config" "$REL_DIR/dev.sys.config"
+ln -sf "$PROJECT_DIR/config/dev.vm.args" "$REL_DIR/dev.vm.args"
+export RELX_CONFIG_PATH="$REL_DIR/dev.sys.config"
+export VMARGS_PATH="$REL_DIR/dev.vm.args"
 
 echo ""
 echo "=== Hecate Dev ==="
