@@ -128,16 +128,10 @@ handle_info(countdown_tick, #lobby{state = countdown, countdown = N} = State) ->
     {noreply, State#lobby{countdown = N - 1}};
 
 handle_info({'DOWN', _Ref, process, Pid, _Reason}, #lobby{engine_pid = Pid, game_id = GameId} = State) ->
-    logger:info("[mpong_lobby] Engine stopped for ~s, lobby closing", [GameId]),
-    %% Update projection to mark game as ended
-    case project_mpong_games_store:get(GameId) of
-        {ok, Game} ->
-            project_mpong_games_store:put(GameId, Game#{
-                status => <<"ended">>,
-                ended_at => erlang:system_time(millisecond)
-            });
-        _ -> ok
-    end,
+    logger:info("[mpong_lobby] Engine stopped for ~s, dispatching end_game", [GameId]),
+    %% Dispatch end_game command through the aggregate (projection handles store update)
+    Cmd = end_game_v1:new(GameId, undefined, <<"engine_stopped">>),
+    spawn(fun() -> maybe_end_game:dispatch(GameId, Cmd) end),
     {stop, normal, State};
 
 handle_info(_Info, State) ->
@@ -206,21 +200,9 @@ start_engine(#lobby{game_id = GameId, seats = Seats} = State) ->
          Modes#{WI => {bot, Personality}}}
     end, {#{}, #{}}, Seats),
 
-    %% Write game to projection store so frontend can find it
-    Players = [#{node_id => PId, wall_index => maps:get(wall_index, PInfo), alive => true,
-                 joined_at => erlang:system_time(millisecond)}
-               || {PId, PInfo} <- maps:to_list(PlayersMap)],
-    project_mpong_games_store:put(GameId, #{
-        game_id => GameId,
-        host_node_id => State#lobby.host_node,
-        players => Players,
-        max_players => State#lobby.max_players,
-        status => <<"playing">>,
-        hosted_at => erlang:system_time(millisecond),
-        started_at => erlang:system_time(millisecond),
-        ended_at => null,
-        winner_node_id => null
-    }),
+    %% Dispatch start_game command — projection handles read model update
+    StartCmd = start_game_v1:new(GameId, State#lobby.host_node),
+    spawn(fun() -> maybe_start_game:dispatch(GameId, StartCmd) end),
 
     case run_game_engine_sup:start_engine(#{
         game_id => GameId,
