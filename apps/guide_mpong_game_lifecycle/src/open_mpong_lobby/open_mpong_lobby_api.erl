@@ -25,6 +25,7 @@ handle_post(Req0, State) ->
     {ok, RawBody, Req1} = cowboy_req:read_body(Req0),
     Body = json:decode(RawBody),
     MaxPlayers = maps:get(<<"max_players">>, Body, 2),
+    Mode = parse_mode(maps:get(<<"mode">>, Body, <<"lan">>)),
 
     %% Get our champion
     NodeId = atom_to_binary(node()),
@@ -34,11 +35,13 @@ handle_post(Req0, State) ->
             Config = #{
                 game_id => GameId,
                 max_players => MaxPlayers,
-                host_champion => Champion
+                host_champion => Champion,
+                mode => Mode
             },
             case mpong_lobby_server:start_link(Config) of
                 {ok, _Pid} ->
                     Resp = json:encode(#{ok => true, game_id => GameId,
+                                         mode => Mode,
                                          host_champion => maps:get(name, Champion, <<"Unknown">>)}),
                     Req = cowboy_req:reply(201,
                         #{<<"content-type">> => <<"application/json">>},
@@ -61,3 +64,6 @@ handle_post(Req0, State) ->
 
 generate_id() ->
     binary:encode_hex(crypto:strong_rand_bytes(8), lowercase).
+
+parse_mode(<<"mesh">>) -> mesh;
+parse_mode(_) -> lan.

@@ -138,9 +138,10 @@ terminate(_Reason, #seeker{mesh_sub = MeshSub}) ->
 try_lan_join(undefined, _GameId, _HostNode, _HostPid, State) ->
     {noreply, State};
 try_lan_join(Champion, GameId, HostNode, HostPid, State) ->
+    Tech = collect_tech(lan),
     logger:info("[mpong_seeker] Found LAN lobby ~s on ~s, reserving spot",
                 [GameId, HostNode]),
-    gen_server:cast(HostPid, {reserve_spot, self(), Champion}),
+    gen_server:cast(HostPid, {reserve_spot, self(), Champion, Tech}),
     {noreply, State#seeker{champion = Champion, host_pid = HostPid}}.
 
 %%====================================================================
@@ -178,13 +179,17 @@ try_mesh_join(Champion, JoinProcedure, GameId, State) ->
     spawn(fun() ->
         case hecate_mesh:get_client() of
             {ok, Client} ->
+                Tech = collect_tech(mesh),
                 Args = #{
                     <<"champion">> => Champion,
-                    <<"node_id">> => atom_to_binary(node())
+                    <<"node_id">> => atom_to_binary(node()),
+                    <<"tech">> => Tech
                 },
+                T0 = erlang:monotonic_time(millisecond),
                 case macula:call(Client, JoinProcedure, Args, #{timeout => 5000}) of
                     {ok, _Result} ->
-                        logger:info("[mpong_seeker] Mesh join accepted for ~s", [GameId]),
+                        RTT = erlang:monotonic_time(millisecond) - T0,
+                        logger:info("[mpong_seeker] Mesh join accepted for ~s (RTT: ~bms)", [GameId, RTT]),
                         Self ! {mesh_joined, GameId};
                     {error, Reason} ->
                         logger:warning("[mpong_seeker] Mesh join failed for ~s: ~p",
@@ -218,6 +223,39 @@ unsubscribe_mesh(Ref) ->
     case erlang:function_exported(hecate_mesh, unsubscribe, 1) of
         true -> hecate_mesh:unsubscribe(Ref);
         false -> ok
+    end.
+
+%%====================================================================
+%% Internal: Tech metadata collection
+%%====================================================================
+
+collect_tech(Transport) ->
+    {Country, City} = get_geo(),
+    NatType = get_nat_type(),
+    #{transport => Transport,
+      country => Country,
+      city => City,
+      rtt_ms => undefined,
+      nat_type => NatType}.
+
+get_geo() ->
+    case catch geo_check:get_public_ip() of
+        {ok, IP} -> get_geo_location(IP);
+        _ -> {undefined, undefined}
+    end.
+
+get_geo_location(IP) ->
+    case catch geo_check:get_location(IP) of
+        {ok, #{country := C, city := City}} -> {C, City};
+        _ -> {undefined, undefined}
+    end.
+
+get_nat_type() ->
+    case catch macula_nat_detector:get_local_profile() of
+        {ok, #{mapping_policy := M, filtering_policy := F}} ->
+            iolist_to_binary(io_lib:format("~s/~s", [M, F]));
+        _ ->
+            <<"unknown">>
     end.
 
 %%====================================================================
