@@ -75,6 +75,9 @@ init(#{game_id := GameId, players := Players} = Config) ->
     pg:join(pg, mpong_games_available, self()),
     pg:join(pg, {mpong_game, GameId}, self()),
 
+    %% Subscribe to remote paddle input over mesh (host receives from remote players)
+    handle_paddle_input:subscribe(GameId, self()),
+
     Timer = erlang:send_after(?TICK_MS, self(), tick),
 
     %% Log champion names
@@ -289,6 +292,8 @@ broadcast(#engine{game_id = GameId, ball = Ball, paddles = Paddles,
     %% Cross-node pg group (remote viewers on other cluster nodes)
     GameMembers = try pg:get_members(pg, {mpong_game, GameId}) catch _:_ -> [] end,
     [Pid ! {mpong_state, GameId, StateMsg} || Pid <- GameMembers, Pid =/= self()],
+    %% Mesh broadcast (remote nodes outside Erlang cluster)
+    broadcast_game_state:broadcast(GameId, StateMsg),
     case Tick rem 100 of
         0 ->
             logger:info("[mpong] tick=~b score=~b-~b games=~b-~b",
