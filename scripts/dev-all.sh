@@ -116,10 +116,10 @@ cleanup() {
     trap - EXIT INT TERM   # prevent re-entry
     echo ""
     echo "Stopping all dev processes..."
-    # Stop BEAM via relx (graceful OTP shutdown)
-    "$DAEMON_DIR/_build/default/rel/hecate/bin/hecate" stop 2>/dev/null || true
-    # Fallback: kill by node name if relx stop didn't work
-    pkill -f 'name hecate_dev' 2>/dev/null || true
+    # Stop BEAM via relx (graceful OTP shutdown, 5s timeout)
+    timeout 5 "$DAEMON_DIR/_build/default/rel/hecate/bin/hecate" stop 2>/dev/null || true
+    # Force kill BEAM if still alive
+    pkill -9 -f 'name hecate_dev' 2>/dev/null || true
     # Kill remaining children (vite, cargo, etc.)
     jobs -p 2>/dev/null | xargs -r kill 2>/dev/null || true
     rm -f "$DEV_SOCK"
