@@ -405,7 +405,7 @@ format_tech(_) -> <<"partial-tech">>.
 advertise_join_rpc(GameId) ->
     try
         case hecate_mesh:get_client() of
-            {ok, Client} ->
+            {ok, Client} when is_pid(Client) ->
                 Procedure = advertise_game:join_procedure(GameId),
                 Self = self(),
                 Handler = fun(Args) ->
@@ -427,8 +427,9 @@ advertise_join_rpc(GameId) ->
                 undefined
         end
     catch
-        exit:{timeout, _} ->
-            logger:warning("[mpong_lobby] Mesh advertise timed out, will retry"),
+        Class:Err ->
+            logger:warning("[mpong_lobby] Mesh advertise failed (~p:~p), will retry",
+                           [Class, Err]),
             undefined
     end.
 

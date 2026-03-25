@@ -112,32 +112,21 @@ fi
 DAEMON_PID=""
 VITE_PID=""
 
-cleanup_vite() {
-    if [ -n "$VITE_PID" ] && kill -0 "$VITE_PID" 2>/dev/null; then
-        echo ""
-        echo "Stopping Vite dev server (PID $VITE_PID)..."
-        kill "$VITE_PID" 2>/dev/null || true
-        wait "$VITE_PID" 2>/dev/null || true
-    fi
-}
-
-cleanup_all() {
-    cleanup_vite
-    if [ -n "$DAEMON_PID" ] && kill -0 "$DAEMON_PID" 2>/dev/null; then
-        echo ""
-        echo "Stopping dev daemon (PID $DAEMON_PID)..."
-        kill "$DAEMON_PID" 2>/dev/null || true
-        wait "$DAEMON_PID" 2>/dev/null || true
-    fi
-    # Kill any orphaned BEAM process with our dev node name
+cleanup() {
+    trap - EXIT INT TERM   # prevent re-entry
+    echo ""
+    echo "Stopping all dev processes..."
+    # Stop BEAM via relx (graceful OTP shutdown)
+    "$DAEMON_DIR/_build/default/rel/hecate/bin/hecate" stop 2>/dev/null || true
+    # Fallback: kill by node name if relx stop didn't work
     pkill -f 'name hecate_dev' 2>/dev/null || true
+    # Kill remaining children (vite, cargo, etc.)
+    jobs -p 2>/dev/null | xargs -r kill 2>/dev/null || true
     rm -f "$DEV_SOCK"
-    echo "Dev daemon stopped."
+    echo "Dev stopped."
 }
 
-# Only clean up on explicit Ctrl+C, NOT on EXIT.
-# cargo tauri dev exits and restarts on rebuilds — EXIT trap kills everything.
-trap cleanup_all INT TERM
+trap cleanup EXIT INT TERM
 
 ensure_searxng() {
     # Start SearXNG container if not already running
@@ -302,7 +291,5 @@ case "$MODE" in
         ensure_searxng
         start_daemon
         start_web
-        # cargo tauri dev exited (Ctrl+C or crash) — stop everything
-        cleanup_all
         ;;
 esac
