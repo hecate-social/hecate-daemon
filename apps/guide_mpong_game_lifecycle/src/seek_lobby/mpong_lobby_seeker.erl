@@ -39,13 +39,13 @@ init([]) ->
     ensure_pg(),
     pg:join(pg, mpong_lobby, self()),
 
-    %% Subscribe to mesh topic for remote lobby discovery
-    MeshSub = subscribe_mesh_lobbies(),
+    %% Defer mesh subscription — mesh client may not be connected yet
+    self() ! try_mesh_subscribe,
 
     %% Periodically try connecting to peer dev nodes (every 10s until connected)
     erlang:send_after(3000, self(), try_connect_peers),
     logger:info("[mpong_seeker] Listening for lobbies on pg + mesh"),
-    {ok, #seeker{mesh_sub = MeshSub}}.
+    {ok, #seeker{}}.
 
 handle_call(_Req, _From, State) ->
     {reply, ok, State}.
@@ -114,6 +114,20 @@ handle_info({mesh_joined, GameId}, #seeker{} = State) ->
     hecate_web_events:broadcast(mpong_lobby_joined, #{game_id => GameId, wall_index => undefined}),
     listen_game_state_sup:start_listener(#{game_id => GameId, wall_index => 1}),
     {noreply, State#seeker{joined_game = GameId}};
+
+handle_info(try_mesh_subscribe, #seeker{mesh_sub = undefined} = State) ->
+    case subscribe_mesh_lobbies() of
+        undefined ->
+            erlang:send_after(3000, self(), try_mesh_subscribe),
+            {noreply, State};
+        Ref ->
+            logger:info("[mpong_seeker] Mesh subscription active"),
+            {noreply, State#seeker{mesh_sub = Ref}}
+    end;
+
+handle_info(try_mesh_subscribe, State) ->
+    %% Already subscribed
+    {noreply, State};
 
 handle_info(try_connect_peers, State) ->
     Connected = try_connect_dev_peers(),

@@ -180,7 +180,7 @@ ensure_searxng() {
         -e "SEARXNG_SETTINGS_PATH=$DEV_DATA_DIR/searxng/settings.yml" \
         -e "GRANIAN_HOST=127.0.0.1" \
         -e "GRANIAN_PORT=8888" \
-        docker.io/searxng/searxng:latest >/dev/null
+        podman.io/searxng/searxng:latest >/dev/null
 
     # Wait for it to respond
     echo -n "  Waiting for SearXNG on :8888"
@@ -302,5 +302,7 @@ case "$MODE" in
         ensure_searxng
         start_daemon
         start_web
+        # cargo tauri dev exited (Ctrl+C or crash) — stop everything
+        cleanup_all
         ;;
 esac

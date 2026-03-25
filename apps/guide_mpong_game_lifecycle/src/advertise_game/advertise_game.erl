@@ -34,8 +34,13 @@ announce(#{game_id := GameId, host_node_id := HostNodeId,
         join_procedure => join_procedure(GameId)
     }),
     case erlang:function_exported(hecate_mesh, publish, 2) of
-        true -> hecate_mesh:publish(Topic, Payload);
-        false -> ok
+        true ->
+            Result = hecate_mesh:publish(Topic, Payload),
+            logger:info("[advertise_game] Published to ~s: ~p", [Topic, Result]),
+            Result;
+        false ->
+            logger:warning("[advertise_game] hecate_mesh:publish/2 not available"),
+            ok
     end.
 
 -spec withdraw(binary()) -> ok.
