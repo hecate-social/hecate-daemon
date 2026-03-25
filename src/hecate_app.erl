@@ -61,6 +61,10 @@
 start(_StartType, _StartArgs) ->
     logger:info("Starting Hecate"),
 
+    %% Raise macula QUIC rate limits for LAN mesh clusters (default 5/IP is too low)
+    application:set_env(macula, quic_max_conn_per_ip, 50),
+    application:set_env(macula, quic_max_conn_global_per_sec, 200),
+
     %% 1. Create namespaced directory layout
     shared_paths:ensure_layout(),
 
