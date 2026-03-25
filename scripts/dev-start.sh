@@ -57,6 +57,9 @@ fi
 # Use standard EPMD for dev node discovery (not custom port range)
 unset ERL_DIST_PORT
 
+# Tell macula gateway our LAN hostname so it advertises the correct endpoint in DHT
+export MACULA_HOSTNAME="$(/usr/bin/hostname -f 2>/dev/null || cat /etc/hostname)"
+
 # Clean stale socket
 rm -f "$HECATE_SOCKET_PATH"
 
