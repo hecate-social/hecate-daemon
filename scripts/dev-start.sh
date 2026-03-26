@@ -41,11 +41,9 @@ fi
 # Override socket path for dev (env file has REPLACE_ME placeholder)
 export HECATE_SOCKET_PATH="$HOME/.hecate-dev/hecate-daemon/sockets/api.sock"
 
-# MACULA_BOOTSTRAP_PEERS is intentionally NOT set here.
-# hecate_mesh_client handles its own connection to boot.macula.io via macula:connect().
-# Setting MACULA_BOOTSTRAP_PEERS causes macula_root to create a SECOND peer connection
-# to the same endpoint, competing for the boot server's rate limit budget (5/10s).
-# With two connections retrying simultaneously, neither can establish reliably.
+# Client mode: node connects to realm server, no local gateway/discovery.
+# hecate_mesh_client creates the ONE connection to boot.macula.io.
+export MACULA_MODE=client
 
 # MaxMind GeoIP: extract license key from GeoIP.conf if not already set
 if [ -z "${MAXMIND_LICENSE_KEY:-}" ] && [ -f "$HOME/.config/maxmind/GeoIP.conf" ]; then
