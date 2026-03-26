@@ -210,6 +210,21 @@ handle_mesh_action(<<"hosted">>, _HostNodeId, _OurNode, Msg, State) ->
     JoinProcedure = maps:get(<<"join_procedure">>, Msg, undefined),
     Champion = get_our_champion(),
     try_mesh_join(Champion, JoinProcedure, GameId, State);
+handle_mesh_action(<<"closed">>, _HostNodeId, _OurNode, Msg, #seeker{joined_game = JG} = State) ->
+    GameId = maps:get(<<"game_id">>, Msg, <<>>),
+    case JG of
+        GameId -> {noreply, State};  %% We're in this game, stay
+        _      -> {noreply, State}   %% Not our game, ignore
+    end;
+handle_mesh_action(<<"ended">>, _HostNodeId, _OurNode, Msg, State) ->
+    GameId = maps:get(<<"game_id">>, Msg, <<>>),
+    case State#seeker.joined_game of
+        GameId ->
+            logger:info("[mpong_seeker] Game ~s ended (mesh event), resetting", [GameId]),
+            reset_state(State);
+        _ ->
+            {noreply, State}
+    end;
 handle_mesh_action(_, _HostNodeId, _OurNode, _Msg, State) ->
     {noreply, State}.
 
@@ -220,7 +235,6 @@ try_mesh_join(_Champion, undefined, _GameId, State) ->
 try_mesh_join(Champion, JoinProcedure, GameId, State) ->
     logger:info("[mpong_seeker] Found mesh lobby ~s, joining via RPC ~s",
                 [GameId, JoinProcedure]),
-    %% Spawn the mesh RPC call to avoid blocking the seeker
     Self = self(),
     spawn(fun() ->
         Tech = collect_tech(mesh),
@@ -231,13 +245,20 @@ try_mesh_join(Champion, JoinProcedure, GameId, State) ->
         },
         T0 = erlang:monotonic_time(millisecond),
         case hecate_mesh:call(JoinProcedure, Args, 5000) of
-            {ok, _Result} ->
+            {ok, #{<<"status">> := <<"accepted">>} = Result} ->
                 RTT = erlang:monotonic_time(millisecond) - T0,
-                logger:info("[mpong_seeker] Mesh join accepted for ~s (RTT: ~bms)", [GameId, RTT]),
+                WI = maps:get(<<"wall_index">>, Result, undefined),
+                logger:info("[mpong_seeker] Mesh join ACCEPTED for ~s wall=~p (RTT: ~bms)",
+                            [GameId, WI, RTT]),
                 Self ! {mesh_joined, GameId};
+            {ok, #{<<"status">> := <<"rejected">>} = Result} ->
+                Reason = maps:get(<<"reason">>, Result, <<"unknown">>),
+                logger:info("[mpong_seeker] Mesh join REJECTED for ~s: ~s", [GameId, Reason]);
+            {ok, Other} ->
+                logger:warning("[mpong_seeker] Mesh join unexpected response for ~s: ~p",
+                               [GameId, Other]);
             {error, Reason} ->
-                logger:warning("[mpong_seeker] Mesh join failed for ~s: ~p",
-                               [GameId, Reason])
+                logger:warning("[mpong_seeker] Mesh join FAILED for ~s: ~p", [GameId, Reason])
         end
     end),
     {noreply, State#seeker{champion = Champion}}.

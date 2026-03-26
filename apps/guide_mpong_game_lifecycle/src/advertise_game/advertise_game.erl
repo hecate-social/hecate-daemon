@@ -9,7 +9,7 @@
 %%%-------------------------------------------------------------------
 -module(advertise_game).
 
--export([announce/1, withdraw/1, join_procedure/1, topic/0]).
+-export([announce/1, closed/1, ended/1, withdraw/1, join_procedure/1, topic/0]).
 
 %% @doc Build the mesh RPC procedure name for joining a game.
 -spec join_procedure(binary()) -> binary().
@@ -43,13 +43,21 @@ announce(#{game_id := GameId, host_node_id := HostNodeId,
             ok
     end.
 
+-spec closed(binary()) -> ok.
+closed(GameId) ->
+    publish_action(<<"closed">>, GameId).
+
+-spec ended(binary()) -> ok.
+ended(GameId) ->
+    publish_action(<<"ended">>, GameId).
+
 -spec withdraw(binary()) -> ok.
 withdraw(GameId) ->
+    publish_action(<<"withdrawn">>, GameId).
+
+publish_action(Action, GameId) ->
     Topic = topic(),
-    Payload = json:encode(#{
-        action => <<"withdrawn">>,
-        game_id => GameId
-    }),
+    Payload = json:encode(#{action => Action, game_id => GameId}),
     case erlang:function_exported(hecate_mesh, publish, 2) of
         true -> hecate_mesh:publish(Topic, Payload);
         false -> ok

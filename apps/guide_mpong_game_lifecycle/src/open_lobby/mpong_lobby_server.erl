@@ -111,6 +111,16 @@ init(#{game_id := GameId, max_players := MaxPlayers, host_champion := HostChampi
 handle_call(get_info, _From, State) ->
     {reply, lobby_info(State), State};
 
+%% Mesh join (synchronous — returns accept/reject to caller)
+handle_call({mesh_join, ChampionData, NodeId, Tech},
+            _From, #lobby{state = waiting, mode = Mode, seats = Seats} = State)
+  when Mode =:= mesh; Mode =:= mixed ->
+    handle_mesh_reserve(ChampionData, NodeId, Tech, Seats, State);
+
+handle_call({mesh_join, _ChampionData, _NodeId, _Tech}, _From, State) ->
+    %% Not waiting or wrong mode — reject
+    {reply, {ok, #{status => <<"rejected">>, reason => <<"lobby_not_accepting">>}}, State};
+
 handle_call(_Req, _From, State) ->
     {reply, {error, unknown}, State}.
 
@@ -127,20 +137,6 @@ handle_cast({reserve_spot, FromPid, ChampionData},
     Tech = #{transport => lan, country => undefined, city => undefined,
              rtt_ms => 0, nat_type => undefined},
     handle_reserve(FromPid, ChampionData, Tech, State);
-
-%% Mesh join (with tech metadata) — accepted in mesh and mixed modes
-handle_cast({mesh_join, ChampionData, NodeId, Tech},
-            #lobby{state = waiting, mode = Mode, seats = Seats} = State)
-  when Mode =:= mesh; Mode =:= mixed ->
-    handle_mesh_reserve(ChampionData, NodeId, Tech, Seats, State);
-
-%% Mesh join (legacy 3-tuple, no tech)
-handle_cast({mesh_join, ChampionData, NodeId},
-            #lobby{state = waiting, mode = Mode, seats = Seats} = State)
-  when Mode =:= mesh; Mode =:= mixed ->
-    Tech = #{transport => mesh, country => undefined, city => undefined,
-             rtt_ms => undefined, nat_type => undefined},
-    handle_mesh_reserve(ChampionData, NodeId, Tech, Seats, State);
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -202,10 +198,15 @@ handle_info(countdown_tick, #lobby{state = countdown, countdown = N} = State) ->
     erlang:send_after(1000, self(), countdown_tick),
     {noreply, State#lobby{countdown = N - 1}};
 
-handle_info({'DOWN', _Ref, process, Pid, _Reason}, #lobby{engine_pid = Pid, game_id = GameId} = State) ->
+handle_info({'DOWN', _Ref, process, Pid, _Reason}, #lobby{engine_pid = Pid, game_id = GameId, mode = Mode} = State) ->
     logger:info("[mpong_lobby] Engine stopped for ~s, dispatching end_game", [GameId]),
     Cmd = end_game_v1:new(GameId, undefined, <<"engine_stopped">>),
     spawn(fun() -> maybe_end_game:dispatch(GameId, Cmd) end),
+    %% Notify mesh that game ended — seekers reset their state
+    case Mode of
+        lan -> ok;
+        _   -> advertise_game:ended(GameId)
+    end,
     {stop, normal, State};
 
 handle_info(_Info, State) ->
@@ -295,11 +296,25 @@ handle_mesh_reserve(ChampionData, NodeId, Tech, Seats, State) ->
                          format_tech(Tech)]),
 
             hecate_web_events:broadcast(mpong_lobby, lobby_info(State2)),
-            maybe_start_countdown(NewSeats, State2);
+            Reply = {ok, #{status => <<"accepted">>, wall_index => WallIndex,
+                           game_id => State#lobby.game_id}},
+            case all_seats_filled(NewSeats) of
+                true ->
+                    logger:info("[mpong_lobby] All seats filled, starting countdown"),
+                    erlang:send_after(1000, self(), countdown_tick),
+                    broadcast_countdown(State#lobby.game_id, ?COUNTDOWN_SECS),
+                    %% Publish lobby_closed to mesh so seekers know to stop trying
+                    advertise_game:closed(State#lobby.game_id),
+                    {reply, Reply,
+                     State2#lobby{state = countdown, countdown = ?COUNTDOWN_SECS}};
+                false ->
+                    {reply, Reply, State2}
+            end;
         full ->
-            {noreply, State}
+            {reply, {ok, #{status => <<"rejected">>, reason => <<"full">>}}, State}
     end.
 
+%% LAN still uses noreply variant
 maybe_start_countdown(Seats, State) ->
     case all_seats_filled(Seats) of
         true ->
@@ -425,8 +440,10 @@ advertise_join_rpc(GameId) ->
             ChampionData = maps:get(<<"champion">>, Args, #{}),
             NodeId = maps:get(<<"node_id">>, Args, <<"unknown">>),
             Tech = maps:get(<<"tech">>, Args, #{}),
-            gen_server:cast(Self, {mesh_join, ChampionData, NodeId, Tech}),
-            {ok, #{status => <<"reserved">>, game_id => GameId}}
+            %% Synchronous call — returns actual accept/reject result
+            try gen_server:call(Self, {mesh_join, ChampionData, NodeId, Tech}, 3000)
+            catch _:_ -> {ok, #{status => <<"error">>, reason => <<"lobby_unavailable">>}}
+            end
         end,
         case hecate_mesh:advertise(Procedure, Handler) of
             {ok, Ref} ->
