@@ -72,7 +72,13 @@ do_project_joined(Data, State, RM) ->
                 node_id => gf(player_node_id, Data),
                 wall_index => gf(wall_index, Data),
                 alive => true,
-                joined_at => gf(joined_at, Data)
+                joined_at => gf(joined_at, Data),
+                champion_name => gf(champion_name, Data),
+                transport => gf(transport, Data),
+                country => gf(country, Data),
+                city => gf(city, Data),
+                rtt_ms => gf(rtt_ms, Data),
+                nat_type => gf(nat_type, Data)
             },
             Players = maps:get(players, Game, []),
             project_mpong_games_store:put(GameId, Game#{players => Players ++ [Player]});

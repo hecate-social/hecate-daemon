@@ -18,6 +18,8 @@
 -export([start_link/1, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
+-include_lib("evoq/include/evoq.hrl").
+
 -define(BROADCAST_MS, 2000).
 -define(COUNTDOWN_SECS, 3).
 
@@ -340,8 +342,15 @@ start_engine(#lobby{game_id = GameId, seats = Seats} = State) ->
          Modes#{WI => {bot, Personality}}}
     end, {#{}, #{}}, Seats),
 
-    StartCmd = start_game_v1:new(GameId, State#lobby.host_node),
-    spawn(fun() -> maybe_start_game:dispatch(GameId, StartCmd) end),
+    %% Dispatch join commands for each player (with metadata), then start
+    spawn(fun() ->
+        lists:foreach(fun(Seat) ->
+            dispatch_seat_join(GameId, Seat)
+        end, Seats),
+        timer:sleep(50),
+        StartCmd = start_game_v1:new(GameId, State#lobby.host_node),
+        maybe_start_game:dispatch(GameId, StartCmd)
+    end),
 
     case run_game_engine_sup:start_engine(#{
         game_id => GameId,
@@ -397,6 +406,52 @@ tech_field(Key, Tech) -> maps:get(Key, Tech, null).
 %%====================================================================
 %% Internal: Helpers
 %%====================================================================
+
+dispatch_seat_join(GameId, #{wall_index := WI, champion := Champion, node_id := NId, tech := Tech}) ->
+    Name = maps:get(name, Champion, maps:get(<<"name">>, Champion, <<"Unknown">>)),
+    PlayerId = <<Name/binary, "@", NId/binary>>,
+    Transport = tech_bin(transport, Tech),
+    Country = tech_bin(country, Tech),
+    City = tech_bin(city, Tech),
+    RTT = case Tech of undefined -> undefined; _ -> maps:get(rtt_ms, Tech, undefined) end,
+    NatType = tech_bin(nat_type, Tech),
+    StreamId = mpong_game_aggregate:stream_id(GameId),
+    EvoqCmd = #evoq_command{
+        command_type = join_game,
+        aggregate_type = mpong_game_aggregate,
+        aggregate_id = StreamId,
+        payload = #{
+            command_type => join_game,
+            game_id => GameId,
+            player_node_id => PlayerId,
+            champion_name => Name,
+            transport => Transport,
+            country => Country,
+            city => City,
+            rtt_ms => RTT,
+            nat_type => NatType
+        },
+        metadata = #{timestamp => erlang:system_time(millisecond)}
+    },
+    case evoq_dispatcher:dispatch(EvoqCmd, #{
+        store_id => mpong_store,
+        adapter => reckon_evoq_adapter,
+        consistency => eventual
+    }) of
+        {ok, _V, _Events} -> ok;
+        {error, Reason} ->
+            logger:warning("[mpong_lobby] Join dispatch failed for ~s wall ~b: ~p",
+                           [Name, WI, Reason])
+    end;
+dispatch_seat_join(_GameId, _Seat) ->
+    ok.
+
+tech_bin(_Key, undefined) -> undefined;
+tech_bin(Key, Tech) ->
+    case maps:get(Key, Tech, undefined) of
+        V when is_atom(V), V =/= undefined -> atom_to_binary(V);
+        V -> V
+    end.
 
 find_open_seat([]) -> full;
 find_open_seat([#{status := open, wall_index := WI} | _]) -> {ok, WI};

@@ -98,6 +98,11 @@ quick_start(GameId, HostNodeId, BotCount) ->
     }).
 
 dispatch_join(GameId, PlayerNodeId, _WallIndex) ->
+    %% Extract champion name from "Name@node" format
+    ChampionName = case binary:split(PlayerNodeId, <<"@">>) of
+        [Name, _] -> Name;
+        _ -> PlayerNodeId
+    end,
     StreamId = mpong_game_aggregate:stream_id(GameId),
     EvoqCmd = #evoq_command{
         command_type = join_game,
@@ -106,7 +111,9 @@ dispatch_join(GameId, PlayerNodeId, _WallIndex) ->
         payload = #{
             command_type => join_game,
             game_id => GameId,
-            player_node_id => PlayerNodeId
+            player_node_id => PlayerNodeId,
+            champion_name => ChampionName,
+            transport => <<"local">>
         },
         metadata = #{timestamp => erlang:system_time(millisecond)}
     },

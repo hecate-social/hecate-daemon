@@ -17,7 +17,13 @@ handle_from_map(Payload) ->
                 game_id => GameId,
                 player_node_id => PlayerNodeId,
                 wall_index => WallIndex,
-                joined_at => erlang:system_time(millisecond)
+                joined_at => erlang:system_time(millisecond),
+                champion_name => maps:get(champion_name, Payload, undefined),
+                transport => maps:get(transport, Payload, undefined),
+                country => maps:get(country, Payload, undefined),
+                city => maps:get(city, Payload, undefined),
+                rtt_ms => maps:get(rtt_ms, Payload, undefined),
+                nat_type => maps:get(nat_type, Payload, undefined)
             },
             {ok, [Event]}
     end.
