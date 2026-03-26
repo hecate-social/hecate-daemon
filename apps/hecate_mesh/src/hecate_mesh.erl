@@ -4,6 +4,9 @@
     publish/2,
     subscribe/2,
     unsubscribe/1,
+    advertise/2,
+    call/3,
+    call/4,
     get_client/0,
     get_status/0,
     is_connected/0,
@@ -24,6 +27,18 @@ subscribe(Topic, Callback) ->
 -spec unsubscribe(reference()) -> ok | {error, term()}.
 unsubscribe(SubRef) ->
     hecate_mesh_client:unsubscribe(SubRef).
+
+-spec advertise(binary(), fun()) -> {ok, reference()} | {error, term()}.
+advertise(Procedure, Handler) ->
+    hecate_mesh_client:advertise(Procedure, Handler).
+
+-spec call(binary(), map(), timeout()) -> {ok, term()} | {error, term()}.
+call(Procedure, Args, Timeout) ->
+    hecate_mesh_client:call(Procedure, Args, Timeout).
+
+-spec call(binary(), map(), map(), timeout()) -> {ok, term()} | {error, term()}.
+call(Procedure, Args, _Opts, Timeout) ->
+    hecate_mesh_client:call(Procedure, Args, Timeout).
 
 -spec get_client() -> {ok, pid()} | {error, term()}.
 get_client() ->

@@ -419,26 +419,21 @@ format_tech(_) -> <<"partial-tech">>.
 
 advertise_join_rpc(GameId) ->
     try
-        case hecate_mesh:get_client() of
-            {ok, Client} when is_pid(Client) ->
-                Procedure = advertise_game:join_procedure(GameId),
-                Self = self(),
-                Handler = fun(Args) ->
-                    ChampionData = maps:get(<<"champion">>, Args, #{}),
-                    NodeId = maps:get(<<"node_id">>, Args, <<"unknown">>),
-                    Tech = maps:get(<<"tech">>, Args, #{}),
-                    gen_server:cast(Self, {mesh_join, ChampionData, NodeId, Tech}),
-                    {ok, #{status => <<"reserved">>, game_id => GameId}}
-                end,
-                case macula:advertise(Client, Procedure, Handler) of
-                    {ok, Ref} ->
-                        logger:info("[mpong_lobby] Mesh RPC registered: ~s", [Procedure]),
-                        Ref;
-                    {error, Reason} ->
-                        logger:warning("[mpong_lobby] Mesh RPC failed: ~p", [Reason]),
-                        undefined
-                end;
-            _ ->
+        Procedure = advertise_game:join_procedure(GameId),
+        Self = self(),
+        Handler = fun(Args) ->
+            ChampionData = maps:get(<<"champion">>, Args, #{}),
+            NodeId = maps:get(<<"node_id">>, Args, <<"unknown">>),
+            Tech = maps:get(<<"tech">>, Args, #{}),
+            gen_server:cast(Self, {mesh_join, ChampionData, NodeId, Tech}),
+            {ok, #{status => <<"reserved">>, game_id => GameId}}
+        end,
+        case hecate_mesh:advertise(Procedure, Handler) of
+            {ok, Ref} ->
+                logger:info("[mpong_lobby] Mesh RPC registered: ~s", [Procedure]),
+                Ref;
+            {error, Reason} ->
+                logger:warning("[mpong_lobby] Mesh RPC failed: ~p", [Reason]),
                 undefined
         end
     catch
@@ -449,8 +444,4 @@ advertise_join_rpc(GameId) ->
     end.
 
 unadvertise_join_rpc(undefined) -> ok;
-unadvertise_join_rpc(Ref) ->
-    case hecate_mesh:get_client() of
-        {ok, Client} -> macula:unadvertise(Client, Ref);
-        _ -> ok
-    end.
+unadvertise_join_rpc(_Ref) -> ok.

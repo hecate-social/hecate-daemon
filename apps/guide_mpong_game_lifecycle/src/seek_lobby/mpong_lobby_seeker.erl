@@ -197,26 +197,21 @@ try_mesh_join(Champion, JoinProcedure, GameId, State) ->
     %% Spawn the mesh RPC call to avoid blocking the seeker
     Self = self(),
     spawn(fun() ->
-        case hecate_mesh:get_client() of
-            {ok, Client} ->
-                Tech = collect_tech(mesh),
-                Args = #{
-                    <<"champion">> => Champion,
-                    <<"node_id">> => atom_to_binary(node()),
-                    <<"tech">> => Tech
-                },
-                T0 = erlang:monotonic_time(millisecond),
-                case macula:call(Client, JoinProcedure, Args, #{timeout => 5000}) of
-                    {ok, _Result} ->
-                        RTT = erlang:monotonic_time(millisecond) - T0,
-                        logger:info("[mpong_seeker] Mesh join accepted for ~s (RTT: ~bms)", [GameId, RTT]),
-                        Self ! {mesh_joined, GameId};
-                    {error, Reason} ->
-                        logger:warning("[mpong_seeker] Mesh join failed for ~s: ~p",
-                                       [GameId, Reason])
-                end;
-            _ ->
-                logger:warning("[mpong_seeker] No mesh client for join RPC")
+        Tech = collect_tech(mesh),
+        Args = #{
+            <<"champion">> => Champion,
+            <<"node_id">> => atom_to_binary(node()),
+            <<"tech">> => Tech
+        },
+        T0 = erlang:monotonic_time(millisecond),
+        case hecate_mesh:call(JoinProcedure, Args, 5000) of
+            {ok, _Result} ->
+                RTT = erlang:monotonic_time(millisecond) - T0,
+                logger:info("[mpong_seeker] Mesh join accepted for ~s (RTT: ~bms)", [GameId, RTT]),
+                Self ! {mesh_joined, GameId};
+            {error, Reason} ->
+                logger:warning("[mpong_seeker] Mesh join failed for ~s: ~p",
+                               [GameId, Reason])
         end
     end),
     {noreply, State#seeker{champion = Champion}}.
