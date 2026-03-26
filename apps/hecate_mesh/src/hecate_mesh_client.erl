@@ -60,7 +60,13 @@ discover_subscribers(_Topic) ->
 init([]) ->
     Realm = application:get_env(hecate, realm, <<"io.macula">>),
     Identity = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>),
-    Bootstrap = application:get_env(hecate, bootstrap, [<<"https://boot.macula.io:4433">>]),
+    Bootstrap = case os:getenv("MACULA_RELAYS") of
+        false -> application:get_env(hecate, bootstrap,
+                     [<<"https://relay00.macula.io:4433">>]);
+        EnvStr -> [list_to_binary(string:trim(U))
+                   || U <- string:split(EnvStr, ",", all),
+                      string:trim(U) =/= ""]
+    end,
     Url = ensure_binary(hd(Bootstrap)),
 
     logger:info("[hecate_mesh] Starting relay client (realm: ~s, relay: ~s)", [Realm, Url]),

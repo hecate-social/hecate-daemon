@@ -136,7 +136,10 @@ build_token(DisplayCode, ExpiresAt) ->
     SiteId = guide_site_lifecycle_app:site_id(),
     NodeName = atom_to_binary(node()),
     Realm = to_binary(application:get_env(hecate, realm, <<"io.macula">>)),
-    Bootstrap = to_binary(application:get_env(hecate, mesh_bootstrap, <<"https://boot.macula.io:443">>)),
+    Bootstrap = case os:getenv("MACULA_RELAYS") of
+        false -> to_binary(application:get_env(hecate, mesh_bootstrap, <<"https://relay00.macula.io:4433">>));
+        EnvStr -> list_to_binary(hd(string:split(EnvStr, ",")))
+    end,
 
     AdminHost = case binary:split(NodeName, <<"@">>) of
         [_, Host] -> Host;
