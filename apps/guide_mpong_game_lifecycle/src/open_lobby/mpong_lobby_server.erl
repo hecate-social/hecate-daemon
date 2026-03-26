@@ -342,12 +342,13 @@ start_engine(#lobby{game_id = GameId, seats = Seats} = State) ->
          Modes#{WI => {bot, Personality}}}
     end, {#{}, #{}}, Seats),
 
-    %% Dispatch join commands for each player (with metadata), then start
+    %% Dispatch host → joins → start (aggregate requires this order)
     spawn(fun() ->
+        HostCmd = host_game_v1:new(GameId, State#lobby.host_node, State#lobby.max_players),
+        maybe_host_game:dispatch(HostCmd),
         lists:foreach(fun(Seat) ->
             dispatch_seat_join(GameId, Seat)
         end, Seats),
-        timer:sleep(50),
         StartCmd = start_game_v1:new(GameId, State#lobby.host_node),
         maybe_start_game:dispatch(GameId, StartCmd)
     end),
