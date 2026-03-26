@@ -98,6 +98,22 @@ handle_info({spot_denied, GameId, Reason}, State) ->
 handle_info({mpong_countdown, _GameId, _N}, State) ->
     {noreply, State};
 
+handle_info({mpong_state, GameId, StateMsg}, #seeker{joined_game = GameId} = State) ->
+    hecate_web_events:broadcast(mpong_state, StateMsg),
+    %% Check if match is over (best of 3: someone won 2 games)
+    case maps:get(<<"games_won">>, StateMsg, maps:get(games_won, StateMsg, undefined)) of
+        GamesWon when is_map(GamesWon) ->
+            MaxWins = lists:max([0 | [V || V <- maps:values(GamesWon), is_integer(V)]]),
+            case MaxWins >= 2 of
+                true ->
+                    logger:info("[mpong_seeker] Match over for ~s, ready for new games", [GameId]),
+                    reset_state(State);
+                false ->
+                    {noreply, State}
+            end;
+        _ ->
+            {noreply, State}
+    end;
 handle_info({mpong_state, _GameId, StateMsg}, State) ->
     hecate_web_events:broadcast(mpong_state, StateMsg),
     {noreply, State};
@@ -113,7 +129,17 @@ handle_info({mesh_joined, GameId}, #seeker{} = State) ->
     logger:info("[mpong_seeker] Mesh game joined: ~s, starting state listener", [GameId]),
     hecate_web_events:broadcast(mpong_lobby_joined, #{game_id => GameId, wall_index => undefined}),
     listen_game_state_sup:start_listener(#{game_id => GameId, wall_index => 1}),
+    %% Safety: auto-reset after 10 minutes in case game end is never detected
+    erlang:send_after(600000, self(), {game_timeout, GameId}),
     {noreply, State#seeker{joined_game = GameId}};
+
+handle_info({game_timeout, GameId}, #seeker{joined_game = GameId} = State) ->
+    logger:info("[mpong_seeker] Game ~s timed out, resetting", [GameId]),
+    reset_state(State);
+
+handle_info({game_timeout, _OldGameId}, State) ->
+    %% Already moved on to a different game or reset
+    {noreply, State};
 
 handle_info(try_mesh_subscribe, #seeker{mesh_sub = undefined} = State) ->
     case subscribe_mesh_lobbies() of
