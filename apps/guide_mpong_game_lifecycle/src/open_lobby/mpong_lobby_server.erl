@@ -75,8 +75,8 @@ init(#{game_id := GameId, max_players := MaxPlayers, host_champion := HostChampi
     HostNode = atom_to_binary(node()),
 
     %% Host takes seat 0 with local tech info
-    HostTech = #{transport => Mode, country => undefined, city => undefined,
-                 rtt_ms => 0, nat_type => <<"local">>},
+    HostTech = #{transport => local, country => undefined, city => undefined,
+                 rtt_ms => undefined, nat_type => <<"local">>},
     Seat0 = #{wall_index => 0, status => reserved,
               champion => HostChampion, node_id => HostNode, pid => self(),
               tech => HostTech},
@@ -414,7 +414,13 @@ dispatch_seat_join(GameId, #{wall_index := WI, champion := Champion, node_id := 
     Transport = tech_bin(transport, Tech),
     Country = tech_bin(country, Tech),
     City = tech_bin(city, Tech),
-    RTT = case Tech of undefined -> undefined; _ -> maps:get(rtt_ms, Tech, undefined) end,
+    RTT = case Tech of
+        undefined -> undefined;
+        _ -> case maps:find(rtt_ms, Tech) of
+                {ok, R} -> R;
+                error -> maps:get(<<"rtt_ms">>, Tech, undefined)
+             end
+    end,
     NatType = tech_bin(nat_type, Tech),
     StreamId = mpong_game_aggregate:stream_id(GameId),
     EvoqCmd = #evoq_command{
@@ -449,9 +455,18 @@ dispatch_seat_join(_GameId, _Seat) ->
 
 tech_bin(_Key, undefined) -> undefined;
 tech_bin(Key, Tech) ->
-    case maps:get(Key, Tech, undefined) of
-        V when is_atom(V), V =/= undefined -> atom_to_binary(V);
-        V -> V
+    BinKey = atom_to_binary(Key),
+    V = case maps:find(Key, Tech) of
+        {ok, Val} -> Val;
+        error ->
+            case maps:find(BinKey, Tech) of
+                {ok, Val} -> Val;
+                error -> undefined
+            end
+    end,
+    case V of
+        A when is_atom(A), A =/= undefined -> atom_to_binary(A);
+        _ -> V
     end.
 
 find_open_seat([]) -> full;
