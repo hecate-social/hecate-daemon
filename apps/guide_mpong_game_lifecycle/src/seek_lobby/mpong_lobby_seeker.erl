@@ -162,8 +162,14 @@ try_lan_join(Champion, GameId, HostNode, HostPid, State) ->
 %% Internal: Mesh join
 %%====================================================================
 
-handle_mesh_lobby(Payload, State) ->
-    Msg = decode_payload(Payload),
+handle_mesh_lobby(PublishData, State) ->
+    %% PublishData from macula is #{topic => ..., payload => DecodedPayload}
+    %% Extract the actual game announcement from the payload field
+    RawPayload = case PublishData of
+        #{payload := P} -> P;
+        _ -> PublishData
+    end,
+    Msg = decode_payload(RawPayload),
     Action = maps:get(<<"action">>, Msg, undefined),
     HostNodeId = maps:get(<<"host_node_id">>, Msg, <<>>),
     OurNode = atom_to_binary(node()),
