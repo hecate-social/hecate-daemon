@@ -156,6 +156,9 @@ handle_info({init_mesh, GameId, HostNode, MaxPlayers},
         _ ->
             advertise_game:announce(#{game_id => GameId, host_node_id => HostNode,
                                       max_players => MaxPlayers}),
+            %% Re-announce periodically until lobby fills (same interval as LAN broadcast).
+            %% A single announce is lost if boot restarts or subscribers join late.
+            erlang:send_after(?BROADCAST_MS, self(), broadcast_mesh),
             {noreply, State#lobby{mesh_adv_ref = MeshAdvRef}}
     end;
 
@@ -174,6 +177,18 @@ handle_info(broadcast_lobby, #lobby{state = waiting, mode = Mode} = State)
 
 handle_info(broadcast_lobby, State) ->
     %% Not waiting or not lan mode — stop broadcasting
+    {noreply, State};
+
+handle_info(broadcast_mesh, #lobby{state = waiting, mode = Mode} = State)
+  when Mode =:= mesh; Mode =:= mixed ->
+    advertise_game:announce(#{game_id => State#lobby.game_id,
+                              host_node_id => State#lobby.host_node,
+                              max_players => State#lobby.max_players}),
+    erlang:send_after(?BROADCAST_MS, self(), broadcast_mesh),
+    {noreply, State};
+
+handle_info(broadcast_mesh, State) ->
+    %% Not waiting or not mesh mode — stop announcing
     {noreply, State};
 
 handle_info(countdown_tick, #lobby{state = countdown, countdown = 1} = State) ->
