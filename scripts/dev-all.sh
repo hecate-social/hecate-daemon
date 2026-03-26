@@ -176,7 +176,7 @@ ensure_searxng() {
         -e "SEARXNG_SETTINGS_PATH=$DEV_DATA_DIR/searxng/settings.yml" \
         -e "GRANIAN_HOST=127.0.0.1" \
         -e "GRANIAN_PORT=8888" \
-        podman.io/searxng/searxng:latest >/dev/null
+        docker.io/searxng/searxng:latest >/dev/null
 
     # Wait for it to respond
     echo -n "  Waiting for SearXNG on :8888"

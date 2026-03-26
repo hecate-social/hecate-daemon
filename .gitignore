@@ -43,3 +43,4 @@ data/
 rebar3.crashdump
 
 # Lock files are tracked for reproducible builds
+rebar.lock
