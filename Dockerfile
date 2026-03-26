@@ -18,9 +18,9 @@ RUN curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 &
     chmod +x /usr/local/bin/rebar3
 
 # Copy dependency config first (cacheable layer)
-COPY rebar.config rebar.lock ./
+COPY rebar.config ./
 
-# Fetch dependencies (cached until rebar.config/lock changes)
+# Fetch dependencies (cached until rebar.config changes)
 RUN rebar3 get-deps
 
 # Copy source (busts cache when code changes)
