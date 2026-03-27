@@ -61,12 +61,9 @@ discover_subscribers(Topic) ->
 
 -spec get_peers() -> {ok, list()}.
 get_peers() ->
-    case hecate_mesh_client:get_client() of
-        {ok, Client} when is_pid(Client) ->
-            macula:get_known_peers(Client);
-        _ ->
-            {ok, []}
-    end.
+    %% In relay mode, peers are managed by the relay, not tracked locally.
+    %% The relay /status endpoint exposes connected nodes.
+    {ok, []}.
 
 -spec get_proof_results() -> map().
 get_proof_results() ->

@@ -22,7 +22,10 @@ init(Req0, State) ->
 handle_get(Req0, State) ->
     Response = case hecate_mesh:get_status() of
         {ok, Status} ->
-            {ok, Peers} = hecate_mesh:get_peers(),
+            Peers = case hecate_mesh:get_peers() of
+                {ok, P} -> P;
+                _ -> []
+            end,
             maps:merge(#{ok => true, peers => Peers, peer_count => length(Peers)}, Status);
         {error, Reason} ->
             #{ok => false, error => iolist_to_binary(io_lib:format("~p", [Reason]))}
