@@ -44,26 +44,29 @@ handle_call(_Req, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({mesh_state, Payload}, #listener{game_id = GameId, wall_index = WI} = State) ->
-    case json:decode(Payload) of
-        #{<<"ball">> := Ball} = StateMsg ->
-            %% Forward to local SSE connections
-            Members = pg:get_members(pg, {mpong_game_stream, GameId}),
-            [Pid ! {mpong_state, GameId, StateMsg} || Pid <- Members, Pid =/= self()],
-
-            %% Run AI and send paddle position back
-            Arena = case State#listener.arena of
-                undefined -> mpong_arena:new(maps:size(maps:get(<<"paddles">>, StateMsg, #{})));
-                A -> A
-            end,
-            PaddlePos = mpong_ai:compute_paddle_position(Ball, WI, Arena),
-            send_paddle(GameId, PaddlePos),
-            {noreply, State#listener{arena = Arena}};
-        _ ->
-            {noreply, State}
-    end;
+handle_info({mesh_state, #{payload := Payload}}, State) ->
+    handle_game_state(Payload, State);
+handle_info({mesh_state, Payload}, State) when is_binary(Payload) ->
+    handle_game_state(json:decode(Payload), State);
+handle_info({mesh_state, Payload}, State) when is_map(Payload) ->
+    handle_game_state(Payload, State);
 
 handle_info(_Info, State) ->
+    {noreply, State}.
+
+handle_game_state(#{<<"ball">> := Ball} = StateMsg, #listener{game_id = GameId, wall_index = WI} = State) ->
+    %% Forward to local SSE connections
+    Members = pg:get_members(pg, {mpong_game_stream, GameId}),
+    [Pid ! {mpong_state, GameId, StateMsg} || Pid <- Members, Pid =/= self()],
+    %% Run AI and send paddle position back
+    Arena = case State#listener.arena of
+        undefined -> mpong_arena:new(maps:size(maps:get(<<"paddles">>, StateMsg, #{})));
+        A -> A
+    end,
+    PaddlePos = mpong_ai:compute_paddle_position(Ball, WI, Arena),
+    send_paddle(GameId, PaddlePos),
+    {noreply, State#listener{arena = Arena}};
+handle_game_state(_Other, State) ->
     {noreply, State}.
 
 terminate(_Reason, #listener{game_id = GameId}) ->

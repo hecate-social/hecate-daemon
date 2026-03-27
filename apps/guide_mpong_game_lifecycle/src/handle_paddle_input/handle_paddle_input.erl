@@ -24,11 +24,15 @@ subscribe(GameId, EnginePid) ->
             ok
     end.
 
--spec handle_message(binary(), pid()) -> ok.
-handle_message(Payload, EnginePid) ->
-    case json:decode(Payload) of
-        #{<<"node_id">> := NodeId, <<"position">> := Pos} ->
-            mpong_game_engine:update_paddle(EnginePid, NodeId, Pos);
-        _ ->
-            ok
-    end.
+-spec handle_message(term(), pid()) -> ok.
+handle_message(#{payload := Payload}, EnginePid) ->
+    handle_paddle(Payload, EnginePid);
+handle_message(Payload, EnginePid) when is_binary(Payload) ->
+    handle_paddle(json:decode(Payload), EnginePid);
+handle_message(Payload, EnginePid) when is_map(Payload) ->
+    handle_paddle(Payload, EnginePid);
+handle_message(_, _) -> ok.
+
+handle_paddle(#{<<"node_id">> := NodeId, <<"position">> := Pos}, EnginePid) ->
+    mpong_game_engine:update_paddle(EnginePid, NodeId, Pos);
+handle_paddle(_, _) -> ok.
