@@ -16,7 +16,7 @@
     client :: pid() | undefined,
     realm :: binary(),
     identity :: binary(),
-    bootstrap :: binary()
+    relays :: [binary()]
 }).
 
 %%====================================================================
@@ -67,12 +67,12 @@ init([]) ->
                    || U <- string:split(EnvStr, ",", all),
                       string:trim(U) =/= ""]
     end,
-    Url = ensure_binary(hd(Bootstrap)),
+    Relays = [ensure_binary(R) || R <- Bootstrap],
 
-    logger:info("[hecate_mesh] Starting relay client (realm: ~s, relay: ~s)", [Realm, Url]),
+    logger:info("[hecate_mesh] Starting relay client (realm: ~s, relays: ~p)", [Realm, Relays]),
 
     {ok, Client} = macula_relay_client:start_link(#{
-        url => Url,
+        relays => Relays,
         realm => Realm,
         identity => Identity
     }),
@@ -83,19 +83,19 @@ init([]) ->
         client = Client,
         realm = Realm,
         identity = Identity,
-        bootstrap = Url
+        relays = Relays
     }}.
 
 handle_call(get_client, _From, #state{client = Client} = State) ->
     {reply, {ok, Client}, State};
 
 handle_call(get_status, _From, #state{client = Client, realm = Realm,
-                                       identity = Identity, bootstrap = Url} = State) ->
+                                       identity = Identity, relays = Relays} = State) ->
     Status = #{
         connected => is_pid(Client),
         realm => Realm,
         identity => Identity,
-        bootstrap => [Url],
+        relays => Relays,
         mode => relay
     },
     {reply, {ok, Status}, State};
