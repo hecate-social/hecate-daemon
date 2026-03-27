@@ -31,7 +31,23 @@ start_stream(Req0) ->
 
     ensure_pg_scope(),
     ok = pg:join(?SCOPE, {mpong_game_stream, GameId}, self()),
-    logger:info("[mpong_sse] Joined pg group for game ~s, pid=~p", [GameId, self()]),
+
+    %% Subscribe via mesh for cross-relay game observation.
+    %% If the game engine is on another relay, pg alone won't receive ticks.
+    Self = self(),
+    MeshTopic = <<"mpong.game.", GameId/binary, ".state">>,
+    case erlang:function_exported(hecate_mesh, subscribe, 2) of
+        true ->
+            hecate_mesh:subscribe(MeshTopic, fun(#{payload := Payload}) ->
+                Self ! {mpong_state, GameId, Payload};
+            (Payload) when is_map(Payload) ->
+                Self ! {mpong_state, GameId, Payload};
+            (Payload) when is_binary(Payload) ->
+                Self ! {mpong_state, GameId, json:decode(Payload)}
+            end);
+        false -> ok
+    end,
+    logger:info("[mpong_sse] Joined pg + mesh for game ~s, pid=~p", [GameId, self()]),
 
     Req = cowboy_req:stream_reply(200, #{
         <<"content-type">> => <<"text/event-stream">>,
