@@ -67,9 +67,9 @@ ENV HECATE_API_PORT=4444
 # Expose ports
 EXPOSE 4444
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -q --spider http://localhost:4444/health || exit 1
+# Health check — verify Erlang node is registered with epmd
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD /app/erts-*/bin/epmd -names 2>/dev/null | grep -q hecate || exit 1
 
 # Run — entrypoint generates vm.args from HECATE_NODE_NAME / HECATE_ERLANG_COOKIE
 ENTRYPOINT ["/app/entrypoint.sh"]
