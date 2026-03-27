@@ -1,38 +1,42 @@
 %%%-------------------------------------------------------------------
 %%% @doc Receives remote paddle positions from mesh PubSub.
 %%%
-%%% On the HOST node, subscribes to mpong.game.{game_id}.paddle.
-%%% When a remote player sends their paddle position, forwards it
-%%% to the local game engine.
+%%% On the HOST node, subscribes to {realm}.hecate.mpong.game.paddle.
+%%% Filters by game_id in payload. When a remote player sends their
+%%% paddle position, forwards it to the local game engine.
 %%%
-%%% Topic: mpong.game.{game_id}.paddle
+%%% Topic: {realm}.hecate.mpong.game.paddle (game_id in payload)
 %%% @end
 %%%-------------------------------------------------------------------
 -module(handle_paddle_input).
 
--export([subscribe/2, handle_message/2]).
+-export([subscribe/2, topic/0]).
+
+topic() ->
+    Realm = application:get_env(hecate, realm, <<"io.macula">>),
+    <<Realm/binary, ".hecate.mpong.game.paddle">>.
 
 -spec subscribe(binary(), pid()) -> ok.
 subscribe(GameId, EnginePid) ->
-    Topic = <<"mpong.game.", GameId/binary, ".paddle">>,
     case erlang:function_exported(hecate_mesh, subscribe, 2) of
         true ->
-            hecate_mesh:subscribe(Topic, fun(Msg) ->
-                handle_message(Msg, EnginePid)
+            hecate_mesh:subscribe(topic(), fun(Msg) ->
+                handle_message(Msg, GameId, EnginePid)
             end);
         false ->
             ok
     end.
 
--spec handle_message(term(), pid()) -> ok.
-handle_message(#{payload := Payload}, EnginePid) ->
-    handle_paddle(Payload, EnginePid);
-handle_message(Payload, EnginePid) when is_binary(Payload) ->
-    handle_paddle(json:decode(Payload), EnginePid);
-handle_message(Payload, EnginePid) when is_map(Payload) ->
-    handle_paddle(Payload, EnginePid);
-handle_message(_, _) -> ok.
+handle_message(#{payload := Payload}, GameId, EnginePid) ->
+    handle_paddle(Payload, GameId, EnginePid);
+handle_message(Payload, GameId, EnginePid) when is_binary(Payload) ->
+    handle_paddle(json:decode(Payload), GameId, EnginePid);
+handle_message(Payload, GameId, EnginePid) when is_map(Payload) ->
+    handle_paddle(Payload, GameId, EnginePid);
+handle_message(_, _, _) -> ok.
 
-handle_paddle(#{<<"node_id">> := NodeId, <<"position">> := Pos}, EnginePid) ->
+%% Only process paddles for OUR game
+handle_paddle(#{<<"game_id">> := GID, <<"node_id">> := NodeId, <<"position">> := Pos}, GameId, EnginePid)
+  when GID =:= GameId ->
     mpong_game_engine:update_paddle(EnginePid, NodeId, Pos);
-handle_paddle(_, _) -> ok.
+handle_paddle(_, _, _) -> ok.

@@ -2,8 +2,8 @@
 %%% @doc GET /api/mpong/games/:game_id/stream — SSE endpoint for
 %%% real-time game state.
 %%%
-%%% Joins a pg group and streams game engine ticks to the web frontend.
-%%% Uses blocking receive loop pattern (same as web_events_stream_api).
+%%% Joins a pg group for LAN delivery and subscribes to mesh topic
+%%% for cross-relay delivery. Filters by game_id in payload.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(stream_mpong_game_api).
@@ -32,22 +32,26 @@ start_stream(Req0) ->
     ensure_pg_scope(),
     ok = pg:join(?SCOPE, {mpong_game_stream, GameId}, self()),
 
-    %% Subscribe via mesh for cross-relay game observation.
-    %% If the game engine is on another relay, pg alone won't receive ticks.
+    %% Subscribe to shared mesh topic, filter by game_id in payload
     Self = self(),
-    MeshTopic = <<"mpong.game.", GameId/binary, ".state">>,
+    MeshTopic = broadcast_game_state:topic(),
     case erlang:function_exported(hecate_mesh, subscribe, 2) of
         true ->
-            hecate_mesh:subscribe(MeshTopic, fun(#{payload := Payload}) ->
-                Self ! {mpong_state, GameId, Payload};
-            (Payload) when is_map(Payload) ->
-                Self ! {mpong_state, GameId, Payload};
-            (Payload) when is_binary(Payload) ->
-                Self ! {mpong_state, GameId, json:decode(Payload)}
+            hecate_mesh:subscribe(MeshTopic, fun(Msg) ->
+                Payload = case Msg of
+                    #{payload := P} -> P;
+                    P when is_map(P) -> P;
+                    P when is_binary(P) -> json:decode(P)
+                end,
+                case Payload of
+                    #{<<"game_id">> := GID} when GID =:= GameId ->
+                        Self ! {mpong_state, GameId, Payload};
+                    _ -> ok
+                end
             end);
         false -> ok
     end,
-    logger:info("[mpong_sse] Joined pg + mesh for game ~s, pid=~p", [GameId, self()]),
+    logger:info("[mpong_sse] Joined pg + mesh for game ~s", [GameId]),
 
     Req = cowboy_req:stream_reply(200, #{
         <<"content-type">> => <<"text/event-stream">>,
@@ -56,13 +60,11 @@ start_stream(Req0) ->
         <<"x-accel-buffering">> => <<"no">>
     }, Req0),
 
-    %% Send connected event
     cowboy_req:stream_body(
         <<"event: connected\ndata: {\"game_id\":\"", GameId/binary, "\"}\n\n">>,
         nofin, Req),
 
     erlang:send_after(?HEARTBEAT_MS, self(), heartbeat),
-
     stream_loop(Req, GameId).
 
 stream_loop(Req, GameId) ->
