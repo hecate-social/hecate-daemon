@@ -30,7 +30,7 @@ dispatch_install(PluginId, Data) ->
         name              => resolve_routing_name(gf(oci_image, Data), TechName),
         display_name      => gf(display_name, Data, gf(plugin_name, Data, TechName)),
         oci_image         => gf(oci_image, Data),
-        installed_version => gf(version, Data, <<"latest">>),
+        installed_version => resolve_version(Data),
         license_id        => gf(license_id, Data),
         icon              => gf(icon, Data, undefined),
         group_name        => gf(group_name, Data, undefined),
@@ -75,6 +75,25 @@ tech_name_from_plugin_id(PluginId) when is_binary(PluginId) ->
         [_Org, Name] -> Name;
         _ -> PluginId
     end.
+
+%% Resolve software version — avoid picking up the stream version (integer).
+%% Priority: explicit installed_version string > extract from package_url > "latest"
+resolve_version(Data) ->
+    case gf(installed_version, Data) of
+        V when is_binary(V), byte_size(V) > 0 -> V;
+        _ -> extract_version_from_url(gf(package_url, Data, undefined))
+    end.
+
+extract_version_from_url(Url) when is_binary(Url) ->
+    %% e.g. ".../download/v0.3.1/hecate-app-snake-duel.tar.gz" → "v0.3.1"
+    Parts = binary:split(Url, <<"/">>, [global]),
+    find_version_part(lists:reverse(Parts));
+extract_version_from_url(_) ->
+    <<"latest">>.
+
+find_version_part([]) -> <<"latest">>;
+find_version_part([<<"v", _/binary>> = V | _]) -> V;
+find_version_part([_ | Rest]) -> find_version_part(Rest).
 
 gf(Key, Data) -> hecate_api_utils:get_field(Key, Data).
 gf(Key, Data, Default) -> hecate_api_utils:get_field(Key, Data, Default).
