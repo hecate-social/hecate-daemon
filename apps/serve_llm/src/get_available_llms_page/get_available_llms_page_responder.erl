@@ -76,12 +76,13 @@ subscribe(Topic) ->
     end.
 
 build_topic(AgentIdentity, Action) ->
+    Realm = application:get_env(hecate, realm, <<"io.macula">>),
     AgentPath = case AgentIdentity of
         <<"mri:agent:", Rest/binary>> -> Rest;
         _ -> AgentIdentity
     end,
     SafePath = binary:replace(AgentPath, <<"/">>, <<".">>, [global]),
-    <<"hecate.llm.", Action/binary, ".", SafePath/binary>>.
+    <<Realm/binary, ".hecate.llm.", Action/binary, ".", SafePath/binary>>.
 
 get_agent_identity() ->
     application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>).
