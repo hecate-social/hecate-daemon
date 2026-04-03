@@ -69,12 +69,27 @@ init([]) ->
     end,
     Relays = [ensure_binary(R) || R <- Bootstrap],
 
-    logger:info("[hecate_mesh] Starting relay client (realm: ~s, relays: ~p)", [Realm, Relays]),
+    %% Build site metadata from cookie + env vars
+    Cookie = atom_to_binary(erlang:get_cookie()),
+    SiteId = binary:part(binary:encode_hex(crypto:hash(sha256, Cookie)), 0, 16),
+    Site = maps:from_list([{K, V} || {K, V} <- [
+        {site_id, SiteId},
+        {name, env_bin("HECATE_SITE_NAME", SiteId)},
+        {city, env_bin("HECATE_GEO_CITY", undefined)},
+        {country, env_bin("HECATE_GEO_COUNTRY", undefined)},
+        {lat, env_float("HECATE_GEO_LAT")},
+        {lng, env_float("HECATE_GEO_LNG")},
+        {site_type, env_bin("HECATE_SITE_TYPE", <<"daemon">>)}
+    ], V =/= undefined]),
+
+    logger:info("[hecate_mesh] Starting relay client (realm: ~s, site: ~s, relays: ~p)",
+                [Realm, SiteId, Relays]),
 
     {ok, Client} = macula_relay_client:start_link(#{
         relays => Relays,
         realm => Realm,
-        identity => Identity
+        identity => Identity,
+        site => Site
     }),
 
     logger:info("[hecate_mesh] Relay client started"),
@@ -139,3 +154,23 @@ terminate(_Reason, #state{client = Client}) ->
 
 ensure_binary(B) when is_binary(B) -> B;
 ensure_binary(S) when is_list(S) -> list_to_binary(S).
+
+env_bin(Key, Default) ->
+    case os:getenv(Key) of
+        false -> Default;
+        "" -> Default;
+        Val -> list_to_binary(Val)
+    end.
+
+env_float(Key) ->
+    case os:getenv(Key) of
+        false -> undefined;
+        "" -> undefined;
+        Val ->
+            try list_to_float(Val)
+            catch error:badarg ->
+                try float(list_to_integer(Val))
+                catch error:badarg -> undefined
+                end
+            end
+    end.
