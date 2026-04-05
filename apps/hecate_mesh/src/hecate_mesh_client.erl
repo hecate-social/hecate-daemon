@@ -1,8 +1,9 @@
 %%%-------------------------------------------------------------------
-%%% @doc Hecate mesh client — connects to the relay server.
+%%% @doc Hecate mesh client — multi-homed relay connections.
 %%%
-%%% Thin wrapper around macula_relay_client. The relay client handles
-%%% QUIC connection, reconnection, and subscription replay internally.
+%%% Wraps macula_multi_relay for node multi-homing. Maintains N
+%%% concurrent QUIC connections to diverse relays. Subscribes on ALL,
+%%% publishes via PRIMARY, deduplicates incoming by message_id.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_mesh_client).
@@ -16,7 +17,8 @@
     client :: pid() | undefined,
     realm :: binary(),
     identity :: binary(),
-    relays :: [binary()]
+    relays :: [binary()],
+    connections :: pos_integer()
 }).
 
 %%====================================================================
@@ -82,57 +84,78 @@ init([]) ->
         {site_type, env_bin("HECATE_SITE_TYPE", <<"daemon">>)}
     ], V =/= undefined]),
 
-    logger:info("[hecate_mesh] Starting relay client (realm: ~s, site: ~s, relays: ~p)",
-                [Realm, SiteId, Relays]),
+    Connections = case os:getenv("MACULA_CONNECTIONS") of
+        false -> application:get_env(hecate, mesh_connections, 2);
+        ConnStr ->
+            try list_to_integer(string:trim(ConnStr))
+            catch error:badarg -> 2
+            end
+    end,
 
-    {ok, Client} = macula_relay_client:start_link(#{
+    logger:info("[hecate_mesh] Starting multi-relay client (realm: ~s, site: ~s, "
+                "connections: ~b, relays: ~p)",
+                [Realm, SiteId, Connections, Relays]),
+
+    {ok, Client} = macula_multi_relay:start_link(#{
         relays => Relays,
         realm => Realm,
         identity => Identity,
-        site => Site
+        site => Site,
+        connections => Connections
     }),
 
-    logger:info("[hecate_mesh] Relay client started"),
+    logger:info("[hecate_mesh] Multi-relay client started (~b connections)", [Connections]),
 
     {ok, #state{
         client = Client,
         realm = Realm,
         identity = Identity,
-        relays = Relays
+        relays = Relays,
+        connections = Connections
     }}.
 
 handle_call(get_client, _From, #state{client = Client} = State) ->
     {reply, {ok, Client}, State};
 
 handle_call(get_status, _From, #state{client = Client, realm = Realm,
-                                       identity = Identity, relays = Relays} = State) ->
+                                       identity = Identity, relays = Relays,
+                                       connections = Connections} = State) ->
+    MultiStatus = case is_pid(Client) of
+        true -> case macula_multi_relay:get_status(Client) of
+            {ok, MS} -> MS;
+            _ -> #{}
+        end;
+        false -> #{}
+    end,
     Status = #{
         connected => is_pid(Client),
         realm => Realm,
         identity => Identity,
         relays => Relays,
-        mode => relay
+        connections => Connections,
+        multi_relay => MultiStatus,
+        mode => multi_relay
     },
     {reply, {ok, Status}, State};
 
 handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) ->
-    macula_relay_client:publish(Client, Topic, Payload),
+    macula_multi_relay:publish(Client, Topic, Payload),
     {reply, ok, State};
 
 handle_call({subscribe, Topic, Callback}, _From, #state{client = Client} = State) ->
-    Result = macula_relay_client:subscribe(Client, Topic, Callback),
+    Result = macula_multi_relay:subscribe(Client, Topic, Callback),
     {reply, Result, State};
 
 handle_call({unsubscribe, SubRef}, _From, #state{client = Client} = State) ->
-    Result = macula_relay_client:unsubscribe(Client, SubRef),
+    Result = macula_multi_relay:unsubscribe(Client, SubRef),
     {reply, Result, State};
 
 handle_call({advertise, Procedure, Handler}, _From, #state{client = Client} = State) ->
-    Result = macula_relay_client:advertise(Client, Procedure, Handler),
+    Result = macula_multi_relay:advertise(Client, Procedure, Handler),
     {reply, Result, State};
 
 handle_call({rpc_call, Procedure, Args, Timeout}, _From, #state{client = Client} = State) ->
-    Result = macula_relay_client:call(Client, Procedure, Args, Timeout),
+    Result = macula_multi_relay:call(Client, Procedure, Args, Timeout),
     {reply, Result, State};
 
 handle_call(_Request, _From, State) ->
@@ -145,7 +168,7 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 terminate(_Reason, #state{client = Client}) ->
-    catch macula_relay_client:stop(Client),
+    catch macula_multi_relay:stop(Client),
     ok.
 
 %%====================================================================
