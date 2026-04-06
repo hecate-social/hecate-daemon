@@ -195,19 +195,25 @@ handle_message({ok, {subscribe, Msg}}, State) ->
         %% Join local edge pg groups
         pg:join(pg, {edge_topic, Topic}, self()),
         pg:join(pg, {edge_local, Topic}, self()),
-        %% Subscribe on WAN if not already subscribed for this topic
+        %% Bridge to WAN — check cache to avoid re-subscribing
         case maps:is_key(Topic, Acc) of
             true -> Acc;
             false ->
-                Self = self(),
-                Callback = fun(#{payload := Payload}) ->
-                    Self ! {wan_publish, Topic, Payload}
-                end,
-                case hecate_mesh:subscribe(Topic, Callback) of
-                    {ok, SubRef} ->
-                        ?LOG_INFO("[edge_handler] Bridged ~s to WAN", [Topic]),
-                        Acc#{Topic => SubRef};
-                    _ -> Acc
+                case hecate_edge_relay_cache:should_bridge(Topic) of
+                    skip ->
+                        Acc;
+                    bridge ->
+                        Self = self(),
+                        Callback = fun(#{payload := Payload}) ->
+                            Self ! {wan_publish, Topic, Payload}
+                        end,
+                        case hecate_mesh:subscribe(Topic, Callback) of
+                            {ok, SubRef} ->
+                                hecate_edge_relay_cache:mark_bridged(Topic),
+                                ?LOG_INFO("[edge_handler] Bridged ~s to WAN", [Topic]),
+                                Acc#{Topic => SubRef};
+                            _ -> Acc
+                        end
                 end
         end
     end, State#state.wan_subs, Topics),

@@ -22,6 +22,14 @@ init(disabled) ->
 init(#{port := Port}) ->
     Children = [
         #{
+            id => hecate_edge_relay_cache,
+            start => {hecate_edge_relay_cache, start_link, []},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [hecate_edge_relay_cache]
+        },
+        #{
             id => hecate_edge_relay_listener,
             start => {hecate_edge_relay_listener, start_link, [#{port => Port}]},
             restart => permanent,
