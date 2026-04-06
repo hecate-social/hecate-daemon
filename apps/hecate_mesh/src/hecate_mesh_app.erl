@@ -44,6 +44,7 @@ wait_for_geo_check(Retries) ->
 
 start_mesh() ->
     logger:info("[hecate_mesh] Connecting to Macula mesh"),
+    mesh_catch_up:init_position_table(),
     {ok, Pid} = hecate_mesh_sup:start_link(),
     logger:info("[hecate_mesh] Mesh client started"),
     {ok, Pid}.
