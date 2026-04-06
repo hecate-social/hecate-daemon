@@ -29,20 +29,7 @@ start_link(Opts) ->
 
 init(#{port := Port}) ->
     process_flag(trap_exit, true),
-    %% macula_quic:listen/2 expects {cert, Path} and {key, Path} —
-    %% it internally converts to {certfile, ...} for quicer.
-    %% Do NOT pass macula_tls:quic_server_opts() which uses {certfile, ...} directly.
-    {CertPath, KeyPath} = macula_tls:get_cert_paths(),
-    macula_tls:ensure_cert_exists(CertPath, KeyPath),
-    ListenOpts = [
-        {cert, CertPath},
-        {key, KeyPath},
-        {alpn, ["macula"]},
-        {idle_timeout_ms, 120000},
-        {keep_alive_interval_ms, 30000},
-        {peer_unidi_stream_count, 3},
-        {peer_bidi_stream_count, 100}
-    ],
+    ListenOpts = build_listen_opts(),
     case macula_quic:listen(Port, ListenOpts) of
         {ok, Listener} ->
             ?LOG_INFO("[edge_relay] Listening on port ~b", [Port]),
@@ -59,17 +46,7 @@ init(#{port := Port}) ->
 %%====================================================================
 
 handle_info(retry_listen, #state{port = Port, listener = undefined} = State) ->
-    {CertPath, KeyPath} = macula_tls:get_cert_paths(),
-    macula_tls:ensure_cert_exists(CertPath, KeyPath),
-    ListenOpts = [
-        {cert, CertPath},
-        {key, KeyPath},
-        {alpn, ["macula"]},
-        {idle_timeout_ms, 120000},
-        {keep_alive_interval_ms, 30000},
-        {peer_unidi_stream_count, 3},
-        {peer_bidi_stream_count, 100}
-    ],
+    ListenOpts = build_listen_opts(),
     case macula_quic:listen(Port, ListenOpts) of
         {ok, Listener} ->
             ?LOG_INFO("[edge_relay] Listening on port ~b (retry succeeded)", [Port]),
@@ -148,6 +125,22 @@ terminate(_Reason, #state{listener = Listener}) ->
 %%====================================================================
 %% Internal
 %%====================================================================
+
+%% macula_quic:listen/2 expects {cert, Path} and {key, Path} —
+%% it internally converts to {certfile, ...} for quicer.
+%% Do NOT pass macula_tls:quic_server_opts() which uses {certfile, ...} directly.
+build_listen_opts() ->
+    {CertPath, KeyPath} = macula_tls:get_cert_paths(),
+    macula_tls:ensure_cert_exists(CertPath, KeyPath),
+    [
+        {cert, CertPath},
+        {key, KeyPath},
+        {alpn, ["macula"]},
+        {idle_timeout_ms, 120000},
+        {keep_alive_interval_ms, 30000},
+        {peer_unidi_stream_count, 3},
+        {peer_bidi_stream_count, 100}
+    ].
 
 register_accept(Listener) ->
     case quicer:async_accept(Listener, #{}) of

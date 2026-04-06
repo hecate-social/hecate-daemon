@@ -229,11 +229,14 @@ handle_message({ok, {register_procedure, Msg}}, State) ->
         _:_ -> ok
     end,
     %% Also advertise on WAN so remote nodes can call this procedure
-    Self = self(),
+    %% Capture the handler PID here — inside the fun, self() refers to
+    %% the spawned RPC process, not this handler.
+    HandlerPid = self(),
     Handler = fun(Args) ->
         %% Forward WAN RPC call to the LAN client
         CallId = base64:encode(crypto:strong_rand_bytes(12)),
-        Self ! {relay_call, self(), CallId, Procedure, Args},
+        RpcCallerPid = self(),
+        HandlerPid ! {relay_call, RpcCallerPid, CallId, Procedure, Args},
         %% Wait for reply from LAN client
         receive
             {relay_reply, CallId, Result} -> {ok, Result}

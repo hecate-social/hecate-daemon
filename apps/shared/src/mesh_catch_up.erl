@@ -177,4 +177,5 @@ event_to_map({event, _Id, EventType, StreamId, Version, Data, Metadata, _Tags, _
         epoch_us => EpochUs
     };
 event_to_map(Other) ->
+    ?LOG_WARNING("[catch_up] Unknown event format: ~p", [Other]),
     #{raw => Other}.
