@@ -192,30 +192,8 @@ handle_message({ok, {connect, Msg}}, State) ->
 handle_message({ok, {subscribe, Msg}}, State) ->
     Topics = maps:get(<<"topics">>, Msg, []),
     WanSubs = lists:foldl(fun(Topic, Acc) ->
-        %% Join local edge pg groups
-        pg:join(pg, {edge_topic, Topic}, self()),
-        pg:join(pg, {edge_local, Topic}, self()),
-        %% Bridge to WAN — check cache to avoid re-subscribing
-        case maps:is_key(Topic, Acc) of
-            true -> Acc;
-            false ->
-                case hecate_edge_relay_cache:should_bridge(Topic) of
-                    skip ->
-                        Acc;
-                    bridge ->
-                        Self = self(),
-                        Callback = fun(#{payload := Payload}) ->
-                            Self ! {wan_publish, Topic, Payload}
-                        end,
-                        case hecate_mesh:subscribe(Topic, Callback) of
-                            {ok, SubRef} ->
-                                hecate_edge_relay_cache:mark_bridged(Topic),
-                                ?LOG_INFO("[edge_handler] Bridged ~s to WAN", [Topic]),
-                                Acc#{Topic => SubRef};
-                            _ -> Acc
-                        end
-                end
-        end
+        join_local_groups(Topic),
+        maybe_bridge_to_wan(Topic, Acc, self())
     end, State#state.wan_subs, Topics),
     State#state{wan_subs = WanSubs};
 
@@ -274,30 +252,7 @@ handle_message({ok, {call, Msg}}, State) ->
     Procedure = maps:get(<<"procedure">>, Msg, <<>>),
     CallId = maps:get(<<"call_id">>, Msg, <<>>),
     Args = maps:get(<<"args">>, Msg, #{}),
-    case gproc:lookup_pids({p, l, {edge_rpc, Procedure}}) of
-        [] ->
-            %% Not local — forward to WAN
-            HandlerPid = self(),
-            spawn(fun() ->
-                case hecate_mesh:call(Procedure, Args, 5000) of
-                    {ok, Result} ->
-                        HandlerPid ! {relay_reply, CallId, Result};
-                    {error, Reason} ->
-                        HandlerPid ! {relay_reply, CallId,
-                            #{<<"error">> => #{<<"code">> => <<"wan_error">>,
-                                               <<"message">> => iolist_to_binary(
-                                                   io_lib:format("~p", [Reason]))}}}
-                end
-            end);
-        [ProviderPid | _] when ProviderPid =/= self() ->
-            ProviderPid ! {relay_call, self(), CallId, Procedure, Args};
-        _ ->
-            %% Provider is self — shouldn't happen, but handle gracefully
-            send_to_client(reply, #{
-                <<"call_id">> => CallId,
-                <<"error">> => #{<<"code">> => <<"self_call">>}
-            }, State)
-    end,
+    route_rpc_call(Procedure, CallId, Args, State),
     State;
 
 %%--------------------------------------------------------------------
@@ -335,6 +290,57 @@ handle_message({error, Reason}, State) ->
 %%====================================================================
 %% Internal
 %%====================================================================
+
+join_local_groups(Topic) ->
+    pg:join(pg, {edge_topic, Topic}, self()),
+    pg:join(pg, {edge_local, Topic}, self()).
+
+maybe_bridge_to_wan(Topic, WanSubs, Self) ->
+    case maps:is_key(Topic, WanSubs) of
+        true -> WanSubs;
+        false -> try_bridge(Topic, WanSubs, Self)
+    end.
+
+try_bridge(Topic, WanSubs, Self) ->
+    case hecate_edge_relay_cache:should_bridge(Topic) of
+        skip -> WanSubs;
+        bridge -> do_bridge(Topic, WanSubs, Self)
+    end.
+
+do_bridge(Topic, WanSubs, Self) ->
+    Callback = fun(#{payload := Payload}) -> Self ! {wan_publish, Topic, Payload} end,
+    case hecate_mesh:subscribe(Topic, Callback) of
+        {ok, SubRef} ->
+            hecate_edge_relay_cache:mark_bridged(Topic),
+            ?LOG_INFO("[edge_handler] Bridged ~s to WAN", [Topic]),
+            WanSubs#{Topic => SubRef};
+        _ ->
+            WanSubs
+    end.
+
+route_rpc_call(Procedure, CallId, Args, State) ->
+    case gproc:lookup_pids({p, l, {edge_rpc, Procedure}}) of
+        [] ->
+            escalate_rpc_to_wan(Procedure, CallId, Args);
+        [ProviderPid | _] when ProviderPid =/= self() ->
+            ProviderPid ! {relay_call, self(), CallId, Procedure, Args};
+        _ ->
+            send_to_client(reply, #{<<"call_id">> => CallId,
+                                    <<"error">> => #{<<"code">> => <<"self_call">>}}, State)
+    end.
+
+escalate_rpc_to_wan(Procedure, CallId, Args) ->
+    HandlerPid = self(),
+    spawn(fun() ->
+        Reply = case hecate_mesh:call(Procedure, Args, 5000) of
+            {ok, Result} -> Result;
+            {error, Reason} ->
+                #{<<"error">> => #{<<"code">> => <<"wan_error">>,
+                                   <<"message">> => iolist_to_binary(
+                                       io_lib:format("~p", [Reason]))}}
+        end,
+        HandlerPid ! {relay_reply, CallId, Reply}
+    end).
 
 send_to_client(Type, Msg, #state{stream = Stream}) ->
     Binary = macula_protocol_encoder:encode(Type, Msg),
