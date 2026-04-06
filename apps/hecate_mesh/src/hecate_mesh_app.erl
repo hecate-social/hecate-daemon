@@ -47,4 +47,15 @@ start_mesh() ->
     mesh_catch_up:init_position_table(),
     {ok, Pid} = hecate_mesh_sup:start_link(),
     logger:info("[hecate_mesh] Mesh client started"),
+    register_dist_relay(),
     {ok, Pid}.
+
+register_dist_relay() ->
+    case hecate_mesh_client:get_client() of
+        {ok, Client} ->
+            macula_dist_relay:register_mesh_client(Client),
+            macula_dist_relay:advertise_dist_accept(),
+            logger:info("[hecate_mesh] Distribution relay registered");
+        _ ->
+            logger:info("[hecate_mesh] No mesh client for dist relay")
+    end.
