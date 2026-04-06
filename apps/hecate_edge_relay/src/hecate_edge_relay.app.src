@@ -1,0 +1,16 @@
+{application, hecate_edge_relay, [
+    {description, "T3 edge relay — LAN QUIC listener for local mesh routing"},
+    {vsn, "0.1.0"},
+    {registered, [hecate_edge_relay]},
+    {mod, {hecate_edge_relay_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        macula,
+        hecate_mesh
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.
