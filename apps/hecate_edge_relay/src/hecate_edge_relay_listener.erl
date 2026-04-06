@@ -29,13 +29,19 @@ start_link(Opts) ->
 
 init(#{port := Port}) ->
     process_flag(trap_exit, true),
+    %% macula_quic:listen/2 expects {cert, Path} and {key, Path} —
+    %% it internally converts to {certfile, ...} for quicer.
+    %% Do NOT pass macula_tls:quic_server_opts() which uses {certfile, ...} directly.
+    {CertPath, KeyPath} = macula_tls:get_cert_paths(),
+    macula_tls:ensure_cert_exists(CertPath, KeyPath),
     ListenOpts = [
+        {cert, CertPath},
+        {key, KeyPath},
         {alpn, ["macula"]},
         {idle_timeout_ms, 120000},
         {keep_alive_interval_ms, 30000},
         {peer_unidi_stream_count, 3},
         {peer_bidi_stream_count, 100}
-        | macula_tls:quic_server_opts()
     ],
     case macula_quic:listen(Port, ListenOpts) of
         {ok, Listener} ->
@@ -53,13 +59,16 @@ init(#{port := Port}) ->
 %%====================================================================
 
 handle_info(retry_listen, #state{port = Port, listener = undefined} = State) ->
+    {CertPath, KeyPath} = macula_tls:get_cert_paths(),
+    macula_tls:ensure_cert_exists(CertPath, KeyPath),
     ListenOpts = [
+        {cert, CertPath},
+        {key, KeyPath},
         {alpn, ["macula"]},
         {idle_timeout_ms, 120000},
         {keep_alive_interval_ms, 30000},
         {peer_unidi_stream_count, 3},
         {peer_bidi_stream_count, 100}
-        | macula_tls:quic_server_opts()
     ],
     case macula_quic:listen(Port, ListenOpts) of
         {ok, Listener} ->
