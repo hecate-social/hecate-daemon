@@ -334,7 +334,7 @@ route_rpc_call(Procedure, CallId, Args, State) ->
 
 escalate_rpc_to_wan(Procedure, CallId, Args) ->
     HandlerPid = self(),
-    spawn(fun() ->
+    spawn_monitor(fun() ->
         Reply = case hecate_mesh:call(Procedure, Args, 5000) of
             {ok, Result} -> Result;
             {error, Reason} ->
