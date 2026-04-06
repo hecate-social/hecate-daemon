@@ -57,13 +57,21 @@ edge_relay_port() ->
             end
     end.
 
-%% Ensure the TLS cert directory exists (macula_tls uses /var/lib/macula/)
+%% Ensure TLS certs exist for the QUIC server listener.
+%% macula_tls:quic_server_opts() reads cert_path/key_path from macula app env.
+%% We set them to a writable location (HECATE_HOME) before the listener starts.
 ensure_cert_dir() ->
-    CertDir = "/var/lib/macula",
+    Home = os:getenv("HECATE_HOME", "/tmp"),
+    CertDir = Home ++ "/edge-relay-tls",
+    CertFile = CertDir ++ "/cert.pem",
+    KeyFile = CertDir ++ "/key.pem",
     case filelib:is_dir(CertDir) of
         true -> ok;
         false ->
-            ?LOG_INFO("[edge_relay] Creating cert directory: ~s", [CertDir]),
-            filelib:ensure_dir(CertDir ++ "/"),
-            file:make_dir(CertDir)
-    end.
+            ?LOG_INFO("[edge_relay] Creating TLS cert directory: ~s", [CertDir]),
+            filelib:ensure_dir(CertFile)
+    end,
+    %% Tell macula_tls where to find/generate certs
+    application:set_env(macula, cert_path, CertFile),
+    application:set_env(macula, key_path, KeyFile),
+    ok.
