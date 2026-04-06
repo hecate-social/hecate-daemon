@@ -43,13 +43,36 @@ init(#{port := Port}) ->
             register_accept(Listener),
             {ok, #state{listener = Listener, port = Port, handlers = []}};
         {error, Reason} ->
-            ?LOG_ERROR("[edge_relay] Listen failed on port ~b: ~p", [Port, Reason]),
-            {stop, {listen_failed, Reason}}
+            ?LOG_ERROR("[edge_relay] Listen failed on port ~b: ~p — will retry in 10s", [Port, Reason]),
+            erlang:send_after(10000, self(), retry_listen),
+            {ok, #state{listener = undefined, port = Port, handlers = []}}
     end.
 
 %%====================================================================
 %% Connection acceptance
 %%====================================================================
+
+handle_info(retry_listen, #state{port = Port, listener = undefined} = State) ->
+    ListenOpts = [
+        {alpn, ["macula"]},
+        {idle_timeout_ms, 120000},
+        {keep_alive_interval_ms, 30000},
+        {peer_unidi_stream_count, 3},
+        {peer_bidi_stream_count, 100}
+        | macula_tls:quic_server_opts()
+    ],
+    case macula_quic:listen(Port, ListenOpts) of
+        {ok, Listener} ->
+            ?LOG_INFO("[edge_relay] Listening on port ~b (retry succeeded)", [Port]),
+            register_accept(Listener),
+            {noreply, State#state{listener = Listener}};
+        {error, Reason} ->
+            ?LOG_WARNING("[edge_relay] Retry listen failed: ~p — retrying in 30s", [Reason]),
+            erlang:send_after(30000, self(), retry_listen),
+            {noreply, State}
+    end;
+handle_info(retry_listen, State) ->
+    {noreply, State};
 
 handle_info({quic, new_conn, Conn, ConnInfo}, #state{listener = Listener} = State) ->
     ?LOG_INFO("[edge_relay] New LAN connection: ~p", [ConnInfo]),

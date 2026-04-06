@@ -20,11 +20,17 @@ start(_StartType, _StartArgs) ->
     case is_enabled() of
         true ->
             Port = edge_relay_port(),
+            ensure_cert_dir(),
             ?LOG_INFO("[edge_relay] Starting T3 edge relay on port ~b", [Port]),
-            hecate_edge_relay_sup:start_link(#{port => Port});
+            case hecate_edge_relay_sup:start_link(#{port => Port}) of
+                {ok, Pid} ->
+                    {ok, Pid};
+                {error, Reason} ->
+                    ?LOG_ERROR("[edge_relay] Failed to start: ~p — running without edge relay", [Reason]),
+                    hecate_edge_relay_sup:start_link(disabled)
+            end;
         false ->
             ?LOG_INFO("[edge_relay] Disabled (set HECATE_EDGE_RELAY=true to enable)"),
-            %% Return a minimal supervisor that does nothing
             hecate_edge_relay_sup:start_link(disabled)
     end.
 
@@ -49,4 +55,15 @@ edge_relay_port() ->
             try list_to_integer(string:trim(PortStr))
             catch error:badarg -> 4433
             end
+    end.
+
+%% Ensure the TLS cert directory exists (macula_tls uses /var/lib/macula/)
+ensure_cert_dir() ->
+    CertDir = "/var/lib/macula",
+    case filelib:is_dir(CertDir) of
+        true -> ok;
+        false ->
+            ?LOG_INFO("[edge_relay] Creating cert directory: ~s", [CertDir]),
+            filelib:ensure_dir(CertDir ++ "/"),
+            file:make_dir(CertDir)
     end.
