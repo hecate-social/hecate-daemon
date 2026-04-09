@@ -371,8 +371,8 @@ hot_swap_routes() ->
         logger:info("[plugin-loader] Routes hot-swapped (~b plugin API, ~b plugin static)",
                      [length(PluginApiRoutes), length(PluginStaticRoutes)])
     catch
-        Class:Reason ->
-            logger:error("[plugin-loader] Route hot-swap failed: ~p:~p", [Class, Reason])
+        Class:Reason:Stack ->
+            logger:error("[plugin-loader] Route hot-swap failed: ~p:~p~n~p", [Class, Reason, Stack])
     end.
 
 %%====================================================================

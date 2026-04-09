@@ -159,7 +159,7 @@ handle_info({probe_timeout, Name}, #state{pending_probes = Pending, probes = Pro
             erlang:demonitor(MonRef, [flush]),
             ProbeResult = #{status => failed, duration_ms => ?PROBE_TIMEOUT_MS,
                            detail => #{error => timeout}},
-            logger:warning("[mesh_proof] Probe ~p timed out after ~bms", [Name, ?PROBE_TIMEOUT_MS]),
+            logger:info("[mesh_proof] Probe ~p timed out after ~bms", [Name, ?PROBE_TIMEOUT_MS]),
             broadcast_probe_progress(Name, ProbeResult),
             NewPending = remove_probe_by_name(Name, Pending),
             NewProbes = Probes#{Name => ProbeResult},
@@ -261,7 +261,7 @@ complete_probes(#state{probes = Probes, start_time = StartTime} = State) ->
             {ok, Client} when is_pid(Client) ->
                 case announce_mesh_presence:announce(Client, Probes) of
                     ok -> logger:info("[mesh_proof] Presence announced");
-                    {error, Reason} -> logger:warning("[mesh_proof] Presence announce failed: ~p", [Reason])
+                    {error, Reason} -> logger:info("[mesh_proof] Presence announce failed: ~p", [Reason])
                 end;
             _ ->
                 logger:warning("[mesh_proof] Cannot announce presence — no mesh client")
@@ -299,7 +299,7 @@ format_probe_result(Name, {ok, Detail}, StartTime) ->
 format_probe_result(Name, {error, Reason}, StartTime) ->
     Duration = erlang:monotonic_time(millisecond) - StartTime,
     ErrorBin = iolist_to_binary(io_lib:format("~p", [Reason])),
-    logger:warning("[mesh_proof] Probe ~p: failed (~bms) — ~s", [Name, Duration, ErrorBin]),
+    logger:info("[mesh_proof] Probe ~p: failed (~bms) — ~s", [Name, Duration, ErrorBin]),
     #{status => failed, duration_ms => Duration, detail => #{error => ErrorBin}}.
 
 find_probe_by_name(Name, Pending) ->

@@ -44,12 +44,16 @@ compile() ->
 
 plugin_api_routes() ->
     try hecate_plugin_loader:plugin_routes()
-    catch _:_ -> []
+    catch Class:Reason ->
+        logger:warning("[hecate_api_routes] Plugin routes failed: ~p:~p", [Class, Reason]),
+        []
     end.
 
 plugin_static_routes() ->
     try hecate_plugin_loader:plugin_static_routes()
-    catch _:_ -> []
+    catch Class:Reason ->
+        logger:warning("[hecate_api_routes] Plugin static routes failed: ~p:~p", [Class, Reason]),
+        []
     end.
 
 -spec discover_routes() -> [cowboy_router:route_match()].

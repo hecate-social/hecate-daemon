@@ -120,13 +120,7 @@ handle_call(get_client, _From, #state{client = Client} = State) ->
 handle_call(get_status, _From, #state{client = Client, realm = Realm,
                                        identity = Identity, relays = Relays,
                                        connections = Connections} = State) ->
-    MultiStatus = case is_pid(Client) of
-        true -> case macula_multi_relay:get_status(Client) of
-            {ok, MS} -> MS;
-            _ -> #{}
-        end;
-        false -> #{}
-    end,
+    MultiStatus = get_multi_status(Client),
     Status = #{
         connected => is_pid(Client),
         realm => Realm,
@@ -175,6 +169,13 @@ terminate(_Reason, #state{client = Client}) ->
 %% Internal
 %%====================================================================
 
+get_multi_status(Client) when is_pid(Client) ->
+    case macula_multi_relay:get_status(Client) of
+        {ok, MS} -> MS;
+        _ -> #{}
+    end;
+get_multi_status(_) -> #{}.
+
 ensure_binary(B) when is_binary(B) -> B;
 ensure_binary(S) when is_list(S) -> list_to_binary(S).
 
@@ -189,11 +190,15 @@ env_float(Key) ->
     case os:getenv(Key) of
         false -> undefined;
         "" -> undefined;
-        Val ->
-            try list_to_float(Val)
-            catch error:badarg ->
-                try float(list_to_integer(Val))
-                catch error:badarg -> undefined
-                end
+        Val -> parse_float_safe(Val)
+    end.
+
+parse_float_safe(Val) ->
+    case string:to_float(Val) of
+        {F, []} -> F;
+        _ ->
+            case string:to_integer(Val) of
+                {I, []} -> float(I);
+                _ -> undefined
             end
     end.
