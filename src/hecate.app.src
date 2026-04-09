@@ -11,7 +11,6 @@
     inets,
     cowboy,
     hackney,
-    quicer,
     gproc,
     msgpack,
 
@@ -34,7 +33,7 @@
     {api_port, 4444},
     {api_host, {127, 0, 0, 1}},
     {data_dir, "~/.hecate/hecate-daemon"},
-    {bootstrap, ["https://relay00.macula.io:4433", "https://relay01.macula.io:4433", "https://relay02.macula.io:4433"]},
+    {bootstrap, ["https://boot.macula.io:443"]},
     {realm, <<"io.macula">>}
   ]},
   {modules, []},
