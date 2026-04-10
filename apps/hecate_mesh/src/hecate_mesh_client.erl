@@ -130,18 +130,16 @@ init([]) ->
     %% When another node in the cluster joins a realm, it broadcasts here.
     pg:join(pg, hecate_realm_credentials, self()),
 
-    %% Headless nodes (no web UI) can auto-activate mesh on boot
+    %% Boot mode: join_with_token takes priority over auto_activate.
+    %% They are mutually exclusive — join_with_token implies activation.
+    JoinToken = os:getenv("HECATE_REALM_JOIN_TOKEN"),
     AutoActivate = os:getenv("HECATE_MESH_AUTO_ACTIVATE", "false") =:= "true",
-    case AutoActivate of
-        true -> erlang:send_after(2000, self(), auto_activate);
-        false -> ok
-    end,
-
-    %% Join token: if set, auto-activate and join realm after mesh connects
-    case os:getenv("HECATE_REALM_JOIN_TOKEN") of
-        false -> ok;
-        "" -> ok;
-        _Token -> erlang:send_after(3000, self(), join_with_token)
+    case {JoinToken, AutoActivate} of
+        {T, _} when is_list(T), T =/= "" ->
+            erlang:send_after(3000, self(), join_with_token);
+        {_, true} ->
+            erlang:send_after(2000, self(), auto_activate);
+        _ -> ok
     end,
 
     {ok, #state{
@@ -374,9 +372,10 @@ store_join_credentials(Result) ->
     case evoq_dispatcher:dispatch(Cmd, Opts) of
         ok ->
             logger:info("[hecate_mesh] Realm membership confirmed via join token"),
-            os:putenv("HECATE_REALM_API_KEY", binary_to_list(ApiKey)),
-            %% Broadcast credentials to cluster peers so they can auto-join
-            broadcast_realm_credentials(#{realm_id => RealmId, api_key => ApiKey});
+            %% Store API key in application env (not os:putenv — that's visible in /proc)
+            application:set_env(hecate, realm_api_key, ApiKey),
+            %% Broadcast realm_id only — each peer gets its own key via token
+            broadcast_realm_credentials(#{realm_id => RealmId});
         {error, Reason} ->
             logger:error("[hecate_mesh] Failed to store realm membership: ~p", [Reason])
     end.
