@@ -128,7 +128,11 @@ init([]) ->
 
     %% Join pg group for cluster-inherited realm credentials.
     %% When another node in the cluster joins a realm, it broadcasts here.
-    pg:join(pg, hecate_realm_credentials, self()),
+    %% pg may not be available in all deployment modes (standalone containers).
+    try pg:join(pg, hecate_realm_credentials, self())
+    catch exit:{noproc, _} ->
+        logger:warning("[hecate_mesh] pg scope not available — cluster credential sharing disabled")
+    end,
 
     %% Boot mode: join_with_token takes priority over auto_activate.
     %% They are mutually exclusive — join_with_token implies activation.
@@ -342,7 +346,7 @@ handle_info(_Info, State) ->
 %% @private Broadcast realm credentials to all peers in the Erlang cluster.
 %% Uses pg group — only hecate_mesh_client processes receive this.
 broadcast_realm_credentials(Credentials) ->
-    Members = pg:get_members(pg, hecate_realm_credentials),
+    Members = try pg:get_members(pg, hecate_realm_credentials) catch exit:{noproc, _} -> [] end,
     Self = self(),
     Peers = [P || P <- Members, P =/= Self],
     case Peers of
