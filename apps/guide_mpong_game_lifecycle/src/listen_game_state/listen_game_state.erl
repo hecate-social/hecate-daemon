@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% @doc Listens to game state from mesh on NON-HOST nodes.
 %%%
-%%% Subscribes to {realm}.hecate.mpong.game.state topic.
+%%% Subscribes to mpong/state_broadcast_v1 topic.
 %%% Filters by game_id in payload. Receives game state, runs local
 %%% AI, sends paddle position back.
 %%%
-%%% Topic: {realm}.hecate.mpong.game.state (subscribe, filter by game_id)
-%%% Topic: {realm}.hecate.mpong.game.paddle (publish, game_id in payload)
+%%% Subscribe: {realm}/hecate-social/hecate/mpong/state_broadcast_v1
+%%% Publish:   {realm}/hecate-social/hecate/mpong/paddle_moved_v1
 %%% @end
 %%%-------------------------------------------------------------------
 -module(listen_game_state).
@@ -71,8 +71,7 @@ terminate(_Reason, #listener{game_id = GameId}) ->
     ok.
 
 send_paddle(GameId, Position) ->
-    Realm = application:get_env(hecate, realm, <<"io.macula">>),
-    Topic = <<Realm/binary, ".hecate.mpong.game.paddle">>,
+    Topic = handle_paddle_input:topic(),
     NodeId = atom_to_binary(node()),
     Payload = json:encode(#{game_id => GameId, node_id => NodeId, position => Position}),
     case erlang:function_exported(hecate_mesh, publish, 2) of

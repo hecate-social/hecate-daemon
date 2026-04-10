@@ -139,5 +139,5 @@ emit_status(ModelName, Status) ->
     store_event(<<"llm_status_reported_v1">>, llm_status_reported_v1:to_map(Event)).
 
 store_event(EventType, EventData) ->
-    Event = EventData#{event_type => EventType},
+    Event = #{event_type => EventType, data => EventData, metadata => #{}},
     reckon_evoq_adapter:append(llm_store, <<"llm_status">>, ?ANY_VERSION, [Event]).

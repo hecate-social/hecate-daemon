@@ -28,7 +28,8 @@ init(Req0, State) ->
     },
     Response1 = maybe_add_boot_status(DaemonState, Response0),
     Response2 = maybe_add_mesh_proof(Response1),
-    Response = maybe_add_plugin_health(DaemonState, Response2),
+    Response3 = maybe_add_plugin_health(DaemonState, Response2),
+    Response = add_viewstate(Response3),
     Body = json:encode(Response),
     Req = cowboy_req:reply(200, #{
         <<"content-type">> => <<"application/json">>
@@ -88,6 +89,12 @@ check_plugin_health(Cb) ->
 format_health(ok) -> <<"ok">>;
 format_health(degraded) -> <<"degraded">>;
 format_health({unhealthy, Reason}) -> Reason.
+
+add_viewstate(Response) ->
+    Viewstate = try hecate_viewstate:compute()
+                catch _:_ -> #{}
+                end,
+    Response#{viewstate => Viewstate}.
 
 lifecycle_status(running) -> <<"healthy">>;
 lifecycle_status(starting) -> <<"starting">>;

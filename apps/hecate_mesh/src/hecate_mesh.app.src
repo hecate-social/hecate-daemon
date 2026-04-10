@@ -6,7 +6,9 @@
     {applications, [
         kernel,
         stdlib,
-        macula
+        macula,
+        evoq,
+        guide_realm_memberships
     ]},
     {env, [
         %% Config is read from hecate app env (see sys.config):

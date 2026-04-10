@@ -38,14 +38,14 @@
 %% @doc Advertise a catch-up RPC procedure on the mesh.
 %% Remote consumers call this to replay events from StoreId.
 %%
-%% Procedure naming: `{Realm}.replay.{Domain}`
-%% e.g., `io.macula.replay.license_offerings`
+%% Procedure follows macula_topic convention:
+%% {realm}/hecate-social/hecate/{domain}/replay_events_v1
 %%
 %% The handler reads events in global order from the given offset
 %% and returns them as a list.
 -spec advertise_replay(binary(), atom(), binary()) -> ok.
-advertise_replay(Realm, StoreId, Domain) ->
-    Procedure = <<Realm/binary, ".replay.", Domain/binary>>,
+advertise_replay(_Realm, StoreId, Domain) ->
+    Procedure = hecate_topics:hope(Domain, <<"replay_events">>, 1),
     Handler = fun(Args) ->
         Offset = maps:get(<<"since">>, Args, 0),
         Limit = maps:get(<<"limit">>, Args, ?BATCH_SIZE),
@@ -70,8 +70,8 @@ advertise_replay(Realm, StoreId, Domain) ->
 %% Returns the number of events processed, or {error, Reason}.
 -spec catch_up(binary(), binary(), binary(), fun((map()) -> ok)) ->
     {ok, non_neg_integer()} | {error, term()}.
-catch_up(Realm, Domain, StreamKey, ProcessFn) ->
-    Procedure = <<Realm/binary, ".replay.", Domain/binary>>,
+catch_up(_Realm, Domain, StreamKey, ProcessFn) ->
+    Procedure = hecate_topics:hope(Domain, <<"replay_events">>, 1),
     Position = get_position(StreamKey),
     catch_up_loop(Procedure, StreamKey, Position, ProcessFn, 0).
 

@@ -15,10 +15,9 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    AgentIdentity = get_agent_identity(),
-    Topic = build_topic(AgentIdentity, <<"list">>),
+    Topic = hecate_topics:hope(<<"llm">>, <<"list_models">>, 1),
     self() ! {try_subscribe, Topic},
-    {ok, #state{subscription_ref = undefined, agent_identity = AgentIdentity}}.
+    {ok, #state{subscription_ref = undefined, agent_identity = get_agent_identity()}}.
 
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.
@@ -74,15 +73,6 @@ subscribe(Topic) ->
         {ok, SubRef} -> SubRef;
         {error, _} -> undefined
     end.
-
-build_topic(AgentIdentity, Action) ->
-    Realm = application:get_env(hecate, realm, <<"io.macula">>),
-    AgentPath = case AgentIdentity of
-        <<"mri:agent:", Rest/binary>> -> Rest;
-        _ -> AgentIdentity
-    end,
-    SafePath = binary:replace(AgentPath, <<"/">>, <<".">>, [global]),
-    <<Realm/binary, ".hecate.llm.", Action/binary, ".", SafePath/binary>>.
 
 get_agent_identity() ->
     application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>).

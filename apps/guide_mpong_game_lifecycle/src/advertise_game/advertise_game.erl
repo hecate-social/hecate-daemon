@@ -4,23 +4,26 @@
 %%% After a game is hosted, publishes game availability to mesh
 %%% PubSub topic so other nodes can discover it.
 %%%
-%%% Topic: mpong.games.available
+%%% Topic: {realm}/hecate-social/hecate/mpong/game_advertised_v1
+%%% Procedure: {realm}/hecate-social/hecate/mpong/join_game_v1
 %%% @end
 %%%-------------------------------------------------------------------
 -module(advertise_game).
 
 -export([announce/1, closed/1, ended/1, withdraw/1, join_procedure/1, topic/0]).
 
-%% @doc Build the mesh RPC procedure name for joining a game.
+%% @doc Build the mesh RPC procedure name for joining a specific game.
+%% NOTE: game_id in procedure name is intentional here — each lobby
+%% advertises its own join endpoint for direct RPC routing.
 -spec join_procedure(binary()) -> binary().
 join_procedure(GameId) ->
-    <<"hecate.mpong.join.", GameId/binary>>.
+    Base = hecate_topics:hope(<<"mpong">>, <<"join_game">>, 1),
+    <<Base/binary, ".", GameId/binary>>.
 
 %% @doc Build the realm-prefixed mesh topic for game announcements.
 -spec topic() -> binary().
 topic() ->
-    Realm = application:get_env(hecate, realm, <<"io.macula">>),
-    <<Realm/binary, ".hecate.mpong.games.available">>.
+    hecate_topics:fact(<<"mpong">>, <<"game_advertised">>, 1).
 
 -spec announce(map()) -> ok.
 announce(#{game_id := GameId, host_node_id := HostNodeId,

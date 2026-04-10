@@ -34,6 +34,19 @@ init([]) ->
         }
         %% NOTE: Emitters are supervised by their respective domain supervisors
         %% (vertical slicing), not here (that would be horizontal).
+
+        %% Process manager: realm membership confirmed -> activate mesh
+        ,#{
+            id => on_realm_membership_confirmed_activate_mesh,
+            start => {evoq_event_handler, start_link, [
+                on_realm_membership_confirmed_activate_mesh, #{},
+                #{store_id => realm_memberships_store}
+            ]},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [on_realm_membership_confirmed_activate_mesh]
+        }
     ],
 
     {ok, {SupFlags, Children}}.

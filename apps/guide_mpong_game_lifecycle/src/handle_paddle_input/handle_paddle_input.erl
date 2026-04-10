@@ -5,7 +5,7 @@
 %%% Filters by game_id in payload. When a remote player sends their
 %%% paddle position, forwards it to the local game engine.
 %%%
-%%% Topic: {realm}.hecate.mpong.game.paddle (game_id in payload)
+%%% Topic: {realm}/hecate-social/hecate/mpong/paddle_moved_v1
 %%% @end
 %%%-------------------------------------------------------------------
 -module(handle_paddle_input).
@@ -13,8 +13,7 @@
 -export([subscribe/2, topic/0]).
 
 topic() ->
-    Realm = application:get_env(hecate, realm, <<"io.macula">>),
-    <<Realm/binary, ".hecate.mpong.game.paddle">>.
+    hecate_topics:fact(<<"mpong">>, <<"paddle_moved">>, 1).
 
 -spec subscribe(binary(), pid()) -> ok.
 subscribe(GameId, EnginePid) ->

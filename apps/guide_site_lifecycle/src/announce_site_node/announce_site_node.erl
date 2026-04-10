@@ -34,8 +34,7 @@ periodic_loop() ->
     periodic_loop().
 
 do_announce() ->
-    Realm = application:get_env(hecate, realm, <<"io.macula">>),
-    Topic = <<Realm/binary, ".hecate.site.node_joined">>,
+    Topic = hecate_topics:fact(<<"site">>, <<"node_announced">>, 1),
     SiteId = guide_site_lifecycle_app:site_id(),
     NodeName = atom_to_binary(node()),
 
