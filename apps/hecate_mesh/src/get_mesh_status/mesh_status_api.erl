@@ -26,7 +26,9 @@ handle_get(Req0, State) ->
                 {ok, P} -> P;
                 _ -> []
             end,
-            maps:merge(#{ok => true, peers => Peers, peer_count => length(Peers)}, Status);
+            {ok, #{current_relay := CurrentRelay}} = hecate_mesh:get_neighborhood(),
+            maps:merge(#{ok => true, peers => Peers, peer_count => length(Peers),
+                         current_relay => CurrentRelay}, Status);
         {error, Reason} ->
             #{ok => false, error => iolist_to_binary(io_lib:format("~p", [Reason]))}
     end,
