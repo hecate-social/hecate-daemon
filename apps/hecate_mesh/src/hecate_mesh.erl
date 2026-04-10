@@ -14,7 +14,12 @@
     get_peers/0,
     get_proof_results/0,
     rerun_proof/0,
-    get_neighborhood/0
+    get_neighborhood/0,
+    %% Local-first: deferred mesh registration
+    activate/0,
+    is_activated/0,
+    register_subscription/2,
+    register_advertisement/2
 ]).
 
 -spec publish(binary(), map()) -> ok | {error, term()}.
@@ -62,8 +67,6 @@ discover_subscribers(Topic) ->
 
 -spec get_peers() -> {ok, list()}.
 get_peers() ->
-    %% In relay mode, peers are managed by the relay, not tracked locally.
-    %% The relay /status endpoint exposes connected nodes.
     {ok, []}.
 
 -spec get_proof_results() -> map().
@@ -74,14 +77,32 @@ get_proof_results() ->
 rerun_proof() ->
     mesh_proof_coordinator:rerun_probes().
 
+%% @doc Activate mesh — connect to relays. Called after UI is up.
+-spec activate() -> ok | {error, already_activated}.
+activate() ->
+    hecate_mesh_client:activate().
+
+%% @doc Check if mesh has been activated.
+-spec is_activated() -> boolean().
+is_activated() ->
+    hecate_mesh_client:is_activated().
+
+%% @doc Register a subscription to be applied when mesh activates.
+-spec register_subscription(binary(), fun()) -> ok.
+register_subscription(Topic, Callback) ->
+    hecate_mesh_client:register_subscription(Topic, Callback).
+
+%% @doc Register an advertisement to be applied when mesh activates.
+-spec register_advertisement(binary(), fun()) -> ok.
+register_advertisement(Procedure, Handler) ->
+    hecate_mesh_client:register_advertisement(Procedure, Handler).
+
 -spec get_neighborhood() -> {ok, map()}.
 get_neighborhood() ->
-    %% Get ranked relay list from SDK discovery cache
     Ranked = try macula_relay_discovery:ranked_relays()
              catch _:_ -> [] end,
     TotalKnown = try macula_relay_discovery:relay_count()
                  catch _:_ -> 0 end,
-    %% Get current relay from multi_relay status
     CurrentRelay = current_relay_info(),
     OnlineCount = length([R || R <- Ranked, maps:get(status, R) =:= online]),
     {ok, #{
@@ -110,7 +131,6 @@ primary_relay_info([_ | Rest]) ->
     primary_relay_info(Rest).
 
 extract_hostname(Url) ->
-    %% <<"https://relay-de-berlin.macula.io:4433">> → <<"relay-de-berlin.macula.io">>
     Stripped = re:replace(Url, <<"^https?://">>, <<>>, [{return, binary}]),
     re:replace(Stripped, <<":\\d+.*">>, <<>>, [{return, binary}]).
 
@@ -125,7 +145,6 @@ enrich_relay(Hostname) ->
     end.
 
 parse_city_country(Hostname) ->
-    %% <<"relay-de-berlin.macula.io">> → {<<"Berlin">>, <<"DE">>}
     case re:run(Hostname, <<"^relay-([a-z]{2})-([a-z-]+)\\.">>,
                 [{capture, [1, 2], binary}]) of
         {match, [Country, RawCity]} ->
@@ -146,4 +165,3 @@ titlecase_rest(<<" ", C, Rest/binary>>, Acc) ->
     titlecase_rest(Rest, <<Acc/binary, " ", Upper/binary>>);
 titlecase_rest(<<C, Rest/binary>>, Acc) ->
     titlecase_rest(Rest, <<Acc/binary, C>>).
-
