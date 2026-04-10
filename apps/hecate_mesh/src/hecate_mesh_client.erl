@@ -126,6 +126,10 @@ init([]) ->
     logger:info("[hecate_mesh] Ready in local mode (activate to connect, ~b relays configured)",
                 [length(Relays)]),
 
+    %% Join pg group for cluster-inherited realm credentials.
+    %% When another node in the cluster joins a realm, it broadcasts here.
+    pg:join(pg, hecate_realm_credentials, self()),
+
     %% Headless nodes (no web UI) can auto-activate mesh on boot
     AutoActivate = os:getenv("HECATE_MESH_AUTO_ACTIVATE", "false") =:= "true",
     case AutoActivate of
@@ -318,8 +322,37 @@ handle_info(do_join_with_token, #state{client = Client} = State) ->
     end),
     {noreply, State};
 
+%% Cluster-inherited join: another node broadcast realm credentials
+handle_info({realm_credentials, Credentials}, #state{activated = false} = State) ->
+    RealmId = maps:get(realm_id, Credentials, maps:get(<<"realm_id">>, Credentials, <<"?">>)),
+    logger:info("[hecate_mesh] Received realm credentials from cluster peer (realm=~s)", [RealmId]),
+    %% Activate mesh with inherited credentials
+    case handle_call(activate, {self(), make_ref()}, State) of
+        {reply, ok, NewState} ->
+            logger:info("[hecate_mesh] Mesh activated via cluster-inherited join"),
+            {noreply, NewState};
+        {reply, _, NewState} ->
+            {noreply, NewState}
+    end;
+handle_info({realm_credentials, _Credentials}, State) ->
+    %% Already activated — ignore
+    {noreply, State};
+
 handle_info(_Info, State) ->
     {noreply, State}.
+
+%% @private Broadcast realm credentials to all peers in the Erlang cluster.
+%% Uses pg group — only hecate_mesh_client processes receive this.
+broadcast_realm_credentials(Credentials) ->
+    Members = pg:get_members(pg, hecate_realm_credentials),
+    Self = self(),
+    Peers = [P || P <- Members, P =/= Self],
+    case Peers of
+        [] -> ok;
+        _ ->
+            logger:info("[hecate_mesh] Broadcasting realm credentials to ~b cluster peer(s)", [length(Peers)]),
+            lists:foreach(fun(Pid) -> Pid ! {realm_credentials, Credentials} end, Peers)
+    end.
 
 %% @private Store credentials from join_with_token RPC response.
 %% Dispatches confirm_realm_membership command which triggers the
@@ -341,7 +374,9 @@ store_join_credentials(Result) ->
     case evoq_dispatcher:dispatch(Cmd, Opts) of
         ok ->
             logger:info("[hecate_mesh] Realm membership confirmed via join token"),
-            os:putenv("HECATE_REALM_API_KEY", binary_to_list(ApiKey));
+            os:putenv("HECATE_REALM_API_KEY", binary_to_list(ApiKey)),
+            %% Broadcast credentials to cluster peers so they can auto-join
+            broadcast_realm_credentials(#{realm_id => RealmId, api_key => ApiKey});
         {error, Reason} ->
             logger:error("[hecate_mesh] Failed to store realm membership: ~p", [Reason])
     end.
