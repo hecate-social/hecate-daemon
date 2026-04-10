@@ -45,6 +45,7 @@ RUN apk add --no-cache \
     libgcc \
     openssl \
     ca-certificates \
+    curl \
     dbus
 
 WORKDIR /app
