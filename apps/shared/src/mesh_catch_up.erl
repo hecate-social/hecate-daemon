@@ -52,13 +52,26 @@ advertise_replay(Realm, StoreId, Domain) ->
         EventTypes = maps:get(<<"event_types">>, Args, undefined),
         replay_from_store(StoreId, Offset, Limit, EventTypes)
     end,
-    case hecate_mesh:advertise(Procedure, Handler) of
+    %% Defer to avoid blocking app boot — mesh may not be connected yet
+    spawn(fun() -> advertise_with_retry(Procedure, Handler, StoreId, 5) end),
+    ok.
+
+advertise_with_retry(_Procedure, _Handler, _StoreId, 0) ->
+    ok;
+advertise_with_retry(Procedure, Handler, StoreId, Retries) ->
+    timer:sleep(2000),
+    case catch hecate_mesh:advertise(Procedure, Handler) of
         {ok, _Ref} ->
             ?LOG_INFO("[catch_up] Advertised ~s (store: ~p)", [Procedure, StoreId]),
             ok;
         {error, Reason} ->
-            ?LOG_WARNING("[catch_up] Failed to advertise ~s: ~p", [Procedure, Reason]),
-            ok
+            ?LOG_WARNING("[catch_up] Failed to advertise ~s: ~p (retries left: ~b)",
+                         [Procedure, Reason, Retries - 1]),
+            advertise_with_retry(Procedure, Handler, StoreId, Retries - 1);
+        {'EXIT', Reason} ->
+            ?LOG_WARNING("[catch_up] Advertise ~s crashed: ~p (retries left: ~b)",
+                         [Procedure, Reason, Retries - 1]),
+            advertise_with_retry(Procedure, Handler, StoreId, Retries - 1)
     end.
 
 %%====================================================================
