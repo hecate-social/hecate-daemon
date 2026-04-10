@@ -133,6 +133,13 @@ init([]) ->
         false -> ok
     end,
 
+    %% Join token: if set, auto-activate and join realm after mesh connects
+    case os:getenv("HECATE_REALM_JOIN_TOKEN") of
+        false -> ok;
+        "" -> ok;
+        _Token -> erlang:send_after(3000, self(), join_with_token)
+    end,
+
     {ok, #state{
         client = undefined,
         activated = false,
@@ -264,8 +271,80 @@ handle_info(auto_activate, #state{activated = false} = State) ->
     end;
 handle_info(auto_activate, State) ->
     {noreply, State};
+
+%% Join realm via token — activate mesh first, then call join RPC
+handle_info(join_with_token, #state{activated = false} = State) ->
+    logger:info("[hecate_mesh] Join token set — activating mesh first"),
+    case handle_call(activate, {self(), make_ref()}, State) of
+        {reply, ok, NewState} ->
+            erlang:send_after(2000, self(), do_join_with_token),
+            {noreply, NewState};
+        {reply, _, NewState} ->
+            logger:warning("[hecate_mesh] Failed to activate for join token"),
+            {noreply, NewState}
+    end;
+handle_info(join_with_token, State) ->
+    %% Already activated — go straight to join
+    erlang:send_after(1000, self(), do_join_with_token),
+    {noreply, State};
+
+handle_info(do_join_with_token, #state{client = undefined} = State) ->
+    logger:warning("[hecate_mesh] No mesh client — retrying join in 3s"),
+    erlang:send_after(3000, self(), do_join_with_token),
+    {noreply, State};
+handle_info(do_join_with_token, #state{client = Client} = State) ->
+    Token = list_to_binary(os:getenv("HECATE_REALM_JOIN_TOKEN")),
+    NodeName = State#state.identity,
+    SiteId = case State#state.site of
+        #{<<"site_id">> := Id} -> Id;
+        _ -> undefined
+    end,
+    logger:info("[hecate_mesh] Joining realm with token ~s...", [binary:part(Token, 0, min(7, byte_size(Token)))]),
+    Args = #{
+        <<"token">> => Token,
+        <<"node_name">> => NodeName,
+        <<"site_id">> => SiteId
+    },
+    spawn(fun() ->
+        case catch macula:call(Client, <<"io.macula.realm.join_with_token">>, Args, 10000) of
+            {ok, Result} ->
+                logger:info("[hecate_mesh] Realm join succeeded: ~p", [maps:get(<<"realm_id">>, Result, <<"?">>)]),
+                store_join_credentials(Result);
+            {error, Reason} ->
+                logger:error("[hecate_mesh] Realm join failed: ~p", [Reason]);
+            Other ->
+                logger:error("[hecate_mesh] Realm join unexpected: ~p", [Other])
+        end
+    end),
+    {noreply, State};
+
 handle_info(_Info, State) ->
     {noreply, State}.
+
+%% @private Store credentials from join_with_token RPC response.
+%% Dispatches confirm_realm_membership command which triggers the
+%% on_realm_membership_confirmed_activate_mesh process manager.
+store_join_credentials(Result) ->
+    RealmId = maps:get(<<"realm_id">>, Result, <<"io.macula">>),
+    ApiKey = maps:get(<<"api_key">>, Result, <<>>),
+    NodeName = maps:get(<<"node_name">>, Result, <<"anonymous">>),
+    MembershipId = <<"jt-", (base64:encode(crypto:strong_rand_bytes(12)))/binary>>,
+    Cmd = confirm_realm_membership_v1:new(
+        MembershipId, RealmId, NodeName, <<"join_token">>,
+        erlang:system_time(second)
+    ),
+    Opts = #{
+        store_id => realm_memberships_store,
+        adapter => reckon_evoq_adapter,
+        consistency => eventual
+    },
+    case evoq_dispatcher:dispatch(Cmd, Opts) of
+        ok ->
+            logger:info("[hecate_mesh] Realm membership confirmed via join token"),
+            os:putenv("HECATE_REALM_API_KEY", binary_to_list(ApiKey));
+        {error, Reason} ->
+            logger:error("[hecate_mesh] Failed to store realm membership: ~p", [Reason])
+    end.
 
 terminate(_Reason, #state{client = Client}) ->
     catch macula_multi_relay:stop(Client),
