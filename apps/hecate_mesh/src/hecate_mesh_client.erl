@@ -126,6 +126,13 @@ init([]) ->
     logger:info("[hecate_mesh] Ready in local mode (activate to connect, ~b relays configured)",
                 [length(Relays)]),
 
+    %% Headless nodes (no web UI) can auto-activate mesh on boot
+    AutoActivate = os:getenv("HECATE_MESH_AUTO_ACTIVATE", "false") =:= "true",
+    case AutoActivate of
+        true -> erlang:send_after(2000, self(), auto_activate);
+        false -> ok
+    end,
+
     {ok, #state{
         client = undefined,
         activated = false,
@@ -249,6 +256,14 @@ handle_cast({register_adv, Procedure, Handler}, #state{client = Client} = State)
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+handle_info(auto_activate, #state{activated = false} = State) ->
+    logger:info("[hecate_mesh] Auto-activating mesh (HECATE_MESH_AUTO_ACTIVATE=true)"),
+    case handle_call(activate, {self(), make_ref()}, State) of
+        {reply, ok, NewState} -> {noreply, NewState};
+        {reply, _, NewState} -> {noreply, NewState}
+    end;
+handle_info(auto_activate, State) ->
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
