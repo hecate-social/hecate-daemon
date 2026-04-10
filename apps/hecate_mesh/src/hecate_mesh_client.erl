@@ -137,19 +137,19 @@ handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) -
     {reply, ok, State};
 
 handle_call({subscribe, Topic, Callback}, _From, #state{client = Client} = State) ->
-    Result = macula_multi_relay:subscribe(Client, Topic, Callback),
+    Result = safe_mesh_call(fun() -> macula_multi_relay:subscribe(Client, Topic, Callback) end),
     {reply, Result, State};
 
 handle_call({unsubscribe, SubRef}, _From, #state{client = Client} = State) ->
-    Result = macula_multi_relay:unsubscribe(Client, SubRef),
+    Result = safe_mesh_call(fun() -> macula_multi_relay:unsubscribe(Client, SubRef) end),
     {reply, Result, State};
 
 handle_call({advertise, Procedure, Handler}, _From, #state{client = Client} = State) ->
-    Result = macula_multi_relay:advertise(Client, Procedure, Handler),
+    Result = safe_mesh_call(fun() -> macula_multi_relay:advertise(Client, Procedure, Handler) end),
     {reply, Result, State};
 
 handle_call({rpc_call, Procedure, Args, Timeout}, _From, #state{client = Client} = State) ->
-    Result = macula_multi_relay:call(Client, Procedure, Args, Timeout),
+    Result = safe_mesh_call(fun() -> macula_multi_relay:call(Client, Procedure, Args, Timeout) end),
     {reply, Result, State};
 
 handle_call(_Request, _From, State) ->
@@ -168,6 +168,17 @@ terminate(_Reason, #state{client = Client}) ->
 %%====================================================================
 %% Internal
 %%====================================================================
+
+%% Catch timeouts from multi_relay when mesh isn't connected yet.
+%% Without this, callers crash during boot if relay DNS fails or
+%% connection takes longer than gen_server:call timeout.
+safe_mesh_call(Fun) ->
+    try Fun()
+    catch
+        exit:{timeout, _} -> {error, mesh_timeout};
+        exit:{noproc, _} -> {error, mesh_not_started};
+        exit:{{timeout, _}, _} -> {error, mesh_timeout}
+    end.
 
 get_multi_status(Client) when is_pid(Client) ->
     case macula_multi_relay:get_status(Client) of

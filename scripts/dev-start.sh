@@ -45,7 +45,7 @@ export HECATE_SOCKET_PATH="$HOME/.hecate-dev/hecate-daemon/sockets/api.sock"
 export MACULA_MODE=client
 
 # Relay list (override via env file or MACULA_RELAYS env var)
-export MACULA_RELAYS="${MACULA_RELAYS:-https://relay00.macula.io:4433,https://relay01.macula.io:4433,https://relay02.macula.io:4433}"
+export MACULA_RELAYS="${MACULA_RELAYS:-https://relays-hetzner-nuremberg.macula.io:4433,https://relays-hetzner-helsinki.macula.io:4433,https://relays-linode-paris.macula.io:4433}"
 
 # MaxMind GeoIP: extract license key from GeoIP.conf if not already set
 if [ -z "${MAXMIND_LICENSE_KEY:-}" ] && [ -f "$HOME/.config/maxmind/GeoIP.conf" ]; then
