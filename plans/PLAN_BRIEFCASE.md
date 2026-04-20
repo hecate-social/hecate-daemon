@@ -41,6 +41,31 @@ Reasons:
 The prior `hecate-apps/hecate-app-briefcase` placeholder repo has been
 deleted (was empty scaffold; capability belongs inside the daemon).
 
+## Transport Decision — No True P2P (2026-04-20)
+
+**All mesh traffic transits macula-relay. We do not pursue direct
+peer-to-peer QUIC between nodes.**
+
+Why:
+
+- NAT traversal (ICE/STUN/TURN-equivalent over QUIC) is complex, unreliable
+  across hostile NATs, and demands session signalling we don't want to own.
+- Relay-mediated flow is simpler to debug, monitor, rate-limit, and bill.
+- The relay mesh itself is already global (`relay-{country}-{city}.macula.io`
+  — hundreds of nodes) and is part of our moat, not an afterthought.
+- UCAN authorization enforcement sits cleanly at the relay.
+
+Consequences for Briefcase:
+
+- `file_shared` pubsub facts flow A → relay → B.
+- `briefcase.get_chunk` RPC flows B → relay → A → relay → B.
+- Content bytes traverse relays for their entire path. Bandwidth is
+  the relay operator's concern; optimise via (a) chunking so first-byte
+  latency is low, (b) realm-locality — peers and relays in the same
+  geographic region, (c) caching hints.
+- No fallback to direct P2P. If relays are unreachable, Briefcase is
+  unreachable — this is an explicit tradeoff.
+
 ---
 
 ## Architecture

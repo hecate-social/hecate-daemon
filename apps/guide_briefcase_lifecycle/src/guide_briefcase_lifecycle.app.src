@@ -12,7 +12,8 @@
         macula,
         cowboy,
         shared,
-        hecate_api
+        hecate_api,
+        hecate_mesh
     ]},
     {env, []},
     {modules, []},
