@@ -41,7 +41,8 @@
     {payments_store,            "payments",            "Payments (payment process)"},
     {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"},
     {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"},
-    {mpong_store,               "mpong",               "MPong (mesh pong game lifecycle)"}
+    {mpong_store,               "mpong",               "MPong (mesh pong game lifecycle)"},
+    {briefcase_store,           "briefcase",           "Briefcase (file upload, revise, move, archive, grant)"}
 ]).
 
 %% Site store (cluster nodes, site-level state).

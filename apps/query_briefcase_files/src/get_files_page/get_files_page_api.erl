@@ -21,19 +21,9 @@ init(Req0, State) ->
     end.
 
 handle_get(Req0, _State) ->
-    case list_active() of
+    case project_briefcase_files_store:list() of
         {ok, Files} ->
             hecate_api_utils:json_ok(#{items => Files}, Req0);
         {error, Reason} ->
             hecate_api_utils:json_error(500, Reason, Req0)
-    end.
-
-%% Phase 1: read directly from the briefcase_files ETS table.
-%% Phase 2+: add a dedicated store module (project_briefcase_files_store).
-list_active() ->
-    try
-        Entries = [V || {_K, V} <- ets:tab2list(briefcase_files)],
-        {ok, Entries}
-    catch
-        error:badarg -> {ok, []}
     end.

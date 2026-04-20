@@ -8,7 +8,12 @@
         stdlib,
         reckon_db,
         evoq,
-        reckon_evoq
+        reckon_evoq,
+        macula,
+        cowboy,
+        shared,
+        hecate_api,
+        hecate_mesh
     ]},
     {env, []},
     {modules, []},
