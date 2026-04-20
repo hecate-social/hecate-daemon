@@ -1,0 +1,18 @@
+{application, query_repos, [
+    {description, "Repos query service (read models for git-over-mesh catalog)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_repos_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        cowboy,
+        shared,
+        hecate_api,
+        project_repos
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

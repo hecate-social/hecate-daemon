@@ -42,7 +42,8 @@
     {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"},
     {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"},
     {mpong_store,               "mpong",               "MPong (mesh pong game lifecycle)"},
-    {briefcase_store,           "briefcase",           "Briefcase (file upload, revise, move, archive, grant)"}
+    {briefcase_store,           "briefcase",           "Briefcase (file upload, revise, move, archive, grant)"},
+    {repo_store,                "repos",               "Repos (git-over-mesh lifecycle: initiate, rename, describe, archive)"}
 ]).
 
 %% Site store (cluster nodes, site-level state).
