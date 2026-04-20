@@ -1,8 +1,8 @@
-%%% @doc Supervisor for project_briefcase_files.
+%%% @doc Top-level supervisor for project_briefcase_files (PRJ).
 %%%
-%%% Phase 1: no children yet — the projection is registered with evoq
-%%% at boot by `hecate_app`. Later phases may add a dedicated store
-%%% worker or read-model cache.
+%%% Starts the ETS store first (creates `briefcase_files` table), then
+%%% the merged projection that consumes briefcase lifecycle events from
+%%% the `briefcase_store` event log.
 %%% @end
 -module(project_briefcase_files_sup).
 -behaviour(supervisor).
@@ -13,10 +13,18 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-    SupFlags = #{
-        strategy  => one_for_one,
-        intensity => 10,
-        period    => 10
-    },
-    Children = [],
-    {ok, {SupFlags, Children}}.
+    Children = [
+        %% ETS store (must start first — creates table)
+        #{id      => project_briefcase_files_store,
+          start   => {project_briefcase_files_store, start_link, []},
+          restart => permanent,
+          type    => worker},
+        %% Merged projection: briefcase lifecycle events -> files ETS
+        #{id      => briefcase_lifecycle_to_files,
+          start   => {evoq_projection, start_link,
+                      [briefcase_lifecycle_to_files, #{},
+                       #{store_id => briefcase_store}]},
+          restart => permanent,
+          type    => worker}
+    ],
+    {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.
