@@ -7,20 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- **Renamed pairing to joining** — all "pairing" terminology replaced with "joining
-  a realm". `hecate pair` CLI command is now `hecate join`. Confirm code removed —
-  OAuth login is sufficient proof of intent since the browser opens from the same
-  device. API endpoints changed from `/api/v1/pairing/sessions` to
-  `/api/v1/join/sessions`. `hecate_realm_session` state no longer carries
-  `confirm_code`.
-
 ### Ideas
 - **Settings history widget** — expose the settings event stream as a timeline
   on the settings page. A way to visualize our event-sourced nature: every
   initiation, realm joining, and preference change shown chronologically.
   Needs a new query desk (e.g. `get_settings_history/`) that reads from the
   settings ReckonDB stream and returns the event log.
+
+## [0.18.0] - 2026-04-20
+
+### Added
+- **Hecate Briefcase** — mesh-backed decentralized file sharing, the
+  killer app for the Macula mesh. Drop a file on one peer, it appears on
+  every other peer in the realm. Built-in to hecate-daemon via three new
+  apps following the CMD/PRJ/QRY trinity pattern:
+  - `guide_briefcase_lifecycle` (CMD) — `upload_file` command + slices
+    for future verbs (revise, move, archive, purge, grant, revoke);
+    aggregate + state + content store + mesh emitter + RPC handler
+  - `project_briefcase_files` (PRJ) — `briefcase_lifecycle_to_files`
+    projection + `briefcase_files` ETS read model + `listen_for_shared_files`
+    mesh subscriber that fetches content via realm-scoped RPC
+  - `query_briefcase_files` (QRY) — `GET /api/briefcase/files`,
+    `GET /api/briefcase/files/:id`, `GET /api/briefcase/files/:id/content`
+- **`POST /api/briefcase/files/upload`** — multipart upload endpoint.
+  Computes BLAKE3 of content (via `macula_blake3_nif`), writes to
+  `briefcase_content_store`, dispatches `upload_file_v1` → emits
+  `file_uploaded_v1`, projects to `briefcase_files` ETS, and fire-and-forget
+  publishes `file_shared_v1` integration fact to the realm mesh topic.
+- **Mesh distribution** — `<realm>.briefcase.file_shared` pubsub topic and
+  `<realm>.briefcase.get_chunk` RPC procedure, both realm-scoped. Subscribers
+  on other peers skip already-known files (idempotent), fetch content via RPC,
+  insert metadata into the local read model. All traffic transits
+  macula-relay; no direct peer-to-peer.
+- **`briefcase_store`** ReckonDB stream registered at `hecate_app` boot,
+  alongside the existing stores (settings, licenses, plugins, etc.).
+- **`plans/PLAN_BRIEFCASE.md`** — full phased roadmap with architectural
+  decisions (no-P2P, domain events vs integration facts, deferred
+  chunking/encryption/UCAN/sync-folder phases).
+
+### Changed
+- **Renamed pairing to joining** — all "pairing" terminology replaced with
+  "joining a realm". `hecate pair` CLI command is now `hecate join`.
+  Confirm code removed — OAuth login is sufficient proof of intent since
+  the browser opens from the same device. API endpoints changed from
+  `/api/v1/pairing/sessions` to `/api/v1/join/sessions`.
+  `hecate_realm_session` state no longer carries `confirm_code`.
+- Release version bumped 0.16.5 → 0.18.0. v0.17.0 was tagged at a
+  pre-Briefcase commit on 2026-03-27 and cannot be reused for this release.
 
 ## [0.11.2] - 2026-02-26
 
