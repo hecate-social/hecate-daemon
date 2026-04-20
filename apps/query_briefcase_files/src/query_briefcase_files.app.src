@@ -1,0 +1,15 @@
+{application, query_briefcase_files, [
+    {description, "Briefcase files query service (read models)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_briefcase_files_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        project_briefcase_files
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.
