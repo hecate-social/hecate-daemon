@@ -6,6 +6,9 @@
     {applications, [
         kernel,
         stdlib,
+        cowboy,
+        shared,
+        hecate_api,
         project_briefcase_files
     ]},
     {env, []},
