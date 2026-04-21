@@ -51,7 +51,7 @@ project_initiated(Data, State, RM) ->
         revised_at     => undefined,
         archived_at    => undefined
     },
-    {ok, RM2} = evoq_read_model:put(RM, RepoId, Entry),
+    {ok, RM2} = evoq_read_model:put(RepoId, Entry, RM),
     {ok, State, RM2}.
 
 project_renamed(Data, State, RM) ->
@@ -86,9 +86,9 @@ project_archived(Data, State, RM) ->
 %% ===================================================================
 
 update_entry(RepoId, State, RM, UpdateFun) ->
-    case evoq_read_model:get(RM, RepoId) of
+    case evoq_read_model:get(RepoId, RM) of
         {ok, Entry} ->
-            {ok, RM2} = evoq_read_model:put(RM, RepoId, UpdateFun(Entry)),
+            {ok, RM2} = evoq_read_model:put(RepoId, UpdateFun(Entry), RM),
             {ok, State, RM2};
         {error, not_found} ->
             {ok, State, RM}

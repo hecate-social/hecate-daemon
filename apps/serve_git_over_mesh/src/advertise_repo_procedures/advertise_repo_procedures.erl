@@ -43,12 +43,14 @@ init(_Config) ->
     {ok, #{}}.
 
 handle_event(<<"repo_initiated_v1">>, Event, _Metadata, State) ->
-    RepoId = gf(repo_id, Event),
-    Realm  = gf(realm,   Event, hecate_topics:realm()),
+    Data   = maps:get(data, Event, Event),
+    RepoId = gf(repo_id, Data),
+    Realm  = gf(realm,   Data, hecate_topics:realm()),
     advertise_once(RepoId, Realm),
     {ok, State};
 handle_event(<<"repo_archived_v1">>, Event, _Metadata, State) ->
-    RepoId = gf(repo_id, Event),
+    Data   = maps:get(data, Event, Event),
+    RepoId = gf(repo_id, Data),
     retract(RepoId),
     {ok, State};
 handle_event(_Other, _Event, _Meta, State) ->
@@ -109,7 +111,12 @@ stream_procedure_uri(Realm, RepoId) ->
     <<Realm/binary, ".git.", RepoId/binary, ".rpc_stream">>.
 
 make_handler(RepoId) ->
-    fun(Args) -> git_over_mesh_procedure:handle(RepoId, Args) end.
+    %% macula SDK requires handlers to return {ok, Result} | {error, Reason}.
+    %% git_over_mesh_procedure:handle/2 returns a bare map (with its own
+    %% ok/error keys); wrap the success path so macula_mesh_client's
+    %% format_call_result/2 can encode the reply. If the handler crashes
+    %% macula will catch and translate — nothing to do here.
+    fun(Args) -> {ok, git_over_mesh_procedure:handle(RepoId, Args)} end.
 
 make_stream_handler(RepoId) ->
     fun(Stream, Args) ->

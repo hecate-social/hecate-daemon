@@ -41,7 +41,8 @@ run(RepoId, Args) when is_binary(RepoId), is_map(Args) ->
 
 invoke(Git, RepoDir, Stdin) ->
     GitArgs = ["receive-pack", "--stateless-rpc", RepoDir],
-    case port_io:run(Git, GitArgs, Stdin) of
+    Env = [{"GIT_PROTOCOL", "version=2"}],
+    case port_io:run(Git, GitArgs, Stdin, Env, 60000) of
         #{ok := _} = Result ->
             Result;
         {error, Reason} ->

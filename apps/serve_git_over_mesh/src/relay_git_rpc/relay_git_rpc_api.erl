@@ -121,9 +121,12 @@ dispatch(Realm, RepoId, Op, Stdin) ->
     end.
 
 call_via_mesh(Procedure, Args) ->
+    %% Client is a macula_multi_relay pid; dispatch via multi_relay
+    %% (macula:call routes via macula_mesh_client, which does not handle
+    %% multi_relay pids). See hecate_mesh_client.erl:279.
     case hecate_mesh_client:get_client() of
         {ok, Client} when is_pid(Client) ->
-            try macula:call(Client, Procedure, Args, ?CALL_TIMEOUT_MS) of
+            try macula_multi_relay:call(Client, Procedure, Args, ?CALL_TIMEOUT_MS) of
                 {ok, Result} when is_map(Result) ->
                     Result;
                 {ok, Other} ->

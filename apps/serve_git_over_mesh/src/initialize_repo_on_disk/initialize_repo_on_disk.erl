@@ -21,8 +21,12 @@ init(_Config) ->
     {ok, #{}}.
 
 handle_event(<<"repo_initiated_v1">>, Event, _Metadata, State) ->
-    RepoId        = gf(repo_id, Event),
-    DefaultBranch = gf(default_branch, Event, <<"main">>),
+    %% evoq wraps the command payload under `data` on the event map;
+    %% fall back to the top level for events constructed without a
+    %% wrapper (e.g. direct dispatch in tests).
+    Data          = maps:get(data, Event, Event),
+    RepoId        = gf(repo_id, Data),
+    DefaultBranch = gf(default_branch, Data, <<"main">>),
     case RepoId of
         undefined ->
             logger:warning("[initialize_repo_on_disk] repo_initiated_v1 missing repo_id: ~p",

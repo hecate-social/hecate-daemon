@@ -21,7 +21,7 @@
 %%% @end
 -module(port_io).
 
--export([run/3, run/4]).
+-export([run/3, run/4, run/5]).
 
 -define(DEFAULT_TIMEOUT_MS, 30000).
 
@@ -32,11 +32,15 @@
 
 -spec run(file:filename(), [string()], binary()) -> result().
 run(Exe, Args, StdinBin) ->
-    run(Exe, Args, StdinBin, ?DEFAULT_TIMEOUT_MS).
+    run(Exe, Args, StdinBin, [], ?DEFAULT_TIMEOUT_MS).
 
 -spec run(file:filename(), [string()], binary(), pos_integer()) -> result().
-run(Exe, Args, StdinBin, TimeoutMs)
-  when is_list(Exe), is_list(Args), is_binary(StdinBin),
+run(Exe, Args, StdinBin, TimeoutMs) when is_integer(TimeoutMs) ->
+    run(Exe, Args, StdinBin, [], TimeoutMs).
+
+-spec run(file:filename(), [string()], binary(), [{string(), string()}], pos_integer()) -> result().
+run(Exe, Args, StdinBin, Env, TimeoutMs)
+  when is_list(Exe), is_list(Args), is_binary(StdinBin), is_list(Env),
        is_integer(TimeoutMs), TimeoutMs > 0 ->
     %% Write stdin to a tempfile and redirect via sh -c so git sees EOF.
     TmpIn  = make_temp_path("gom-stdin"),
@@ -44,7 +48,7 @@ run(Exe, Args, StdinBin, TimeoutMs)
         ok ->
             try
                 ShCmd = build_shell_command(Exe, Args, TmpIn),
-                run_sh(ShCmd, TimeoutMs)
+                run_sh(ShCmd, Env, TimeoutMs)
             after
                 _ = file:delete(TmpIn)
             end;
@@ -56,8 +60,12 @@ run(Exe, Args, StdinBin, TimeoutMs)
 %% Internal
 %%====================================================================
 
-run_sh(ShCmd, TimeoutMs) ->
-    Opts = [binary, exit_status, stderr_to_stdout, stream, {cd, "/tmp"}],
+run_sh(ShCmd, Env, TimeoutMs) ->
+    BaseOpts = [binary, exit_status, stderr_to_stdout, stream, {cd, "/tmp"}],
+    Opts = case Env of
+               []    -> BaseOpts;
+               _Else -> [{env, Env} | BaseOpts]
+           end,
     Port = erlang:open_port({spawn, ShCmd}, Opts),
     collect(Port, <<>>, TimeoutMs).
 

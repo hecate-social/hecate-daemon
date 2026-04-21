@@ -35,7 +35,10 @@ run(RepoId, Args) when is_binary(RepoId), is_map(Args) ->
 
 invoke(Git, RepoDir, Extra, Stdin) ->
     GitArgs = ["upload-pack", "--stateless-rpc"] ++ Extra ++ [RepoDir],
-    case port_io:run(Git, GitArgs, Stdin) of
+    %% Protocol v2 requires GIT_PROTOCOL=version=2 in env; otherwise
+    %% upload-pack speaks v0 and chokes on `command=ls-refs` in stdin.
+    Env = [{"GIT_PROTOCOL", "version=2"}],
+    case port_io:run(Git, GitArgs, Stdin, Env, 60000) of
         #{ok := _} = Result ->
             Result;
         {error, Reason} ->
