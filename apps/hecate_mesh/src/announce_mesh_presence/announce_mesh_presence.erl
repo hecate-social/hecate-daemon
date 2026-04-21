@@ -15,14 +15,9 @@ announce(Client, ProbeResults) ->
     Topic = <<Realm/binary, ".hecate.presence">>,
     Version = app_version(),
     Capabilities = derive_capabilities(ProbeResults),
-    NodeIdHex = case macula:get_node_id(Client) of
-        {ok, Bin} -> binary:encode_hex(Bin);
-        _ -> <<"unknown">>
-    end,
 
     Fact = #{
         identity => Identity,
-        node_id => NodeIdHex,
         version => Version,
         capabilities => Capabilities,
         timestamp => erlang:system_time(millisecond)
@@ -30,8 +25,8 @@ announce(Client, ProbeResults) ->
 
     case macula:publish(Client, Topic, Fact) of
         ok ->
-            PeerCount = case macula:get_known_peers(Client) of
-                {ok, Peers} -> length(Peers);
+            PeerCount = case macula:list_nodes(Client) of
+                {ok, Peers} -> map_size(Peers);
                 _ -> 0
             end,
             broadcast_pg(mesh_presence_announced, #{
