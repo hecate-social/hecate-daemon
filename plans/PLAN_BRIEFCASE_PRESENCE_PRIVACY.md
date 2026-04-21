@@ -106,15 +106,107 @@ On `file_shared_v1`:
    - `remote + placeholder` → 404 or auto-pull (see Phase E below).
 3. CEK never leaves the daemon process. hecate-web only sees plaintext bytes.
 
-### Realm shared key — dependency
+### Realm shared key — delivered by macula-realm (resolved 2026-04-21)
 
-**Open dependency:** this plan assumes a per-realm shared symmetric key distributed to members at realm-join. Need to verify whether this exists today in the codebase or must be added as a prerequisite phase. See "Open questions" below.
+Investigation confirmed no realm-wide shared symmetric key exists today. The
+realm today is an identity set (`realm_membership_confirmed_v1` carries
+identity only; `hecate_crypto` encrypts at rest with the **Erlang cookie**,
+which is cluster-local, not realm-scoped).
 
-### Revocation semantics
+**Resolution:** macula-realm server mints `K_realm` at realm-creation and
+delivers it to each joining daemon over TLS. Piggy-backed on the existing
+gitops-provisioning RPC (or a dedicated `realm.get_shared_key` call).
+Operator-controlled rotation via the realm server.
 
-- `license_revoked_v1` → daemon marks the CEK record unusable. Subsequent `open` returns `403 license_revoked`. Cached ciphertext stays on disk (harmless without the CEK) until user clicks `Evict` or purges.
-- Already-decrypted-in-memory bytes that the user has open in their browser at the moment of revocation: out of scope. Soft boundary (Q2).
-- Realm key rotation on member-leave: deferred, see open questions.
+Daemon stores `K_realm` encrypted at rest using existing `hecate_crypto`
+(AES-256-GCM + Erlang-cookie-derived key). Daemon-local, never leaves the
+daemon process.
+
+### Grantee identity in the license — realm MRI
+
+License event payload identifies the grantee as either:
+
+- A specific DID (e.g., `did:macula:bob`) → wrapped CEK uses Bob's pubkey
+- The **realm MRI** (e.g., `mri:realm:io.macula`) → wrapped CEK uses `K_realm`
+
+For realm-licenses, membership is implicit via possession of the current
+`K_realm`. New members joining later inherit access to historical
+realm-licensed files on catching up the license topic. Members who left
+lose future access via rotation (below).
+
+Licenses are **unbounded** by default; the `expires_at` field exists on the
+aggregate but stays `null` for v1. Time-bounded grants + renewal machinery
+are a later phase when the use case appears.
+
+### License topic
+
+License events flow on their own dedicated mesh topic, not piggy-backed on
+briefcase FACTs:
+
+- `{realm}.licenses.issued` — publishes `license_issued_v1` (carries wrapped CEK)
+- `{realm}.licenses.revoked` — publishes `license_revoked_v1`
+- `{realm}.licenses.rewrapped` — publishes `license_rewrapped_v1`
+
+Other realm-scoped domains (scribe, stage, martha, meshtube) reuse the same
+license domain; owning the topic separately keeps the license bounded
+context reusable. Ordering with the `briefcase.file_shared` topic is not
+guaranteed — UI handles both orderings gracefully (placeholder+metadata-
+missing vs placeholder+locked).
+
+### Revocation + rotation semantics
+
+- `license_revoked_v1` → daemon marks the CEK record unusable. Subsequent
+  `open` returns `403 license_revoked`. Cached ciphertext stays on disk
+  (harmless without the CEK) until user clicks `Evict` or purges.
+- Already-decrypted-in-memory bytes in a peer's browser at revocation time:
+  out of scope. Soft boundary (Q2).
+- **Realm key rotation on member-leave**: automatic on every
+  `realm_membership_revoked_v1` event. Rotate `K_realm` → re-wrap all
+  active licenses' CEKs (no content re-encryption). Via process manager
+  pattern — see below.
+
+### Process manager wiring
+
+Two `on_*` process managers connect realm-level events to license-level
+effects. Both directories scream at the filesystem level, matching the
+architectural rule in hecate-daemon/CLAUDE.md.
+
+```
+realm_membership_revoked_v1  (guide_realm_memberships)
+  ↓
+apps/guide_realm_memberships/src/on_realm_membership_revoked_rotate_key/
+  → dispatches rotate_realm_key_v1 command to macula-realm server
+    ↓
+realm_key_rotated_v1          (guide_realm_memberships or new domain)
+  ↓
+apps/guide_license_lifecycle/src/on_realm_key_rotated_rewrap_licenses/
+  → for each active license in the realm:
+      dispatches rewrap_license_v1
+        ↓
+      license_rewrapped_v1     (guide_license_lifecycle)
+        ↓
+      emitter publishes to {realm}.licenses.rewrapped topic
+```
+
+License aggregate state after a rewrap:
+
+```erlang
+#{license_id       => ...,
+  grantee          => ...,                % realm MRI or DID
+  file_id          => ...,
+  wrapped_cek      => <latest wrapped bytes>,
+  k_realm_version  => <integer>,          % which key version wrapped this
+  rewrap_count     => <integer>,          % observability
+  status           => active | revoked,
+  expires_at       => null | <integer>,   % null in v1
+  ...}.
+```
+
+**Catch-up lag:** if Bob is offline when Carol is revoked, rotation happens
+without him. On reconnect, Bob must fetch the current `K_realm` version
+from macula-realm before any of his licenses unwrap. Phase C includes a
+startup/reconnect check: compare local `K_realm` version to realm server's
+current version, pull updates before using.
 
 ---
 
@@ -183,16 +275,19 @@ Phases are independently ship-able. Each ends with a working app.
 
 **Done when:** Alice shares locally, Bob's UI shows the placeholder row within seconds.
 
-### Phase C — Realm shared key infrastructure (gate on existence)
+### Phase C — Realm shared key infrastructure
 
-**Goal:** confirm or build the realm shared key.
+**Goal:** build the realm shared key distribution (confirmed new work — see "Realm shared key" section above).
 
-- Investigate: does `guide_realm_memberships` already provision a shared realm key on join?
-  - If yes → wire it into `hecate_ucan` or a new `hecate_realm_crypto` module.
-  - If no → design + implement the join-time key distribution. Likely wraps the key via realm-cert or Hanko session.
-- Expose `hecate_realm_crypto:realm_key(Realm) -> {ok, Key} | {error, not_joined}`.
+- macula-realm server: add `K_realm` minting at realm creation; persist encrypted with operator admin key.
+- macula-realm RPC: `realm.get_shared_key(Realm) → {ok, #{version, key}}` (TLS-protected; authenticated via user's Hanko session).
+- hecate-daemon: on realm-join, call the RPC, store `K_realm` locally via `hecate_crypto` (AES-256-GCM at rest).
+- New module `hecate_realm_crypto` exposing: `realm_key(Realm) → {ok, {Version, Key}} | {error, not_joined}`; `rotate_realm_key(Realm)` (triggers fetch from server); `unwrap_for_realm(CipherText, Realm)`.
+- Process manager: `on_realm_membership_revoked_rotate_key` dispatches rotation via realm server RPC; receives `realm_key_rotated_v1` event with new version.
+- Process manager: `on_realm_key_rotated_rewrap_licenses` iterates active licenses in the realm, dispatches `rewrap_license_v1` commands.
+- Catch-up: on daemon startup + realm-reconnect, compare local `K_realm` version to realm server; pull updates.
 
-**Done when:** daemon can fetch the realm shared key synchronously, 1-node and multi-node tests pass.
+**Done when:** daemon can fetch `K_realm` at join; rotation-on-revoke round-trips through both PMs; Bob offline during rotation catches up on reconnect.
 
 ### Phase D — License-based CEK for shared files
 
@@ -241,14 +336,21 @@ Phases are independently ship-able. Each ends with a working app.
 
 ---
 
-## Open questions (resolve before Phase C)
+## Resolved decisions (2026-04-21 session)
 
-1. **Does a per-realm shared symmetric key exist today?** If not, Phase C must design + implement it. Check `guide_realm_memberships` + Hanko session flow.
-2. **Realm key rotation on member-leave.** If Carol leaves the realm, does the realm key rotate? If not, Carol can decrypt historical realm-licensed files forever. Rotation = re-wrap all active licenses for remaining members. Accept this cost or live with the leak?
-3. **Where do licenses travel?** Piggy-backed on the `file_shared` FACT (via encrypted metadata field), or separate mesh topic `realm.briefcase.licenses`, or RPC direct Alice→Bob?
-4. **What identifies a realm-license grantee?** The realm MRI? A membership list snapshot? Time-bounded?
+| # | Question | Decision |
+|---|---|---|
+| Q1 | Realm shared key today? | No. **macula-realm server mints `K_realm` at realm creation, delivers at join via TLS-authenticated RPC.** Operator controls rotation. |
+| Q2 | Rotation on member-leave? | **Automatic on every `realm_membership_revoked_v1`.** Rotate `K_realm`, re-wrap CEKs only (no content re-encryption). Via process manager pattern. |
+| Q3 | Where do licenses travel? | **Dedicated mesh topic `{realm}.licenses.{issued,revoked,rewrapped}`.** License domain stays reusable across future consumers. |
+| Q4 | Grantee identity? | **Realm MRI** (e.g., `mri:realm:io.macula`) for realm-licenses; **DID** for targeted. New members inherit historical access on key + topic catch-up. Unbounded by default (expires_at = null). |
 
-Flagged from Q4: remote cache size cap (LRU) deferred entirely. Revisit after observing usage.
+## Deferred (revisit after v1)
+
+- LRU cache size cap on remote content. User-controlled eviction only in v1.
+- Time-bounded license grants + renewal lifecycle.
+- License-metadata privacy: who-got-what is visible on the license topic; acceptable for trusted realms; tighten with encrypted-metadata later if needed.
+- Cross-realm license delegation.
 
 ---
 
