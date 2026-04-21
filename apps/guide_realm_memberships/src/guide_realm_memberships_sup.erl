@@ -22,6 +22,14 @@ init([]) ->
             type => worker,
             modules => [evoq_event_handler,
                         on_realm_membership_confirmed_fetch_key]
+        },
+        #{
+            id => catch_up_realm_keys,
+            start => {catch_up_realm_keys, start_link, []},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [catch_up_realm_keys]
         }
     ],
     {ok, {SupFlags, Children}}.
