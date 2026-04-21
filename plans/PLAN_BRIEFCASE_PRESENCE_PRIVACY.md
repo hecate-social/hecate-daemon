@@ -291,6 +291,12 @@ Phases are independently ship-able. Each ends with a working app.
 
 ### Phase D — License-based CEK for shared files
 
+> **Detailed plan lives in `PLAN_PHASE_D_LICENSING.md`** — all open questions
+> resolved there (DID-scope first-class, rewrap-on-rotation, `expires_at`
+> 10-year horizon, distinct revoke/resign events, batched license mesh
+> events). The summary below is the parent plan's framing; the detailed
+> doc supersedes it on specifics.
+
 **Goal:** encryption on the serve path; licenses carry wrapped CEKs.
 
 - `file_shared_v1` handler generates fresh CEK, wraps it for the license target (realm key or recipient pubkey), dispatches `license_issued_v1`.
