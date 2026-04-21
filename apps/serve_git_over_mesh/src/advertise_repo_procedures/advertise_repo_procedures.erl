@@ -61,25 +61,40 @@ handle_event(_Other, _Event, _Meta, State) ->
 advertise_once(undefined, _Realm) ->
     logger:warning("[advertise_repo_procedures] missing repo_id, skipping advertise");
 advertise_once(RepoId, Realm) ->
-    Proc = procedure_uri(Realm, RepoId),
+    Proc       = procedure_uri(Realm, RepoId),
+    StreamProc = stream_procedure_uri(Realm, RepoId),
     case ets:lookup(?TABLE, RepoId) of
         [{_, _Existing}] ->
             logger:debug("[advertise_repo_procedures] ~s already advertised", [Proc]);
         [] ->
             Handler = make_handler(RepoId),
             ok = hecate_mesh_client:register_advertisement(Proc, Handler),
-            true = ets:insert(?TABLE, {RepoId, Proc}),
-            logger:info("[advertise_repo_procedures] Advertised ~s", [Proc])
+            %% Streaming sibling — server-stream variant of fetch.
+            %% Phase 4 pilot 3 of PLAN_MACULA_STREAMING.md.
+            StreamHandler = make_stream_handler(RepoId),
+            ok = hecate_mesh_client:register_stream_advertisement(
+                   StreamProc, server_stream, StreamHandler),
+            true = ets:insert(?TABLE, {RepoId, {Proc, StreamProc}}),
+            logger:info("[advertise_repo_procedures] Advertised ~s + ~s",
+                        [Proc, StreamProc])
     end.
 
 retract(undefined) ->
     ok;
 retract(RepoId) ->
     case ets:lookup(?TABLE, RepoId) of
-        [{_, Proc}] ->
+        [{_, {Proc, StreamProc}}] ->
+            _ = hecate_mesh_client:unregister_advertisement(Proc),
+            _ = hecate_mesh_client:unregister_advertisement(StreamProc),
+            ets:delete(?TABLE, RepoId),
+            logger:info("[advertise_repo_procedures] Retracted ~s + ~s",
+                        [Proc, StreamProc]),
+            ok;
+        [{_, Proc}] when is_binary(Proc) ->
+            %% Backward-compat: legacy single-proc rows from before the
+            %% stream pilot landed. Retract just the unary one.
             _ = hecate_mesh_client:unregister_advertisement(Proc),
             ets:delete(?TABLE, RepoId),
-            logger:info("[advertise_repo_procedures] Retracted ~s", [Proc]),
             ok;
         [] ->
             ok
@@ -89,8 +104,17 @@ retract(RepoId) ->
 procedure_uri(Realm, RepoId) ->
     <<Realm/binary, ".git.", RepoId/binary, ".rpc">>.
 
+-spec stream_procedure_uri(binary(), binary()) -> binary().
+stream_procedure_uri(Realm, RepoId) ->
+    <<Realm/binary, ".git.", RepoId/binary, ".rpc_stream">>.
+
 make_handler(RepoId) ->
     fun(Args) -> git_over_mesh_procedure:handle(RepoId, Args) end.
+
+make_stream_handler(RepoId) ->
+    fun(Stream, Args) ->
+        git_over_mesh_stream_procedure:handle(RepoId, Stream, Args)
+    end.
 
 gf(Key, Map)          -> gf(Key, Map, undefined).
 gf(Key, Map, Default) ->
