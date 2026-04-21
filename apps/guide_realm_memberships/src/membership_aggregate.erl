@@ -90,5 +90,18 @@ do_execute(store_realm_shared_key, State, Payload) ->
         {true,  false} -> maybe_store_realm_shared_key:handle_from_map(Payload)
     end;
 
+do_execute(announce_identity_public_key, State, Payload) ->
+    %% Announce once K_realm is stored (full membership). Idempotent —
+    %% re-announcing is a no-op because the aggregate rejects it.
+    KeyStored = (State#membership_state.status band ?REALM_KEY_STORED) =/= 0,
+    Announced = (State#membership_state.status band ?IDENTITY_PUBKEY_ANNOUNCED) =/= 0,
+    Revoked   = (State#membership_state.status band ?MEMBERSHIP_REVOKED) =/= 0,
+    case {KeyStored, Announced, Revoked} of
+        {false, _,    _}    -> {error, realm_key_not_stored};
+        {_,     _,    true} -> {error, membership_revoked};
+        {true,  true, _}    -> {error, already_announced};
+        {true,  false, false} -> maybe_announce_identity_public_key:handle_from_map(Payload)
+    end;
+
 do_execute(_Unknown, _State, _Payload) ->
     {error, unknown_command}.

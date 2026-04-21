@@ -16,5 +16,7 @@
     k_realm_version       :: non_neg_integer() | undefined,
     k_realm_encrypted     :: binary() | undefined,
     k_realm_received_at   :: integer() | undefined,
+    %% X25519 encryption pubkey announced to the realm directory.
+    identity_pubkey_announced_at :: integer() | undefined,
     status                :: non_neg_integer()
 }).

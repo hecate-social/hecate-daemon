@@ -31,6 +31,7 @@ new(_AggregateId) ->
         k_realm_version = undefined,
         k_realm_encrypted = undefined,
         k_realm_received_at = undefined,
+        identity_pubkey_announced_at = undefined,
         status = 0
     }.
 
@@ -58,6 +59,8 @@ to_map(#membership_state{} = S) ->
         k_realm_version       => S#membership_state.k_realm_version,
         k_realm_encrypted     => S#membership_state.k_realm_encrypted,
         k_realm_received_at   => S#membership_state.k_realm_received_at,
+        identity_pubkey_announced_at =>
+            S#membership_state.identity_pubkey_announced_at,
         status                => S#membership_state.status
     }.
 
@@ -101,6 +104,13 @@ do_apply(<<"realm_shared_key_stored_v1">>, State, Event) ->
         k_realm_encrypted   = get_field(<<"k_realm_encrypted">>, k_realm_encrypted, Event),
         k_realm_received_at = get_field(<<"received_at">>, received_at, Event),
         status              = State#membership_state.status bor ?REALM_KEY_STORED
+    };
+
+do_apply(<<"identity_public_key_announced_v1">>, State, Event) ->
+    State#membership_state{
+        identity_pubkey_announced_at =
+            get_field(<<"announced_at">>, announced_at, Event),
+        status = State#membership_state.status bor ?IDENTITY_PUBKEY_ANNOUNCED
     };
 
 do_apply(_UnknownType, State, _Event) ->

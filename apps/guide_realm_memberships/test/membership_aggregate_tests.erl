@@ -220,6 +220,25 @@ revoked_state() ->
               revoked_at => 3000},
     membership_aggregate:apply(S0, Event).
 
+key_stored_state() ->
+    S0 = confirmed_state(),
+    Event = #{event_type => <<"realm_shared_key_stored_v1">>,
+              membership_id => <<"mem-001">>,
+              realm => <<"io.macula">>,
+              k_realm_version => 1,
+              k_realm_encrypted => <<"sealed-bytes">>,
+              received_at => 2500},
+    membership_aggregate:apply(S0, Event).
+
+announced_state() ->
+    S0 = key_stored_state(),
+    Event = #{event_type => <<"identity_public_key_announced_v1">>,
+              membership_id => <<"mem-001">>,
+              mri => <<"mri:agent:io.macula/alice/host00">>,
+              encryption_public_key => <<0:256>>,
+              announced_at => 2700},
+    membership_aggregate:apply(S0, Event).
+
 %% ===================================================================
 %% store_realm_shared_key (Phase C.2)
 %% ===================================================================
@@ -287,3 +306,73 @@ store_shared_key_rotation_test() ->
     ?assertEqual(2, maps:get(k_realm_version, Map)),
     ?assertEqual(<<"v2-bytes">>, maps:get(k_realm_encrypted, Map)),
     ?assert(evoq_bit_flags:has(maps:get(status, Map), ?REALM_KEY_STORED)).
+
+%% ===================================================================
+%% announce_identity_public_key (Phase D Session 1)
+%% ===================================================================
+
+announce_pubkey_happy_test() ->
+    State = key_stored_state(),
+    Pub = crypto:strong_rand_bytes(32),
+    Payload = #{
+        command_type          => announce_identity_public_key,
+        membership_id         => <<"mem-001">>,
+        mri                   => <<"mri:agent:io.macula/alice/host00">>,
+        encryption_public_key => Pub
+    },
+    {ok, [Event]} = membership_aggregate:execute(State, Payload),
+    ?assertEqual(<<"identity_public_key_announced_v1">>,
+                 maps:get(event_type, Event)),
+    ?assertEqual(Pub, maps:get(encryption_public_key, Event)),
+    S1 = membership_aggregate:apply(State, Event),
+    Map = membership_state:to_map(S1),
+    ?assert(evoq_bit_flags:has(maps:get(status, Map),
+                               ?IDENTITY_PUBKEY_ANNOUNCED)),
+    ?assert(is_integer(maps:get(identity_pubkey_announced_at, Map))).
+
+announce_pubkey_before_key_stored_rejected_test() ->
+    State = confirmed_state(),
+    Payload = #{
+        command_type          => announce_identity_public_key,
+        membership_id         => <<"mem-001">>,
+        mri                   => <<"mri:agent:io.macula/alice/host00">>,
+        encryption_public_key => crypto:strong_rand_bytes(32)
+    },
+    ?assertEqual({error, realm_key_not_stored},
+                 membership_aggregate:execute(State, Payload)).
+
+announce_pubkey_twice_rejected_test() ->
+    State = announced_state(),
+    Payload = #{
+        command_type          => announce_identity_public_key,
+        membership_id         => <<"mem-001">>,
+        mri                   => <<"mri:agent:io.macula/alice/host00">>,
+        encryption_public_key => crypto:strong_rand_bytes(32)
+    },
+    ?assertEqual({error, already_announced},
+                 membership_aggregate:execute(State, Payload)).
+
+announce_pubkey_after_revoke_rejected_test() ->
+    State0 = announced_state(),
+    RevEvt = #{event_type => <<"realm_membership_revoked_v1">>,
+               membership_id => <<"mem-001">>,
+               reason => <<"kicked">>, revoked_at => 9999},
+    State = membership_aggregate:apply(State0, RevEvt),
+    Payload = #{
+        command_type          => announce_identity_public_key,
+        membership_id         => <<"mem-001">>,
+        mri                   => <<"mri:agent:io.macula/alice/host00">>,
+        encryption_public_key => crypto:strong_rand_bytes(32)
+    },
+    ?assertEqual({error, membership_revoked},
+                 membership_aggregate:execute(State, Payload)).
+
+announce_pubkey_missing_fields_rejected_test() ->
+    State = key_stored_state(),
+    Payload = #{
+        command_type => announce_identity_public_key,
+        membership_id => <<"mem-001">>
+        %% no mri, no encryption_public_key
+    },
+    ?assertEqual({error, missing_fields},
+                 membership_aggregate:execute(State, Payload)).

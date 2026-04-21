@@ -24,6 +24,26 @@ init([]) ->
                         on_realm_membership_confirmed_fetch_key]
         },
         #{
+            id => on_realm_shared_key_stored_announce_public_key,
+            start => {evoq_event_handler, start_link,
+                      [on_realm_shared_key_stored_announce_public_key, #{}, #{}]},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [evoq_event_handler,
+                        on_realm_shared_key_stored_announce_public_key]
+        },
+        #{
+            id => identity_public_key_announced_v1_to_mesh,
+            start => {evoq_event_handler, start_link,
+                      [identity_public_key_announced_v1_to_mesh, #{}, #{}]},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [evoq_event_handler,
+                        identity_public_key_announced_v1_to_mesh]
+        },
+        #{
             id => catch_up_realm_keys,
             start => {catch_up_realm_keys, start_link, []},
             restart => permanent,
