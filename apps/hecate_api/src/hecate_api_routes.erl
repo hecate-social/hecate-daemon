@@ -29,6 +29,7 @@
     guide_mpong_game_lifecycle, project_mpong_games, query_mpong_games,
     guide_briefcase_lifecycle, project_briefcase_files, query_briefcase_files,
     guide_repo_lifecycle, project_repos, query_repos,
+    announce_ref_updates, serve_git_over_mesh,
     query_observer
 ]).
 

@@ -1,0 +1,23 @@
+{application, announce_ref_updates, [
+    {description, "Infrastructure: post-receive hook socket + mesh FACT publisher for repo ref updates"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {announce_ref_updates_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        macula,
+        hecate_mesh,
+        guide_repo_lifecycle,
+        project_repos,
+        shared
+    ]},
+    {env, [
+        %% Socket path can be overridden via HECATE_REF_UPDATES_SOCK env var.
+        %% Default: `${XDG_RUNTIME_DIR}/hecate/ref_updates.sock` if writable,
+        %% else `/run/hecate/ref_updates.sock`. See `receive_ref_update_rpc`.
+    ]},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.

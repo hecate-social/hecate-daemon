@@ -1,0 +1,102 @@
+%%% @doc Desk: advertise a mesh RPC procedure per initiated repo.
+%%%
+%%% Procedure URI:
+%%%   `{Realm}.git.{RepoId}.rpc`
+%%%
+%%% The handler function dispatches on the `op` arg (`describe` /
+%%% `fetch` / `push`) — see `git_over_mesh_procedure:handle/2`.
+%%%
+%%% We run as a plain `evoq_event_handler` that:
+%%%   - Reacts to `repo_initiated_v1` by calling
+%%%     `hecate_mesh_client:register_advertisement/2`.
+%%%   - Reacts to `repo_archived_v1` by calling
+%%%     `hecate_mesh_client:unregister_advertisement/1`.
+%%%
+%%% Dedup: a private ETS set (`?MODULE`) tracks advertised procedures
+%%% so redundant `repo_initiated_v1` events (e.g. projection replay)
+%%% don't double-register.
+%%% @end
+-module(advertise_repo_procedures).
+-behaviour(evoq_event_handler).
+
+-export([start_link/0]).
+-export([interested_in/0, init/1, handle_event/4]).
+
+-define(TABLE, ?MODULE).
+
+-spec start_link() -> {ok, pid()} | {error, term()}.
+start_link() ->
+    %% Create (or reuse) the dedup table before the handler worker starts.
+    case ets:info(?TABLE) of
+        undefined ->
+            ets:new(?TABLE, [named_table, public, set,
+                             {read_concurrency, true}]);
+        _ ->
+            ok
+    end,
+    evoq_event_handler:start_link(?MODULE, #{}).
+
+interested_in() ->
+    [<<"repo_initiated_v1">>, <<"repo_archived_v1">>].
+
+init(_Config) ->
+    {ok, #{}}.
+
+handle_event(<<"repo_initiated_v1">>, Event, _Metadata, State) ->
+    RepoId = gf(repo_id, Event),
+    Realm  = gf(realm,   Event, hecate_topics:realm()),
+    advertise_once(RepoId, Realm),
+    {ok, State};
+handle_event(<<"repo_archived_v1">>, Event, _Metadata, State) ->
+    RepoId = gf(repo_id, Event),
+    retract(RepoId),
+    {ok, State};
+handle_event(_Other, _Event, _Meta, State) ->
+    {ok, State}.
+
+%%====================================================================
+%% Internal
+%%====================================================================
+
+advertise_once(undefined, _Realm) ->
+    logger:warning("[advertise_repo_procedures] missing repo_id, skipping advertise");
+advertise_once(RepoId, Realm) ->
+    Proc = procedure_uri(Realm, RepoId),
+    case ets:lookup(?TABLE, RepoId) of
+        [{_, _Existing}] ->
+            logger:debug("[advertise_repo_procedures] ~s already advertised", [Proc]);
+        [] ->
+            Handler = make_handler(RepoId),
+            ok = hecate_mesh_client:register_advertisement(Proc, Handler),
+            true = ets:insert(?TABLE, {RepoId, Proc}),
+            logger:info("[advertise_repo_procedures] Advertised ~s", [Proc])
+    end.
+
+retract(undefined) ->
+    ok;
+retract(RepoId) ->
+    case ets:lookup(?TABLE, RepoId) of
+        [{_, Proc}] ->
+            _ = hecate_mesh_client:unregister_advertisement(Proc),
+            ets:delete(?TABLE, RepoId),
+            logger:info("[advertise_repo_procedures] Retracted ~s", [Proc]),
+            ok;
+        [] ->
+            ok
+    end.
+
+-spec procedure_uri(binary(), binary()) -> binary().
+procedure_uri(Realm, RepoId) ->
+    <<Realm/binary, ".git.", RepoId/binary, ".rpc">>.
+
+make_handler(RepoId) ->
+    fun(Args) -> git_over_mesh_procedure:handle(RepoId, Args) end.
+
+gf(Key, Map)          -> gf(Key, Map, undefined).
+gf(Key, Map, Default) ->
+    case maps:find(Key, Map) of
+        {ok, V} -> V;
+        error ->
+            BinKey = atom_to_binary(Key, utf8),
+            maps:get(BinKey, Map, Default)
+    end.

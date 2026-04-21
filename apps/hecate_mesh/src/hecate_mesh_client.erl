@@ -16,7 +16,8 @@
 -export([start_link/0, activate/0, is_activated/0]).
 -export([get_client/0, get_status/0, publish/2, subscribe/2,
          unsubscribe/1, discover_subscribers/1, advertise/2, call/3, call/4]).
--export([register_subscription/2, register_advertisement/2]).
+-export([register_subscription/2, register_advertisement/2,
+         unregister_advertisement/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -record(state, {
@@ -59,6 +60,13 @@ register_subscription(Topic, Callback) ->
 -spec register_advertisement(binary(), fun()) -> ok.
 register_advertisement(Procedure, Handler) ->
     gen_server:cast(?MODULE, {register_adv, Procedure, Handler}).
+
+%% @doc Retract a previously-registered advertisement.
+%% When the mesh isn't activated yet this clears any pending entry.
+%% Safe to call from any process.
+-spec unregister_advertisement(binary()) -> ok.
+unregister_advertisement(Procedure) ->
+    gen_server:cast(?MODULE, {unregister_adv, Procedure}).
 
 get_client() ->
     gen_server:call(?MODULE, get_client).
@@ -264,6 +272,14 @@ handle_cast({register_adv, Procedure, Handler}, #state{activated = false} = Stat
     {noreply, State#state{pending_advs = [{Procedure, Handler} | State#state.pending_advs]}};
 handle_cast({register_adv, Procedure, Handler}, #state{client = Client} = State) ->
     spawn(fun() -> safe_mesh_call(fun() -> macula_multi_relay:advertise(Client, Procedure, Handler) end) end),
+    {noreply, State};
+
+handle_cast({unregister_adv, Procedure}, #state{activated = false} = State) ->
+    %% Drop the pending entry if present; nothing else to do while dormant.
+    Pending = [{P, H} || {P, H} <- State#state.pending_advs, P =/= Procedure],
+    {noreply, State#state{pending_advs = Pending}};
+handle_cast({unregister_adv, Procedure}, #state{client = Client} = State) ->
+    spawn(fun() -> safe_mesh_call(fun() -> macula_multi_relay:unadvertise(Client, Procedure) end) end),
     {noreply, State};
 
 handle_cast(_Msg, State) ->

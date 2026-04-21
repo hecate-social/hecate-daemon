@@ -1,0 +1,22 @@
+{application, serve_git_over_mesh, [
+    {description, "Infrastructure: bare repo disk storage + mesh RPC advertisements (git-over-mesh)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {serve_git_over_mesh_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        evoq,
+        reckon_evoq,
+        macula,
+        hecate_mesh,
+        guide_repo_lifecycle,
+        project_repos,
+        announce_ref_updates,
+        shared
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"GitHub", "https://github.com/hecate-social/hecate-daemon"}]}
+]}.
