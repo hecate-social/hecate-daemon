@@ -14,7 +14,8 @@
 interested_in() ->
     [<<"realm_membership_initiated_v1">>,
      <<"realm_membership_confirmed_v1">>,
-     <<"realm_membership_revoked_v1">>].
+     <<"realm_membership_revoked_v1">>,
+     <<"realm_shared_key_stored_v1">>].
 
 init(_Config) ->
     {ok, RM} = evoq_read_model:new(evoq_read_model_ets, #{name => ?TABLE}),
@@ -25,6 +26,7 @@ project(#{data := Data} = Event, _Metadata, State, RM) ->
         <<"realm_membership_initiated_v1">> -> project_initiated(Data, State, RM);
         <<"realm_membership_confirmed_v1">> -> project_confirmed(Data, State, RM);
         <<"realm_membership_revoked_v1">>   -> project_revoked(Data, State, RM);
+        <<"realm_shared_key_stored_v1">>    -> project_key_stored(Data, State, RM);
         _                                   -> {ok, State, RM}
     end.
 
@@ -67,6 +69,24 @@ project_confirmed(Data, State, RM) ->
             },
             {ok, RM2} = evoq_read_model:put(MembershipId, Updated, RM),
             hecate_web_events:broadcast(settings_changed, #{reason => realm_confirmed}),
+            {ok, State, RM2};
+        [] ->
+            {ok, State, RM}
+    end.
+
+%% --- Key stored: flip REALM_KEY_STORED bit, record version ---
+
+project_key_stored(Data, State, RM) ->
+    MembershipId = gf(membership_id, Data),
+    case ets:lookup(?TABLE, MembershipId) of
+        [{_, #{status := OldStatus} = Existing}] ->
+            NewStatus = evoq_bit_flags:set(OldStatus, ?REALM_KEY_STORED),
+            Updated = Existing#{
+                status              => NewStatus,
+                k_realm_version     => gf(k_realm_version, Data),
+                k_realm_received_at => gf(received_at, Data)
+            },
+            {ok, RM2} = evoq_read_model:put(MembershipId, Updated, RM),
             {ok, State, RM2};
         [] ->
             {ok, State, RM}

@@ -79,5 +79,16 @@ do_execute(revoke_realm_membership, State, Payload) ->
             end
     end;
 
+do_execute(store_realm_shared_key, State, Payload) ->
+    %% Acceptable once the realm is confirmed and not revoked. Re-storing
+    %% is permitted — that's how rotation lands (new version, new bytes).
+    Confirmed = (State#membership_state.status band ?MEMBERSHIP_CONFIRMED) =/= 0,
+    Revoked   = (State#membership_state.status band ?MEMBERSHIP_REVOKED)   =/= 0,
+    case {Confirmed, Revoked} of
+        {false, _}    -> {error, not_confirmed};
+        {true,  true} -> {error, membership_revoked};
+        {true,  false} -> maybe_store_realm_shared_key:handle_from_map(Payload)
+    end;
+
 do_execute(_Unknown, _State, _Payload) ->
     {error, unknown_command}.

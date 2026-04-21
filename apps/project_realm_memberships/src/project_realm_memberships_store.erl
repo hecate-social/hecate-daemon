@@ -12,9 +12,11 @@
 -export([start_link/0]).
 -export([get/1, list_confirmed/0, list_all/0]).
 -export([get_credentials/1]).
+-export([get_shared_key/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(TABLE, realm_memberships).
+-define(SHARED_KEYS_TABLE, realm_shared_keys).
 
 -spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
@@ -60,6 +62,16 @@ get_credentials(MembershipId) ->
             {error, not_found}
     end.
 
+%% @doc Fetch the sealed K_realm for a realm (keyed by realm URI).
+%% Returns the ciphertext, version, and timestamp — unwrapping is
+%% `hecate_realm_crypto:unseal/1`'s job, not this store's.
+-spec get_shared_key(binary()) -> {ok, map()} | {error, not_found}.
+get_shared_key(Realm) when is_binary(Realm) ->
+    case ets:lookup(?SHARED_KEYS_TABLE, Realm) of
+        [{_, Entry}] -> {ok, Entry};
+        []           -> {error, not_found}
+    end.
+
 %%====================================================================
 %% gen_server (owns the ETS table)
 %%====================================================================
@@ -67,6 +79,8 @@ get_credentials(MembershipId) ->
 init([]) ->
     ?TABLE = ets:new(?TABLE, [set, public, named_table, {read_concurrency, true}]),
     realm_credentials = ets:new(realm_credentials, [set, public, named_table, {read_concurrency, true}]),
+    ?SHARED_KEYS_TABLE = ets:new(?SHARED_KEYS_TABLE,
+                                 [set, public, named_table, {read_concurrency, true}]),
     {ok, #{}}.
 
 handle_call(_Request, _From, State) ->

@@ -6,5 +6,6 @@
 -define(MEMBERSHIP_CONFIRMED,      2).  %% 2^1
 -define(MEMBERSHIP_REVOKED,        4).  %% 2^2
 -define(CREDENTIALS_SECURED,       8).  %% 2^3
+-define(REALM_KEY_STORED,         16).  %% 2^4 — K_realm fetched + sealed locally
 
 -endif.

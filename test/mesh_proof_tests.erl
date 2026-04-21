@@ -308,6 +308,7 @@ announce_with_capabilities() ->
     FakeNodeId = crypto:strong_rand_bytes(32),
     meck:expect(macula, get_node_id, fun(_Client) -> {ok, FakeNodeId} end),
     meck:expect(macula, get_known_peers, fun(_Client) -> {ok, [<<"peer1">>]} end),
+    meck:expect(macula, list_nodes, fun(_Client) -> {ok, #{<<"peer1">> => #{}}} end),
 
     CaptureRef = make_ref(),
     TestPid = self(),

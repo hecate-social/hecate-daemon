@@ -219,3 +219,71 @@ revoked_state() ->
               reason => <<"manual">>,
               revoked_at => 3000},
     membership_aggregate:apply(S0, Event).
+
+%% ===================================================================
+%% store_realm_shared_key (Phase C.2)
+%% ===================================================================
+
+store_shared_key_happy_test() ->
+    State = confirmed_state(),
+    Payload = #{
+        command_type      => store_realm_shared_key,
+        membership_id     => <<"mem-001">>,
+        realm             => <<"io.macula">>,
+        k_realm_version   => 1,
+        k_realm_encrypted => <<"sealed-bytes">>
+    },
+    {ok, [Event]} = membership_aggregate:execute(State, Payload),
+    ?assertEqual(<<"realm_shared_key_stored_v1">>, maps:get(event_type, Event)),
+    ?assertEqual(1, maps:get(k_realm_version, Event)),
+    ?assertEqual(<<"sealed-bytes">>, maps:get(k_realm_encrypted, Event)),
+    S1 = membership_aggregate:apply(State, Event),
+    Map = membership_state:to_map(S1),
+    Status = maps:get(status, Map),
+    ?assert(evoq_bit_flags:has(Status, ?REALM_KEY_STORED)),
+    ?assertEqual(1, maps:get(k_realm_version, Map)).
+
+store_shared_key_not_confirmed_test() ->
+    State = initiated_state(),
+    Payload = #{
+        command_type      => store_realm_shared_key,
+        membership_id     => <<"mem-001">>,
+        realm             => <<"io.macula">>,
+        k_realm_version   => 1,
+        k_realm_encrypted => <<"sealed">>
+    },
+    ?assertEqual({error, not_confirmed},
+                 membership_aggregate:execute(State, Payload)).
+
+store_shared_key_revoked_rejected_test() ->
+    State = revoked_state(),
+    Payload = #{
+        command_type      => store_realm_shared_key,
+        membership_id     => <<"mem-001">>,
+        realm             => <<"io.macula">>,
+        k_realm_version   => 1,
+        k_realm_encrypted => <<"sealed">>
+    },
+    ?assertEqual({error, membership_revoked},
+                 membership_aggregate:execute(State, Payload)).
+
+store_shared_key_rotation_test() ->
+    State0 = confirmed_state(),
+    {ok, [E1]} = membership_aggregate:execute(State0, #{
+        command_type      => store_realm_shared_key,
+        membership_id     => <<"mem-001">>,
+        realm             => <<"io.macula">>,
+        k_realm_version   => 1,
+        k_realm_encrypted => <<"v1-bytes">>}),
+    State1 = membership_aggregate:apply(State0, E1),
+    {ok, [E2]} = membership_aggregate:execute(State1, #{
+        command_type      => store_realm_shared_key,
+        membership_id     => <<"mem-001">>,
+        realm             => <<"io.macula">>,
+        k_realm_version   => 2,
+        k_realm_encrypted => <<"v2-bytes">>}),
+    State2 = membership_aggregate:apply(State1, E2),
+    Map = membership_state:to_map(State2),
+    ?assertEqual(2, maps:get(k_realm_version, Map)),
+    ?assertEqual(<<"v2-bytes">>, maps:get(k_realm_encrypted, Map)),
+    ?assert(evoq_bit_flags:has(maps:get(status, Map), ?REALM_KEY_STORED)).

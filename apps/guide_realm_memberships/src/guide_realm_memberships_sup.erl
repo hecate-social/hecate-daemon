@@ -1,6 +1,7 @@
 %%% @doc Top-level supervisor for guide_realm_memberships.
 %%%
-%%% Empty — realm memberships are local-only, no emitters or PMs needed yet.
+%%% Hosts the process manager that fetches K_realm from the realm
+%%% server on `realm_membership_confirmed_v1`.
 -module(guide_realm_memberships_sup).
 -behaviour(supervisor).
 
@@ -11,5 +12,16 @@ start_link() ->
 
 init([]) ->
     SupFlags = #{strategy => one_for_one, intensity => 10, period => 10},
-    Children = [],
+    Children = [
+        #{
+            id => on_realm_membership_confirmed_fetch_key,
+            start => {evoq_event_handler, start_link,
+                      [on_realm_membership_confirmed_fetch_key, #{}, #{}]},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [evoq_event_handler,
+                        on_realm_membership_confirmed_fetch_key]
+        }
+    ],
     {ok, {SupFlags, Children}}.

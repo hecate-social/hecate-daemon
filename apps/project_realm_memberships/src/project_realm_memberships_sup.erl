@@ -22,6 +22,10 @@ init([]) ->
         %% Projection: credentials secured events -> realm_credentials ETS
         #{id => credentials_secured_v1_to_credentials,
           start => {evoq_projection, start_link, [credentials_secured_v1_to_credentials, #{}, #{store_id => realm_memberships_store}]},
+          restart => permanent, type => worker},
+        %% Projection: realm shared key events -> realm_shared_keys ETS
+        #{id => realm_shared_key_stored_v1_to_realm_shared_keys,
+          start => {evoq_projection, start_link, [realm_shared_key_stored_v1_to_realm_shared_keys, #{}, #{store_id => realm_memberships_store}]},
           restart => permanent, type => worker}
     ],
     {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

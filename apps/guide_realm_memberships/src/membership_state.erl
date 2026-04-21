@@ -28,6 +28,9 @@ new(_AggregateId) ->
         confirmed_at = undefined,
         revoked_at = undefined,
         secured_at = undefined,
+        k_realm_version = undefined,
+        k_realm_encrypted = undefined,
+        k_realm_received_at = undefined,
         status = 0
     }.
 
@@ -52,6 +55,9 @@ to_map(#membership_state{} = S) ->
         confirmed_at          => S#membership_state.confirmed_at,
         revoked_at            => S#membership_state.revoked_at,
         secured_at            => S#membership_state.secured_at,
+        k_realm_version       => S#membership_state.k_realm_version,
+        k_realm_encrypted     => S#membership_state.k_realm_encrypted,
+        k_realm_received_at   => S#membership_state.k_realm_received_at,
         status                => S#membership_state.status
     }.
 
@@ -87,6 +93,14 @@ do_apply(<<"realm_membership_revoked_v1">>, State, Event) ->
     State#membership_state{
         revoked_at = get_field(<<"revoked_at">>, revoked_at, Event),
         status = State#membership_state.status bor ?MEMBERSHIP_REVOKED
+    };
+
+do_apply(<<"realm_shared_key_stored_v1">>, State, Event) ->
+    State#membership_state{
+        k_realm_version     = get_field(<<"k_realm_version">>, k_realm_version, Event),
+        k_realm_encrypted   = get_field(<<"k_realm_encrypted">>, k_realm_encrypted, Event),
+        k_realm_received_at = get_field(<<"received_at">>, received_at, Event),
+        status              = State#membership_state.status bor ?REALM_KEY_STORED
     };
 
 do_apply(_UnknownType, State, _Event) ->
