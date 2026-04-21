@@ -68,7 +68,7 @@ handle_cast(scan_now, State) ->
     {noreply, State}.
 
 handle_info(check_activation, State) ->
-    handle_activation(hecate_mesh:is_activated(), State);
+    handle_activation(mesh_activated(), State);
 
 handle_info(periodic_scan, State) ->
     scan_memberships(),
@@ -94,6 +94,15 @@ handle_activation(true, State) ->
 handle_activation(false, State) ->
     erlang:send_after(?ACTIVATION_POLL_MS, self(), check_activation),
     {noreply, State}.
+
+%% hecate_mesh_client lives in a different app's supervision tree and
+%% may not be registered yet when this worker boots. Treat its absence
+%% the same as "not activated" — the poll loop revisits.
+mesh_activated() ->
+    case erlang:whereis(hecate_mesh_client) of
+        undefined -> false;
+        _Pid      -> hecate_mesh:is_activated()
+    end.
 
 schedule_next() ->
     erlang:send_after(?SCAN_INTERVAL_MS, self(), periodic_scan).
