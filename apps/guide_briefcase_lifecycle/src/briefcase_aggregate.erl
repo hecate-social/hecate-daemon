@@ -48,5 +48,30 @@ do_execute(upload_file, State, Payload) ->
         _ -> {error, already_uploaded}
     end;
 
+do_execute(share_file_v1, State, Payload) ->
+    Status = State#briefcase_state.status,
+    Uploaded = (Status band ?FILE_UPLOADED) =/= 0,
+    Shared   = (Status band ?FILE_SHARED)   =/= 0,
+    case {Uploaded, Shared} of
+        {false, _}    -> {error, not_uploaded};
+        {true,  true} -> {error, already_shared};
+        {true,  false} -> maybe_share_file:handle_with_state(Payload, State)
+    end;
+
+do_execute(unshare_file_v1, State, Payload) ->
+    case State#briefcase_state.status band ?FILE_SHARED of
+        0 -> {error, not_shared};
+        _ -> maybe_unshare_file:handle_from_map(Payload)
+    end;
+
+%% announce_file is the birth event for remote files (peer announced a
+%% file we've never seen). Only allowed on empty aggregates — if we
+%% already uploaded (local origin) or already announced, skip.
+do_execute(announce_file_v1, State, Payload) ->
+    case State#briefcase_state.status of
+        0 -> maybe_announce_file:handle_from_map(Payload);
+        _ -> {error, already_present}
+    end;
+
 do_execute(_Unknown, _State, _Payload) ->
     {error, unknown_command}.

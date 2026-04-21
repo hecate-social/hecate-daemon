@@ -64,6 +64,10 @@ do_apply(<<"file_unshared_v1">>, State, #{data := _}) ->
     apply_file_unshared(State);
 do_apply(<<"file_unshared_v1">>, State, _Data) ->
     apply_file_unshared(State);
+do_apply(<<"file_announced_v1">>, State, #{data := Data}) ->
+    apply_file_announced(State, Data);
+do_apply(<<"file_announced_v1">>, State, Data) ->
+    apply_file_announced(State, Data);
 do_apply(_UnknownEventType, State, _Event) ->
     State.
 
@@ -88,6 +92,21 @@ apply_file_shared(State) ->
 apply_file_unshared(State) ->
     State#briefcase_state{
         status = evoq_bit_flags:unset(State#briefcase_state.status, ?FILE_SHARED)
+    }.
+
+%% Remote-origin birth: we learn about a peer's file via mesh FACT.
+%% Populates metadata + marks FILE_ANNOUNCED. No content yet (that's
+%% the FILE_CACHED transition, Phase E).
+apply_file_announced(State, Data) ->
+    State#briefcase_state{
+        realm        = gf(realm,        Data, State#briefcase_state.realm),
+        path         = gf(path,         Data, State#briefcase_state.path),
+        mime_type    = gf(mime_type,    Data, State#briefcase_state.mime_type),
+        size         = gf(size,         Data, State#briefcase_state.size),
+        content_hash = gf(content_hash, Data, State#briefcase_state.content_hash),
+        author_did   = gf(author_did,   Data, State#briefcase_state.author_did),
+        uploaded_at  = gf(announced_at, Data, State#briefcase_state.uploaded_at),
+        status       = evoq_bit_flags:set(State#briefcase_state.status, ?FILE_ANNOUNCED)
     }.
 
 %% @private Get field from map with default (atom or binary key).

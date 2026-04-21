@@ -1,10 +1,13 @@
 %%% @doc Top-level supervisor for guide_briefcase_lifecycle.
 %%%
-%%% Phase 1: no child processes — commands dispatch stateless through
-%%% `reckon_evoq_adapter`. Later phases add:
-%%%   - `briefcase_chunk_store` — content-addressed chunk I/O
-%%%   - `briefcase_fs_watcher`  — reconciler (Phase 6)
-%%%   - `briefcase_mesh_emitter` — pubsub event broadcast (Phase 2)
+%%% Supervises mesh emitters for the briefcase CMD department. Each
+%%% emitter subscribes to a specific domain event via
+%%% `evoq_event_handler` and publishes an integration FACT to the mesh.
+%%%
+%%% Phase B wires:
+%%%   - `file_shared_v1_to_mesh` — on each `file_shared_v1`, publish
+%%%     `{realm}.briefcase.file_shared` FACT so realm peers can record
+%%%     a placeholder for the file.
 %%% @end
 -module(guide_briefcase_lifecycle_sup).
 -behaviour(supervisor).
@@ -20,5 +23,13 @@ init([]) ->
         intensity => 10,
         period    => 10
     },
-    Children = [],
+    Children = [
+        emitter(file_shared_v1_to_mesh)
+    ],
     {ok, {SupFlags, Children}}.
+
+emitter(Mod) ->
+    #{id      => Mod,
+      start   => {evoq_event_handler, start_link, [Mod, #{}]},
+      restart => permanent,
+      type    => worker}.

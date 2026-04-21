@@ -15,7 +15,8 @@
 interested_in() ->
     [<<"file_uploaded_v1">>,
      <<"file_shared_v1">>,
-     <<"file_unshared_v1">>].
+     <<"file_unshared_v1">>,
+     <<"file_announced_v1">>].
 
 init(_Config) ->
     {ok, RM} = evoq_read_model:new(evoq_read_model_ets, #{name => ?TABLE}),
@@ -23,10 +24,11 @@ init(_Config) ->
 
 project(#{data := Data} = Event, _Metadata, State, RM) ->
     case get_event_type(Event) of
-        <<"file_uploaded_v1">> -> project_file_uploaded(Data, State, RM);
-        <<"file_shared_v1">>   -> project_privacy_change(Data, <<"shared">>, State, RM);
-        <<"file_unshared_v1">> -> project_privacy_change(Data, <<"private">>, State, RM);
-        _                      -> {ok, State, RM}
+        <<"file_uploaded_v1">>  -> project_file_uploaded(Data, State, RM);
+        <<"file_shared_v1">>    -> project_privacy_change(Data, <<"shared">>, State, RM);
+        <<"file_unshared_v1">>  -> project_privacy_change(Data, <<"private">>, State, RM);
+        <<"file_announced_v1">> -> project_file_announced(Data, State, RM);
+        _                       -> {ok, State, RM}
     end.
 
 %% ===================================================================
@@ -48,6 +50,29 @@ project_file_uploaded(Data, State, RM) ->
         presence     => <<"local">>,
         status       => 1,
         status_label => <<"Uploaded">>
+    },
+    {ok, RM2} = evoq_read_model:put(FileId, Entry, RM),
+    {ok, State, RM2}.
+
+%% ===================================================================
+%% file_announced_v1 — remote peer's shared file, placeholder row
+%% ===================================================================
+
+project_file_announced(Data, State, RM) ->
+    FileId = gf(file_id, Data),
+    Entry = #{
+        file_id      => FileId,
+        realm        => gf(realm, Data),
+        path         => gf(path, Data),
+        mime_type    => gf(mime_type, Data),
+        size         => gf(size, Data),
+        content_hash => gf(content_hash, Data),
+        author_did   => gf(author_did, Data),
+        uploaded_at  => gf(announced_at, Data),
+        privacy      => <<"shared">>,
+        presence     => <<"remote">>,
+        status       => 64,  %% FILE_ANNOUNCED
+        status_label => <<"Placeholder">>
     },
     {ok, RM2} = evoq_read_model:put(FileId, Entry, RM),
     {ok, State, RM2}.
