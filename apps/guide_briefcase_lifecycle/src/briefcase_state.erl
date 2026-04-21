@@ -55,8 +55,15 @@ to_map(#briefcase_state{} = S) ->
 do_apply(<<"file_uploaded_v1">>, State, #{data := Data}) ->
     apply_file_uploaded(State, Data);
 do_apply(<<"file_uploaded_v1">>, State, Data) ->
-    %% Event without wrapper
     apply_file_uploaded(State, Data);
+do_apply(<<"file_shared_v1">>, State, #{data := _}) ->
+    apply_file_shared(State);
+do_apply(<<"file_shared_v1">>, State, _Data) ->
+    apply_file_shared(State);
+do_apply(<<"file_unshared_v1">>, State, #{data := _}) ->
+    apply_file_unshared(State);
+do_apply(<<"file_unshared_v1">>, State, _Data) ->
+    apply_file_unshared(State);
 do_apply(_UnknownEventType, State, _Event) ->
     State.
 
@@ -71,6 +78,16 @@ apply_file_uploaded(State, Data) ->
         author_did   = gf(author_did, Data, State#briefcase_state.author_did),
         uploaded_at  = gf(uploaded_at, Data, State#briefcase_state.uploaded_at),
         status       = evoq_bit_flags:set(State#briefcase_state.status, ?FILE_UPLOADED)
+    }.
+
+apply_file_shared(State) ->
+    State#briefcase_state{
+        status = evoq_bit_flags:set(State#briefcase_state.status, ?FILE_SHARED)
+    }.
+
+apply_file_unshared(State) ->
+    State#briefcase_state{
+        status = evoq_bit_flags:unset(State#briefcase_state.status, ?FILE_SHARED)
     }.
 
 %% @private Get field from map with default (atom or binary key).

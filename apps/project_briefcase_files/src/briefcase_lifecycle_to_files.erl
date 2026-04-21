@@ -1,9 +1,9 @@
 %%% @doc Merged projection: briefcase lifecycle events -> files ETS.
 %%%
-%%% Phase 1 handles `file_uploaded_v1` only. Later phases add
-%%% `file_revised_v1`, `file_moved_v1`, `file_archived_v1`,
-%%% `file_purged_v1`, `folder_opened_v1`, `folder_collapsed_v1`,
-%%% `access_granted_v1`, `access_revoked_v1`, chunk transfer events.
+%%% Phase A handles: `file_uploaded_v1` (creates row, privacy=private),
+%%% `file_shared_v1` (flips privacy=shared), `file_unshared_v1` (back to
+%%% private). Later phases add revise/move/archive/purge + remote
+%%% placeholder/cached states.
 %%% @end
 -module(briefcase_lifecycle_to_files).
 -behaviour(evoq_projection).
@@ -13,7 +13,9 @@
 -define(TABLE, briefcase_files).
 
 interested_in() ->
-    [<<"file_uploaded_v1">>].
+    [<<"file_uploaded_v1">>,
+     <<"file_shared_v1">>,
+     <<"file_unshared_v1">>].
 
 init(_Config) ->
     {ok, RM} = evoq_read_model:new(evoq_read_model_ets, #{name => ?TABLE}),
@@ -22,11 +24,13 @@ init(_Config) ->
 project(#{data := Data} = Event, _Metadata, State, RM) ->
     case get_event_type(Event) of
         <<"file_uploaded_v1">> -> project_file_uploaded(Data, State, RM);
+        <<"file_shared_v1">>   -> project_privacy_change(Data, <<"shared">>, State, RM);
+        <<"file_unshared_v1">> -> project_privacy_change(Data, <<"private">>, State, RM);
         _                      -> {ok, State, RM}
     end.
 
 %% ===================================================================
-%% file_uploaded_v1 — insert new file into read model
+%% file_uploaded_v1 — insert new file into read model (private by default)
 %% ===================================================================
 
 project_file_uploaded(Data, State, RM) ->
@@ -40,11 +44,31 @@ project_file_uploaded(Data, State, RM) ->
         content_hash => gf(content_hash, Data),
         author_did   => gf(author_did, Data),
         uploaded_at  => gf(uploaded_at, Data),
+        privacy      => <<"private">>,
+        presence     => <<"local">>,
         status       => 1,
         status_label => <<"Uploaded">>
     },
-    {ok, RM2} = evoq_read_model:put(RM, FileId, Entry),
+    {ok, RM2} = evoq_read_model:put(FileId, Entry, RM),
     {ok, State, RM2}.
+
+%% ===================================================================
+%% file_shared_v1 / file_unshared_v1 — flip the privacy flag
+%% ===================================================================
+
+project_privacy_change(Data, NewPrivacy, State, RM) ->
+    FileId = gf(file_id, Data),
+    case evoq_read_model:get(FileId, RM) of
+        {ok, Entry} ->
+            Entry2 = Entry#{privacy => NewPrivacy},
+            {ok, RM2} = evoq_read_model:put(FileId, Entry2, RM),
+            {ok, State, RM2};
+        {error, not_found} ->
+            %% Privacy change for unknown file — ignore; file_uploaded
+            %% event is the birth record. Out-of-order delivery would
+            %% reconcile on replay.
+            {ok, State, RM}
+    end.
 
 %% ===================================================================
 %% Helpers

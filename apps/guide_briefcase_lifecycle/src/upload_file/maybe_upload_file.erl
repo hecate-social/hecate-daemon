@@ -53,21 +53,13 @@ dispatch(Cmd) ->
         payload        = CmdMap#{command_type => upload_file},
         metadata       = #{timestamp => erlang:system_time(millisecond)}
     },
-    Result = evoq_dispatcher:dispatch(EvoqCmd, #{
+    %% Upload defaults to `private` — no mesh emission here. Sharing is
+    %% an explicit action via `share_file_v1` (see share_file_api + Phase B).
+    evoq_dispatcher:dispatch(EvoqCmd, #{
         store_id    => briefcase_store,
         adapter     => reckon_evoq_adapter,
         consistency => eventual
-    }),
-    case Result of
-        {ok, _Version, _Events} ->
-            %% Fire-and-forget publication of the integration fact to the
-            %% realm-scoped mesh topic. Local state is always authoritative;
-            %% mesh failures do not roll back the local upload.
-            _ = share_file_in_mesh:share(CmdMap),
-            Result;
-        _ ->
-            Result
-    end.
+    }).
 
 %% Internal
 
