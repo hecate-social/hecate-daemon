@@ -21,6 +21,65 @@ Phase 2.
   - `describe` — metadata only, no git invocation.
   - `fetch`    — wraps `git upload-pack --stateless-rpc`.
   - `push`     — wraps `git receive-pack --stateless-rpc`.
+- `respond_to_realm_gitops_init/` — advertises
+  `<realm>.config.gitops.initiate`. A realm server (macula-realm)
+  calls this procedure over the mesh to provision a brand-new
+  gitops repo on this node. See **Realm-initiated provisioning**
+  below.
+
+## Realm-initiated provisioning
+
+macula-realm is a mesh client; it does not own any repos on the user's
+machine. When the user lands on macula-realm's `/gitops/setup` page,
+macula-realm calls this daemon's `<realm>.config.gitops.initiate`
+advertisement to create the gitops repo here, then stores the returned
+`mesh://{realm}/{repo_id}` URI on the user's record.
+
+### Auth model (v1 — locked)
+
+- The responder verifies the caller's DID against an allowlist sourced
+  from `hecate/realm_server_dids` application env, populated at boot
+  from the `MACULA_REALM_SERVER_DIDS` env var (comma-separated DIDs).
+- **Fail-closed**: empty allowlist rejects every realm-initiated call.
+- **No cert-chain verification** in v1. A DID hit in the allowlist is
+  enough. Realm-cert chain validation is deferred.
+- **No user-consent dialog** in v1. The user has already joined the
+  realm; provisioning is an implicit consequence. Consent UX is
+  deferred.
+- **Synchronous** — the daemon must be online when the realm server
+  calls. A 30 s timeout is the operator-facing contract; anything
+  larger indicates a mesh / daemon problem.
+
+### Request shape
+
+Procedure URI: `<realm>.config.gitops.initiate`
+
+```erlang
+#{ op         => <<"initiate_gitops">>,
+   caller_did => <<"did:macula:realm:macula.io">>,
+   owner_did  => <<"did:macula:agent:io.macula/alice">>,
+   realm      => <<"io.macula">>
+ }
+```
+
+Reply on success:
+
+```erlang
+{ok, #{ok       => true,
+       repo_id  => <<"hex16repo">>,
+       mesh_uri => <<"mesh://io.macula/hex16repo">>}}
+```
+
+Errors: `{error, invalid_request}`, `{error, unauthorized}`,
+`{error, realm_mismatch}`, or whatever `maybe_initiate_repo:dispatch/1`
+returns on failure.
+
+### Caller-DID plumbing note
+
+Macula V2 is expected to surface the verified caller DID in the handler
+envelope. Until that lands, the responder requires `caller_did` in the
+request map. This is NOT a security hole — the DID still has to clear
+the allowlist.
 
 ## Storage layout
 

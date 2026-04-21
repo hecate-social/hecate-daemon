@@ -8,6 +8,9 @@
 %%%   - `advertise_repo_procedures_sup` — reacts to `repo_initiated_v1`
 %%%     by registering mesh procedure advertisements for each repo;
 %%%     reacts to `repo_archived_v1` by unadvertising.
+%%%   - `respond_to_realm_gitops_init_sup` — advertises
+%%%     `{realm}.config.gitops.initiate` so a realm server can
+%%%     provision a gitops repo on this node over the mesh.
 %%% @end
 -module(serve_git_over_mesh_sup).
 -behaviour(supervisor).
@@ -30,6 +33,10 @@ init([]) ->
           type    => supervisor},
         #{id      => advertise_repo_procedures_sup,
           start   => {advertise_repo_procedures_sup, start_link, []},
+          restart => permanent,
+          type    => supervisor},
+        #{id      => respond_to_realm_gitops_init_sup,
+          start   => {respond_to_realm_gitops_init_sup, start_link, []},
           restart => permanent,
           type    => supervisor}
     ],
