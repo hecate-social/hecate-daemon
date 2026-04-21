@@ -27,10 +27,16 @@ init([]) ->
             {detect_llms, start_link, []},
             permanent, 5000, worker, [detect_llms]},
 
-        %% chat_to_llm_responder: handles chat requests from mesh
+        %% chat_to_llm_responder: handles unary chat requests from mesh
         {chat_to_llm_responder,
             {chat_to_llm_responder, start_link, []},
             permanent, 5000, worker, [chat_to_llm_responder]},
+
+        %% stream_chat_with_llm_sup: streaming chat (server-stream RPC)
+        %% First Phase 4 pilot of PLAN_MACULA_STREAMING.md
+        {stream_chat_with_llm_sup,
+            {stream_chat_with_llm_sup, start_link, []},
+            permanent, infinity, supervisor, [stream_chat_with_llm_sup]},
 
         %% get_available_llms_page_responder: handles list requests from mesh
         {get_available_llms_page_responder,

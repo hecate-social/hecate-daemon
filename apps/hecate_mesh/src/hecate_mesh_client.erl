@@ -17,7 +17,8 @@
 -export([get_client/0, get_status/0, publish/2, subscribe/2,
          unsubscribe/1, discover_subscribers/1, advertise/2, call/3, call/4]).
 -export([register_subscription/2, register_advertisement/2,
-         unregister_advertisement/1]).
+         unregister_advertisement/1,
+         register_stream_advertisement/3, call_stream/4]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -record(state, {
@@ -29,7 +30,8 @@
     connections :: pos_integer(),
     site :: map(),
     pending_subs :: [{binary(), fun()}],
-    pending_advs :: [{binary(), fun()}]
+    pending_advs :: [{binary(), fun()}],
+    pending_stream_advs = [] :: [{binary(), atom(), fun()}]
 }).
 
 %%====================================================================
@@ -60,6 +62,23 @@ register_subscription(Topic, Callback) ->
 -spec register_advertisement(binary(), fun()) -> ok.
 register_advertisement(Procedure, Handler) ->
     gen_server:cast(?MODULE, {register_adv, Procedure, Handler}).
+
+%% @doc Register a streaming-RPC advertisement to be applied when mesh
+%% activates. Mirrors register_advertisement/2 for the streaming surface
+%% added in macula 1.5.x. Mode is server_stream | client_stream | bidi.
+-spec register_stream_advertisement(binary(), atom(),
+        fun((pid(), term()) -> any())) -> ok.
+register_stream_advertisement(Procedure, Mode, Handler) ->
+    gen_server:cast(?MODULE, {register_stream_adv, Procedure, Mode, Handler}).
+
+%% @doc Open a streaming RPC against a remote procedure. Returns the
+%% client-side macula_stream pid. Caller drains chunks with
+%% macula:recv/1,2 or sends with macula:send/2,3.
+-spec call_stream(binary(), term(), map(), timeout()) ->
+        {ok, pid()} | {error, term()}.
+call_stream(Procedure, Args, _Opts, Timeout) ->
+    gen_server:call(?MODULE, {call_stream, Procedure, Args, Timeout},
+                    Timeout + 1000).
 
 %% @doc Retract a previously-registered advertisement.
 %% When the mesh isn't activated yet this clears any pending entry.
@@ -174,10 +193,12 @@ handle_call(activate, _From, #state{activated = true} = State) ->
 handle_call(activate, _From, #state{activated = false} = State) ->
     #state{relays = Relays, realm = Realm, identity = Identity,
            site = Site, connections = Connections,
-           pending_subs = PendingSubs, pending_advs = PendingAdvs} = State,
+           pending_subs = PendingSubs, pending_advs = PendingAdvs,
+           pending_stream_advs = PendingStreamAdvs} = State,
 
-    logger:info("[hecate_mesh] Activating mesh connection (~b relays, ~b pending subs, ~b pending advs)",
-                [length(Relays), length(PendingSubs), length(PendingAdvs)]),
+    logger:info("[hecate_mesh] Activating mesh connection (~b relays, ~b pending subs, ~b pending advs, ~b pending stream advs)",
+                [length(Relays), length(PendingSubs), length(PendingAdvs),
+                 length(PendingStreamAdvs)]),
 
     {ok, Client} = macula_multi_relay:start_link(#{
         relays => Relays,
@@ -188,14 +209,15 @@ handle_call(activate, _From, #state{activated = false} = State) ->
     }),
 
     %% Drain pending registrations (best-effort, don't crash on failure)
-    drain_pending(Client, PendingSubs, PendingAdvs),
+    drain_pending(Client, PendingSubs, PendingAdvs, PendingStreamAdvs),
 
     %% Run mesh proof ceremony (non-blocking)
     mesh_proof_coordinator:run_probes(),
 
     logger:info("[hecate_mesh] Mesh activated"),
     {reply, ok, State#state{client = Client, activated = true,
-                            pending_subs = [], pending_advs = []}};
+                            pending_subs = [], pending_advs = [],
+                            pending_stream_advs = []}};
 
 %% -- Status ------------------------------------------------------------
 
@@ -257,6 +279,16 @@ handle_call({rpc_call, Procedure, Args, Timeout}, _From, #state{client = Client}
     Result = safe_mesh_call(fun() -> macula_multi_relay:call(Client, Procedure, Args, Timeout) end),
     {reply, Result, State};
 
+handle_call({call_stream, _Procedure, _Args, _Timeout}, _From,
+            #state{activated = false} = State) ->
+    {reply, {error, not_activated}, State};
+handle_call({call_stream, Procedure, Args, Timeout}, _From,
+            #state{client = Client} = State) ->
+    Result = safe_mesh_call(fun() ->
+        macula_multi_relay:call_stream(Client, Procedure, Args, Timeout)
+    end),
+    {reply, Result, State};
+
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown}, State}.
 
@@ -272,6 +304,19 @@ handle_cast({register_adv, Procedure, Handler}, #state{activated = false} = Stat
     {noreply, State#state{pending_advs = [{Procedure, Handler} | State#state.pending_advs]}};
 handle_cast({register_adv, Procedure, Handler}, #state{client = Client} = State) ->
     spawn(fun() -> safe_mesh_call(fun() -> macula_multi_relay:advertise(Client, Procedure, Handler) end) end),
+    {noreply, State};
+
+handle_cast({register_stream_adv, Procedure, Mode, Handler},
+            #state{activated = false} = State) ->
+    Pending = [{Procedure, Mode, Handler} | State#state.pending_stream_advs],
+    {noreply, State#state{pending_stream_advs = Pending}};
+handle_cast({register_stream_adv, Procedure, Mode, Handler},
+            #state{client = Client} = State) ->
+    spawn(fun() ->
+        safe_mesh_call(fun() ->
+            macula_multi_relay:advertise_stream(Client, Procedure, Mode, Handler)
+        end)
+    end),
     {noreply, State};
 
 handle_cast({unregister_adv, Procedure}, #state{activated = false} = State) ->
@@ -408,7 +453,7 @@ terminate(_Reason, #state{client = Client}) ->
 %% Internal
 %%====================================================================
 
-drain_pending(Client, Subs, Advs) ->
+drain_pending(Client, Subs, Advs, StreamAdvs) ->
     lists:foreach(fun({Topic, Callback}) ->
         case safe_mesh_call(fun() -> macula_multi_relay:subscribe(Client, Topic, Callback) end) of
             {ok, _} -> logger:info("[hecate_mesh] Subscribed: ~s", [Topic]);
@@ -420,7 +465,13 @@ drain_pending(Client, Subs, Advs) ->
             {ok, _} -> logger:info("[hecate_mesh] Advertised: ~s", [Procedure]);
             {error, R} -> logger:warning("[hecate_mesh] Advertise ~s failed: ~p", [Procedure, R])
         end
-    end, Advs).
+    end, Advs),
+    lists:foreach(fun({Procedure, Mode, Handler}) ->
+        case safe_mesh_call(fun() -> macula_multi_relay:advertise_stream(Client, Procedure, Mode, Handler) end) of
+            ok -> logger:info("[hecate_mesh] Stream-advertised: ~s (mode=~p)", [Procedure, Mode]);
+            {error, R} -> logger:warning("[hecate_mesh] Stream-advertise ~s failed: ~p", [Procedure, R])
+        end
+    end, StreamAdvs).
 
 safe_mesh_call(Fun) ->
     try Fun()
