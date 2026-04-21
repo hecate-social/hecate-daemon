@@ -32,7 +32,7 @@
 fetch_and_store(MembershipId, Realm)
   when is_binary(MembershipId), byte_size(MembershipId) > 0,
        is_binary(Realm),        byte_size(Realm) > 0 ->
-    case hecate_mesh:call(?RPC_PROCEDURE, #{realm => Realm}, ?RPC_TIMEOUT) of
+    case call_mesh(Realm) of
         {ok, #{<<"version">> := V, <<"key_b64">> := KeyB64}} ->
             store_from_b64(MembershipId, Realm, V, KeyB64);
         {ok, #{version := V, key_b64 := KeyB64}} ->
@@ -48,6 +48,14 @@ fetch_and_store(_, _) ->
 %%====================================================================
 %% Internal
 %%====================================================================
+
+%% hecate_mesh_client may not be registered yet during event replay on
+%% boot. Defensive whereis avoids :noproc crash loops.
+call_mesh(Realm) ->
+    case erlang:whereis(hecate_mesh_client) of
+        undefined -> {error, mesh_not_ready};
+        _Pid      -> hecate_mesh:call(?RPC_PROCEDURE, #{realm => Realm}, ?RPC_TIMEOUT)
+    end.
 
 store_from_b64(MembershipId, Realm, Version, KeyB64) ->
     Plaintext = base64:decode(KeyB64),
