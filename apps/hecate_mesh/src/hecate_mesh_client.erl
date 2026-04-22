@@ -373,7 +373,8 @@ handle_info(do_join_with_token, #state{client = Client} = State) ->
         <<"site_id">> => SiteId
     },
     spawn(fun() ->
-        case catch macula:call(Client, <<"io.macula.realm.join_with_token">>, Args, 10000) of
+        Procedure = hecate_topics:realm_hope(<<"membership">>, <<"join_with_token">>, 1),
+        case catch macula:call(Client, Procedure, Args, 10000) of
             {ok, Result} ->
                 logger:info("[hecate_mesh] Realm join succeeded: ~p", [maps:get(<<"realm_id">>, Result, <<"?">>)]),
                 store_join_credentials(Result);

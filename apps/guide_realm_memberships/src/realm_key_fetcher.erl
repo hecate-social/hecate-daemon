@@ -21,7 +21,7 @@
 
 -export([fetch_and_store/2]).
 
--define(RPC_PROCEDURE, <<"io.macula.realm.get_shared_key">>).
+-define(RPC_PROCEDURE, hecate_topics:realm_hope(<<"identity">>, <<"get_shared_key">>, 1)).
 -define(RPC_TIMEOUT,   10000).
 
 -type result() :: {ok, pos_integer()} | {error, term()}.

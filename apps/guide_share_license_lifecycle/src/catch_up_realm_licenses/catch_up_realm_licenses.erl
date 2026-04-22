@@ -38,7 +38,9 @@
 %% Per-RPC page size.
 -define(BATCH_SIZE,         500).
 %% Replay RPC procedure name (realm server advertises this).
--define(REPLAY_PROC,        <<"io.macula.licenses.replay_events_v1">>).
+%% Org-tier: license schemas are owned by beam-campus, even though
+%% the realm authority happens to host the central replay endpoint.
+-define(REPLAY_PROC,        hecate_topics:org_hope(<<"licenses">>, <<"replay_events">>, 1)).
 
 -record(state, {
     timer_ref :: reference() | undefined

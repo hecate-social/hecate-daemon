@@ -19,7 +19,7 @@
 
 -export([dispatch_for/4]).
 
--define(PUBKEY_RPC, <<"io.macula.realm.get_member_public_keys">>).
+-define(PUBKEY_RPC, hecate_topics:realm_hope(<<"identity">>, <<"get_member_public_keys">>, 1)).
 -define(PUBKEY_RPC_TIMEOUT, 10000).
 
 -type recipient() :: realm | binary().
