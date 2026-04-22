@@ -13,7 +13,8 @@
         cowboy,
         shared,
         hecate_api,
-        hecate_mesh
+        hecate_mesh,
+        guide_share_license_lifecycle
     ]},
     {env, []},
     {modules, []},

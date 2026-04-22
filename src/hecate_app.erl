@@ -35,6 +35,7 @@
     {realm_memberships_store,   "realm_memberships",   "Realm Memberships (join, confirm, revoke)"},
     {llm_store,                 "llm",                 "LLM (detection, status reporting)"},
     {licenses_store,            "licenses",            "Licenses (consumer lifecycle)"},
+    {share_licenses_store,      "share_licenses",      "Share-Licenses (Phase D crypto grants)"},
     {license_offerings_store,   "license_offerings",   "License Offerings (author catalog)"},
     {procurements_store,        "procurements",        "Procurements (buying process)"},
     {sales_store,               "sales",               "Sales (selling process)"},

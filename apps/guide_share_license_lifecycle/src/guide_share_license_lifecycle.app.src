@@ -1,0 +1,11 @@
+{application, guide_share_license_lifecycle,
+ [{description, "Phase D share-license domain: issue/accept/end/rewrap with wrapped CEKs."},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, {guide_share_license_lifecycle_app, []}},
+  {applications, [kernel, stdlib, evoq, reckon_evoq, shared, hecate_mesh]},
+  {env, []},
+  {modules, []},
+  {licenses, ["Apache-2.0"]},
+  {links, []}
+ ]}.
