@@ -38,6 +38,43 @@ unknown_on_issued_test() ->
     ?assertEqual({error, unknown_command},
                  issued_license_aggregate:execute(State, #{command_type => bogus})).
 
+revoke_happy_test() ->
+    State = issued_state(<<"lic-1">>),
+    Payload = #{command_type => revoke_share_license_v1,
+                license_id   => <<"lic-1">>,
+                reason       => kicked,
+                revoked_at   => 5000},
+    {ok, [Event]} = issued_license_aggregate:execute(State, Payload),
+    ?assertEqual(<<"share_license_revoked_v1">>, maps:get(event_type, Event)),
+    ?assertEqual(<<"lic-1">>, maps:get(license_id, Event)),
+    %% enrich_from_state pulled grantee/realm/issuer_did off state:
+    ?assertEqual(<<"mri:realm:io.macula">>, maps:get(grantee, Event)),
+    ?assertEqual(<<"io.macula">>, maps:get(realm, Event)),
+    ?assertEqual(<<"mri:agent:io.macula/alice/host00">>, maps:get(issuer_did, Event)),
+    ?assertEqual(kicked, maps:get(reason, Event)),
+    ?assertEqual(5000, maps:get(revoked_at, Event)).
+
+revoke_before_issue_rejected_test() ->
+    State = issued_license_state:new(<<>>),
+    Payload = #{command_type => revoke_share_license_v1,
+                license_id   => <<"lic-1">>,
+                reason       => kicked},
+    ?assertEqual({error, license_not_issued},
+                 issued_license_aggregate:execute(State, Payload)).
+
+revoke_after_revoke_rejected_test() ->
+    State0 = issued_state(<<"lic-1">>),
+    RevEvt = #{event_type => <<"share_license_revoked_v1">>,
+               license_id => <<"lic-1">>,
+               reason     => kicked,
+               revoked_at => 5000},
+    State1 = issued_license_aggregate:apply(State0, RevEvt),
+    Payload = #{command_type => revoke_share_license_v1,
+                license_id   => <<"lic-1">>,
+                reason       => double_kicked},
+    ?assertEqual({error, license_revoked},
+                 issued_license_aggregate:execute(State1, Payload)).
+
 %% --- apply ---
 
 apply_issued_sets_issued_bit_test() ->
@@ -49,7 +86,7 @@ apply_issued_sets_issued_bit_test() ->
 
 apply_revoked_sets_revoked_bit_test() ->
     State0 = issued_state(<<"lic-r">>),
-    RevEvt = #{event_type => <<"license_revoked_v1">>,
+    RevEvt = #{event_type => <<"share_license_revoked_v1">>,
                license_id => <<"lic-r">>,
                reason     => <<"kicked">>,
                revoked_at => 9999},

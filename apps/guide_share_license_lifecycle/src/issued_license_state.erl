@@ -19,9 +19,9 @@ new(_AggregateId) ->
     #issued_license_state{status = 0}.
 
 -spec apply_event(state(), map()) -> state().
-apply_event(S, #{event_type := <<"license_issued_v1">>} = E)     -> apply_issued(E, S);
-apply_event(S, #{event_type := <<"license_revoked_v1">>} = E)    -> apply_revoked(E, S);
-apply_event(S, #{event_type := <<"license_rewrapped_v1">>} = E)  -> apply_rewrapped(E, S);
+apply_event(S, #{event_type := <<"license_issued_v1">>} = E)           -> apply_issued(E, S);
+apply_event(S, #{event_type := <<"share_license_revoked_v1">>} = E)    -> apply_revoked(E, S);
+apply_event(S, #{event_type := <<"license_rewrapped_v1">>} = E)        -> apply_rewrapped(E, S);
 apply_event(S, _E) -> S.
 
 -spec to_map(state()) -> map().

@@ -29,6 +29,7 @@
 -export([init_position_table/0]).
 
 -define(POSITION_TABLE, mesh_catch_up_positions).
+-define(POSITION_DETS_FILE, "catch_up_positions.dets").
 -define(BATCH_SIZE, 500).
 
 %%====================================================================
@@ -79,30 +80,48 @@ catch_up(_Realm, Domain, StreamKey, ProcessFn) ->
 %% Position tracking
 %%====================================================================
 
-%% @doc Initialize the ETS position table. Call once at app startup.
+%% @doc Initialize the position table. ETS fronts an optional dets file
+%% so positions survive daemon restarts without re-replaying from zero.
+%%
+%% Resolution:
+%%   1. If `shared_paths:run_dir/0' exists (production daemon), open
+%%      dets at `{run_dir}/catch_up_positions.dets' and seed ETS.
+%%   2. Otherwise (tests, REPL, early boot), run in ETS-only mode — no
+%%      persistence but no crash either.
+%%
+%% Safe to call multiple times; re-opens the existing dets file.
 -spec init_position_table() -> ok.
 init_position_table() ->
-    case ets:whereis(?POSITION_TABLE) of
-        undefined ->
-            ets:new(?POSITION_TABLE, [named_table, public, set, {read_concurrency, true}]),
-            ok;
-        _ ->
-            ok
-    end.
+    ensure_ets(),
+    ensure_dets(),
+    seed_ets_from_dets(),
+    ok.
 
 %% @doc Get the last processed position for a stream key.
 -spec get_position(binary()) -> non_neg_integer().
 get_position(StreamKey) ->
-    case ets:lookup(?POSITION_TABLE, StreamKey) of
-        [{_, Pos}] -> Pos;
-        [] -> 0
+    case ets_whereis() of
+        undefined -> 0;
+        _ ->
+            case ets:lookup(?POSITION_TABLE, StreamKey) of
+                [{_, Pos}] -> Pos;
+                [] -> 0
+            end
     end.
 
-%% @doc Save the last processed position for a stream key.
+%% @doc Save the last processed position for a stream key. Write-through
+%% to dets when the dets file is open; otherwise ETS-only.
 -spec save_position(binary(), non_neg_integer()) -> ok.
 save_position(StreamKey, Position) ->
+    ensure_ets(),
     ets:insert(?POSITION_TABLE, {StreamKey, Position}),
-    ok.
+    case dets_open() of
+        false -> ok;
+        true  ->
+            _ = dets:insert(?POSITION_TABLE, {StreamKey, Position}),
+            _ = dets:sync(?POSITION_TABLE),
+            ok
+    end.
 
 %%====================================================================
 %% Internal
@@ -175,3 +194,66 @@ event_to_map({event, _Id, EventType, StreamId, Version, Data, Metadata, _Tags, _
 event_to_map(Other) ->
     ?LOG_WARNING("[catch_up] Unknown event format: ~p", [Other]),
     #{raw => Other}.
+
+%%====================================================================
+%% Persistence helpers
+%%====================================================================
+
+ensure_ets() ->
+    case ets_whereis() of
+        undefined ->
+            _ = ets:new(?POSITION_TABLE,
+                        [named_table, public, set, {read_concurrency, true}]),
+            ok;
+        _ ->
+            ok
+    end.
+
+ets_whereis() -> ets:whereis(?POSITION_TABLE).
+
+ensure_dets() ->
+    case dets_file_path() of
+        undefined -> ok;
+        Path ->
+            _ = filelib:ensure_dir(Path),
+            case dets:info(?POSITION_TABLE) of
+                undefined ->
+                    case dets:open_file(?POSITION_TABLE,
+                                        [{file, Path},
+                                         {type, set},
+                                         {keypos, 1}]) of
+                        {ok, _} -> ok;
+                        {error, Reason} ->
+                            ?LOG_WARNING("[catch_up] dets open failed ~s: ~p",
+                                         [Path, Reason]),
+                            ok
+                    end;
+                _ ->
+                    ok
+            end
+    end.
+
+seed_ets_from_dets() ->
+    case dets_open() of
+        false -> ok;
+        true ->
+            Entries = dets:match_object(?POSITION_TABLE, {'_', '_'}),
+            lists:foreach(
+                fun({K, V}) -> ets:insert(?POSITION_TABLE, {K, V}) end,
+                Entries),
+            ok
+    end.
+
+dets_open() ->
+    dets:info(?POSITION_TABLE) =/= undefined.
+
+dets_file_path() ->
+    %% shared_paths:run_dir/0 resolves ~/.hecate/hecate-daemon/run in
+    %% production; in tests the HECATE_HOME env var may point somewhere
+    %% ephemeral. Any failure → ETS-only mode (no persistence).
+    try shared_paths:run_dir() of
+        Dir when is_list(Dir); is_binary(Dir) ->
+            filename:join(Dir, ?POSITION_DETS_FILE)
+    catch
+        _:_ -> undefined
+    end.

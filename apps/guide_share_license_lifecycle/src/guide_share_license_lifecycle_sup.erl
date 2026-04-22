@@ -21,6 +21,9 @@ init([]) ->
         emitter(license_accepted_v1_to_pg),
         emitter(license_ended_v1_to_pg),
 
+        %% Single-event mesh emitter: issuer-side revoke → mesh FACT.
+        emitter(share_license_revoked_v1_to_mesh),
+
         %% Batched mesh emitter: gen_server owns the buffer + flush
         %% timer; evoq handler `license_issued_v1_to_batch` forwards
         %% incoming events to it via cast.
@@ -40,7 +43,14 @@ init([]) ->
         #{id => listen_for_license_revoked,
           start => {listen_for_license_revoked, start_link, []},
           restart => permanent, shutdown => 5000, type => worker,
-          modules => [listen_for_license_revoked]}
+          modules => [listen_for_license_revoked]},
+
+        %% Reconnect-catch-up worker — polls realm server's replay RPC
+        %% and reissues accept/end dispatches for events missed offline.
+        #{id => catch_up_realm_licenses,
+          start => {catch_up_realm_licenses, start_link, []},
+          restart => permanent, shutdown => 5000, type => worker,
+          modules => [catch_up_realm_licenses]}
     ],
     {ok, {SupFlags, Children}}.
 

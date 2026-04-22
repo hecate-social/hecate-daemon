@@ -18,5 +18,10 @@
     k_realm_received_at   :: integer() | undefined,
     %% X25519 encryption pubkey announced to the realm directory.
     identity_pubkey_announced_at :: integer() | undefined,
+    %% End / resign fields (terminal transitions — Phase D).
+    ended_at              :: integer() | undefined,
+    end_reason            :: atom() | undefined,           %% :revoked | :resigned | :banned
+    ended_by              :: binary() | undefined,         %% DID (admin for revoke, self for resign)
+    resigned_at           :: integer() | undefined,
     status                :: non_neg_integer()
 }).

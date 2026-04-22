@@ -50,12 +50,19 @@ execute(#issued_license_state{status = 0}, Payload) ->
         _                -> {error, license_not_issued}
     end;
 
-%% Already issued — reject re-issue.
-execute(#issued_license_state{status = S}, Payload)
+%% Already revoked — terminal.
+execute(#issued_license_state{status = S}, _Payload)
+  when S band ?SL_REVOKED =/= 0 ->
+    {error, license_revoked};
+
+%% Issued + active — accept issue (reject) / revoke / rewrap (Session 4).
+execute(#issued_license_state{status = S} = State, Payload)
   when S band ?SL_ISSUED =/= 0 ->
     case command_type(Payload) of
-        issue_license_v1 -> {error, already_issued};
-        _                -> {error, unknown_command}
+        issue_license_v1         -> {error, already_issued};
+        revoke_share_license_v1  -> maybe_revoke_share_license:handle_from_map(
+                                        enrich_from_state(Payload, State));
+        _                        -> {error, unknown_command}
     end;
 
 execute(_State, _Payload) ->
@@ -72,3 +79,15 @@ apply(State, Event) ->
 command_type(#{command_type := T}) when is_atom(T) -> T;
 command_type(#{command_type := T}) when is_binary(T) -> binary_to_existing_atom(T, utf8);
 command_type(_) -> undefined.
+
+%% @private Enrich the revoke payload with fields already on state so the
+%% mesh FACT can carry grantee / realm / issuer_did without the caller
+%% needing to know them.
+enrich_from_state(Payload, #issued_license_state{} = S) ->
+    Defaults = #{
+        license_id => S#issued_license_state.license_id,
+        grantee    => S#issued_license_state.grantee,
+        realm      => S#issued_license_state.realm,
+        issuer_did => S#issued_license_state.issuer_did
+    },
+    maps:merge(Defaults, Payload).

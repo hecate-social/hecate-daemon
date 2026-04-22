@@ -69,24 +69,35 @@ do_execute(secure_realm_credentials, State, Payload) ->
             end
     end;
 
-do_execute(revoke_realm_membership, State, Payload) ->
+do_execute(end_realm_membership_v1, State, Payload) ->
     case State#membership_state.status band ?MEMBERSHIP_CONFIRMED of
         0 -> {error, not_confirmed};
         _ ->
-            case State#membership_state.status band ?MEMBERSHIP_REVOKED of
-                0 -> maybe_revoke_realm_membership:handle_from_map(Payload);
-                _ -> {error, already_revoked}
+            case State#membership_state.status band ?MEMBERSHIP_ENDED of
+                0 -> maybe_end_realm_membership:handle_from_map(Payload);
+                _ -> {error, already_ended}
+            end
+    end;
+
+do_execute(resign_realm_membership_v1, State, Payload) ->
+    case State#membership_state.status band ?MEMBERSHIP_CONFIRMED of
+        0 -> {error, not_confirmed};
+        _ ->
+            case State#membership_state.status band ?MEMBERSHIP_ENDED of
+                0 -> maybe_resign_realm_membership:handle_from_map(
+                         enrich_resign(Payload, State));
+                _ -> {error, already_ended}
             end
     end;
 
 do_execute(store_realm_shared_key, State, Payload) ->
-    %% Acceptable once the realm is confirmed and not revoked. Re-storing
-    %% is permitted — that's how rotation lands (new version, new bytes).
+    %% Acceptable once the realm is confirmed and not ended. Re-storing is
+    %% permitted — that's how rotation lands (new version, new bytes).
     Confirmed = (State#membership_state.status band ?MEMBERSHIP_CONFIRMED) =/= 0,
-    Revoked   = (State#membership_state.status band ?MEMBERSHIP_REVOKED)   =/= 0,
-    case {Confirmed, Revoked} of
+    Ended     = (State#membership_state.status band ?MEMBERSHIP_ENDED)     =/= 0,
+    case {Confirmed, Ended} of
         {false, _}    -> {error, not_confirmed};
-        {true,  true} -> {error, membership_revoked};
+        {true,  true} -> {error, membership_ended};
         {true,  false} -> maybe_store_realm_shared_key:handle_from_map(Payload)
     end;
 
@@ -95,13 +106,30 @@ do_execute(announce_identity_public_key, State, Payload) ->
     %% re-announcing is a no-op because the aggregate rejects it.
     KeyStored = (State#membership_state.status band ?REALM_KEY_STORED) =/= 0,
     Announced = (State#membership_state.status band ?IDENTITY_PUBKEY_ANNOUNCED) =/= 0,
-    Revoked   = (State#membership_state.status band ?MEMBERSHIP_REVOKED) =/= 0,
-    case {KeyStored, Announced, Revoked} of
+    Ended     = (State#membership_state.status band ?MEMBERSHIP_ENDED) =/= 0,
+    case {KeyStored, Announced, Ended} of
         {false, _,    _}    -> {error, realm_key_not_stored};
-        {_,     _,    true} -> {error, membership_revoked};
+        {_,     _,    true} -> {error, membership_ended};
         {true,  true, _}    -> {error, already_announced};
         {true,  false, false} -> maybe_announce_identity_public_key:handle_from_map(Payload)
     end;
 
 do_execute(_Unknown, _State, _Payload) ->
     {error, unknown_command}.
+
+%% @private Enrich resign payload with realm_id + member_did (own MRI)
+%% already present on the aggregate, so the emitter and terminal event
+%% can reference them without the caller needing to know.
+enrich_resign(Payload, #membership_state{} = S) ->
+    MemberDid = case erlang:whereis(hecate_identity) of
+        undefined -> undefined;
+        _ -> case hecate_identity:get_mri() of
+                 {ok, Mri}       -> Mri;
+                 not_initialized -> undefined
+             end
+    end,
+    Defaults = #{
+        realm_id   => S#membership_state.realm_id,
+        member_did => MemberDid
+    },
+    maps:merge(Defaults, Payload).

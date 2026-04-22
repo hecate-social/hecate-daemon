@@ -32,6 +32,10 @@ new(_AggregateId) ->
         k_realm_encrypted = undefined,
         k_realm_received_at = undefined,
         identity_pubkey_announced_at = undefined,
+        ended_at = undefined,
+        end_reason = undefined,
+        ended_by = undefined,
+        resigned_at = undefined,
         status = 0
     }.
 
@@ -61,6 +65,10 @@ to_map(#membership_state{} = S) ->
         k_realm_received_at   => S#membership_state.k_realm_received_at,
         identity_pubkey_announced_at =>
             S#membership_state.identity_pubkey_announced_at,
+        ended_at              => S#membership_state.ended_at,
+        end_reason            => S#membership_state.end_reason,
+        ended_by              => S#membership_state.ended_by,
+        resigned_at           => S#membership_state.resigned_at,
         status                => S#membership_state.status
     }.
 
@@ -92,10 +100,43 @@ do_apply(<<"realm_credentials_secured_v1">>, State, Event) ->
         status = State#membership_state.status bor ?CREDENTIALS_SECURED
     };
 
+%% Historical event — pre-Phase-D streams stored
+%% `realm_membership_revoked_v1`. Upcast on replay so state carries the
+%% new end-of-life fields while retaining MEMBERSHIP_REVOKED for audit.
 do_apply(<<"realm_membership_revoked_v1">>, State, Event) ->
+    At = get_field(<<"revoked_at">>, revoked_at, Event),
     State#membership_state{
-        revoked_at = get_field(<<"revoked_at">>, revoked_at, Event),
-        status = State#membership_state.status bor ?MEMBERSHIP_REVOKED
+        revoked_at = At,
+        ended_at   = At,
+        end_reason = revoked,
+        status     = State#membership_state.status
+                         bor ?MEMBERSHIP_REVOKED
+                         bor ?MEMBERSHIP_ENDED
+    };
+
+do_apply(<<"realm_membership_ended_v1">>, State, Event) ->
+    At = get_field(<<"ended_at">>, ended_at, Event),
+    Reason = normalize_reason(get_field(<<"reason">>, reason, Event)),
+    EndedBy = get_field(<<"ended_by">>, ended_by, Event),
+    Status0 = State#membership_state.status bor ?MEMBERSHIP_ENDED,
+    Status = case Reason of
+        revoked -> Status0 bor ?MEMBERSHIP_REVOKED;
+        _       -> Status0
+    end,
+    State#membership_state{
+        ended_at   = At,
+        end_reason = Reason,
+        ended_by   = EndedBy,
+        revoked_at = revoked_timestamp(State#membership_state.revoked_at,
+                                        Reason, At),
+        status     = Status
+    };
+
+do_apply(<<"realm_membership_resigned_v1">>, State, Event) ->
+    At = get_field(<<"resigned_at">>, resigned_at, Event),
+    State#membership_state{
+        resigned_at = At,
+        status      = State#membership_state.status bor ?MEMBERSHIP_RESIGNED
     };
 
 do_apply(<<"realm_shared_key_stored_v1">>, State, Event) ->
@@ -122,3 +163,13 @@ do_apply(_UnknownType, State, _Event) ->
 
 get_field(BinKey, AtomKey, Event) ->
     maps:get(BinKey, Event, maps:get(AtomKey, Event, undefined)).
+
+normalize_reason(A) when is_atom(A) -> A;
+normalize_reason(B) when is_binary(B) ->
+    try binary_to_existing_atom(B, utf8)
+    catch _:_ -> revoked
+    end;
+normalize_reason(_) -> revoked.
+
+revoked_timestamp(Existing, revoked, At) when Existing =:= undefined -> At;
+revoked_timestamp(Existing, _Other,  _At) -> Existing.
