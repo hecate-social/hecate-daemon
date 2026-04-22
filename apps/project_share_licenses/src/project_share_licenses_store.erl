@@ -31,11 +31,13 @@
          list_active_for_realm_version/2,
          list_all/0,
          get_accepted_by_file_id/1,
-         list_accepted/0]).
+         list_accepted/0,
+         get_issued_file/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(TABLE, my_issued_realm_scoped_active_licenses).
 -define(ACCEPTED_TABLE, my_accepted_share_licenses).
+-define(FILES_TABLE, my_issued_files).
 
 -spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
@@ -100,6 +102,20 @@ list_accepted() ->
         _ -> {ok, [E || {_, E} <- ets:tab2list(?ACCEPTED_TABLE)]}
     end.
 
+%% @doc Issuer-side per-file index entry. Returns the sealed CEK +
+%% realm + issuer for a file this daemon has shared. Used by the
+%% encrypt-on-serve path.
+-spec get_issued_file(binary()) -> {ok, map()} | {error, not_found}.
+get_issued_file(FileId) when is_binary(FileId) ->
+    case ets:whereis(?FILES_TABLE) of
+        undefined -> {error, not_found};
+        _ ->
+            case ets:lookup(?FILES_TABLE, FileId) of
+                [{_, Entry}] -> {ok, Entry};
+                []           -> {error, not_found}
+            end
+    end.
+
 %%====================================================================
 %% gen_server (ETS owner)
 %%====================================================================
@@ -107,6 +123,7 @@ list_accepted() ->
 init([]) ->
     ensure_table(?TABLE),
     ensure_table(?ACCEPTED_TABLE),
+    ensure_table(?FILES_TABLE),
     {ok, #{}}.
 
 ensure_table(Name) ->

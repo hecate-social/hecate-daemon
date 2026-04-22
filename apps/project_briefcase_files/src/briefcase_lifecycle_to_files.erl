@@ -16,7 +16,9 @@ interested_in() ->
     [<<"file_uploaded_v1">>,
      <<"file_shared_v1">>,
      <<"file_unshared_v1">>,
-     <<"file_announced_v1">>].
+     <<"file_announced_v1">>,
+     <<"file_cached_v1">>,
+     <<"file_evicted_v1">>].
 
 init(_Config) ->
     {ok, RM} = evoq_read_model:new(evoq_read_model_ets, #{name => ?TABLE}),
@@ -28,6 +30,8 @@ project(#{data := Data} = Event, _Metadata, State, RM) ->
         <<"file_shared_v1">>    -> project_privacy_change(Data, <<"shared">>, State, RM);
         <<"file_unshared_v1">>  -> project_privacy_change(Data, <<"private">>, State, RM);
         <<"file_announced_v1">> -> project_file_announced(Data, State, RM);
+        <<"file_cached_v1">>    -> project_file_cached(Data, State, RM);
+        <<"file_evicted_v1">>   -> project_file_evicted(Data, State, RM);
         _                       -> {ok, State, RM}
     end.
 
@@ -76,6 +80,48 @@ project_file_announced(Data, State, RM) ->
     },
     {ok, RM2} = evoq_read_model:put(FileId, Entry, RM),
     {ok, State, RM2}.
+
+%% ===================================================================
+%% file_cached_v1 — ciphertext downloaded + persisted locally
+%% ===================================================================
+
+project_file_cached(Data, State, RM) ->
+    FileId = gf(file_id, Data),
+    case evoq_read_model:get(FileId, RM) of
+        {ok, Entry} ->
+            Updated = Entry#{
+                presence     => <<"cached">>,
+                status_label => <<"Cached">>,
+                cache_size   => gf(cache_size, Data),
+                cached_at    => gf(cached_at, Data),
+                source_realm => gf(source_realm, Data)
+            },
+            {ok, RM2} = evoq_read_model:put(FileId, Updated, RM),
+            {ok, State, RM2};
+        {error, not_found} ->
+            {ok, State, RM}
+    end.
+
+%% ===================================================================
+%% file_evicted_v1 — cached ciphertext removed from disk
+%% ===================================================================
+
+project_file_evicted(Data, State, RM) ->
+    FileId = gf(file_id, Data),
+    case evoq_read_model:get(FileId, RM) of
+        {ok, Entry} ->
+            Cleared = maps:without([cache_size, cached_at, source_realm],
+                                   Entry),
+            Updated = Cleared#{
+                presence     => <<"remote">>,
+                status_label => <<"Placeholder">>,
+                evicted_at   => gf(evicted_at, Data)
+            },
+            {ok, RM2} = evoq_read_model:put(FileId, Updated, RM),
+            {ok, State, RM2};
+        {error, not_found} ->
+            {ok, State, RM}
+    end.
 
 %% ===================================================================
 %% file_shared_v1 / file_unshared_v1 — flip the privacy flag

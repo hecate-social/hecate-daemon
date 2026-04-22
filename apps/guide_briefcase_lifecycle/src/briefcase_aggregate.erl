@@ -73,5 +73,32 @@ do_execute(announce_file_v1, State, Payload) ->
         _ -> {error, already_present}
     end;
 
+%% Phase E: pull ciphertext from a peer. Requires the file to have
+%% been announced locally. Idempotent: a second download against an
+%% already-cached file is rejected (re-cache = evict + download).
+%% Locally-uploaded files are owned, never downloaded — that check
+%% runs first so the returned error is informative.
+do_execute(download_file_v1, State, Payload) ->
+    Status = State#briefcase_state.status,
+    Announced = (Status band ?FILE_ANNOUNCED) =/= 0,
+    Cached    = (Status band ?FILE_CACHED)    =/= 0,
+    Uploaded  = (Status band ?FILE_UPLOADED)  =/= 0,
+    if
+        Uploaded       -> {error, locally_uploaded};
+        not Announced  -> {error, not_announced};
+        Cached         -> {error, already_cached};
+        true           -> maybe_download_file:handle_with_state(Payload, State)
+    end;
+
+%% Phase E: drop cached ciphertext from disk. Valid only on
+%% FILE_CACHED files (remote + cached). Emitting file_evicted_v1
+%% clears the bit — a re-download re-fills the cache.
+do_execute(evict_file_v1, State, Payload) ->
+    Status = State#briefcase_state.status,
+    case (Status band ?FILE_CACHED) =/= 0 of
+        true  -> maybe_evict_file:handle_with_state(Payload, State);
+        false -> {error, not_cached}
+    end;
+
 do_execute(_Unknown, _State, _Payload) ->
     {error, unknown_command}.

@@ -12,6 +12,30 @@
 -define(PROC, <<"test.briefcase.get_chunk_stream">>).
 %% Use a 32-hex-char file_id (matches BLAKE3 truncation pattern).
 -define(FILE_ID, <<"deadbeef00112233445566778899aabb">>).
+-define(FILES_TABLE, my_issued_files).
+
+%% @private Register a CEK for ?FILE_ID in the my_issued_files ETS so
+%% the encrypt-on-serve path can look it up. Returns the plaintext
+%% CEK so tests can decrypt what they receive.
+seed_cek(FileId) ->
+    case ets:info(?FILES_TABLE) of
+        undefined -> ets:new(?FILES_TABLE, [public, named_table, set]);
+        _         -> ok
+    end,
+    Cek = crypto:strong_rand_bytes(32),
+    {ok, Sealed} = hecate_crypto:encrypt(Cek),
+    ets:insert(?FILES_TABLE, {FileId,
+                              #{file_id => FileId,
+                                origin_cek_sealed => Sealed,
+                                realm => <<"io.macula">>,
+                                issuer_did => <<"test">>}}),
+    Cek.
+
+clear_cek(FileId) ->
+    case ets:info(?FILES_TABLE) of
+        undefined -> ok;
+        _         -> ets:delete(?FILES_TABLE, FileId)
+    end.
 
 setup() ->
     {ok, _} = application:ensure_all_started(macula),
@@ -33,6 +57,7 @@ setup() ->
 teardown({TmpDir, OldHome}) ->
     [macula:unadvertise_stream(P)
      || {P, _} <- macula_stream_local:list_advertised()],
+    clear_cek(?FILE_ID),
     case OldHome of
         false -> os:unsetenv("HECATE_HOME");
         _ -> os:putenv("HECATE_HOME", OldHome)
@@ -49,27 +74,28 @@ with_setup(Tests) ->
 
 stream_small_file_test_() ->
     with_setup([
-        {"single chunk file streams in one chunk then eof",
+        {"single chunk file streams as one encrypted frame + eof",
          fun() ->
+             Cek = seed_cek(?FILE_ID),
              ok = briefcase_content_store:put(?FILE_ID, <<"hello world">>),
              {ok, S} = macula:call_stream(?PROC,
                  #{<<"file_id">> => ?FILE_ID}),
-             ?assertEqual({chunk, <<"hello world">>},
-                          macula:recv(S, 1000)),
-             ?assertEqual(eof, macula:recv(S, 1000))
+             Plaintext = drain_and_decrypt(S, Cek),
+             ?assertEqual(<<"hello world">>, Plaintext)
          end}
     ]).
 
 stream_multi_chunk_file_test_() ->
     with_setup([
-        {"file > 64KB streams as multiple chunks",
+        {"file > 64KB streams as multiple encrypted frames",
          fun() ->
+             Cek = seed_cek(?FILE_ID),
              %% 200 KB of repeating bytes — 4 chunks of 64 KB + remainder
              Bytes = binary:copy(<<"x">>, 200 * 1024),
              ok = briefcase_content_store:put(?FILE_ID, Bytes),
              {ok, S} = macula:call_stream(?PROC,
                  #{<<"file_id">> => ?FILE_ID}),
-             Reassembled = drain(S, <<>>, 0),
+             Reassembled = drain_and_decrypt(S, Cek),
              ?assertEqual(Bytes, Reassembled)
          end}
     ]).
@@ -78,9 +104,23 @@ missing_file_test_() ->
     with_setup([
         {"unknown file_id aborts with not_available",
          fun() ->
+             %% File absent — CEK lookup never runs.
              {ok, S} = macula:call_stream(?PROC,
                  #{<<"file_id">> => <<"nonexistent000000000000000000000">>}),
              ?assertMatch({error, {<<"not_available">>, _}},
+                          macula:recv(S, 1000))
+         end}
+    ]).
+
+no_cek_test_() ->
+    with_setup([
+        {"file present but no CEK in my_issued_files aborts with no_cek",
+         fun() ->
+             ok = briefcase_content_store:put(?FILE_ID, <<"payload">>),
+             clear_cek(?FILE_ID),
+             {ok, S} = macula:call_stream(?PROC,
+                 #{<<"file_id">> => ?FILE_ID}),
+             ?assertMatch({error, {<<"no_cek">>, _}},
                           macula:recv(S, 1000))
          end}
     ]).
@@ -106,11 +146,35 @@ bad_request_test_() ->
 %%% Helpers
 %%% ===================================================================
 
-drain(Stream, Acc, Chunks) ->
+%% Drain the stream, decoding each chunk as a hecate_file_frame and
+%% decrypting with `Cek`. Partial-frame reassembly for the case where
+%% a macula chunk ends mid-frame.
+drain_and_decrypt(Stream, Cek) ->
+    drain_loop(Stream, Cek, <<>>, <<>>, 0).
+
+drain_loop(Stream, Cek, Buf, Plain, Chunks) ->
     case macula:recv(Stream, 2000) of
-        {chunk, Bin} -> drain(Stream, <<Acc/binary, Bin/binary>>, Chunks + 1);
+        {chunk, Bin} ->
+            NewBuf = <<Buf/binary, Bin/binary>>,
+            {NewBuf2, NewPlain, NewChunks} =
+                peel_frames(NewBuf, Cek, Plain, Chunks),
+            drain_loop(Stream, Cek, NewBuf2, NewPlain, NewChunks);
         eof ->
-            ?assert(Chunks >= 4),  %% 200 KB / 64 KB ≥ 4 chunks
-            Acc;
-        Other -> erlang:error({unexpected, Other})
+            ?assert(Chunks >= 1),
+            Plain;
+        Other ->
+            erlang:error({unexpected, Other})
+    end.
+
+peel_frames(Buf, Cek, Plain, Chunks) ->
+    case hecate_file_frame:decode_frame(Buf) of
+        {ok, Envelope, Rest} ->
+            {ok, Pt} = hecate_file_frame:decrypt_envelope(Cek, Envelope),
+            peel_frames(Rest, Cek, <<Plain/binary, Pt/binary>>, Chunks + 1);
+        eof ->
+            %% Zero-length frame — upstream will get a matching eof
+            %% from macula shortly.
+            {<<>>, Plain, Chunks};
+        {more, _Needed} ->
+            {Buf, Plain, Chunks}
     end.

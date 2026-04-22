@@ -9,7 +9,9 @@
         cowboy,
         shared,
         hecate_api,
-        project_briefcase_files
+        project_briefcase_files,
+        project_share_licenses,
+        guide_briefcase_lifecycle
     ]},
     {env, []},
     {modules, []},

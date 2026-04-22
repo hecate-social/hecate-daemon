@@ -3,25 +3,32 @@
 %%% Server-stream variant of serve_file_content_rpc:get_chunk. The
 %%% legacy unary call returns the whole file in one reply map — fine
 %%% for tiny config files, hostile beyond a few MB. This streaming
-%%% variant reads the file in fixed-size chunks and emits each as a
-%%% raw STREAM_DATA frame, so a 1 GB file moves with stable memory on
-%%% both sides.
+%%% variant reads the file in fixed-size plaintext chunks, AES-256-GCM
+%%% encrypts each with the per-file CEK, and emits the resulting
+%%% framed envelopes as STREAM_DATA frames. A 1 GB file moves with
+%%% stable memory on both sides AND ciphertext is all that crosses
+%%% the wire — the serving daemon's CEK plaintext never leaves
+%%% process memory.
 %%%
-%%% Phase 4 pilot consumer of PLAN_MACULA_STREAMING.md.
+%%% Phase 4 pilot consumer of PLAN_MACULA_STREAMING.md + Phase E
+%%% encrypt-on-serve (PLAN_BRIEFCASE_PRESENCE_PRIVACY.md).
 %%%
 %%% Args (open payload):
 %%%   #{ <<"file_id">> => binary() }
 %%%
-%%% Stream chunks: raw bytes (encoding=raw). Each chunk is at most
-%%% ?CHUNK_BYTES bytes. EOF on file end. STREAM_ERROR with code
-%%% not_available if the file isn't present locally.
+%%% Stream format: `hecate_file_frame` frames — each frame is
+%%% `u32 length | nonce:12 | tag:16 | ciphertext`. EOF is an explicit
+%%% zero-length frame. STREAM_ERROR with code `not_available` if the
+%%% file isn't present locally, `no_cek` if the per-file CEK isn't in
+%%% the `my_issued_files` index (file was never licensed by this
+%%% daemon).
 -module(stream_file_content_rpc).
 
 -export([procedure/1, handle/2, register/0]).
 
-%% 64 KB matches typical QUIC stream MTU + leaves headroom for relay
-%% framing overhead. Same chunk ceiling as the streaming-plan
-%% recommendation (PLAN_MACULA_STREAMING.md "frame size cap").
+%% 64 KB plaintext per chunk. Envelope adds 12 + 16 = 28 bytes nonce
+%% + tag, so wire chunk is at most 65564 bytes plus the 4-byte length
+%% prefix. Matches the PLAN_MACULA_STREAMING.md frame-size cap.
 -define(CHUNK_BYTES, 65536).
 
 -spec procedure(binary()) -> binary().
@@ -68,14 +75,36 @@ stream_file(Stream, FileId) ->
             macula:abort(Stream, <<"not_available">>, <<"file not present">>),
             ok;
         true ->
-            Path = briefcase_content_store:content_path(FileId),
-            stream_path(Stream, Path)
+            with_cek(Stream, FileId, fun(Cek) ->
+                Path = briefcase_content_store:content_path(FileId),
+                stream_path(Stream, Path, Cek)
+            end)
     end.
 
-stream_path(Stream, Path) ->
+%% @private Look up + unseal the per-file CEK; abort the stream with
+%% an informative error code if unavailable. Plaintext CEK lives only
+%% inside `Fn`'s scope and never escapes this module.
+with_cek(Stream, FileId, Fn) ->
+    case hecate_file_cek:sealed(FileId) of
+        {ok, Sealed} ->
+            case hecate_file_cek:unseal(Sealed) of
+                {ok, Cek} ->
+                    Fn(Cek);
+                {error, Reason} ->
+                    macula:abort(Stream, <<"cek_unseal_failed">>,
+                                 iolist_to_binary(io_lib:format("~p", [Reason]))),
+                    ok
+            end;
+        {error, not_found} ->
+            macula:abort(Stream, <<"no_cek">>,
+                         <<"file has no issued CEK on this daemon">>),
+            ok
+    end.
+
+stream_path(Stream, Path, Cek) ->
     case file:open(Path, [read, binary, raw]) of
         {ok, Fd} ->
-            Result = pump(Stream, Fd),
+            Result = pump(Stream, Fd, Cek),
             ok = file:close(Fd),
             finalize(Stream, Result);
         {error, Reason} ->
@@ -84,18 +113,22 @@ stream_path(Stream, Path) ->
             ok
     end.
 
-pump(Stream, Fd) ->
+pump(Stream, Fd, Cek) ->
     case file:read(Fd, ?CHUNK_BYTES) of
         eof -> ok;
         {ok, Chunk} ->
-            case macula:send(Stream, Chunk) of
-                ok -> pump(Stream, Fd);
+            Frame = hecate_file_frame:encode_chunk(Cek, Chunk),
+            case macula:send(Stream, Frame) of
+                ok -> pump(Stream, Fd, Cek);
                 {error, _} = Err -> Err
             end;
         {error, _} = Err -> Err
     end.
 
 finalize(Stream, ok) ->
+    %% Emit explicit EOF frame before closing so peers can distinguish
+    %% clean end-of-stream from a truncated transfer.
+    _ = macula:send(Stream, hecate_file_frame:encode_eof()),
     macula:close(Stream),
     ok;
 finalize(_Stream, {error, _Reason}) ->

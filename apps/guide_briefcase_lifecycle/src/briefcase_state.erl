@@ -68,6 +68,10 @@ do_apply(<<"file_announced_v1">>, State, #{data := Data}) ->
     apply_file_announced(State, Data);
 do_apply(<<"file_announced_v1">>, State, Data) ->
     apply_file_announced(State, Data);
+do_apply(<<"file_cached_v1">>, State, _Event) ->
+    apply_file_cached(State);
+do_apply(<<"file_evicted_v1">>, State, _Event) ->
+    apply_file_evicted(State);
 do_apply(_UnknownEventType, State, _Event) ->
     State.
 
@@ -107,6 +111,16 @@ apply_file_announced(State, Data) ->
         author_did   = gf(author_did,   Data, State#briefcase_state.author_did),
         uploaded_at  = gf(announced_at, Data, State#briefcase_state.uploaded_at),
         status       = evoq_bit_flags:set(State#briefcase_state.status, ?FILE_ANNOUNCED)
+    }.
+
+apply_file_cached(State) ->
+    State#briefcase_state{
+        status = evoq_bit_flags:set(State#briefcase_state.status, ?FILE_CACHED)
+    }.
+
+apply_file_evicted(State) ->
+    State#briefcase_state{
+        status = evoq_bit_flags:unset(State#briefcase_state.status, ?FILE_CACHED)
     }.
 
 %% @private Get field from map with default (atom or binary key).
