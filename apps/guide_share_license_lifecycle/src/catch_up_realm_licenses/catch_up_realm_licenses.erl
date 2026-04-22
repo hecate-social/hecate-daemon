@@ -7,7 +7,12 @@
 %%%
 %%%   - `license_issued_v1`         → `accept_license_v1` (if own MRI)
 %%%   - `share_license_revoked_v1`  → `end_license_v1`
-%%%   - `license_rewrapped_v1`      → Session 4 (logged + skipped)
+%%%   - `license_rewrapped_v1`      → `receive_license_rewrap_v1`
+%%%
+%%% After a successful sweep, stamps `last_license_catchup_at` for the
+%%% realm via `hecate_license_guard:stamp_catchup/1`. The open-path
+%%% staleness guard consults this timestamp to refuse decryption when
+%%% state is too old.
 %%%
 %%% Position is persisted via `mesh_catch_up:save_position/2` keyed on
 %%% `<<"licenses-", Realm/binary>>` — matching the replay RPC's stream
@@ -158,19 +163,28 @@ catch_up_loop(Realm, OwnMri, StreamKey, Offset, Processed) ->
                     catch_up_loop(Realm, OwnMri, StreamKey, NewOffset,
                                    Processed + Count);
                 _ ->
-                    log_done(Realm, Processed + Count)
+                    finish_sweep(Realm, Processed + Count)
             end;
         {ok, #{<<"events">> := []}} ->
-            log_done(Realm, Processed);
+            finish_sweep(Realm, Processed);
         {ok, Other} ->
             logger:warning("[catch_up.realm_licenses] unexpected response realm=~s: ~p",
                            [Realm, Other]),
-            log_done(Realm, Processed);
+            finish_sweep(Realm, Processed);
         {error, Reason} ->
             logger:info("[catch_up.realm_licenses] realm=~s replay RPC failed: ~p "
                         "(processed ~b so far)",
                         [Realm, Reason, Processed])
     end.
+
+%% @private Stamp the per-realm catch-up timestamp and log.
+%% Only fires when the RPC returned successfully (including zero new
+%% events) — a network failure mid-sweep leaves the timestamp as it
+%% was so the staleness guard refuses the open path until the next
+%% successful sweep.
+finish_sweep(Realm, Count) ->
+    hecate_license_guard:stamp_catchup(Realm),
+    log_done(Realm, Count).
 
 log_done(_Realm, 0) -> ok;
 log_done(Realm, N) ->
@@ -189,12 +203,10 @@ dispatch_event(#{<<"event_type">> := <<"share_license_revoked_v1">>} = Evt, _Rea
 dispatch_event(#{event_type := <<"share_license_revoked_v1">>} = Evt, _Realm, OwnMri) ->
     dispatch_revoked(extract_data(Evt), OwnMri);
 
-dispatch_event(#{<<"event_type">> := <<"license_rewrapped_v1">>}, _Realm, _OwnMri) ->
-    logger:debug("[catch_up.realm_licenses] rewrap replay — Session 4 wiring pending"),
-    ok;
-dispatch_event(#{event_type := <<"license_rewrapped_v1">>}, _Realm, _OwnMri) ->
-    logger:debug("[catch_up.realm_licenses] rewrap replay — Session 4 wiring pending"),
-    ok;
+dispatch_event(#{<<"event_type">> := <<"license_rewrapped_v1">>} = Evt, _Realm, _OwnMri) ->
+    dispatch_rewrapped(extract_data(Evt));
+dispatch_event(#{event_type := <<"license_rewrapped_v1">>} = Evt, _Realm, _OwnMri) ->
+    dispatch_rewrapped(extract_data(Evt));
 
 dispatch_event(Other, _Realm, _OwnMri) ->
     logger:debug("[catch_up.realm_licenses] unknown event type: ~p",
@@ -267,6 +279,51 @@ log_end_result(LicenseId, {error, license_ended}) ->
     logger:debug("[catch_up.realm_licenses] idempotent end license=~s", [LicenseId]);
 log_end_result(LicenseId, {error, Reason}) ->
     logger:info("[catch_up.realm_licenses] end dispatch error license=~s: ~p",
+                [LicenseId, Reason]).
+
+%% --- Rewrap replay ---
+
+dispatch_rewrapped(Data) ->
+    LicenseId = gf(license_id, Data),
+    case {LicenseId, gf(new_wrapped_cek, Data), gf(new_k_realm_version, Data)} of
+        {undefined, _, _} ->
+            logger:info("[catch_up.realm_licenses] rewrap replay missing license_id");
+        {_, undefined, _} ->
+            logger:info("[catch_up.realm_licenses] rewrap replay missing new_wrapped_cek license=~s",
+                        [LicenseId]);
+        {_, _, undefined} ->
+            logger:info("[catch_up.realm_licenses] rewrap replay missing new_k_realm_version license=~s",
+                        [LicenseId]);
+        {_, Wrapped, Version} ->
+            do_dispatch_rewrap(LicenseId, decode_maybe_base64(Wrapped), Version, Data)
+    end.
+
+do_dispatch_rewrap(LicenseId, NewWrappedCek, NewVersion, Data) ->
+    Payload = #{
+        license_id          => LicenseId,
+        new_wrapped_cek     => NewWrappedCek,
+        new_k_realm_version => NewVersion,
+        batch_id            => gf(batch_id, Data),
+        rewrapped_at        => gf(rewrapped_at, Data)
+    },
+    case receive_license_rewrap_v1:new(Payload) of
+        {ok, Cmd} ->
+            log_rewrap_result(LicenseId,
+                              maybe_receive_license_rewrap:dispatch(Cmd));
+        {error, Reason} ->
+            logger:info("[catch_up.realm_licenses] rewrap cmd build failed: ~p", [Reason])
+    end.
+
+log_rewrap_result(LicenseId, {ok, _V, _Events}) ->
+    logger:info("[catch_up.realm_licenses] caught-up rewrap license=~s", [LicenseId]);
+log_rewrap_result(LicenseId, {error, stale_rewrap}) ->
+    logger:debug("[catch_up.realm_licenses] idempotent rewrap license=~s", [LicenseId]);
+log_rewrap_result(LicenseId, {error, license_not_accepted}) ->
+    logger:debug("[catch_up.realm_licenses] skip rewrap for unaccepted license=~s", [LicenseId]);
+log_rewrap_result(LicenseId, {error, license_ended}) ->
+    logger:debug("[catch_up.realm_licenses] skip rewrap for ended license=~s", [LicenseId]);
+log_rewrap_result(LicenseId, {error, Reason}) ->
+    logger:info("[catch_up.realm_licenses] rewrap dispatch error license=~s: ~p",
                 [LicenseId, Reason]).
 
 %% --- Helpers ---

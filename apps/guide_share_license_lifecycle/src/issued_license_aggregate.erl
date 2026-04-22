@@ -6,11 +6,9 @@
 %%% Lifecycle:
 %%%   1. issue_license_v1 (birth — carries file_id, grantee, wrapped_cek,
 %%%      origin_cek_sealed for future rewrap).
-%%%   2. revoke_license_v1 — Session 3 (issuer revokes a specific grant).
-%%%   3. rewrap_license_v1 — Session 4 (after K_realm rotation).
-%%%
-%%% Phase D Session 2 covers birth only. State module already folds the
-%%% future events so replay works across versions.
+%%%   2. revoke_share_license_v1 — terminal authority action.
+%%%   3. rewrap_license_v1 — updates wrapped_cek after K_realm rotation;
+%%%      monotonic guard rejects replay/stale attempts.
 %%% @end
 -module(issued_license_aggregate).
 -behaviour(evoq_aggregate).
@@ -55,13 +53,14 @@ execute(#issued_license_state{status = S}, _Payload)
   when S band ?SL_REVOKED =/= 0 ->
     {error, license_revoked};
 
-%% Issued + active — accept issue (reject) / revoke / rewrap (Session 4).
+%% Issued + active — accept issue (reject) / revoke / rewrap.
 execute(#issued_license_state{status = S} = State, Payload)
   when S band ?SL_ISSUED =/= 0 ->
     case command_type(Payload) of
         issue_license_v1         -> {error, already_issued};
         revoke_share_license_v1  -> maybe_revoke_share_license:handle_from_map(
                                         enrich_from_state(Payload, State));
+        rewrap_license_v1        -> maybe_rewrap(State, Payload);
         _                        -> {error, unknown_command}
     end;
 
@@ -91,3 +90,19 @@ enrich_from_state(Payload, #issued_license_state{} = S) ->
         issuer_did => S#issued_license_state.issuer_did
     },
     maps:merge(Defaults, Payload).
+
+%% @private Monotonic version guard. A replayed rewrap (or stale dispatch
+%% from a slow PM) whose `new_k_realm_version` is not strictly greater
+%% than the current stored version is rejected — replay then becomes a
+%% no-op rather than corrupting `wrapped_cek` with stale bytes.
+maybe_rewrap(State, Payload) ->
+    NewV = maps:get(new_k_realm_version, Payload, undefined),
+    CurV = State#issued_license_state.k_realm_version,
+    case version_strictly_advances(NewV, CurV) of
+        true  -> maybe_rewrap_license:handle_from_map(enrich_from_state(Payload, State));
+        false -> {error, stale_rewrap}
+    end.
+
+version_strictly_advances(NewV, _Cur) when not is_integer(NewV)     -> false;
+version_strictly_advances(NewV, Cur) when is_integer(Cur), NewV =< Cur -> false;
+version_strictly_advances(_NewV, _Cur)                              -> true.

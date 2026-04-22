@@ -1,8 +1,10 @@
 %%% @doc Top-level supervisor for Phase D share-license domain.
 %%%
 %%% Hosts the pg-emitters (internal event relay), the batched mesh
-%%% emitter (issued-batch), and the mesh listeners that dispatch
-%%% accept_license / end_license on inbound traffic.
+%%% emitters (issued-batch + rewrapped-batch), the rewrap process
+%%% manager on the issuer side, and the mesh listeners that dispatch
+%%% accept_license / end_license / receive_license_rewrap on inbound
+%%% traffic.
 %%% @end
 -module(guide_share_license_lifecycle_sup).
 -behaviour(supervisor).
@@ -34,6 +36,20 @@ init([]) ->
 
         emitter(license_issued_v1_to_batch),
 
+        %% Rewrap-on-rotation batched mesh emitter (issuer side).
+        #{id => licenses_rewrapped_batch_emitter,
+          start => {licenses_rewrapped_batch_emitter, start_link, []},
+          restart => permanent, shutdown => 5000, type => worker,
+          modules => [licenses_rewrapped_batch_emitter]},
+
+        emitter(license_rewrapped_v1_to_batch),
+
+        %% Rewrap-on-rotation process manager: local
+        %% `realm_shared_key_stored_v1` -> N `rewrap_license_v1` commands
+        %% for realm-scope licenses this daemon issued under the old
+        %% version.
+        emitter(on_realm_key_rotated_rewrap_licenses),
+
         %% Mesh listeners (gen_servers that subscribe once mesh is up)
         #{id => listen_for_license_batch,
           start => {listen_for_license_batch, start_link, []},
@@ -45,8 +61,14 @@ init([]) ->
           restart => permanent, shutdown => 5000, type => worker,
           modules => [listen_for_license_revoked]},
 
+        #{id => listen_for_license_rewrapped,
+          start => {listen_for_license_rewrapped, start_link, []},
+          restart => permanent, shutdown => 5000, type => worker,
+          modules => [listen_for_license_rewrapped]},
+
         %% Reconnect-catch-up worker — polls realm server's replay RPC
-        %% and reissues accept/end dispatches for events missed offline.
+        %% and reissues accept/end/rewrap dispatches for events missed
+        %% offline.
         #{id => catch_up_realm_licenses,
           start => {catch_up_realm_licenses, start_link, []},
           restart => permanent, shutdown => 5000, type => worker,

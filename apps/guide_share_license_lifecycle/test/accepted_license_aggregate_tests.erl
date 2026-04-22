@@ -80,6 +80,47 @@ end_before_accept_rejected_test() ->
     ?assertEqual({error, license_not_accepted},
                  accepted_license_aggregate:execute(State, Payload)).
 
+%% --- rewrap command ---
+
+receive_rewrap_happy_test() ->
+    State = accepted_state(<<"lic-a">>),
+    %% accepted_event starts with k_realm_version = undefined, so any
+    %% defined NewV advances — use v2 here.
+    Payload = rewrap_payload(<<"lic-a">>, 2),
+    {ok, [Event]} = accepted_license_aggregate:execute(State, Payload),
+    ?assertEqual(<<"license_rewrap_received_v1">>, maps:get(event_type, Event)),
+    ?assertEqual(<<"fresh-wrap">>, maps:get(new_wrapped_cek, Event)),
+    ?assertEqual(2, maps:get(new_k_realm_version, Event)).
+
+receive_rewrap_stale_rejected_test() ->
+    %% Prime state to k_realm_version = 2, then attempt a v2 rewrap.
+    State0 = accepted_state(<<"lic-a">>),
+    RwEvt = #{event_type          => <<"license_rewrap_received_v1">>,
+              license_id          => <<"lic-a">>,
+              new_wrapped_cek     => <<"first">>,
+              new_k_realm_version => 2},
+    State1 = accepted_license_aggregate:apply(State0, RwEvt),
+    Payload = rewrap_payload(<<"lic-a">>, 2),
+    ?assertEqual({error, stale_rewrap},
+                 accepted_license_aggregate:execute(State1, Payload)).
+
+receive_rewrap_before_accept_rejected_test() ->
+    State = accepted_license_state:new(<<>>),
+    Payload = rewrap_payload(<<"lic-a">>, 2),
+    ?assertEqual({error, license_not_accepted},
+                 accepted_license_aggregate:execute(State, Payload)).
+
+receive_rewrap_after_end_rejected_test() ->
+    State0 = accepted_state(<<"lic-a">>),
+    EndEvt = #{event_type => <<"license_ended_v1">>,
+               license_id => <<"lic-a">>,
+               reason     => revoked,
+               ended_at   => 1},
+    State1 = accepted_license_aggregate:apply(State0, EndEvt),
+    Payload = rewrap_payload(<<"lic-a">>, 2),
+    ?assertEqual({error, license_ended},
+                 accepted_license_aggregate:execute(State1, Payload)).
+
 stream_id_test() ->
     ?assertEqual(<<"accepted-license-xyz">>,
                  accepted_license_aggregate:stream_id(<<"xyz">>)).
@@ -104,3 +145,11 @@ accepted_event(LicenseId) ->
 accepted_state(LicenseId) ->
     S0 = accepted_license_state:new(<<>>),
     accepted_license_aggregate:apply(S0, accepted_event(LicenseId)).
+
+rewrap_payload(LicenseId, Version) ->
+    #{command_type        => receive_license_rewrap_v1,
+      license_id          => LicenseId,
+      new_wrapped_cek     => <<"fresh-wrap">>,
+      new_k_realm_version => Version,
+      batch_id            => <<"rotation-batch-1">>,
+      rewrapped_at        => 9000}.

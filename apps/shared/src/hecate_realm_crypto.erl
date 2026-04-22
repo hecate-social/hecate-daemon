@@ -17,7 +17,7 @@
 %%% @end
 -module(hecate_realm_crypto).
 
--export([current/1, has_key/1, wrap/2, unwrap/2]).
+-export([current/1, has_key/1, wrap/2, unwrap/2, wrap_with_sealed/2]).
 
 -define(NONCE_SIZE, 12).
 -define(TAG_SIZE, 16).
@@ -65,6 +65,21 @@ wrap(Realm, Plaintext) when is_binary(Realm), is_binary(Plaintext) ->
 -spec unwrap(binary(), binary()) -> wrap_result().
 unwrap(Realm, Sealed) when is_binary(Realm), is_binary(Sealed) ->
     with_key(Realm, fun(KRealm) -> do_unwrap(KRealm, Sealed) end).
+
+%% @doc Wrap `Plaintext` with a sealed K_realm provided directly by the
+%% caller, bypassing the `realm_shared_keys` ETS lookup.
+%%
+%% Used by the rewrap process manager on rotation: the PM receives a
+%% `realm_shared_key_stored_v1` domain event carrying `k_realm_encrypted`
+%% and must rewrap licenses under the NEW version BEFORE the projection
+%% race window closes. Going through `wrap/2` would race the projection
+%% and sometimes wrap with the old version. This helper takes the
+%% sealed bytes directly from the event data so the operation is
+%% deterministic.
+-spec wrap_with_sealed(binary(), binary()) -> wrap_result().
+wrap_with_sealed(Sealed, Plaintext)
+  when is_binary(Sealed), is_binary(Plaintext) ->
+    unseal_and_apply(Sealed, fun(KRealm) -> do_wrap(KRealm, Plaintext) end).
 
 %%====================================================================
 %% Internal

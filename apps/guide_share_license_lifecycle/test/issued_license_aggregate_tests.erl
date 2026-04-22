@@ -75,6 +75,55 @@ revoke_after_revoke_rejected_test() ->
     ?assertEqual({error, license_revoked},
                  issued_license_aggregate:execute(State1, Payload)).
 
+%% --- rewrap command ---
+
+rewrap_happy_test() ->
+    State = issued_state(<<"lic-1">>),
+    Payload = rewrap_payload(<<"lic-1">>, 2),
+    {ok, [Event]} = issued_license_aggregate:execute(State, Payload),
+    ?assertEqual(<<"license_rewrapped_v1">>, maps:get(event_type, Event)),
+    ?assertEqual(<<"lic-1">>, maps:get(license_id, Event)),
+    ?assertEqual(<<"new-wrapped">>, maps:get(new_wrapped_cek, Event)),
+    ?assertEqual(2, maps:get(new_k_realm_version, Event)),
+    %% enrich_from_state pulled realm/grantee/issuer_did off state:
+    ?assertEqual(<<"mri:realm:io.macula">>, maps:get(grantee, Event)),
+    ?assertEqual(<<"io.macula">>, maps:get(realm, Event)),
+    ?assertEqual(<<"mri:agent:io.macula/alice/host00">>, maps:get(issuer_did, Event)).
+
+rewrap_stale_version_rejected_test() ->
+    %% issued_state/1 starts at k_realm_version = 1. A rewrap to v1 must
+    %% fail (not strictly greater) — this is the monotonic guard.
+    State = issued_state(<<"lic-1">>),
+    Payload = rewrap_payload(<<"lic-1">>, 1),
+    ?assertEqual({error, stale_rewrap},
+                 issued_license_aggregate:execute(State, Payload)).
+
+rewrap_old_version_rejected_test() ->
+    %% After a rewrap to v2 lands, a replayed v2 (same version) must
+    %% be rejected — replay produces no corrupt state.
+    State0 = issued_state(<<"lic-1">>),
+    State1 = issued_license_aggregate:apply(State0, rewrap_event(<<"lic-1">>, 2)),
+    Payload = rewrap_payload(<<"lic-1">>, 2),
+    ?assertEqual({error, stale_rewrap},
+                 issued_license_aggregate:execute(State1, Payload)).
+
+rewrap_before_issue_rejected_test() ->
+    State = issued_license_state:new(<<>>),
+    Payload = rewrap_payload(<<"lic-1">>, 2),
+    ?assertEqual({error, license_not_issued},
+                 issued_license_aggregate:execute(State, Payload)).
+
+rewrap_after_revoke_rejected_test() ->
+    State0 = issued_state(<<"lic-r">>),
+    State1 = issued_license_aggregate:apply(State0,
+                #{event_type => <<"share_license_revoked_v1">>,
+                  license_id => <<"lic-r">>,
+                  reason     => kicked,
+                  revoked_at => 5000}),
+    Payload = rewrap_payload(<<"lic-r">>, 2),
+    ?assertEqual({error, license_revoked},
+                 issued_license_aggregate:execute(State1, Payload)).
+
 %% --- apply ---
 
 apply_issued_sets_issued_bit_test() ->
@@ -147,3 +196,19 @@ issued_event(LicenseId) ->
 issued_state(LicenseId) ->
     S0 = issued_license_state:new(<<>>),
     issued_license_aggregate:apply(S0, issued_event(LicenseId)).
+
+rewrap_payload(LicenseId, Version) ->
+    #{command_type        => rewrap_license_v1,
+      license_id          => LicenseId,
+      new_wrapped_cek     => <<"new-wrapped">>,
+      new_k_realm_version => Version,
+      batch_id            => <<"rotation-batch-1">>,
+      rewrapped_at        => 9000}.
+
+rewrap_event(LicenseId, Version) ->
+    #{event_type          => <<"license_rewrapped_v1">>,
+      license_id          => LicenseId,
+      new_wrapped_cek     => <<"new-wrapped">>,
+      new_k_realm_version => Version,
+      batch_id            => <<"rotation-batch-1">>,
+      rewrapped_at        => 9000}.

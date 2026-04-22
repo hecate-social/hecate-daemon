@@ -9,8 +9,9 @@
 %%%      accepted_cek_sealed).
 %%%   2. end_license_v1 (after observing revoke fact or receiving
 %%%      membership end; clears CEK_USABLE).
-%%%   3. receive_license_rewrap_v1 — Session 4 (updates wrapped_cek
-%%%      metadata after K_realm rotation; plaintext CEK unchanged).
+%%%   3. receive_license_rewrap_v1 (updates wrapped_cek + k_realm_version
+%%%      after K_realm rotation; plaintext CEK sealed copy untouched).
+%%%      Monotonic guard rejects stale or replayed rewraps.
 %%% @end
 -module(accepted_license_aggregate).
 -behaviour(evoq_aggregate).
@@ -53,13 +54,14 @@ execute(#accepted_license_state{status = S}, _Payload)
   when S band ?SL_ENDED =/= 0 ->
     {error, license_ended};
 
-%% Accepted — end allowed. Double-accept rejected.
-execute(#accepted_license_state{status = S}, Payload)
+%% Accepted — end / rewrap allowed. Double-accept rejected.
+execute(#accepted_license_state{status = S} = State, Payload)
   when S band ?SL_ACCEPTED =/= 0 ->
     case command_type(Payload) of
-        accept_license_v1 -> {error, already_accepted};
-        end_license_v1    -> maybe_end_license:handle_from_map(Payload);
-        _                 -> {error, unknown_command}
+        accept_license_v1            -> {error, already_accepted};
+        end_license_v1               -> maybe_end_license:handle_from_map(Payload);
+        receive_license_rewrap_v1    -> maybe_rewrap(State, Payload);
+        _                            -> {error, unknown_command}
     end;
 
 execute(_State, _Payload) ->
@@ -76,3 +78,19 @@ apply(State, Event) ->
 command_type(#{command_type := T}) when is_atom(T) -> T;
 command_type(#{command_type := T}) when is_binary(T) -> binary_to_existing_atom(T, utf8);
 command_type(_) -> undefined.
+
+%% @private Same monotonic guard as the issuer side: a rewrap carrying a
+%% `new_k_realm_version` not strictly greater than the currently stored
+%% version is rejected. Replay is a no-op; stale live delivery and
+%% catch-up replay both route through this check.
+maybe_rewrap(State, Payload) ->
+    NewV = maps:get(new_k_realm_version, Payload, undefined),
+    CurV = State#accepted_license_state.k_realm_version,
+    case version_strictly_advances(NewV, CurV) of
+        true  -> maybe_receive_license_rewrap:handle_from_map(Payload);
+        false -> {error, stale_rewrap}
+    end.
+
+version_strictly_advances(NewV, _Cur) when not is_integer(NewV)     -> false;
+version_strictly_advances(NewV, Cur) when is_integer(Cur), NewV =< Cur -> false;
+version_strictly_advances(_NewV, _Cur)                              -> true.

@@ -1,0 +1,17 @@
+{application, project_share_licenses, [
+    {description, "PRJ service for Phase D share-licenses: issuer-side rewrap index."},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {project_share_licenses_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        evoq,
+        reckon_evoq,
+        guide_share_license_lifecycle
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.
