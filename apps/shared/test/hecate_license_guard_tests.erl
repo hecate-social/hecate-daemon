@@ -2,6 +2,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(TABLE, realm_shared_keys).
+-define(ACCEPTED_TABLE, my_accepted_share_licenses).
 -define(SL_ACCEPTED,    2).
 -define(SL_CEK_USABLE, 16).
 -define(SL_ENDED,       8).
@@ -108,6 +109,116 @@ last_catchup_reads_stamp(_) ->
         hecate_license_guard:stamp_catchup(<<"io.macula">>, 123456),
         ?assertEqual(123456, hecate_license_guard:last_catchup(<<"io.macula">>))
     end.
+
+%%====================================================================
+%% can_open_file/2
+%%====================================================================
+
+can_open_file_test_() ->
+    {foreach,
+     fun setup_can_open_file/0,
+     fun cleanup_can_open_file/1,
+     [fun returns_no_license_when_missing/1,
+      fun happy_path_with_accepted_license/1,
+      fun refuses_ended_license/1,
+      fun refuses_realm_mismatch/1,
+      fun refuses_when_state_stale/1]}.
+
+setup_can_open_file() ->
+    ensure_table(?TABLE),
+    ensure_table(?ACCEPTED_TABLE),
+    ets:delete_all_objects(?TABLE),
+    ets:delete_all_objects(?ACCEPTED_TABLE),
+    application:unset_env(hecate, license_staleness_threshold_ms),
+    ok.
+
+cleanup_can_open_file(_) ->
+    ets:delete_all_objects(?TABLE),
+    ets:delete_all_objects(?ACCEPTED_TABLE),
+    ok.
+
+ensure_table(Name) ->
+    case ets:info(Name) of
+        undefined -> ets:new(Name, [public, named_table, set]);
+        _         -> ok
+    end.
+
+returns_no_license_when_missing(_) ->
+    fun() ->
+        ?assertEqual({error, no_license},
+                     hecate_license_guard:can_open_file(
+                         <<"file-unknown">>, <<"io.macula">>))
+    end.
+
+happy_path_with_accepted_license(_) ->
+    fun() ->
+        ets:insert(?TABLE, {<<"io.macula">>, key_entry(<<"io.macula">>)}),
+        hecate_license_guard:stamp_catchup(<<"io.macula">>),
+        ets:insert(?ACCEPTED_TABLE,
+                   {<<"file-1">>, accepted_entry(<<"file-1">>,
+                                                 <<"io.macula">>,
+                                                 accepted_usable(),
+                                                 far_future())}),
+        ?assertEqual(ok, hecate_license_guard:can_open_file(
+                             <<"file-1">>, <<"io.macula">>))
+    end.
+
+refuses_ended_license(_) ->
+    fun() ->
+        ets:insert(?TABLE, {<<"io.macula">>, key_entry(<<"io.macula">>)}),
+        hecate_license_guard:stamp_catchup(<<"io.macula">>),
+        %% SL_ACCEPTED (2) | SL_ENDED (8) — no CEK_USABLE
+        ets:insert(?ACCEPTED_TABLE,
+                   {<<"file-2">>, accepted_entry(<<"file-2">>,
+                                                 <<"io.macula">>,
+                                                 ?SL_ACCEPTED bor ?SL_ENDED,
+                                                 far_future())}),
+        ?assertEqual({error, license_not_usable},
+                     hecate_license_guard:can_open_file(
+                         <<"file-2">>, <<"io.macula">>))
+    end.
+
+refuses_realm_mismatch(_) ->
+    fun() ->
+        ets:insert(?TABLE, {<<"other.realm">>, key_entry(<<"other.realm">>)}),
+        hecate_license_guard:stamp_catchup(<<"other.realm">>),
+        %% License is for other.realm but caller asks about io.macula.
+        ets:insert(?ACCEPTED_TABLE,
+                   {<<"file-3">>, accepted_entry(<<"file-3">>,
+                                                 <<"other.realm">>,
+                                                 accepted_usable(),
+                                                 far_future())}),
+        ?assertEqual({error, license_realm_mismatch},
+                     hecate_license_guard:can_open_file(
+                         <<"file-3">>, <<"io.macula">>))
+    end.
+
+refuses_when_state_stale(_) ->
+    fun() ->
+        ets:insert(?TABLE, {<<"io.macula">>, key_entry(<<"io.macula">>)}),
+        %% Stamp from a week ago.
+        WeekAgo = erlang:system_time(millisecond) - 7 * 86400 * 1000,
+        hecate_license_guard:stamp_catchup(<<"io.macula">>, WeekAgo),
+        ets:insert(?ACCEPTED_TABLE,
+                   {<<"file-4">>, accepted_entry(<<"file-4">>,
+                                                 <<"io.macula">>,
+                                                 accepted_usable(),
+                                                 far_future())}),
+        ?assertEqual({error, license_state_stale},
+                     hecate_license_guard:can_open_file(
+                         <<"file-4">>, <<"io.macula">>))
+    end.
+
+accepted_entry(FileId, Realm, Status, ExpiresAt) ->
+    #{file_id          => FileId,
+      license_id       => <<"lic-", FileId/binary>>,
+      realm            => Realm,
+      status           => Status,
+      expires_at       => ExpiresAt,
+      k_realm_version  => 1,
+      wrap_strategy    => realm_key_v1,
+      wrapped_cek      => <<"wrapped">>,
+      accepted_cek_sealed => <<"sealed">>}.
 
 %% --- helpers ---
 

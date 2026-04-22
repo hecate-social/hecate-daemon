@@ -1,18 +1,27 @@
-%%% @doc ETS owner + query facade for the issuer-side rewrap index.
+%%% @doc ETS owner + query facade for share-license read models.
 %%%
-%%% Table: `my_issued_realm_scoped_active_licenses`
-%%% Key:   `license_id`
-%%% Value: `#{license_id, realm, k_realm_version, wrap_strategy,
-%%%           issuer_did, grantee, origin_cek_sealed, issued_at}`
+%%% Tables:
 %%%
-%%% Only realm-scope licenses this daemon issued are tracked (the only
-%%% licenses that need rewrapping on K_realm rotation). DID-scope
-%%% licenses are unaffected by realm key rotation and are filtered out
-%%% on insert by the projection.
+%%%   `my_issued_realm_scoped_active_licenses` (issuer-side rewrap index)
+%%%     Key:   `license_id`
+%%%     Value: `#{license_id, realm, k_realm_version, wrap_strategy,
+%%%               issuer_did, grantee, origin_cek_sealed, issued_at}`
+%%%     Only realm-scope licenses this daemon issued are tracked — the
+%%%     only ones that need rewrapping on K_realm rotation. DID-scope
+%%%     licenses don't rotate; filtered out at insert.
 %%%
-%%% The `origin_cek_sealed` field is kept in the ETS row so the rewrap
-%%% PM can decrypt + re-wrap without a second aggregate load — critical
-%%% for keeping rotation fast when an issuer has thousands of licenses.
+%%%     The `origin_cek_sealed` field is kept in the row so the rewrap
+%%%     PM can decrypt + re-wrap without loading the aggregate — matters
+%%%     when an issuer has thousands of licenses.
+%%%
+%%%   `my_accepted_share_licenses` (recipient-side open-path index)
+%%%     Key:   `file_id`
+%%%     Value: `#{file_id, license_id, realm, k_realm_version,
+%%%               wrap_strategy, wrapped_cek, accepted_cek_sealed,
+%%%               issuer_did, status, expires_at, ...}`
+%%%     One entry per file the recipient has accepted a license for.
+%%%     Phase F open-path queries this by file_id + runs the staleness
+%%%     guard against the entry's status/expires_at/realm.
 %%% @end
 -module(project_share_licenses_store).
 -behaviour(gen_server).
@@ -20,10 +29,13 @@
 -export([start_link/0]).
 -export([get/1,
          list_active_for_realm_version/2,
-         list_all/0]).
+         list_all/0,
+         get_accepted_by_file_id/1,
+         list_accepted/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -define(TABLE, my_issued_realm_scoped_active_licenses).
+-define(ACCEPTED_TABLE, my_accepted_share_licenses).
 
 -spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
@@ -68,15 +80,44 @@ list_all() ->
         _ -> {ok, [E || {_, E} <- ets:tab2list(?TABLE)]}
     end.
 
+%% @doc Recipient-side lookup: fetch the accepted share-license row
+%% for a given file_id. Used by the Phase F open-path guard.
+-spec get_accepted_by_file_id(binary()) -> {ok, map()} | {error, not_found}.
+get_accepted_by_file_id(FileId) when is_binary(FileId) ->
+    case ets:whereis(?ACCEPTED_TABLE) of
+        undefined -> {error, not_found};
+        _ ->
+            case ets:lookup(?ACCEPTED_TABLE, FileId) of
+                [{_, Entry}] -> {ok, Entry};
+                []           -> {error, not_found}
+            end
+    end.
+
+-spec list_accepted() -> {ok, [map()]}.
+list_accepted() ->
+    case ets:whereis(?ACCEPTED_TABLE) of
+        undefined -> {ok, []};
+        _ -> {ok, [E || {_, E} <- ets:tab2list(?ACCEPTED_TABLE)]}
+    end.
+
 %%====================================================================
 %% gen_server (ETS owner)
 %%====================================================================
 
 init([]) ->
-    ?TABLE = ets:new(?TABLE, [set, public, named_table,
-                              {read_concurrency, true},
-                              {write_concurrency, true}]),
+    ensure_table(?TABLE),
+    ensure_table(?ACCEPTED_TABLE),
     {ok, #{}}.
+
+ensure_table(Name) ->
+    case ets:info(Name) of
+        undefined ->
+            Name = ets:new(Name, [set, public, named_table,
+                                  {read_concurrency, true},
+                                  {write_concurrency, true}]);
+        _ ->
+            ok
+    end.
 
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.

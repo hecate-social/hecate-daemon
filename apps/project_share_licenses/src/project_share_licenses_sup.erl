@@ -25,6 +25,12 @@ init([]) ->
                     [share_license_lifecycle_to_issued_index,
                      #{},
                      #{store_id => share_licenses_store}]},
+          restart => permanent, type => worker},
+        #{id => share_license_lifecycle_to_accepted_index,
+          start => {evoq_projection, start_link,
+                    [share_license_lifecycle_to_accepted_index,
+                     #{},
+                     #{store_id => share_licenses_store}]},
           restart => permanent, type => worker}
     ],
     {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

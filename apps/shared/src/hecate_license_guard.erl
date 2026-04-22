@@ -28,11 +28,12 @@
 %%% @end
 -module(hecate_license_guard).
 
--export([can_open/2]).
+-export([can_open/2, can_open_file/2]).
 -export([stamp_catchup/1, stamp_catchup/2, last_catchup/1]).
 -export([default_threshold_ms/0]).
 
 -define(SHARED_KEYS_TABLE, realm_shared_keys).
+-define(ACCEPTED_LICENSES_TABLE, my_accepted_share_licenses).
 -define(DEFAULT_THRESHOLD_MS, 86400000). %% 24h
 %% Mirror of ?SL_CEK_USABLE from guide_share_license_lifecycle's
 %% share_license_status.hrl. Duplicated here because `shared` lives
@@ -59,6 +60,31 @@ can_open(License, Realm) when is_map(License), is_binary(Realm) ->
         fun() -> with_step(fun() -> check_usable(License) end,
             fun() -> check_freshness(Realm, Now, Threshold) end) end);
 can_open(_License, _Realm) ->
+    {error, bad_args}.
+
+%% @doc Open-path convenience: look up the accepted share-license for a
+%% `FileId` and decide whether its open path is permitted. Reads the
+%% `my_accepted_share_licenses` ETS (owned by `project_share_licenses`)
+%% directly by name to avoid a shared → project circular dep. Returns
+%% `{error, no_license}` when no accepted license exists for the file.
+%%
+%% `Realm` is passed explicitly (not read off the license entry) so
+%% the caller can enforce that the realm matches the calling context —
+%% defends against a license for realm A being used to open content
+%% rendered under realm B.
+-spec can_open_file(binary(), realm()) -> ok | {error, atom()}.
+can_open_file(FileId, Realm)
+  when is_binary(FileId), is_binary(Realm) ->
+    case lookup_accepted(FileId) of
+        {ok, #{realm := LicenseRealm} = License}
+          when LicenseRealm =:= Realm ->
+            can_open(License, Realm);
+        {ok, _License} ->
+            {error, license_realm_mismatch};
+        {error, not_found} ->
+            {error, no_license}
+    end;
+can_open_file(_FileId, _Realm) ->
     {error, bad_args}.
 
 %% @doc Record a successful catch-up sweep for `Realm` at `now()`.
@@ -108,6 +134,16 @@ default_threshold_ms() ->
 threshold_ms() ->
     application:get_env(hecate, license_staleness_threshold_ms,
                         ?DEFAULT_THRESHOLD_MS).
+
+lookup_accepted(FileId) ->
+    case ets:whereis(?ACCEPTED_LICENSES_TABLE) of
+        undefined -> {error, not_found};
+        _ ->
+            case ets:lookup(?ACCEPTED_LICENSES_TABLE, FileId) of
+                [{_, Entry}] -> {ok, Entry};
+                []           -> {error, not_found}
+            end
+    end.
 
 with_step(CheckFun, Continuation) ->
     case CheckFun() of
