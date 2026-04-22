@@ -76,26 +76,145 @@ smoke_admin_guard_responds(Config) ->
                          Decoded)
         end, Daemons).
 
-alice_share_bob_download_open(_Config) ->
-    %% Skeleton — full implementation needs:
-    %%   1. POST /api/briefcase/files/upload on Alice (multipart).
-    %%   2. POST /api/briefcase/files/:id/share on Alice.
-    %%   3. fleet_wait:for_state(Bob, "/api/briefcase/files/:id",
-    %%        <<"presence">>, <<"remote">>).
-    %%   4. POST /api/briefcase/files/:id/download on Bob.
-    %%   5. fleet_wait:for_state(Bob, "/api/briefcase/files/:id/download",
-    %%        <<"state">>, <<"completed">>).
-    %%   6. GET /api/briefcase/files/:id/content on Bob → assert
-    %%      plaintext matches the upload.
-    %%
-    %% Multipart upload via curl needs a tempfile on the SSH target
-    %% (curl --form). Helper for that lands in fleet_daemon:upload/3
-    %% as a follow-up.
-    {skip, "scenario harness pending — needs multipart upload helper"}.
+alice_share_bob_download_open(Config) ->
+    FleetConfig = ?config(fleet_config, Config),
+    {ok, Alice} = fleet_config:daemon(FleetConfig, alice),
+    {ok, Bob}   = fleet_config:daemon(FleetConfig, bob),
+    Token = fleet_config:admin_token(FleetConfig),
 
-revoke_clears_open(_Config) ->
-    %% Skeleton — depends on alice_share_bob_download_open scaffolding.
-    {skip, "depends on share/download scenario — pending"}.
+    %% Generate a unique payload + temp file local to the test runner.
+    Payload = <<"phase-d-fleet-payload-",
+                (integer_to_binary(erlang:unique_integer([positive])))/binary>>,
+    LocalPath = "/tmp/phase_d_fleet_" ++
+                integer_to_list(erlang:unique_integer([positive])) ++
+                ".txt",
+    ok = file:write_file(LocalPath, Payload),
+
+    try
+        %% 1. Alice uploads.
+        {200, UploadBody} =
+            fleet_daemon:upload(Alice, LocalPath,
+                                <<"phase-d-fleet.txt">>,
+                                <<"text/plain">>),
+        #{<<"file_id">> := FileId} = json:decode(UploadBody),
+        ct:pal("Alice uploaded file_id=~s", [FileId]),
+
+        %% 2. Alice shares to realm.
+        ShareBody = json:encode(#{<<"recipients">> => <<"realm">>}),
+        {200, _} =
+            fleet_daemon:post(Alice,
+                <<"/api/briefcase/files/", FileId/binary, "/share">>,
+                ShareBody),
+
+        %% 3. Wait for Bob's projection to show the placeholder.
+        ok = fleet_wait:for_state(Bob,
+            <<"/api/briefcase/files/", FileId/binary>>,
+            <<"presence">>, <<"remote">>),
+        ct:pal("Bob sees placeholder for file_id=~s", [FileId]),
+
+        %% 4. Bob initiates download.
+        {Status, _} =
+            fleet_daemon:post(Bob,
+                <<"/api/briefcase/files/", FileId/binary, "/download">>,
+                #{}),
+        true = lists:member(Status, [200, 202]),
+
+        %% 5. Wait for Bob's progress endpoint to report completed.
+        ok = fleet_wait:for_state(Bob,
+            <<"/api/briefcase/files/", FileId/binary, "/download">>,
+            <<"state">>, <<"completed">>),
+        ct:pal("Bob completed download of file_id=~s", [FileId]),
+
+        %% 6. Open + verify plaintext matches.
+        {200, OpenedBody} =
+            fleet_daemon:get(Bob,
+                <<"/api/briefcase/files/", FileId/binary, "/content">>),
+        ?assertEqual(Payload, OpenedBody),
+        ct:pal("Bob opened file_id=~s — content matches", [FileId]),
+
+        %% 7. Admin guard inspect should report state=ok.
+        AuthHeader = [{<<"Authorization">>, <<"Bearer ", Token/binary>>}],
+        Realm = fleet_config:realm(FleetConfig),
+        {200, GuardBody} =
+            fleet_daemon:get(Bob,
+                <<"/api/admin/briefcase/guard/", FileId/binary,
+                  "?realm=", Realm/binary>>,
+                AuthHeader),
+        ?assertMatch(#{<<"guard">> := #{<<"state">> := <<"ok">>}},
+                     json:decode(GuardBody))
+    after
+        file:delete(LocalPath)
+    end.
+
+revoke_clears_open(Config) ->
+    FleetConfig = ?config(fleet_config, Config),
+    {ok, Alice} = fleet_config:daemon(FleetConfig, alice),
+    {ok, Bob}   = fleet_config:daemon(FleetConfig, bob),
+    Token = fleet_config:admin_token(FleetConfig),
+    Realm = fleet_config:realm(FleetConfig),
+    AuthHeader = [{<<"Authorization">>, <<"Bearer ", Token/binary>>}],
+
+    %% Replay the share + accept flow, then revoke.
+    Payload = <<"revoke-test-payload-",
+                (integer_to_binary(erlang:unique_integer([positive])))/binary>>,
+    LocalPath = "/tmp/phase_d_revoke_" ++
+                integer_to_list(erlang:unique_integer([positive])) ++
+                ".txt",
+    ok = file:write_file(LocalPath, Payload),
+
+    try
+        {200, UploadBody} =
+            fleet_daemon:upload(Alice, LocalPath,
+                                <<"revoke-test.txt">>,
+                                <<"text/plain">>),
+        #{<<"file_id">> := FileId,
+          <<"license_id">> := LicenseId} = json:decode(UploadBody),
+        ShareBody = json:encode(#{<<"recipients">> => <<"realm">>}),
+        {200, ShareResp} =
+            fleet_daemon:post(Alice,
+                <<"/api/briefcase/files/", FileId/binary, "/share">>,
+                ShareBody),
+        %% The share response carries license_ids (the issuer side
+        %% knows them); we want the one Bob accepts (realm-scope).
+        #{<<"license_ids">> := [LicenseIdFromShare | _]} = json:decode(ShareResp),
+
+        ok = fleet_wait:for_state(Bob,
+            <<"/api/briefcase/files/", FileId/binary>>,
+            <<"presence">>, <<"remote">>),
+
+        %% Alice revokes.
+        RevokeBody = json:encode(#{<<"reason">> => <<"test">>}),
+        {Status, _} =
+            fleet_daemon:post(Alice,
+                <<"/api/briefcase/share-licenses/",
+                  LicenseIdFromShare/binary, "/revoke">>,
+                RevokeBody),
+        true = lists:member(Status, [200, 202, 204]),
+
+        %% Wait for Bob's guard to flip to refused.
+        ok = fleet_wait:until(fun() ->
+            case fleet_daemon:get(Bob,
+                    <<"/api/admin/briefcase/guard/", FileId/binary,
+                      "?realm=", Realm/binary>>,
+                    AuthHeader) of
+                {200, GuardBody} ->
+                    case json:decode(GuardBody) of
+                        #{<<"guard">> := #{<<"state">> := <<"refused">>}} -> true;
+                        _ -> false
+                    end;
+                _ -> false
+            end
+        end, 30000),
+
+        %% Open should now return 403.
+        {OpenStatus, _} =
+            fleet_daemon:get(Bob,
+                <<"/api/briefcase/files/", FileId/binary, "/content">>),
+        ?assertEqual(403, OpenStatus),
+        _ = LicenseId  %% silence unused var
+    after
+        file:delete(LocalPath)
+    end.
 
 %%====================================================================
 %% Internal

@@ -77,11 +77,21 @@ get_shared_key(Realm) when is_binary(Realm) ->
 %%====================================================================
 
 init([]) ->
-    ?TABLE = ets:new(?TABLE, [set, public, named_table, {read_concurrency, true}]),
-    realm_credentials = ets:new(realm_credentials, [set, public, named_table, {read_concurrency, true}]),
-    ?SHARED_KEYS_TABLE = ets:new(?SHARED_KEYS_TABLE,
-                                 [set, public, named_table, {read_concurrency, true}]),
+    ensure_table(?TABLE),
+    ensure_table(realm_credentials),
+    ensure_table(?SHARED_KEYS_TABLE),
     {ok, #{}}.
+
+%% @private Idempotent table creation. The original `?TABLE = ets:new(...)`
+%% pattern crashed on restart / co-existence with test fixtures that
+%% create the same named table for stubbing.
+ensure_table(Name) ->
+    case ets:info(Name) of
+        undefined ->
+            ets:new(Name, [set, public, named_table,
+                           {read_concurrency, true}]);
+        _ -> ok
+    end.
 
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.

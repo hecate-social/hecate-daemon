@@ -20,16 +20,58 @@
 -export([ensure_table/0, start_tick/2, update_bytes/3,
          mark_completed/3, mark_failed/3, mark_cancelled/1,
          get/1, list/0, erase/1]).
+-export([register_worker/2, unregister_worker/1, find_worker/1]).
 
 -define(TABLE, briefcase_download_progress).
+-define(WORKERS_TABLE, briefcase_download_workers).
 
 ensure_table() ->
-    case ets:info(?TABLE) of
+    ensure_one(?TABLE),
+    ensure_one(?WORKERS_TABLE),
+    ok.
+
+ensure_one(Name) ->
+    case ets:info(Name) of
         undefined ->
-            ets:new(?TABLE, [public, named_table, set,
-                             {read_concurrency, true},
-                             {write_concurrency, true}]);
+            ets:new(Name, [public, named_table, set,
+                           {read_concurrency, true},
+                           {write_concurrency, true}]);
         _ -> ok
+    end.
+
+%% @doc Worker registers itself on init so DELETE /download can
+%% target the right pid. Called from `briefcase_download_worker:init/1`.
+-spec register_worker(binary(), pid()) -> ok.
+register_worker(FileId, Pid) when is_binary(FileId), is_pid(Pid) ->
+    ensure_table(),
+    ets:insert(?WORKERS_TABLE, {FileId, Pid}),
+    ok.
+
+-spec unregister_worker(binary()) -> ok.
+unregister_worker(FileId) when is_binary(FileId) ->
+    case ets:info(?WORKERS_TABLE) of
+        undefined -> ok;
+        _         -> ets:delete(?WORKERS_TABLE, FileId), ok
+    end.
+
+%% @doc Find the running worker pid for a file_id. If a stale entry
+%% points at a dead process the entry is reaped and `not_found`
+%% returned — keeps the table self-cleaning when a worker exits
+%% abnormally before terminate/2 runs.
+-spec find_worker(binary()) -> {ok, pid()} | not_found.
+find_worker(FileId) when is_binary(FileId) ->
+    case ets:info(?WORKERS_TABLE) of
+        undefined -> not_found;
+        _ ->
+            case ets:lookup(?WORKERS_TABLE, FileId) of
+                [{_, Pid}] when is_pid(Pid) ->
+                    case is_process_alive(Pid) of
+                        true  -> {ok, Pid};
+                        false -> ets:delete(?WORKERS_TABLE, FileId),
+                                 not_found
+                    end;
+                _ -> not_found
+            end
     end.
 
 %% @doc Seed a new row at download start. `TotalSizeHint` may be

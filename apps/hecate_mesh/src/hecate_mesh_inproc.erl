@@ -245,9 +245,43 @@ init([]) ->
     _ = application:ensure_all_started(macula),
     {ok, #{}}.
 
+%% The facade (`hecate_mesh`) delegates everything to
+%% `hecate_mesh_client:foo()` which uses `gen_server:call(?MODULE,
+%% Msg)` for stateful operations. Map those gen_server messages onto
+%% our direct-API helpers so the facade works against either backend.
+handle_call(activate, _From, State)         -> {reply, ok, State};
+handle_call(is_activated, _From, State)     -> {reply, true, State};
+handle_call(get_client, _From, State)       -> {reply, {ok, self()}, State};
+handle_call(get_status, _From, State)       -> {reply, get_status(), State};
+handle_call({publish, Topic, Payload}, _From, State) ->
+    {reply, publish(Topic, Payload), State};
+handle_call({subscribe, Topic, Cb}, _From, State) ->
+    {reply, subscribe(Topic, Cb), State};
+handle_call({unsubscribe, Ref}, _From, State) ->
+    {reply, unsubscribe(Ref), State};
+handle_call({discover_subscribers, Topic}, _From, State) ->
+    {reply, discover_subscribers(Topic), State};
+handle_call({advertise, Procedure, Handler}, _From, State) ->
+    {reply, advertise(Procedure, Handler), State};
+handle_call({call, Procedure, Args, Timeout}, _From, State) ->
+    {reply, call(Procedure, Args, Timeout), State};
+handle_call({call, Procedure, Args, Opts, Timeout}, _From, State) ->
+    {reply, call(Procedure, Args, Opts, Timeout), State};
+handle_call({call_stream, Procedure, Args, Timeout}, _From, State) ->
+    {reply, call_stream(Procedure, Args, #{}, Timeout), State};
+handle_call({call_stream, Procedure, Args, Opts, Timeout}, _From, State) ->
+    {reply, call_stream(Procedure, Args, Opts, Timeout), State};
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown_call}, State}.
 
+handle_cast({register_sub, Topic, Cb}, State) ->
+    _ = register_subscription(Topic, Cb), {noreply, State};
+handle_cast({register_adv, Procedure, Handler}, State) ->
+    _ = register_advertisement(Procedure, Handler), {noreply, State};
+handle_cast({register_stream_adv, Procedure, Mode, Handler}, State) ->
+    _ = register_stream_advertisement(Procedure, Mode, Handler), {noreply, State};
+handle_cast({unregister_adv, Procedure}, State) ->
+    _ = unregister_advertisement(Procedure), {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 

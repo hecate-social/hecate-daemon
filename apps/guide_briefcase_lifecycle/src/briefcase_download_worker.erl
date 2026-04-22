@@ -47,8 +47,10 @@ start_link(FileId, Realm, FetchFn)
 %%====================================================================
 
 init({FileId, Realm, FetchFn}) ->
+    process_flag(trap_exit, true),
     TotalHint = size_hint(FileId),
     ok = briefcase_download_progress:start_tick(FileId, TotalHint),
+    ok = briefcase_download_progress:register_worker(FileId, self()),
     self() ! run,
     {ok, #state{file_id = FileId, realm = Realm,
                 total_size = TotalHint, fetch_fn = FetchFn}}.
@@ -73,7 +75,9 @@ handle_info(run, #state{file_id = FileId, realm = Realm,
 handle_info(_, State) ->
     {noreply, State}.
 
-terminate(_Reason, _State) -> ok.
+terminate(_Reason, #state{file_id = FileId}) ->
+    briefcase_download_progress:unregister_worker(FileId),
+    ok.
 
 %%====================================================================
 %% Internal

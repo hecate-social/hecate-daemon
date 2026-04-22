@@ -13,7 +13,7 @@
 %%% @end
 -module(fleet_daemon).
 
--export([get/2, get/3, post/3, post/4, delete/2, delete/3]).
+-export([get/2, get/3, post/3, post/4, delete/2, delete/3, upload/3, upload/4]).
 
 -type daemon() :: map().
 -type response() :: {pos_integer(), binary()} | {error, term()}.
@@ -42,6 +42,62 @@ delete(Daemon, Path) -> delete(Daemon, Path, []).
 
 delete(Daemon, Path, Headers) ->
     request(Daemon, "DELETE", Path, Headers, undefined).
+
+%% @doc Upload a file via multipart POST. `LocalPath` is read on the
+%% test runner machine; `LogicalPath` is what the daemon records as
+%% the file's logical name.
+%%
+%% Implementation: scp the file to /tmp on the SSH target (so curl
+%% --form @/tmp/... can read it), invoke curl --unix-socket --form,
+%% then `rm` the tempfile in the same SSH session. Three round-trips
+%% per upload — slow, but reliable, and tests aren't latency-sensitive.
+-spec upload(daemon(), file:filename(), binary()) -> response().
+upload(Daemon, LocalPath, LogicalPath) ->
+    upload(Daemon, LocalPath, LogicalPath, <<"application/octet-stream">>).
+
+-spec upload(daemon(), file:filename(), binary(), binary()) -> response().
+upload(Daemon, LocalPath, LogicalPath, MimeType) ->
+    SSH = binary_to_list(maps:get(ssh, Daemon)),
+    Sock = binary_to_list(maps:get(socket, Daemon)),
+    RemoteTmp = "/tmp/fleet_upload_"
+                ++ integer_to_list(erlang:unique_integer([positive])),
+    LogicalPathStr = binary_to_list(LogicalPath),
+    MimeStr = binary_to_list(MimeType),
+
+    %% 1. scp the file to the target.
+    ScpCmd = lists:flatten(io_lib:format(
+        "scp -o ConnectTimeout=5 -o BatchMode=yes ~s ~s:~s 2>&1",
+        [shell_escape(LocalPath), SSH, RemoteTmp])),
+    case os:cmd(ScpCmd) of
+        Out when is_list(Out) ->
+            %% scp returns empty on success, error message on failure.
+            case string:trim(Out) of
+                ""    -> upload_via_curl(SSH, Sock, RemoteTmp,
+                                          LogicalPathStr, MimeStr);
+                Error -> {error, {scp_failed, Error}}
+            end
+    end.
+
+upload_via_curl(SSH, Sock, RemoteTmp, LogicalPathStr, MimeStr) ->
+    Cmd = lists:flatten(io_lib:format(
+        "ssh -o ConnectTimeout=5 -o BatchMode=yes ~s "
+        "'curl --silent --max-time 60 --unix-socket ~s "
+        "-X POST "
+        "--form file=@~s "
+        "--form-string path=~s "
+        "--form-string mime_type=~s "
+        "-w \"\\n%{http_code}\" "
+        "http://localhost/api/briefcase/files/upload; "
+        "rm -f ~s'",
+        [SSH, Sock, RemoteTmp, LogicalPathStr, MimeStr, RemoteTmp])),
+    parse_response(os:cmd(Cmd)).
+
+shell_escape(S) when is_list(S) ->
+    %% Wrap in single quotes; escape any embedded single quotes by
+    %% closing-quoting-reopening.
+    "'" ++ string:replace(S, "'", "'\"'\"'", all) ++ "'";
+shell_escape(S) when is_binary(S) ->
+    shell_escape(binary_to_list(S)).
 
 %%====================================================================
 %% Internal

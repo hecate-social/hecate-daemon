@@ -105,41 +105,20 @@ format_reason_field(R) -> iolist_to_binary(io_lib:format("~p", [R])).
 
 handle_delete(Req0, _State) ->
     FileId = cowboy_req:binding(file_id, Req0),
-    case cancel_worker(FileId) of
-        ok ->
+    case briefcase_download_progress:find_worker(FileId) of
+        {ok, Pid} ->
+            %% Targeted kill via the file_id → pid index registered
+            %% by the worker on init. Worker's terminate/2 unwinds
+            %% the index entry; mark_cancelled stamps the progress
+            %% row so a subsequent GET shows phase=cancelled.
+            exit(Pid, kill),
             briefcase_download_progress:mark_cancelled(FileId),
             hecate_api_utils:json_ok(#{file_id => FileId,
                                        state => <<"cancelled">>}, Req0);
-        not_running ->
+        not_found ->
             hecate_api_utils:json_error(404,
                 <<"No download in flight for this file">>, Req0)
     end.
-
-%% Best-effort cancellation: find the worker by walking the
-%% briefcase_download_sup children, kill the matching pid. Future
-%% refinement: index workers by file_id in an ETS so the lookup is O(1).
-cancel_worker(FileId) ->
-    Children = supervisor:which_children(briefcase_download_sup),
-    Pids = [Pid || {_, Pid, _, _} <- Children, is_pid(Pid)],
-    case find_and_kill(Pids, FileId) of
-        true  -> ok;
-        false -> not_running
-    end.
-
-find_and_kill([], _FileId) -> false;
-find_and_kill([Pid | Rest], FileId) ->
-    case worker_owns(Pid, FileId) of
-        true  -> exit(Pid, kill), true;
-        false -> find_and_kill(Rest, FileId)
-    end.
-
-%% A worker doesn't expose its file_id directly. For Phase E we use a
-%% best-effort heuristic: kill the most recently started worker if
-%% there's exactly one. Multi-worker disambiguation lands when the
-%% worker registers its file_id in an ETS lookup table.
-worker_owns(_Pid, _FileId) ->
-    %% TODO(phase-e+): real lookup. For now cancel-all.
-    true.
 
 %%--------------------------------------------------------------------
 %% Helpers
