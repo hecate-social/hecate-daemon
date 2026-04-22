@@ -45,7 +45,7 @@ publish(Data) ->
 
 do_publish(Mri, Pub, Data) ->
     Realm = realm_from_mri(Mri),
-    Topic = hecate_topics:fact(<<"identity">>, <<"public_key_announced">>, 1),
+    Topic = hecate_topics:realm_fact(<<"identity">>, <<"public_key_announced">>, 1),
     Fact = #{
         mri                    => Mri,
         realm                  => Realm,

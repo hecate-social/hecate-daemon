@@ -76,7 +76,7 @@ hecate_identity_available() ->
     end.
 
 subscribe_now(Mri, State) ->
-    Topic = hecate_topics:fact(<<"licenses">>, <<"issued_batch">>, 1),
+    Topic = hecate_topics:org_fact(<<"licenses">>, <<"issued_batch">>, 1),
     Self = self(),
     Callback = fun(Msg) -> Self ! {mesh_license_batch, Msg} end,
     case hecate_mesh:subscribe(Topic, Callback) of

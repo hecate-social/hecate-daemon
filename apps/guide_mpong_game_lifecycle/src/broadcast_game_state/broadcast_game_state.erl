@@ -12,7 +12,7 @@
 -export([broadcast/2, topic/0]).
 
 topic() ->
-    hecate_topics:fact(<<"mpong">>, <<"state_broadcast">>, 1).
+    hecate_topics:app_fact(<<"mpong">>, <<"state_broadcast">>, 1).
 
 -spec broadcast(binary(), map()) -> ok.
 broadcast(GameId, StateMsg) ->

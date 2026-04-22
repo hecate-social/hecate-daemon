@@ -34,7 +34,7 @@ periodic_loop() ->
     periodic_loop().
 
 do_announce() ->
-    Topic = hecate_topics:fact(<<"site">>, <<"node_announced">>, 1),
+    Topic = hecate_topics:app_fact(<<"site">>, <<"node_announced">>, 1),
     SiteId = guide_site_lifecycle_app:site_id(),
     NodeName = atom_to_binary(node()),
 

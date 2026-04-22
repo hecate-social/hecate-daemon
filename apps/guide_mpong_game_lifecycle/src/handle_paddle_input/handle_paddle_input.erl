@@ -13,7 +13,7 @@
 -export([subscribe/2, topic/0]).
 
 topic() ->
-    hecate_topics:fact(<<"mpong">>, <<"paddle_moved">>, 1).
+    hecate_topics:app_fact(<<"mpong">>, <<"paddle_moved">>, 1).
 
 -spec subscribe(binary(), pid()) -> ok.
 subscribe(GameId, EnginePid) ->

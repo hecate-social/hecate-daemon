@@ -38,7 +38,7 @@ do_publish(MId, Data) ->
             logger:info("[realm_membership_resigned_v1_to_mesh] mesh down; drop resign ~s",
                         [MId]);
         _Pid ->
-            Topic = hecate_topics:fact(<<"membership">>, <<"resigned">>, 1),
+            Topic = hecate_topics:realm_fact(<<"membership">>, <<"resigned">>, 1),
             Fact = #{
                 membership_id => MId,
                 realm_id      => gf(realm_id,    Data),

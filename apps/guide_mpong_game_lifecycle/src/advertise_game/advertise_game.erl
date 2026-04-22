@@ -17,13 +17,13 @@
 %% advertises its own join endpoint for direct RPC routing.
 -spec join_procedure(binary()) -> binary().
 join_procedure(GameId) ->
-    Base = hecate_topics:hope(<<"mpong">>, <<"join_game">>, 1),
+    Base = hecate_topics:app_hope(<<"mpong">>, <<"join_game">>, 1),
     <<Base/binary, ".", GameId/binary>>.
 
 %% @doc Build the realm-prefixed mesh topic for game announcements.
 -spec topic() -> binary().
 topic() ->
-    hecate_topics:fact(<<"mpong">>, <<"game_advertised">>, 1).
+    hecate_topics:app_fact(<<"mpong">>, <<"game_advertised">>, 1).
 
 -spec announce(map()) -> ok.
 announce(#{game_id := GameId, host_node_id := HostNodeId,

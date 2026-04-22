@@ -150,7 +150,7 @@ do_publish_or_drop(BatchId, _Realm, _Issuer, undefined, _Entries) ->
     logger:warning("[licenses_rewrapped_batch] batch=~s missing new_k_realm_version; dropping",
                    [BatchId]);
 do_publish_or_drop(BatchId, Realm, Issuer, NewVer, Entries) ->
-    Topic = hecate_topics:fact(<<"licenses">>, <<"rewrapped_batch">>, 1),
+    Topic = hecate_topics:org_fact(<<"licenses">>, <<"rewrapped_batch">>, 1),
     Fact = #{
         event_type          => <<"licenses_rewrapped_batch_v1">>,
         realm               => Realm,

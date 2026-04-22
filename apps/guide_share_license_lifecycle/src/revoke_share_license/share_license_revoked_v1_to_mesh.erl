@@ -40,7 +40,7 @@ do_publish(LicenseId, Data) ->
             logger:info("[share_license_revoked_v1_to_mesh] mesh down; drop revoke license=~s",
                         [LicenseId]);
         _Pid ->
-            Topic = hecate_topics:fact(<<"licenses">>, <<"revoked">>, 1),
+            Topic = hecate_topics:org_fact(<<"licenses">>, <<"revoked">>, 1),
             Fact = #{
                 license_id => LicenseId,
                 grantee    => gf(grantee,    Data),

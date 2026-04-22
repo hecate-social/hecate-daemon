@@ -74,7 +74,7 @@ hecate_identity_available() ->
     end.
 
 subscribe_now(Mri, State) ->
-    Topic = hecate_topics:fact(<<"licenses">>, <<"revoked">>, 1),
+    Topic = hecate_topics:org_fact(<<"licenses">>, <<"revoked">>, 1),
     Self = self(),
     Callback = fun(Msg) -> Self ! {mesh_license_revoked, Msg} end,
     case hecate_mesh:subscribe(Topic, Callback) of

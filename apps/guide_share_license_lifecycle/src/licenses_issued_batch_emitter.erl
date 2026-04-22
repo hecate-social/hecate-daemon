@@ -140,7 +140,7 @@ do_publish_or_drop(BatchId, _Realm, undefined, _Entries) ->
     logger:warning("[licenses_batch_emit] batch=~s missing issuer_did; dropping",
                    [BatchId]);
 do_publish_or_drop(BatchId, Realm, Issuer, Entries) ->
-    Topic = hecate_topics:fact(<<"licenses">>, <<"issued_batch">>, 1),
+    Topic = hecate_topics:org_fact(<<"licenses">>, <<"issued_batch">>, 1),
     Fact = #{
         event_type => <<"licenses_issued_batch_v1">>,
         realm      => Realm,

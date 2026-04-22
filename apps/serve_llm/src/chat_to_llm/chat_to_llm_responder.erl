@@ -15,7 +15,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    Topic = hecate_topics:hope(<<"llm">>, <<"chat_to_model">>, 1),
+    Topic = hecate_topics:app_hope(<<"llm">>, <<"chat_to_model">>, 1),
     self() ! {try_subscribe, Topic},
     {ok, #state{subscription_ref = undefined, agent_identity = get_agent_identity()}}.
 

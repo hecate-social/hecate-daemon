@@ -46,7 +46,7 @@
 %% and returns them as a list.
 -spec advertise_replay(binary(), atom(), binary()) -> ok.
 advertise_replay(_Realm, StoreId, Domain) ->
-    Procedure = hecate_topics:hope(Domain, <<"replay_events">>, 1),
+    Procedure = hecate_topics:app_hope(Domain, <<"replay_events">>, 1),
     Handler = fun(Args) ->
         Offset = maps:get(<<"since">>, Args, 0),
         Limit = maps:get(<<"limit">>, Args, ?BATCH_SIZE),
@@ -72,7 +72,7 @@ advertise_replay(_Realm, StoreId, Domain) ->
 -spec catch_up(binary(), binary(), binary(), fun((map()) -> ok)) ->
     {ok, non_neg_integer()} | {error, term()}.
 catch_up(_Realm, Domain, StreamKey, ProcessFn) ->
-    Procedure = hecate_topics:hope(Domain, <<"replay_events">>, 1),
+    Procedure = hecate_topics:app_hope(Domain, <<"replay_events">>, 1),
     Position = get_position(StreamKey),
     catch_up_loop(Procedure, StreamKey, Position, ProcessFn, 0).
 
