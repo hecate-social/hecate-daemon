@@ -44,3 +44,7 @@ rebar3.crashdump
 
 # Lock files are tracked for reproducible builds
 rebar.lock
+
+# Fleet test config — contains live admin tokens, never commit.
+test/fleet.config
+test/fleet.local.config

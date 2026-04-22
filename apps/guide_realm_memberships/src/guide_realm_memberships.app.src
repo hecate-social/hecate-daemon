@@ -6,9 +6,11 @@
     {applications, [
         kernel,
         stdlib,
+        cowboy,
         reckon_db,
         evoq,
-        reckon_evoq
+        reckon_evoq,
+        shared
     ]},
     {env, []},
     {modules, []},

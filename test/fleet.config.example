@@ -1,0 +1,44 @@
+%%% Sample fleet test configuration. Copy to `fleet.config`, fill in
+%%% your real SSH targets + tokens, then point HECATE_FLEET_CONFIG
+%%% at the path:
+%%%
+%%%   HECATE_FLEET_CONFIG=test/fleet/fleet.config \
+%%%     rebar3 ct --suite test/fleet/phase_d_fleet_SUITE
+%%%
+%%% Each daemon needs HECATE_ADMIN_TOKEN=<admin_token> in its env so
+%%% the bearer auth succeeds. The realm server needs its own admin
+%%% endpoints enabled for revoke + rotate scenarios.
+%%%
+%%% NEVER commit a populated fleet.config — secrets in plaintext.
+%%% .gitignore should exclude it; only the .example stays in source.
+
+#{
+    realm => <<"io.macula">>,
+    admin_token => <<"REPLACE_WITH_YOUR_ADMIN_TOKEN">>,
+    daemons => [
+        #{role => alice,
+          ssh => <<"rl@beam00.lab">>,
+          socket => <<"/home/rl/.hecate/hecate-daemon/sockets/api.sock">>,
+          api_url => <<"http://127.0.0.1:4444">>,
+          did => <<"mri:agent:io.macula/alice">>},
+        #{role => bob,
+          ssh => <<"rl@beam01.lab">>,
+          socket => <<"/home/rl/.hecate/hecate-daemon/sockets/api.sock">>,
+          api_url => <<"http://127.0.0.1:4444">>,
+          did => <<"mri:agent:io.macula/bob">>},
+        #{role => carol,
+          ssh => <<"rl@beam02.lab">>,
+          socket => <<"/home/rl/.hecate/hecate-daemon/sockets/api.sock">>,
+          api_url => <<"http://127.0.0.1:4444">>,
+          did => <<"mri:agent:io.macula/carol">>},
+        #{role => dave,
+          ssh => <<"rl@beam03.lab">>,
+          socket => <<"/home/rl/.hecate/hecate-daemon/sockets/api.sock">>,
+          api_url => <<"http://127.0.0.1:4444">>,
+          did => <<"mri:agent:io.macula/dave">>}
+    ],
+    realm_server => #{
+        admin_url => <<"https://realm.macula.io/admin">>,
+        admin_token => <<"REPLACE_WITH_REALM_ADMIN_TOKEN">>
+    }
+}.
