@@ -78,6 +78,93 @@ apply_file_evicted_clears_flag_test() ->
     ?assertNot(evoq_bit_flags:has(State2#briefcase_state.status, ?FILE_CACHED)).
 
 %%====================================================================
+%% Async download model — new event folds + gates
+%%====================================================================
+
+apply_file_download_started_sets_downloading_test() ->
+    State0 = briefcase_state:new(<<"file-d">>),
+    Started = #{event_type => <<"file_download_started_v1">>,
+                file_id => <<"file-d">>,
+                realm => <<"io.macula">>,
+                started_at => 1000},
+    State = briefcase_aggregate:apply(State0, Started),
+    ?assert(evoq_bit_flags:has(State#briefcase_state.status, ?FILE_DOWNLOADING)),
+    %% FILE_CACHED stays clear
+    ?assertNot(evoq_bit_flags:has(State#briefcase_state.status, ?FILE_CACHED)).
+
+apply_file_download_completed_sets_cached_clears_downloading_test() ->
+    State0 = briefcase_state:new(<<"file-c">>),
+    State1 = with_flag(State0, ?FILE_DOWNLOADING),
+    Completed = #{event_type => <<"file_download_completed_v1">>,
+                  file_id => <<"file-c">>,
+                  source_realm => <<"io.macula">>,
+                  cache_size => 2048,
+                  frames => 2,
+                  completed_at => 9999},
+    State = briefcase_aggregate:apply(State1, Completed),
+    ?assert(evoq_bit_flags:has(State#briefcase_state.status, ?FILE_CACHED)),
+    ?assertNot(evoq_bit_flags:has(State#briefcase_state.status, ?FILE_DOWNLOADING)).
+
+apply_file_download_failed_clears_downloading_test() ->
+    State0 = briefcase_state:new(<<"file-f">>),
+    State1 = with_flag(State0, ?FILE_DOWNLOADING),
+    Failed = #{event_type => <<"file_download_failed_v1">>,
+               file_id => <<"file-f">>,
+               reason => stream_ended_without_eof_frame,
+               partial_bytes => 512,
+               failed_at => 999},
+    State = briefcase_aggregate:apply(State1, Failed),
+    ?assertNot(evoq_bit_flags:has(State#briefcase_state.status, ?FILE_DOWNLOADING)),
+    ?assertNot(evoq_bit_flags:has(State#briefcase_state.status, ?FILE_CACHED)).
+
+legacy_file_cached_v1_treated_as_completed_test() ->
+    %% Replay safety: a stream that emitted the synchronous-Phase-E
+    %% file_cached_v1 should reconstruct to the same state as a new
+    %% file_download_completed_v1 (FILE_CACHED set, FILE_DOWNLOADING
+    %% clear).
+    State0 = briefcase_state:new(<<"file-l">>),
+    State1 = with_flag(State0, ?FILE_DOWNLOADING),  %% simulate mid-flight
+    Legacy = #{event_type => <<"file_cached_v1">>,
+               file_id => <<"file-l">>,
+               cache_size => 1024,
+               frames => 1,
+               source_realm => <<"io.macula">>,
+               cached_at => 1234},
+    State = briefcase_aggregate:apply(State1, Legacy),
+    ?assert(evoq_bit_flags:has(State#briefcase_state.status, ?FILE_CACHED)),
+    ?assertNot(evoq_bit_flags:has(State#briefcase_state.status, ?FILE_DOWNLOADING)).
+
+download_rejected_if_already_downloading_test() ->
+    State0 = briefcase_state:new(<<"file-id">>),
+    State = with_flags(State0, [?FILE_ANNOUNCED, ?FILE_DOWNLOADING]),
+    Payload = download_payload(<<"file-id">>),
+    ?assertEqual({error, already_downloading},
+                 briefcase_aggregate:execute(State, Payload)).
+
+complete_rejected_if_not_downloading_test() ->
+    %% complete_file_download_v1 is dispatched by the worker — it
+    %% should never reach the aggregate without FILE_DOWNLOADING set.
+    State0 = briefcase_state:new(<<"file-c2">>),
+    State = with_flag(State0, ?FILE_ANNOUNCED),
+    Payload = #{command_type => complete_file_download_v1,
+                file_id => <<"file-c2">>,
+                source_realm => <<"io.macula">>,
+                cache_size => 1024,
+                frames => 1,
+                completed_at => 5000},
+    ?assertEqual({error, not_downloading},
+                 briefcase_aggregate:execute(State, Payload)).
+
+fail_rejected_if_not_downloading_test() ->
+    State0 = briefcase_state:new(<<"file-f2">>),
+    State = with_flag(State0, ?FILE_ANNOUNCED),
+    Payload = #{command_type => fail_file_download_v1,
+                file_id => <<"file-f2">>,
+                reason => some_error},
+    ?assertEqual({error, not_downloading},
+                 briefcase_aggregate:execute(State, Payload)).
+
+%%====================================================================
 %% Helpers
 %%====================================================================
 

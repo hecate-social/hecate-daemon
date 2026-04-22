@@ -1,19 +1,22 @@
 %%% @doc Handler for download_file_v1.
 %%%
-%%% Orchestrates:
-%%%   1. Validate the aggregate state (expects FILE_ANNOUNCED without
-%%%      FILE_CACHED — enforced at the aggregate layer before we run).
-%%%   2. Enforce the open-path guard — skip the download if the
-%%%      license state is stale / revoked (no point caching bytes we
-%%%      can't decrypt).
-%%%   3. Call `download_file_client:fetch/2` to stream ciphertext frames
-%%%      into the cache store.
-%%%   4. Emit `file_cached_v1` with the cache size + frame count.
+%%% The user-facing "I want this file pulled down" command. Emits
+%%% `file_download_started_v1` synchronously, which the PM
+%%% `on_file_download_started_fetch_bytes` reacts to by spawning a
+%%% supervised `briefcase_download_worker`. The cowboy request that
+%%% dispatched this command returns as soon as the event is persisted
+%%% — no blocking on the network pull.
 %%%
-%%% The download is a side effect performed BEFORE the event is
-%%% emitted — so the event accurately records a completed cache. On
-%%% replay the side effect does not re-run; the cached bytes are
-%%% either still on disk or the user needs to re-download explicitly.
+%%% Gates:
+%%%   - `realm` must be set on the aggregate (populated by the
+%%%     file_announced_v1 birth event).
+%%%   - `hecate_license_guard:can_open_file/2` must pass. No point
+%%%     pulling ciphertext we can't decrypt — the guard refuses
+%%%     stale / revoked / expired licenses up-front.
+%%%
+%%% Worker failure / success flow into the aggregate via
+%%% `complete_file_download_v1` / `fail_file_download_v1` dispatched
+%%% from the worker itself.
 %%% @end
 -module(maybe_download_file).
 
@@ -30,10 +33,8 @@ handle_with_state(Payload, State) ->
     FileId = maps:get(file_id, Payload),
     Realm  = State#briefcase_state.realm,
     case validate_realm(Realm) of
-        ok ->
-            guard_and_download(FileId, Realm);
-        {error, _} = Err ->
-            Err
+        ok             -> guard_and_emit(FileId, Realm, State);
+        {error, _} = E -> E
     end.
 
 -spec dispatch(download_file_v1:download_file_v1()) ->
@@ -63,28 +64,15 @@ validate_realm(undefined) -> {error, realm_not_set};
 validate_realm(R) when is_binary(R), byte_size(R) > 0 -> ok;
 validate_realm(_) -> {error, realm_not_set}.
 
-guard_and_download(FileId, Realm) ->
+guard_and_emit(FileId, Realm, State) ->
     case hecate_license_guard:can_open_file(FileId, Realm) of
         ok ->
-            do_fetch(FileId, Realm);
+            {ok, Event} = file_download_started_v1:new(#{
+                file_id    => FileId,
+                realm      => Realm,
+                issuer_did => State#briefcase_state.author_did,
+                started_at => erlang:system_time(millisecond)}),
+            {ok, [file_download_started_v1:to_map(Event)]};
         {error, Reason} ->
             {error, {license_refused, Reason}}
     end.
-
-do_fetch(FileId, Realm) ->
-    case download_file_client:fetch(Realm, FileId) of
-        {ok, #{bytes_written := Size, frames := Frames}} ->
-            build_event(FileId, Realm, Size, Frames);
-        {error, _} = Err ->
-            Err
-    end.
-
-build_event(FileId, Realm, Size, Frames) ->
-    CachedAt = erlang:system_time(millisecond),
-    {ok, Event} = file_cached_v1:new(#{
-        file_id      => FileId,
-        source_realm => Realm,
-        cache_size   => Size,
-        frames       => Frames,
-        cached_at    => CachedAt}),
-    {ok, [file_cached_v1:to_map(Event)]}.

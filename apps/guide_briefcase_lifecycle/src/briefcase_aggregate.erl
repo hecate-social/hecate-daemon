@@ -73,21 +73,46 @@ do_execute(announce_file_v1, State, Payload) ->
         _ -> {error, already_present}
     end;
 
-%% Phase E: pull ciphertext from a peer. Requires the file to have
-%% been announced locally. Idempotent: a second download against an
-%% already-cached file is rejected (re-cache = evict + download).
-%% Locally-uploaded files are owned, never downloaded — that check
-%% runs first so the returned error is informative.
+%% Phase E async model: download_file_v1 is the user's intent. The
+%% handler emits file_download_started_v1 (no I/O); the PM
+%% on_file_download_started_fetch_bytes spawns the supervised worker
+%% which later dispatches complete_file_download_v1 or
+%% fail_file_download_v1 from the worker process.
+%%
+%% Gates: must be FILE_ANNOUNCED, must NOT be FILE_UPLOADED (owned
+%% files don't download), must NOT be FILE_CACHED (already have it),
+%% must NOT be FILE_DOWNLOADING (worker already in flight). The
+%% downloading guard provides idempotency for repeated POSTs.
 do_execute(download_file_v1, State, Payload) ->
     Status = State#briefcase_state.status,
-    Announced = (Status band ?FILE_ANNOUNCED) =/= 0,
-    Cached    = (Status band ?FILE_CACHED)    =/= 0,
-    Uploaded  = (Status band ?FILE_UPLOADED)  =/= 0,
+    Announced   = (Status band ?FILE_ANNOUNCED)   =/= 0,
+    Cached      = (Status band ?FILE_CACHED)      =/= 0,
+    Uploaded    = (Status band ?FILE_UPLOADED)    =/= 0,
+    Downloading = (Status band ?FILE_DOWNLOADING) =/= 0,
     if
         Uploaded       -> {error, locally_uploaded};
         not Announced  -> {error, not_announced};
         Cached         -> {error, already_cached};
+        Downloading    -> {error, already_downloading};
         true           -> maybe_download_file:handle_with_state(Payload, State)
+    end;
+
+%% Internal: worker dispatches this when the cache write completes.
+%% Aggregate gates on FILE_DOWNLOADING — if it's not set, either the
+%% download was never started (bug) or a cancel raced ahead.
+do_execute(complete_file_download_v1, State, Payload) ->
+    Status = State#briefcase_state.status,
+    case (Status band ?FILE_DOWNLOADING) =/= 0 of
+        true  -> maybe_complete_file_download:handle_from_map(Payload);
+        false -> {error, not_downloading}
+    end;
+
+%% Internal: worker dispatches this on fetch failure. Same gate.
+do_execute(fail_file_download_v1, State, Payload) ->
+    Status = State#briefcase_state.status,
+    case (Status band ?FILE_DOWNLOADING) =/= 0 of
+        true  -> maybe_fail_file_download:handle_from_map(Payload);
+        false -> {error, not_downloading}
     end;
 
 %% Phase E: drop cached ciphertext from disk. Valid only on

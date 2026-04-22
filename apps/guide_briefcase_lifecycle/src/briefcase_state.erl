@@ -68,10 +68,20 @@ do_apply(<<"file_announced_v1">>, State, #{data := Data}) ->
     apply_file_announced(State, Data);
 do_apply(<<"file_announced_v1">>, State, Data) ->
     apply_file_announced(State, Data);
+%% Legacy synchronous-fetch event from the Phase E initial cut.
+%% Treated identically to file_download_completed_v1 on replay so
+%% old streams reconstruct to the same end state. New code emits
+%% file_download_completed_v1 only.
 do_apply(<<"file_cached_v1">>, State, _Event) ->
-    apply_file_cached(State);
+    apply_file_completed(State);
 do_apply(<<"file_evicted_v1">>, State, _Event) ->
     apply_file_evicted(State);
+do_apply(<<"file_download_started_v1">>, State, _Event) ->
+    apply_file_download_started(State);
+do_apply(<<"file_download_completed_v1">>, State, _Event) ->
+    apply_file_completed(State);
+do_apply(<<"file_download_failed_v1">>, State, _Event) ->
+    apply_file_download_failed(State);
 do_apply(_UnknownEventType, State, _Event) ->
     State.
 
@@ -113,14 +123,35 @@ apply_file_announced(State, Data) ->
         status       = evoq_bit_flags:set(State#briefcase_state.status, ?FILE_ANNOUNCED)
     }.
 
-apply_file_cached(State) ->
-    State#briefcase_state{
-        status = evoq_bit_flags:set(State#briefcase_state.status, ?FILE_CACHED)
-    }.
+%% Used by both the legacy file_cached_v1 (replay) and the new
+%% file_download_completed_v1 (current code path). Sets FILE_CACHED
+%% and clears FILE_DOWNLOADING (latter is a no-op for legacy replay
+%% where the bit was never set, so the same fold is safe in both
+%% directions).
+apply_file_completed(State) ->
+    Status = State#briefcase_state.status,
+    Cleared = evoq_bit_flags:unset(Status, ?FILE_DOWNLOADING),
+    Updated = evoq_bit_flags:set(Cleared, ?FILE_CACHED),
+    State#briefcase_state{status = Updated}.
 
 apply_file_evicted(State) ->
     State#briefcase_state{
         status = evoq_bit_flags:unset(State#briefcase_state.status, ?FILE_CACHED)
+    }.
+
+apply_file_download_started(State) ->
+    State#briefcase_state{
+        status = evoq_bit_flags:set(State#briefcase_state.status,
+                                    ?FILE_DOWNLOADING)
+    }.
+
+apply_file_download_failed(State) ->
+    %% Clear FILE_DOWNLOADING. FILE_CACHED untouched (probably 0 on
+    %% failure path; preserved on the off chance a retry-after-success
+    %% replays in an unusual order).
+    State#briefcase_state{
+        status = evoq_bit_flags:unset(State#briefcase_state.status,
+                                      ?FILE_DOWNLOADING)
     }.
 
 %% @private Get field from map with default (atom or binary key).

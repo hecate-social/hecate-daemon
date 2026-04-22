@@ -1,13 +1,12 @@
 %%% @doc Top-level supervisor for guide_briefcase_lifecycle.
 %%%
-%%% Supervises mesh emitters for the briefcase CMD department. Each
-%%% emitter subscribes to a specific domain event via
-%%% `evoq_event_handler` and publishes an integration FACT to the mesh.
-%%%
-%%% Phase B wires:
-%%%   - `file_shared_v1_to_mesh` — on each `file_shared_v1`, publish
-%%%     `{realm}.briefcase.file_shared` FACT so realm peers can record
-%%%     a placeholder for the file.
+%%% Supervises:
+%%%   - mesh emitters (Phase B + later)
+%%%   - briefcase_download_progress ETS owner
+%%%   - briefcase_download_sup (simple_one_for_one for async download
+%%%     workers — Phase 4 async model)
+%%%   - on_file_download_started_fetch_bytes evoq handler (the PM
+%%%     that spawns the worker on each file_download_started_v1)
 %%% @end
 -module(guide_briefcase_lifecycle_sup).
 -behaviour(supervisor).
@@ -24,7 +23,24 @@ init([]) ->
         period    => 10
     },
     Children = [
-        emitter(file_shared_v1_to_mesh)
+        %% Mesh emitters — domain events to integration FACTs.
+        emitter(file_shared_v1_to_mesh),
+
+        %% Progress ETS — owned by a tiny gen_server so the table
+        %% lives as long as the supervisor does.
+        #{id => briefcase_download_progress_owner,
+          start => {briefcase_download_progress_owner, start_link, []},
+          restart => permanent, shutdown => 5000, type => worker,
+          modules => [briefcase_download_progress_owner]},
+
+        %% Per-download worker pool.
+        #{id => briefcase_download_sup,
+          start => {briefcase_download_sup, start_link, []},
+          restart => permanent, shutdown => 5000, type => supervisor,
+          modules => [briefcase_download_sup]},
+
+        %% Process manager: file_download_started_v1 -> spawn worker.
+        emitter(on_file_download_started_fetch_bytes)
     ],
     {ok, {SupFlags, Children}}.
 

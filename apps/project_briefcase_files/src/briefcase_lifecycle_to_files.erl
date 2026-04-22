@@ -17,7 +17,12 @@ interested_in() ->
      <<"file_shared_v1">>,
      <<"file_unshared_v1">>,
      <<"file_announced_v1">>,
+     %% Legacy (synchronous Phase E) — kept for replay safety.
      <<"file_cached_v1">>,
+     %% Async download model.
+     <<"file_download_started_v1">>,
+     <<"file_download_completed_v1">>,
+     <<"file_download_failed_v1">>,
      <<"file_evicted_v1">>].
 
 init(_Config) ->
@@ -26,13 +31,18 @@ init(_Config) ->
 
 project(#{data := Data} = Event, _Metadata, State, RM) ->
     case get_event_type(Event) of
-        <<"file_uploaded_v1">>  -> project_file_uploaded(Data, State, RM);
-        <<"file_shared_v1">>    -> project_privacy_change(Data, <<"shared">>, State, RM);
-        <<"file_unshared_v1">>  -> project_privacy_change(Data, <<"private">>, State, RM);
-        <<"file_announced_v1">> -> project_file_announced(Data, State, RM);
-        <<"file_cached_v1">>    -> project_file_cached(Data, State, RM);
-        <<"file_evicted_v1">>   -> project_file_evicted(Data, State, RM);
-        _                       -> {ok, State, RM}
+        <<"file_uploaded_v1">>            -> project_file_uploaded(Data, State, RM);
+        <<"file_shared_v1">>              -> project_privacy_change(Data, <<"shared">>, State, RM);
+        <<"file_unshared_v1">>            -> project_privacy_change(Data, <<"private">>, State, RM);
+        <<"file_announced_v1">>           -> project_file_announced(Data, State, RM);
+        %% Legacy: replay treats file_cached_v1 identically to
+        %% file_download_completed_v1.
+        <<"file_cached_v1">>              -> project_file_completed(Data, State, RM);
+        <<"file_download_started_v1">>    -> project_file_download_started(Data, State, RM);
+        <<"file_download_completed_v1">>  -> project_file_completed(Data, State, RM);
+        <<"file_download_failed_v1">>     -> project_file_download_failed(Data, State, RM);
+        <<"file_evicted_v1">>             -> project_file_evicted(Data, State, RM);
+        _                                  -> {ok, State, RM}
     end.
 
 %% ===================================================================
@@ -82,19 +92,71 @@ project_file_announced(Data, State, RM) ->
     {ok, State, RM2}.
 
 %% ===================================================================
-%% file_cached_v1 — ciphertext downloaded + persisted locally
+%% file_download_started_v1 — async pull begins (transient state)
 %% ===================================================================
 
-project_file_cached(Data, State, RM) ->
+project_file_download_started(Data, State, RM) ->
     FileId = gf(file_id, Data),
     case evoq_read_model:get(FileId, RM) of
         {ok, Entry} ->
             Updated = Entry#{
+                presence     => <<"downloading">>,
+                status_label => <<"Downloading">>,
+                download_started_at => gf(started_at, Data)
+            },
+            {ok, RM2} = evoq_read_model:put(FileId, Updated, RM),
+            {ok, State, RM2};
+        {error, not_found} ->
+            {ok, State, RM}
+    end.
+
+%% ===================================================================
+%% file_download_completed_v1 (and legacy file_cached_v1) —
+%% ciphertext downloaded + persisted locally
+%% ===================================================================
+
+project_file_completed(Data, State, RM) ->
+    FileId = gf(file_id, Data),
+    case evoq_read_model:get(FileId, RM) of
+        {ok, Entry} ->
+            Cleared = maps:without([download_started_at,
+                                    download_failed_at,
+                                    download_failure_reason], Entry),
+            Updated = Cleared#{
                 presence     => <<"cached">>,
                 status_label => <<"Cached">>,
                 cache_size   => gf(cache_size, Data),
-                cached_at    => gf(cached_at, Data),
+                cached_at    => completed_at_or_legacy(Data),
                 source_realm => gf(source_realm, Data)
+            },
+            {ok, RM2} = evoq_read_model:put(FileId, Updated, RM),
+            {ok, State, RM2};
+        {error, not_found} ->
+            {ok, State, RM}
+    end.
+
+%% Legacy file_cached_v1 events used `cached_at`; the new event uses
+%% `completed_at`. Pick whichever is present.
+completed_at_or_legacy(Data) ->
+    case gf(completed_at, Data) of
+        undefined -> gf(cached_at, Data);
+        At        -> At
+    end.
+
+%% ===================================================================
+%% file_download_failed_v1 — pull failed; back to placeholder
+%% ===================================================================
+
+project_file_download_failed(Data, State, RM) ->
+    FileId = gf(file_id, Data),
+    case evoq_read_model:get(FileId, RM) of
+        {ok, Entry} ->
+            Cleared = maps:without([download_started_at], Entry),
+            Updated = Cleared#{
+                presence     => <<"remote">>,
+                status_label => <<"Download failed">>,
+                download_failed_at => gf(failed_at, Data),
+                download_failure_reason => gf(reason, Data)
             },
             {ok, RM2} = evoq_read_model:put(FileId, Updated, RM),
             {ok, State, RM2};

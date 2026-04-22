@@ -72,6 +72,20 @@ authorise_and_serve(FileId, Entry, Req0) ->
                         <<"Remote file not cached locally — download first">>,
                         Req0)
                 end);
+        <<"downloading">> ->
+            %% Async download in flight — surface progress so the UI
+            %% can render a "wait" state. 202 is REST's "resource
+            %% will be available soon".
+            Progress = case briefcase_download_progress:get(FileId) of
+                {ok, Row} -> Row;
+                _         -> #{}
+            end,
+            hecate_api_utils:json_ok(202,
+                #{file_id       => FileId,
+                  state         => <<"downloading">>,
+                  bytes_written => maps:get(bytes_written, Progress, 0),
+                  total_size    => maps:get(total_size_hint, Progress, null)},
+                Req0);
         <<"cached">> ->
             gate_and_then(FileId, Entry, Req0,
                 fun(Realm) ->

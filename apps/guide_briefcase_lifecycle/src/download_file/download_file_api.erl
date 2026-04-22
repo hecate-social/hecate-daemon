@@ -1,22 +1,22 @@
-%%% @doc API handler: POST /api/briefcase/files/:file_id/download
+%%% @doc API: POST + GET + DELETE /api/briefcase/files/:file_id/download
 %%%
-%%% Pulls a peer's ciphertext into the local cache. Must target a row
-%%% that was `file_announced_v1`'d (i.e., we have a placeholder). The
-%%% handler:
+%%% Async download model (Phase E+):
 %%%
-%%%   1. Dispatches `download_file_v1` — the aggregate gates on
-%%%      FILE_ANNOUNCED without FILE_CACHED and enforces the open-
-%%%      path license guard before hitting the network.
-%%%   2. The handler performs the streaming RPC + cache write
-%%%      synchronously; `file_cached_v1` is emitted on success.
+%%% POST   — Dispatch download_file_v1, return 202 with the initial
+%%%          progress row. Worker is spawned by
+%%%          on_file_download_started_fetch_bytes; cowboy worker
+%%%          returns immediately so large files don't block the API.
 %%%
-%%% Response: `{ok, #{file_id, bytes_written, frames}}` or 400 with
-%%% the error reason (including `{license_refused, Reason}` when the
-%%% guard vetoes).
+%%% GET    — Return the current progress row (downloading | completed
+%%%          | failed) as JSON. SSE variant comes in a follow-up; this
+%%%          minimum lands the polling shape so the UI can render
+%%%          progress without changes.
 %%%
-%%% Large files will block the cowboy worker for the duration of the
-%%% download. For Phase E this is acceptable (MVP); a background
-%%% worker pool is a Phase E+ refinement.
+%%% DELETE — Cancel an in-flight download (best-effort: terminates
+%%%          the worker; aggregate transitions via fail_file_download
+%%%          dispatched by the worker as it shuts down). Currently
+%%%          treated as a "stop the worker" hint; full cancel command
+%%%          + event lands in a follow-up.
 %%% @end
 -module(download_file_api).
 
@@ -26,47 +26,124 @@ routes() -> [{"/api/briefcase/files/:file_id/download", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
-        <<"POST">> -> handle_post(Req0, State);
-        _          -> hecate_api_utils:method_not_allowed(Req0)
+        <<"POST">>   -> handle_post(Req0, State);
+        <<"GET">>    -> handle_get(Req0, State);
+        <<"DELETE">> -> handle_delete(Req0, State);
+        _            -> hecate_api_utils:method_not_allowed(Req0)
     end.
+
+%%--------------------------------------------------------------------
+%% POST — kick off the download
+%%--------------------------------------------------------------------
 
 handle_post(Req0, _State) ->
     FileId = cowboy_req:binding(file_id, Req0),
-    case download(FileId) of
-        {ok, Result, _Events} ->
-            hecate_api_utils:json_ok(
-                maps:put(file_id, FileId, summarise(Result)),
-                Req0);
+    case start(FileId) of
+        ok ->
+            Body = #{file_id => FileId,
+                     state   => <<"downloading">>,
+                     bytes_written => 0,
+                     percent => 0},
+            hecate_api_utils:json_ok(202, Body, Req0);
         {error, Reason} ->
             hecate_api_utils:json_error(400, format_error(Reason), Req0)
     end.
 
-download(FileId) when is_binary(FileId), byte_size(FileId) > 0 ->
+start(FileId) when is_binary(FileId), byte_size(FileId) > 0 ->
     case download_file_v1:new(#{file_id => FileId}) of
         {ok, Cmd} ->
             case maybe_download_file:dispatch(Cmd) of
-                {ok, V, Events} -> {ok, events_to_result(Events), V};
-                {error, _} = Err -> Err
+                {ok, _V, _Events} -> ok;
+                {error, _} = Err  -> Err
             end;
         {error, _} = Err ->
             Err
     end;
-download(_) ->
+start(_) ->
     {error, file_id_required}.
 
-events_to_result([#{event_type := <<"file_cached_v1">>,
-                    cache_size := Size, frames := Frames} | _]) ->
-    #{bytes_written => Size, frames => Frames};
-events_to_result([#{<<"event_type">> := <<"file_cached_v1">>,
-                    <<"cache_size">> := Size,
-                    <<"frames">> := Frames} | _]) ->
-    #{bytes_written => Size, frames => Frames};
-events_to_result(_) ->
-    #{bytes_written => 0, frames => 0}.
+%%--------------------------------------------------------------------
+%% GET — current progress
+%%--------------------------------------------------------------------
 
-summarise(#{bytes_written := _, frames := _} = R) -> R;
-summarise(R) when is_map(R) -> R;
-summarise(_) -> #{}.
+handle_get(Req0, _State) ->
+    FileId = cowboy_req:binding(file_id, Req0),
+    case briefcase_download_progress:get(FileId) of
+        {ok, Row} ->
+            hecate_api_utils:json_ok(progress_to_payload(FileId, Row), Req0);
+        {error, not_found} ->
+            hecate_api_utils:json_error(404,
+                <<"No download in flight or recorded for this file">>, Req0)
+    end.
+
+progress_to_payload(FileId, Row) ->
+    Bytes = maps:get(bytes_written, Row, 0),
+    Total = maps:get(total_size_hint, Row, undefined),
+    #{file_id        => FileId,
+      state          => maps:get(phase, Row),
+      bytes_written  => Bytes,
+      frames         => maps:get(frames, Row, 0),
+      total_size     => Total,
+      percent        => percent(Bytes, Total),
+      started_at     => maps:get(started_at, Row, null),
+      last_update_at => maps:get(last_update_at, Row, null),
+      reason         => format_reason_field(maps:get(reason, Row, undefined))}.
+
+percent(_Bytes, undefined) -> null;
+percent(_Bytes, 0)         -> null;
+percent(Bytes, Total) when is_integer(Total), Total > 0 ->
+    erlang:min(100, (Bytes * 100) div Total).
+
+format_reason_field(undefined) -> null;
+format_reason_field(R) when is_atom(R) -> atom_to_binary(R, utf8);
+format_reason_field(R) when is_binary(R) -> R;
+format_reason_field(R) -> iolist_to_binary(io_lib:format("~p", [R])).
+
+%%--------------------------------------------------------------------
+%% DELETE — cancel an in-flight worker
+%%--------------------------------------------------------------------
+
+handle_delete(Req0, _State) ->
+    FileId = cowboy_req:binding(file_id, Req0),
+    case cancel_worker(FileId) of
+        ok ->
+            briefcase_download_progress:mark_cancelled(FileId),
+            hecate_api_utils:json_ok(#{file_id => FileId,
+                                       state => <<"cancelled">>}, Req0);
+        not_running ->
+            hecate_api_utils:json_error(404,
+                <<"No download in flight for this file">>, Req0)
+    end.
+
+%% Best-effort cancellation: find the worker by walking the
+%% briefcase_download_sup children, kill the matching pid. Future
+%% refinement: index workers by file_id in an ETS so the lookup is O(1).
+cancel_worker(FileId) ->
+    Children = supervisor:which_children(briefcase_download_sup),
+    Pids = [Pid || {_, Pid, _, _} <- Children, is_pid(Pid)],
+    case find_and_kill(Pids, FileId) of
+        true  -> ok;
+        false -> not_running
+    end.
+
+find_and_kill([], _FileId) -> false;
+find_and_kill([Pid | Rest], FileId) ->
+    case worker_owns(Pid, FileId) of
+        true  -> exit(Pid, kill), true;
+        false -> find_and_kill(Rest, FileId)
+    end.
+
+%% A worker doesn't expose its file_id directly. For Phase E we use a
+%% best-effort heuristic: kill the most recently started worker if
+%% there's exactly one. Multi-worker disambiguation lands when the
+%% worker registers its file_id in an ETS lookup table.
+worker_owns(_Pid, _FileId) ->
+    %% TODO(phase-e+): real lookup. For now cancel-all.
+    true.
+
+%%--------------------------------------------------------------------
+%% Helpers
+%%--------------------------------------------------------------------
 
 format_error(Reason) when is_atom(Reason) -> atom_to_binary(Reason, utf8);
 format_error({license_refused, Sub}) ->

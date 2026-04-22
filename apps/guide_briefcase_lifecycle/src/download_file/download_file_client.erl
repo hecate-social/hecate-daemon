@@ -17,7 +17,9 @@
 -define(CHUNK_RECV_TIMEOUT_MS, 30000).
 
 -type fetch_opts() :: #{open_timeout_ms => pos_integer(),
-                        chunk_timeout_ms => pos_integer()}.
+                        chunk_timeout_ms => pos_integer(),
+                        progress_fn      => fun((non_neg_integer(),
+                                                 non_neg_integer()) -> any())}.
 -type fetch_result() :: {ok, #{bytes_written := non_neg_integer(),
                                frames := non_neg_integer()}}
                       | {error, term()}.
@@ -34,11 +36,12 @@ fetch(Realm, FileId) ->
 fetch(Realm, FileId, Opts)
   when is_binary(Realm), is_binary(FileId), is_map(Opts) ->
     Proc = <<Realm/binary, ".briefcase.get_chunk_stream">>,
-    OpenTimeout = maps:get(open_timeout_ms, Opts, ?DEFAULT_TIMEOUT_MS),
+    OpenTimeout  = maps:get(open_timeout_ms,  Opts, ?DEFAULT_TIMEOUT_MS),
     ChunkTimeout = maps:get(chunk_timeout_ms, Opts, ?CHUNK_RECV_TIMEOUT_MS),
+    ProgressFn   = maps:get(progress_fn,      Opts, fun(_B, _F) -> ok end),
     case open_stream(Proc, FileId, OpenTimeout) of
         {ok, Stream} ->
-            run_download(Stream, FileId, ChunkTimeout);
+            run_download(Stream, FileId, ChunkTimeout, ProgressFn);
         {error, _} = Err ->
             Err
     end.
@@ -54,11 +57,11 @@ open_stream(Proc, FileId, Timeout) ->
         {error, _} = Err -> Err
     end.
 
-run_download(Stream, FileId, ChunkTimeout) ->
+run_download(Stream, FileId, ChunkTimeout, ProgressFn) ->
     case briefcase_cache_store:open_writer(FileId) of
         {ok, Fd} ->
             Result = pump_frames(Stream, Fd, FileId, ChunkTimeout,
-                                  <<>>, 0, 0),
+                                  ProgressFn, <<>>, 0, 0),
             ok = briefcase_cache_store:close_writer(Fd),
             finalize(FileId, Result);
         {error, _} = Err ->
@@ -73,16 +76,15 @@ run_download(Stream, FileId, ChunkTimeout) ->
 %%   - On an EOF frame: write an EOF marker too and return success.
 %%   - Carry partial bytes across iterations until the next chunk
 %%     completes a frame.
-pump_frames(Stream, Fd, FileId, ChunkTimeout, Buf, BytesOut, Frames) ->
+pump_frames(Stream, Fd, FileId, ChunkTimeout, ProgressFn, Buf, BytesOut, Frames) ->
     case macula:recv(Stream, ChunkTimeout) of
         {chunk, Bin} ->
             NewBuf = <<Buf/binary, Bin/binary>>,
-            case peel_and_write(NewBuf, Fd, BytesOut, Frames) of
+            case peel_and_write(NewBuf, Fd, ProgressFn, BytesOut, Frames) of
                 {continue, BufLeft, BytesOut2, Frames2} ->
                     pump_frames(Stream, Fd, FileId, ChunkTimeout,
-                                BufLeft, BytesOut2, Frames2);
+                                ProgressFn, BufLeft, BytesOut2, Frames2);
                 {done, BytesOut2, Frames2} ->
-                    %% Peeled the EOF frame; drain remaining (defensive).
                     _ = drain_remaining(Stream, ChunkTimeout),
                     {ok, BytesOut2, Frames2};
                 {error, _} = Err ->
@@ -90,8 +92,6 @@ pump_frames(Stream, Fd, FileId, ChunkTimeout, Buf, BytesOut, Frames) ->
                     Err
             end;
         eof ->
-            %% Peer closed without an explicit EOF frame — treat as
-            %% truncated if we haven't seen one yet.
             case Buf of
                 <<>> -> {error, stream_ended_without_eof_frame};
                 _    -> {error, {stream_ended_with_pending_bytes, byte_size(Buf)}}
@@ -102,16 +102,17 @@ pump_frames(Stream, Fd, FileId, ChunkTimeout, Buf, BytesOut, Frames) ->
             {error, {unexpected_stream_message, Other}}
     end.
 
-peel_and_write(Buf, Fd, BytesOut, Frames) ->
+peel_and_write(Buf, Fd, ProgressFn, BytesOut, Frames) ->
     case hecate_file_frame:decode_frame(Buf) of
         {ok, Envelope, Rest} ->
             Len = byte_size(Envelope),
             Frame = <<Len:32/big, Envelope/binary>>,
             case briefcase_cache_store:write_frame(Fd, Frame) of
                 ok ->
-                    peel_and_write(Rest, Fd,
-                                    BytesOut + byte_size(Frame),
-                                    Frames + 1);
+                    NewBytes = BytesOut + byte_size(Frame),
+                    NewFrames = Frames + 1,
+                    safe_progress(ProgressFn, NewBytes, NewFrames),
+                    peel_and_write(Rest, Fd, ProgressFn, NewBytes, NewFrames);
                 {error, _} = Err ->
                     Err
             end;
@@ -128,6 +129,13 @@ peel_and_write(Buf, Fd, BytesOut, Frames) ->
             {continue, Buf, BytesOut, Frames};
         {error, _} = Err ->
             Err
+    end.
+
+%% @private Best-effort progress notification — never propagate a
+%% callback crash up the stream pump.
+safe_progress(Fn, Bytes, Frames) ->
+    try Fn(Bytes, Frames)
+    catch _:_ -> ok
     end.
 
 %% Best-effort drain of any residual macula messages so the stream
