@@ -1,0 +1,29 @@
+## Prod-local devtime node — isolated from both dev and deployed
+## prod by distinct name + cookie. Long name so it can cluster with
+## real beam nodes if the operator needs it (in which case swap the
+## cookie to the site cookie temporarily).
+-name hecate_prodlocal@host00.lab
+-kernel inet_dist_use_interface '{192,168,1,100}'
+
+## Distinct cookie so accidental epmd resolution doesn't let
+## prod-local join anything else. Change only when intentionally
+## clustering for a specific test.
+-setcookie XXZKQDYFJTNBPROLOCALAZC
+
+## No heartbeat — crashes stay crashed (dev ergonomics).
+## -heart
+
+## Interactive code server — required for plugin loading.
+-mode interactive
+
+## Standard EPMD on the same port as dev; rely on distinct node names
+## to avoid collision.
+-start_epmd true
+-epmd_port 4369
+
+-smp auto
++A 64
++P 1048576
++Q 65536
++sbt db
++SDio 32

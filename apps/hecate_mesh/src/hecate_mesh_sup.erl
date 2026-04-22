@@ -13,40 +13,67 @@ init([]) ->
         period => 10
     },
 
-    Children = [
-        %% Mesh client connection manager
-        #{
-            id => hecate_mesh_client,
-            start => {hecate_mesh_client, start_link, []},
-            restart => permanent,
-            shutdown => 5000,
-            type => worker,
-            modules => [hecate_mesh_client]
-        },
-        %% Mesh proof coordinator — orchestrates proof-of-participation ceremony
-        #{
-            id => mesh_proof_coordinator_sup,
-            start => {mesh_proof_coordinator_sup, start_link, []},
-            restart => permanent,
-            shutdown => 5000,
-            type => supervisor,
-            modules => [mesh_proof_coordinator_sup]
-        }
-        %% NOTE: Emitters are supervised by their respective domain supervisors
-        %% (vertical slicing), not here (that would be horizontal).
+    BackendMod = backend_module(),
 
-        %% Process manager: realm membership confirmed -> activate mesh
-        ,#{
-            id => on_realm_membership_confirmed_activate_mesh,
-            start => {evoq_event_handler, start_link, [
-                on_realm_membership_confirmed_activate_mesh, #{},
-                #{store_id => realm_memberships_store}
-            ]},
-            restart => permanent,
-            shutdown => 5000,
-            type => worker,
-            modules => [on_realm_membership_confirmed_activate_mesh]
-        }
-    ],
+    %% Registered under `hecate_mesh_client` regardless of the
+    %% underlying module — keeps call sites + whereis checks
+    %% backend-agnostic.
+    MeshBackendChild = #{
+        id => hecate_mesh_client,
+        start => {BackendMod, start_link, []},
+        restart => permanent,
+        shutdown => 5000,
+        type => worker,
+        modules => [BackendMod]
+    },
 
+    Children = [MeshBackendChild]
+               ++ proof_children(BackendMod)
+               ++ realm_pm_children(),
     {ok, {SupFlags, Children}}.
+
+%% @private Resolve the mesh backend module.
+%%
+%% `client`  — production (`hecate_mesh_client`, real QUIC to relay
+%%             fleet). Default.
+%% `inproc`  — `hecate_mesh_inproc`, in-process pub/sub + macula's
+%%             local stream fabric. Used by CT suites + fast devtime.
+%%
+%% Set via application env `{hecate, [{mesh_backend, inproc}]}` in
+%% sys.config. The prod-local config pins this to `client` explicitly;
+%% dev and CT set it to `inproc`.
+backend_module() ->
+    case application:get_env(hecate, mesh_backend, client) of
+        client -> hecate_mesh_client;
+        inproc -> hecate_mesh_inproc;
+        Other  ->
+            logger:warning(
+                "[hecate_mesh_sup] unknown mesh_backend=~p, falling back to client",
+                [Other]),
+            hecate_mesh_client
+    end.
+
+%% Mesh proof coordinator only makes sense with the real backend —
+%% inproc has no peers to prove to.
+proof_children(hecate_mesh_client) ->
+    [#{id => mesh_proof_coordinator_sup,
+       start => {mesh_proof_coordinator_sup, start_link, []},
+       restart => permanent,
+       shutdown => 5000,
+       type => supervisor,
+       modules => [mesh_proof_coordinator_sup]}];
+proof_children(_InprocOrOther) ->
+    [].
+
+%% The realm-confirmed → activate PM is relevant to both backends:
+%% inproc's activate/0 is a no-op, so the PM firing is harmless, and
+%% domain code doesn't need to branch on backend.
+realm_pm_children() ->
+    [#{id => on_realm_membership_confirmed_activate_mesh,
+       start => {evoq_event_handler, start_link,
+                 [on_realm_membership_confirmed_activate_mesh, #{},
+                  #{store_id => realm_memberships_store}]},
+       restart => permanent,
+       shutdown => 5000,
+       type => worker,
+       modules => [on_realm_membership_confirmed_activate_mesh]}].
