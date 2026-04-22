@@ -29,11 +29,11 @@ get(Daemon, Path) -> get(Daemon, Path, []).
 get(Daemon, Path, Headers) ->
     request(Daemon, "GET", Path, Headers, undefined).
 
--spec post(daemon(), binary(), binary() | map()) -> response().
+-spec post(daemon(), binary(), binary() | map() | iolist()) -> response().
 post(Daemon, Path, Body) -> post(Daemon, Path, Body, []).
 
--spec post(daemon(), binary(), binary() | map(), [{binary(), binary()}]) ->
-    response().
+-spec post(daemon(), binary(), binary() | map() | iolist(),
+           [{binary(), binary()}]) -> response().
 post(Daemon, Path, Body, Headers) ->
     request(Daemon, "POST", Path, with_json_header(Headers), encode_body(Body)).
 
@@ -64,23 +64,36 @@ upload(Daemon, LocalPath, LogicalPath, MimeType) ->
     LogicalPathStr = binary_to_list(LogicalPath),
     MimeStr = binary_to_list(MimeType),
 
-    %% 1. scp the file to the target.
+    %% 1. scp the file to the target. Write stderr + stdout to a
+    %% tempfile and check its exit status — scp writes a multi-line
+    %% SSH pre-connect warning to stderr on this host (post-quantum
+    %% KEX advisory) that's not an error; only the exit code
+    %% distinguishes success from failure reliably.
+    ExitMarker = " ; echo ___EXIT___:$?",
     ScpCmd = lists:flatten(io_lib:format(
-        "scp -o ConnectTimeout=5 -o BatchMode=yes ~s ~s:~s 2>&1",
-        [shell_escape(LocalPath), SSH, RemoteTmp])),
+        "scp -o ConnectTimeout=5 -o BatchMode=yes ~s ~s:~s 2>&1~s",
+        [shell_escape(LocalPath), SSH, RemoteTmp, ExitMarker])),
     case os:cmd(ScpCmd) of
         Out when is_list(Out) ->
-            %% scp returns empty on success, error message on failure.
-            case string:trim(Out) of
-                ""    -> upload_via_curl(SSH, Sock, RemoteTmp,
-                                          LogicalPathStr, MimeStr);
-                Error -> {error, {scp_failed, Error}}
+            case exit_status_of(Out) of
+                0 -> upload_via_curl(SSH, Sock, RemoteTmp,
+                                      LogicalPathStr, MimeStr);
+                _ -> {error, {scp_failed, Out}}
             end
     end.
 
+exit_status_of(Out) ->
+    case re:run(Out, "___EXIT___:(\\d+)", [{capture, [1], list}]) of
+        {match, [N]} -> list_to_integer(N);
+        nomatch      -> -1
+    end.
+
 upload_via_curl(SSH, Sock, RemoteTmp, LogicalPathStr, MimeStr) ->
+    %% `2>/dev/null` drops ssh's own stderr (OpenSSH post-quantum KEX
+    %% advisory on this host) so it doesn't pollute the response body.
+    %% See comment in request/5 above.
     Cmd = lists:flatten(io_lib:format(
-        "ssh -o ConnectTimeout=5 -o BatchMode=yes ~s "
+        "ssh -o ConnectTimeout=5 -o BatchMode=yes -o LogLevel=ERROR ~s "
         "'curl --silent --max-time 60 --unix-socket ~s "
         "-X POST "
         "--form file=@~s "
@@ -88,7 +101,8 @@ upload_via_curl(SSH, Sock, RemoteTmp, LogicalPathStr, MimeStr) ->
         "--form-string mime_type=~s "
         "-w \"\\n%{http_code}\" "
         "http://localhost/api/briefcase/files/upload; "
-        "rm -f ~s'",
+        "rm -f ~s' "
+        "2>/dev/null",
         [SSH, Sock, RemoteTmp, LogicalPathStr, MimeStr, RemoteTmp])),
     parse_response(os:cmd(Cmd)).
 
@@ -108,61 +122,68 @@ request(Daemon, Method, Path, Headers, Body) ->
     Sock = binary_to_list(maps:get(socket, Daemon)),
     PathStr = binary_to_list(Path),
 
+    %% Header args use DOUBLE quotes so they nest safely inside the
+    %% outer single-quoted ssh command. Earlier single-quoted header
+    %% args closed the outer quoting and dropped the Authorization
+    %% header entirely, causing 401 on admin endpoints.
     HeaderArgs = lists:map(
         fun({K, V}) ->
-            io_lib:format(" -H '~s: ~s'", [K, V])
+            io_lib:format(" -H \"~s: ~s\"", [K, V])
         end, Headers),
 
-    DataArg = case Body of
-        undefined -> "";
-        _Bin      -> " --data-binary @-"
-    end,
-
-    Cmd = io_lib:format(
-        "ssh -o ConnectTimeout=5 -o BatchMode=yes ~s "
-        "'curl --silent --max-time 30 --unix-socket ~s "
-        "-X ~s ~s~s -w \"\\n%{http_code}\" http://localhost~s'",
-        [SSH, Sock, Method, lists:flatten(HeaderArgs),
-         DataArg, PathStr]),
-    Cmd2 = lists:flatten(Cmd),
-
     Output = case Body of
-        undefined -> os:cmd(Cmd2);
-        Bin2      -> shell_with_stdin(Cmd2, Bin2)
+        undefined ->
+            run_ssh_curl(SSH, Sock, Method, HeaderArgs, PathStr, "");
+        _ ->
+            BodyBin = iolist_to_binary(Body),
+            run_ssh_curl_with_body(SSH, Sock, Method, HeaderArgs,
+                                    PathStr, BodyBin)
     end,
     parse_response(Output).
+
+%% @private No body: curl reads nothing from stdin.
+run_ssh_curl(SSH, Sock, Method, HeaderArgs, PathStr, ExtraArgs) ->
+    %% `2>/dev/null` drops ssh's own stderr (e.g. the OpenSSH
+    %% "post-quantum KEX" advisory printed on this host) which would
+    %% otherwise get interleaved with curl's stdout and break the
+    %% status/body parser.
+    Cmd = io_lib:format(
+        "ssh -o ConnectTimeout=5 -o BatchMode=yes -o LogLevel=ERROR ~s "
+        "'curl --silent --max-time 30 --unix-socket ~s "
+        "-X ~s ~s~s -w \"\\n%{http_code}\" http://localhost~s' "
+        "2>/dev/null",
+        [SSH, Sock, Method, lists:flatten(HeaderArgs),
+         ExtraArgs, PathStr]),
+    os:cmd(lists:flatten(Cmd)).
+
+%% @private With body: pipe body bytes into ssh locally; ssh forwards
+%% stdin to the remote curl via `--data-binary @-`. When the local
+%% `printf` exits, its pipe closes, ssh sees EOF and forwards it to
+%% curl, which then completes the request.
+%%
+%% We use `printf '%s' BODY` rather than `echo` because echo appends
+%% a newline and interprets backslashes on some shells.
+run_ssh_curl_with_body(SSH, Sock, Method, HeaderArgs, PathStr, BodyBin) ->
+    BodyArg = shell_escape(binary_to_list(BodyBin)),
+    Cmd = io_lib:format(
+        "printf '%s' ~s | "
+        "ssh -o ConnectTimeout=5 -o BatchMode=yes -o LogLevel=ERROR ~s "
+        "'curl --silent --max-time 30 --unix-socket ~s "
+        "-X ~s ~s --data-binary @- "
+        "-w \"\\n%{http_code}\" http://localhost~s' "
+        "2>/dev/null",
+        [BodyArg, SSH, Sock, Method, lists:flatten(HeaderArgs), PathStr]),
+    os:cmd(lists:flatten(Cmd)).
 
 with_json_header(Headers) ->
     [{<<"Content-Type">>, <<"application/json">>} | Headers].
 
-encode_body(undefined)             -> <<>>;
+encode_body(undefined)               -> <<>>;
 encode_body(Bin) when is_binary(Bin) -> Bin;
-encode_body(Map) when is_map(Map)  -> json:encode(Map).
-
-shell_with_stdin(Cmd, Stdin) ->
-    Port = open_port({spawn, Cmd},
-                     [stream, in, out, exit_status, binary]),
-    port_command(Port, Stdin),
-    port_close_input(Port),
-    collect_output(Port, <<>>).
-
-%% @private Some Erlang versions expose this as `port_close/1` only
-%% closing both halves; on others a separate close is required. Wrap
-%% the cross-version differences here.
-port_close_input(Port) ->
-    %% Easiest portable way: send EOF by sending an empty packet.
-    %% In practice this works on all OTP versions we run.
-    try port_command(Port, <<>>) catch _:_ -> ok end,
-    ok.
-
-collect_output(Port, Acc) ->
-    receive
-        {Port, {data, Data}} -> collect_output(Port, <<Acc/binary, Data/binary>>);
-        {Port, {exit_status, _}} -> binary_to_list(Acc)
-    after 60000 ->
-        catch port_close(Port),
-        {error, timeout}
-    end.
+encode_body(Map) when is_map(Map)    -> iolist_to_binary(json:encode(Map));
+%% `json:encode/1` returns iodata, not a binary, so callers that
+%% pre-encode (e.g. to reuse a body across calls) also land here.
+encode_body(IoList) when is_list(IoList) -> iolist_to_binary(IoList).
 
 %% Curl's `-w "\n%{http_code}"` puts the status code on the last line.
 parse_response(Output) when is_list(Output) ->

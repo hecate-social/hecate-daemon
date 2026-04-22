@@ -83,9 +83,15 @@ alice_share_bob_download_open(Config) ->
     Token = fleet_config:admin_token(FleetConfig),
 
     %% Generate a unique payload + temp file local to the test runner.
-    Payload = <<"phase-d-fleet-payload-",
+    %% `unique_integer` resets each VM start, so include wall-clock
+    %% microseconds to guarantee uniqueness across CT reruns. Otherwise
+    %% identical content yields the same content-addressed file_id and
+    %% the daemon's persistent aggregate rejects it as `already_uploaded`.
+    Nonce = integer_to_binary(os:system_time(microsecond)),
+    Payload = <<"phase-d-fleet-payload-", Nonce/binary, "-",
                 (integer_to_binary(erlang:unique_integer([positive])))/binary>>,
     LocalPath = "/tmp/phase_d_fleet_" ++
+                binary_to_list(Nonce) ++ "_" ++
                 integer_to_list(erlang:unique_integer([positive])) ++
                 ".txt",
     ok = file:write_file(LocalPath, Payload),
@@ -98,6 +104,16 @@ alice_share_bob_download_open(Config) ->
                                 <<"text/plain">>),
         #{<<"file_id">> := FileId} = json:decode(UploadBody),
         ct:pal("Alice uploaded file_id=~s", [FileId]),
+
+        %% 1b. Wait for Alice's own briefcase projection to register
+        %% the file. `consistency: eventual` on upload dispatch means
+        %% the HTTP 200 can race ahead of the event reaching the
+        %% briefcase aggregate's store, producing
+        %% {wrong_expected_version, 0, -1} on the subsequent share
+        %% append.
+        ok = fleet_wait:for_state(Alice,
+            <<"/api/briefcase/files/", FileId/binary>>,
+            <<"presence">>, <<"local">>),
 
         %% 2. Alice shares to realm.
         ShareBody = json:encode(#{<<"recipients">> => <<"realm">>}),
@@ -155,9 +171,13 @@ revoke_clears_open(Config) ->
     AuthHeader = [{<<"Authorization">>, <<"Bearer ", Token/binary>>}],
 
     %% Replay the share + accept flow, then revoke.
-    Payload = <<"revoke-test-payload-",
+    %% See alice_share_bob_download_open for why we mix microseconds
+    %% with unique_integer — guarantees cross-VM-start uniqueness.
+    Nonce = integer_to_binary(os:system_time(microsecond)),
+    Payload = <<"revoke-test-payload-", Nonce/binary, "-",
                 (integer_to_binary(erlang:unique_integer([positive])))/binary>>,
     LocalPath = "/tmp/phase_d_revoke_" ++
+                binary_to_list(Nonce) ++ "_" ++
                 integer_to_list(erlang:unique_integer([positive])) ++
                 ".txt",
     ok = file:write_file(LocalPath, Payload),
@@ -167,8 +187,16 @@ revoke_clears_open(Config) ->
             fleet_daemon:upload(Alice, LocalPath,
                                 <<"revoke-test.txt">>,
                                 <<"text/plain">>),
-        #{<<"file_id">> := FileId,
-          <<"license_id">> := LicenseId} = json:decode(UploadBody),
+        %% Upload response: #{ok, file_id, path, size}. The license_id
+        %% only appears on the share response, not upload.
+        #{<<"file_id">> := FileId} = json:decode(UploadBody),
+
+        %% Bridge the eventual-consistency window between upload and
+        %% share — see alice_share_bob_download_open for the rationale.
+        ok = fleet_wait:for_state(Alice,
+            <<"/api/briefcase/files/", FileId/binary>>,
+            <<"presence">>, <<"local">>),
+
         ShareBody = json:encode(#{<<"recipients">> => <<"realm">>}),
         {200, ShareResp} =
             fleet_daemon:post(Alice,
@@ -210,8 +238,7 @@ revoke_clears_open(Config) ->
         {OpenStatus, _} =
             fleet_daemon:get(Bob,
                 <<"/api/briefcase/files/", FileId/binary, "/content">>),
-        ?assertEqual(403, OpenStatus),
-        _ = LicenseId  %% silence unused var
+        ?assertEqual(403, OpenStatus)
     after
         file:delete(LocalPath)
     end.
@@ -229,7 +256,7 @@ verify_reachable(FleetConfig) ->
 
 ping_all([]) -> ok;
 ping_all([D | Rest]) ->
-    case fleet_daemon:get(D, <<"/api/health">>) of
+    case fleet_daemon:get(D, <<"/health">>) of
         {200, _}    -> ping_all(Rest);
         {Status, _} -> {error, {bad_status, D, Status}};
         Other       -> {error, {Other, D}}
