@@ -205,28 +205,61 @@ run_post_boot(ReadyStoreIds) ->
         end
     end.
 
-%% @private Attempt cluster joins for all stores (non-blocking, best-effort).
-%% Stores started in single mode for fast boot. Now upgrade to cluster.
+%% @private Set up Erlang-level clustering (optional) and Khepri
+%% store joins (explicit opt-in).
+%%
+%% Three layers, each opt-in:
+%%   HECATE_ERLANG_COOKIE=<atom>        set the distribution cookie
+%%   HECATE_CLUSTER_PEERS=<csv>         connect_node on each peer (pg
+%%                                      broadcast works at this level)
+%%   HECATE_AUTOJOIN_STORES=true        spawn Khepri store joins against
+%%                                      the first connected peer (DANGER:
+%%                                      replaces local store data with a
+%%                                      snapshot from the target's
+%%                                      leader — only safe when all
+%%                                      stores across the cluster are
+%%                                      known to share the same state
+%%                                      or local state is expendable)
 maybe_join_cluster(StoreIds) ->
-    Cookie = os:getenv("HECATE_ERLANG_COOKIE"),
-    Peers = os:getenv("HECATE_CLUSTER_PEERS"),
-    case {Cookie, Peers} of
-        {false, _} ->
-            logger:info("[boot] No cluster cookie — staying in single-node mode");
-        {_, false} ->
-            logger:info("[boot] No cluster peers — staying in single-node mode");
-        {C, P} when is_list(C), is_list(P) ->
-            logger:info("[boot] Initiating cluster joins for ~b stores", [length(StoreIds)]),
-            erlang:set_cookie(node(), list_to_atom(C)),
-            PeerNodes = [list_to_atom(string:trim(N)) || N <- string:split(P, ",", all), N =/= ""],
-            lists:foreach(fun(Peer) -> net_kernel:connect_node(Peer) end, PeerNodes),
-            lists:foreach(fun(StoreId) ->
-                spawn(fun() ->
-                    case reckon_db_store_coordinator:join_cluster(StoreId) of
-                        ok -> logger:info("[boot] Cluster join ok: ~p", [StoreId]);
-                        coordinator -> logger:info("[boot] Coordinator: ~p", [StoreId]);
-                        {error, Reason} -> logger:warning("[boot] Cluster join failed ~p: ~p", [StoreId, Reason])
-                    end
-                end)
-            end, StoreIds)
-    end.
+    Cookie   = os:getenv("HECATE_ERLANG_COOKIE"),
+    Peers    = os:getenv("HECATE_CLUSTER_PEERS"),
+    AutoJoin = os:getenv("HECATE_AUTOJOIN_STORES") =:= "true",
+    _ = maybe_apply_cookie(Cookie),
+    ConnectedPeers = maybe_connect_peers(Peers),
+    maybe_spawn_store_joins(AutoJoin, ConnectedPeers, StoreIds).
+
+maybe_apply_cookie(false) ->
+    logger:info("[boot] No cluster cookie — keeping vm.args default"),
+    skipped;
+maybe_apply_cookie(Cookie) when is_list(Cookie) ->
+    erlang:set_cookie(node(), list_to_atom(Cookie)),
+    logger:info("[boot] Cluster cookie applied from HECATE_ERLANG_COOKIE"),
+    applied.
+
+maybe_connect_peers(false) ->
+    logger:info("[boot] No cluster peers — staying Erlang-unconnected"),
+    [];
+maybe_connect_peers(Peers) when is_list(Peers) ->
+    PeerNodes = [list_to_atom(string:trim(N)) || N <- string:split(Peers, ",", all), N =/= ""],
+    Connected = [P || P <- PeerNodes, net_kernel:connect_node(P) =:= true],
+    logger:info("[boot] Erlang cluster: ~b/~b peers connected (~p)",
+                [length(Connected), length(PeerNodes), Connected]),
+    Connected.
+
+maybe_spawn_store_joins(false, _Connected, _StoreIds) ->
+    logger:info("[boot] HECATE_AUTOJOIN_STORES not 'true' — Khepri stores stay local "
+                "(pg-based cluster-inherited mesh creds still work at the Erlang layer)");
+maybe_spawn_store_joins(true, [], _StoreIds) ->
+    logger:info("[boot] HECATE_AUTOJOIN_STORES=true but no peers connected — nothing to join");
+maybe_spawn_store_joins(true, _Connected, StoreIds) ->
+    logger:info("[boot] Initiating Khepri cluster joins for ~b stores", [length(StoreIds)]),
+    lists:foreach(fun(StoreId) ->
+        spawn(fun() ->
+            case reckon_db_store_coordinator:join_cluster(StoreId) of
+                ok          -> logger:info("[boot] Cluster join ok: ~p", [StoreId]);
+                coordinator -> logger:info("[boot] Coordinator: ~p", [StoreId]);
+                {error, Reason} ->
+                    logger:warning("[boot] Cluster join failed ~p: ~p", [StoreId, Reason])
+            end
+        end)
+    end, StoreIds).
