@@ -62,8 +62,8 @@ init([]) ->
             modules => [evoq_event_handler,
                         realm_membership_resigned_v1_to_mesh]
         },
-        %% Admin-revoke listener: `{realm}.membership.revoked` →
-        %% dispatch `end_realm_membership_v1 {reason: :revoked}`.
+        %% Admin-revoke listener: subscribes only after a confirmed
+        %% membership exists (gated by the two PMs below).
         #{
             id => listen_for_membership_revoked,
             start => {listen_for_membership_revoked, start_link, []},
@@ -71,6 +71,30 @@ init([]) ->
             shutdown => 5000,
             type => worker,
             modules => [listen_for_membership_revoked]
+        },
+        %% Post-join gate: realm_membership_confirmed_v1 →
+        %% listen_for_membership_revoked:subscribe(member_did).
+        #{
+            id => on_realm_membership_confirmed_subscribe_to_revoked,
+            start => {evoq_event_handler, start_link,
+                      [on_realm_membership_confirmed_subscribe_to_revoked, #{}, #{}]},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [evoq_event_handler,
+                        on_realm_membership_confirmed_subscribe_to_revoked]
+        },
+        %% Post-end gate: realm_membership_ended_v1 →
+        %% listen_for_membership_revoked:unsubscribe().
+        #{
+            id => on_realm_membership_ended_unsubscribe_from_revoked,
+            start => {evoq_event_handler, start_link,
+                      [on_realm_membership_ended_unsubscribe_from_revoked, #{}, #{}]},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [evoq_event_handler,
+                        on_realm_membership_ended_unsubscribe_from_revoked]
         }
     ],
     {ok, {SupFlags, Children}}.
