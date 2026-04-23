@@ -4,10 +4,17 @@
 %%% Runs as a permanent child of guide_mpong_game_lifecycle_sup.
 %%% Discovery sources:
 %%% 1. pg group `mpong_lobby` — LAN/Erlang cluster lobbies
-%%% 2. Mesh topic `mpong.games.available` — remote mesh lobbies
+%%% 2. Mesh topic `mpong/game_advertised_v1` — remote mesh lobbies
 %%%
-%%% For LAN: reserves spot via direct gen_server:cast (pg PID)
-%%% For Mesh: reserves spot via mesh RPC call to join procedure
+%%% LAN flow:  pg cast `{reserve_spot, ...}` → host casts back
+%%%            `{spot_reserved, ...}` or `{spot_denied, ...}`.
+%%%
+%%% Mesh flow: publish `seat_requested_v1` fact with a fresh request_id
+%%%            → host publishes `seat_reserved_v1` or `seat_denied_v1`
+%%%            with the same request_id → seeker correlates, joins or
+%%%            falls back. Async pubsub instead of synchronous RPC so
+%%%            the host doesn't saturate its gen_server queue under
+%%%            burst joins.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(mpong_lobby_seeker).
@@ -16,12 +23,20 @@
 -export([start_link/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
+-define(SEAT_REQUEST_TIMEOUT_MS, 5000).
+
 -record(seeker, {
-    champion    :: map() | undefined,
-    joined_game :: binary() | undefined,
-    wall_index  :: non_neg_integer() | undefined,
-    host_pid    :: pid() | undefined,
-    mesh_sub    :: reference() | undefined
+    champion              :: map() | undefined,
+    joined_game           :: binary() | undefined,
+    wall_index            :: non_neg_integer() | undefined,
+    host_pid              :: pid() | undefined,
+    %% Mesh subscriptions (one per topic).
+    mesh_lobby_sub        :: reference() | undefined,
+    mesh_reserved_sub     :: reference() | undefined,
+    mesh_denied_sub       :: reference() | undefined,
+    %% In-flight seat request — only one outstanding at a time.
+    pending_request_id    :: binary() | undefined,
+    pending_request_game  :: binary() | undefined
 }).
 
 %%====================================================================
@@ -141,18 +156,76 @@ handle_info({game_timeout, _OldGameId}, State) ->
     %% Already moved on to a different game or reset
     {noreply, State};
 
-handle_info(try_mesh_subscribe, #seeker{mesh_sub = undefined} = State) ->
-    case subscribe_mesh_lobbies() of
-        undefined ->
+handle_info(try_mesh_subscribe,
+            #seeker{mesh_lobby_sub = undefined} = State) ->
+    case subscribe_mesh_topics() of
+        {undefined, _, _} ->
             erlang:send_after(3000, self(), try_mesh_subscribe),
             {noreply, State};
-        Ref ->
-            logger:info("[mpong_seeker] Mesh subscription active"),
-            {noreply, State#seeker{mesh_sub = Ref}}
+        {LobbyRef, ReservedRef, DeniedRef} ->
+            logger:info("[mpong_seeker] Mesh subscriptions active "
+                        "(lobby + seat_reserved + seat_denied)"),
+            {noreply, State#seeker{mesh_lobby_sub    = LobbyRef,
+                                    mesh_reserved_sub = ReservedRef,
+                                    mesh_denied_sub   = DeniedRef}}
     end;
 
 handle_info(try_mesh_subscribe, State) ->
     %% Already subscribed
+    {noreply, State};
+
+%% Inbound seat_reserved fact — match by request_id to confirm acceptance.
+handle_info({mpong_seat_reserved, Msg},
+            #seeker{pending_request_id = Pending,
+                    pending_request_game = PendingGame} = State)
+  when Pending =/= undefined ->
+    Payload = decode_payload(extract_payload(Msg)),
+    case maps:get(<<"request_id">>, Payload, undefined) of
+        Pending ->
+            WallIndex = maps:get(<<"wall_index">>, Payload, undefined),
+            logger:info("[mpong_seeker] seat reserved game=~s wall=~p",
+                        [PendingGame, WallIndex]),
+            self() ! {mesh_joined, PendingGame},
+            {noreply, State#seeker{wall_index = WallIndex,
+                                    pending_request_id = undefined,
+                                    pending_request_game = undefined}};
+        _ ->
+            %% Reservation for someone else's request — ignore.
+            {noreply, State}
+    end;
+handle_info({mpong_seat_reserved, _Msg}, State) ->
+    {noreply, State};
+
+%% Inbound seat_denied fact — match by request_id to clear pending.
+handle_info({mpong_seat_denied, Msg},
+            #seeker{pending_request_id = Pending,
+                    pending_request_game = PendingGame} = State)
+  when Pending =/= undefined ->
+    Payload = decode_payload(extract_payload(Msg)),
+    case maps:get(<<"request_id">>, Payload, undefined) of
+        Pending ->
+            Reason = maps:get(<<"reason">>, Payload, <<"unknown">>),
+            logger:info("[mpong_seeker] seat denied game=~s reason=~s",
+                        [PendingGame, Reason]),
+            {noreply, State#seeker{pending_request_id = undefined,
+                                    pending_request_game = undefined}};
+        _ ->
+            {noreply, State}
+    end;
+handle_info({mpong_seat_denied, _Msg}, State) ->
+    {noreply, State};
+
+%% Timeout for a pending seat request. If still pending under this
+%% RequestId, clear so another advertise can trigger a new attempt.
+handle_info({seat_request_timeout, RequestId},
+            #seeker{pending_request_id = RequestId,
+                    pending_request_game = PendingGame} = State) ->
+    logger:info("[mpong_seeker] seat request timed out game=~s request_id=~s",
+                [PendingGame, RequestId]),
+    {noreply, State#seeker{pending_request_id = undefined,
+                            pending_request_game = undefined}};
+handle_info({seat_request_timeout, _OtherRequestId}, State) ->
+    %% Stale timeout for a request that already completed.
     {noreply, State};
 
 handle_info(try_connect_peers, State) ->
@@ -166,9 +239,13 @@ handle_info(try_connect_peers, State) ->
 handle_info(_Info, State) ->
     {noreply, State}.
 
-terminate(_Reason, #seeker{mesh_sub = MeshSub}) ->
+terminate(_Reason, #seeker{mesh_lobby_sub = LobbySub,
+                            mesh_reserved_sub = ReservedSub,
+                            mesh_denied_sub = DeniedSub}) ->
     pg:leave(pg, mpong_lobby, self()),
-    unsubscribe_mesh(MeshSub),
+    unsubscribe_mesh(LobbySub),
+    unsubscribe_mesh(ReservedSub),
+    unsubscribe_mesh(DeniedSub),
     ok.
 
 %%====================================================================
@@ -207,9 +284,8 @@ handle_mesh_action(<<"hosted">>, HostNodeId, OurNode, _Msg, State)
     {noreply, State};
 handle_mesh_action(<<"hosted">>, _HostNodeId, _OurNode, Msg, State) ->
     GameId = maps:get(<<"game_id">>, Msg, <<>>),
-    JoinProcedure = maps:get(<<"join_procedure">>, Msg, undefined),
     Champion = get_our_champion(),
-    try_mesh_join(Champion, JoinProcedure, GameId, State);
+    try_request_seat(Champion, GameId, State);
 handle_mesh_action(<<"closed">>, _HostNodeId, _OurNode, Msg, #seeker{joined_game = JG} = State) ->
     GameId = maps:get(<<"game_id">>, Msg, <<>>),
     case JG of
@@ -228,57 +304,83 @@ handle_mesh_action(<<"ended">>, _HostNodeId, _OurNode, Msg, State) ->
 handle_mesh_action(_, _HostNodeId, _OurNode, _Msg, State) ->
     {noreply, State}.
 
-try_mesh_join(undefined, _JoinProcedure, _GameId, State) ->
+try_request_seat(undefined, _GameId, State) ->
     {noreply, State};
-try_mesh_join(_Champion, undefined, _GameId, State) ->
+try_request_seat(_Champion, _GameId,
+                 #seeker{pending_request_id = Pending} = State)
+  when Pending =/= undefined ->
+    %% Already have an outstanding seat request — wait for response or
+    %% timeout before issuing another. Avoids per-game-advertise spam.
     {noreply, State};
-try_mesh_join(Champion, JoinProcedure, GameId, State) ->
-    logger:info("[mpong_seeker] Found mesh lobby ~s, joining via RPC ~s",
-                [GameId, JoinProcedure]),
-    Self = self(),
-    spawn(fun() ->
-        Tech = collect_tech(mesh),
-        Args = #{
-            <<"champion">> => Champion,
-            <<"node_id">> => atom_to_binary(node()),
-            <<"tech">> => Tech
-        },
-        T0 = erlang:monotonic_time(millisecond),
-        case hecate_mesh:call(JoinProcedure, Args, 5000) of
-            {ok, #{<<"status">> := <<"accepted">>} = Result} ->
-                RTT = erlang:monotonic_time(millisecond) - T0,
-                WI = maps:get(<<"wall_index">>, Result, undefined),
-                logger:info("[mpong_seeker] Mesh join ACCEPTED for ~s wall=~p (RTT: ~bms)",
-                            [GameId, WI, RTT]),
-                Self ! {mesh_joined, GameId};
-            {ok, #{<<"status">> := <<"rejected">>} = Result} ->
-                Reason = maps:get(<<"reason">>, Result, <<"unknown">>),
-                logger:info("[mpong_seeker] Mesh join REJECTED for ~s: ~s", [GameId, Reason]);
-            {ok, Other} ->
-                logger:warning("[mpong_seeker] Mesh join unexpected response for ~s: ~p",
-                               [GameId, Other]);
-            {error, Reason} ->
-                logger:warning("[mpong_seeker] Mesh join FAILED for ~s: ~p", [GameId, Reason])
-        end
-    end),
-    {noreply, State#seeker{champion = Champion}}.
+try_request_seat(Champion, GameId, State) ->
+    RequestId = generate_request_id(),
+    NodeId    = atom_to_binary(node()),
+    Did       = own_did(),
+    Topic     = hecate_topics:app_fact(<<"mpong">>, <<"seat_requested">>, 1),
+    Event     = seat_requested_v1:new(RequestId, GameId, NodeId, Did,
+                                      Champion,
+                                      erlang:system_time(millisecond)),
+    Payload   = json:encode(seat_requested_v1:to_map(Event)),
+    case erlang:function_exported(hecate_mesh, publish, 2) of
+        true  -> hecate_mesh:publish(Topic, Payload);
+        false -> ok
+    end,
+    erlang:send_after(?SEAT_REQUEST_TIMEOUT_MS, self(),
+                      {seat_request_timeout, RequestId}),
+    logger:info("[mpong_seeker] requested seat in ~s request_id=~s",
+                [GameId, RequestId]),
+    {noreply, State#seeker{champion = Champion,
+                           pending_request_id = RequestId,
+                           pending_request_game = GameId}}.
+
+generate_request_id() ->
+    Bytes = crypto:strong_rand_bytes(8),
+    %% Lowercase hex — 16 chars; plenty of entropy for at-most-one-in-flight.
+    iolist_to_binary([io_lib:format("~2.16.0b", [B]) || <<B>> <= Bytes]).
+
+own_did() ->
+    case catch hecate_identity:get_mri() of
+        {ok, Mri} -> Mri;
+        _         -> atom_to_binary(node())
+    end.
 
 %%====================================================================
 %% Internal: Mesh subscription
 %%====================================================================
 
-subscribe_mesh_lobbies() ->
+%% Subscribe to all three mesh topics in one go: game advertisements
+%% (so we can request seats), seat_reserved (so we know we're in),
+%% seat_denied (so we can give up promptly). Returns
+%% {LobbyRef | undefined, ReservedRef | undefined, DeniedRef | undefined}
+%% — if mesh isn't ready, returns {undefined, ...} so the caller retries.
+subscribe_mesh_topics() ->
     Self = self(),
     case erlang:function_exported(hecate_mesh, subscribe, 2) of
         true ->
-            case hecate_mesh:subscribe(advertise_game:topic(),
-                                       fun(Msg) -> Self ! {mesh_lobby, Msg}, ok end) of
-                {ok, Ref} -> Ref;
-                _ -> undefined
-            end;
+            LobbyTopic    = advertise_game:topic(),
+            ReservedTopic = hecate_topics:app_fact(<<"mpong">>,
+                                                   <<"seat_reserved">>, 1),
+            DeniedTopic   = hecate_topics:app_fact(<<"mpong">>,
+                                                   <<"seat_denied">>, 1),
+            LobbyRef    = sub_or_undef(LobbyTopic,
+                                       fun(M) -> Self ! {mesh_lobby, M}, ok end),
+            ReservedRef = sub_or_undef(ReservedTopic,
+                                       fun(M) -> Self ! {mpong_seat_reserved, M}, ok end),
+            DeniedRef   = sub_or_undef(DeniedTopic,
+                                       fun(M) -> Self ! {mpong_seat_denied, M}, ok end),
+            {LobbyRef, ReservedRef, DeniedRef};
         false ->
-            undefined
+            {undefined, undefined, undefined}
     end.
+
+sub_or_undef(Topic, Callback) ->
+    case hecate_mesh:subscribe(Topic, Callback) of
+        {ok, Ref} -> Ref;
+        _         -> undefined
+    end.
+
+extract_payload(#{payload := P}) -> P;
+extract_payload(P)               -> P.
 
 unsubscribe_mesh(undefined) -> ok;
 unsubscribe_mesh(Ref) ->

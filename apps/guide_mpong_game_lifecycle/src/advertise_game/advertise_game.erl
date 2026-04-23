@@ -1,24 +1,19 @@
 %%%-------------------------------------------------------------------
 %%% @doc Advertises available games on the Macula mesh.
 %%%
-%%% After a game is hosted, publishes game availability to mesh
-%%% PubSub topic so other nodes can discover it.
+%%% Publishes game-availability facts on a single canonical topic so
+%%% other nodes can discover them. Joining is no longer a per-game
+%%% RPC procedure — challengers publish `seat_requested_v1` with the
+%%% game_id, and the host responds with `seat_reserved_v1` /
+%%% `seat_denied_v1`. See request_seat/, reserve_seat/, deny_seat/
+%%% desks for the protocol.
 %%%
-%%% Topic: {realm}/hecate-social/hecate/mpong/game_advertised_v1
-%%% Procedure: {realm}/hecate-social/hecate/mpong/join_game_v1
+%%% Topic: io.macula/beam-campus/hecate/mpong/game_advertised_v1
 %%% @end
 %%%-------------------------------------------------------------------
 -module(advertise_game).
 
--export([announce/1, closed/1, ended/1, withdraw/1, join_procedure/1, topic/0]).
-
-%% @doc Build the mesh RPC procedure name for joining a specific game.
-%% NOTE: game_id in procedure name is intentional here — each lobby
-%% advertises its own join endpoint for direct RPC routing.
--spec join_procedure(binary()) -> binary().
-join_procedure(GameId) ->
-    Base = hecate_topics:app_hope(<<"mpong">>, <<"join_game">>, 1),
-    <<Base/binary, ".", GameId/binary>>.
+-export([announce/1, closed/1, ended/1, withdraw/1, topic/0]).
 
 %% @doc Build the realm-prefixed mesh topic for game announcements.
 -spec topic() -> binary().
@@ -33,8 +28,7 @@ announce(#{game_id := GameId, host_node_id := HostNodeId,
         action => <<"hosted">>,
         game_id => GameId,
         host_node_id => HostNodeId,
-        max_players => MaxPlayers,
-        join_procedure => join_procedure(GameId)
+        max_players => MaxPlayers
     }),
     case erlang:function_exported(hecate_mesh, publish, 2) of
         true ->
