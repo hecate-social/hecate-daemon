@@ -155,11 +155,11 @@ init([]) ->
 
     %% Join pg group for cluster-inherited realm credentials.
     %% When another node in the cluster joins a realm, it broadcasts here.
-    %% pg may not be available in all deployment modes (standalone containers).
-    try pg:join(pg, hecate_realm_credentials, self())
-    catch exit:{noproc, _} ->
-        logger:warning("[hecate_mesh] pg scope not available — cluster credential sharing disabled")
-    end,
+    %% Boot-order race: hecate_mesh_client:init/1 can run before the pg
+    %% scope is up. If pg isn't available yet, schedule a retry instead
+    %% of silently giving up — the scope comes up within a second or two
+    %% during normal boot.
+    ensure_pg_membership(),
 
     %% Boot mode: join_with_token takes priority over auto_activate.
     %% They are mutually exclusive — join_with_token implies activation.
@@ -402,8 +402,32 @@ handle_info({realm_credentials, _Credentials}, State) ->
     %% Already activated — ignore
     {noreply, State};
 
+handle_info(ensure_pg_membership, State) ->
+    ensure_pg_membership(),
+    {noreply, State};
+
 handle_info(_Info, State) ->
     {noreply, State}.
+
+%% @private Join the pg scope if it's up; otherwise retry in a moment.
+%% The boot order can put hecate_mesh_client:init/1 before the `pg`
+%% scope is registered, so a one-shot join silently fails and the
+%% client never receives cluster-inherited realm credentials.
+ensure_pg_membership() ->
+    case erlang:whereis(pg) of
+        undefined ->
+            erlang:send_after(500, self(), ensure_pg_membership),
+            ok;
+        _Pid ->
+            try
+                ok = pg:join(pg, hecate_realm_credentials, self()),
+                logger:info("[hecate_mesh] joined pg group hecate_realm_credentials")
+            catch Class:Reason ->
+                logger:warning("[hecate_mesh] pg:join failed ~p:~p — retrying",
+                               [Class, Reason]),
+                erlang:send_after(500, self(), ensure_pg_membership)
+            end
+    end.
 
 %% @private Broadcast realm credentials to all peers in the Erlang cluster.
 %% Uses pg group — only hecate_mesh_client processes receive this.
