@@ -28,7 +28,7 @@
 -module(stream_chat_with_llm).
 -behaviour(gen_server).
 
--export([start_link/0, procedure/1, handle/2]).
+-export([start_link/0, procedure/0, handle/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 %% Generous default per-chunk timeout: large local models can be slow
@@ -39,16 +39,16 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%% @doc Build the procedure MRI for a given realm.
--spec procedure(binary()) -> binary().
-procedure(Realm) when is_binary(Realm) ->
-    <<Realm/binary, ".llm.chat_stream">>.
+%% @doc Build the procedure MRI (app-tier hope).
+-spec procedure() -> binary().
+procedure() ->
+    hecate_topics:app_hope(<<"llm">>, <<"chat_stream">>, 1).
 
 %% @doc gen_server init — register the streaming advertisement.
 init([]) ->
     Realm = application:get_env(hecate, realm, <<"io.macula">>),
     ok = hecate_mesh_client:register_stream_advertisement(
-            procedure(Realm),
+            procedure(),
             server_stream,
             fun ?MODULE:handle/2),
     {ok, #{realm => Realm}}.

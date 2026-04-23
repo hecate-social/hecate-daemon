@@ -18,11 +18,11 @@
 %%% @end
 -module(serve_file_content_rpc).
 
--export([procedure/1, handle/1, register/0]).
+-export([procedure/0, handle/1, register/0]).
 
--spec procedure(binary()) -> binary().
-procedure(Realm) when is_binary(Realm) ->
-    <<Realm/binary, ".briefcase.get_chunk">>.
+-spec procedure() -> binary().
+procedure() ->
+    hecate_topics:app_hope(<<"briefcase">>, <<"get_chunk">>, 1).
 
 %% @doc RPC handler. Signature matches macula:advertise expectations.
 -spec handle(map()) -> {ok, map()} | {error, term()}.
@@ -53,8 +53,7 @@ handle_file_id(_) ->
 %% at boot — the subscription is queued until the mesh activates.
 -spec register() -> ok.
 register() ->
-    Realm = application:get_env(hecate, realm, <<"io.macula">>),
     hecate_mesh_client:register_advertisement(
-        procedure(Realm),
+        procedure(),
         fun ?MODULE:handle/1
     ).

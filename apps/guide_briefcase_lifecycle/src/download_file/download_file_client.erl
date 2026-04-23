@@ -33,9 +33,12 @@ fetch(Realm, FileId) ->
     fetch(Realm, FileId, #{}).
 
 -spec fetch(binary(), binary(), fetch_opts()) -> fetch_result().
-fetch(Realm, FileId, Opts)
-  when is_binary(Realm), is_binary(FileId), is_map(Opts) ->
-    Proc = <<Realm/binary, ".briefcase.get_chunk_stream">>,
+fetch(_Realm, FileId, Opts)
+  when is_binary(FileId), is_map(Opts) ->
+    %% Realm is carried for provenance/logging; the actual procedure
+    %% MRI comes from the app-tier topic builder which already knows
+    %% the current realm from app env.
+    Proc = stream_file_content_rpc:procedure(),
     OpenTimeout  = maps:get(open_timeout_ms,  Opts, ?DEFAULT_TIMEOUT_MS),
     ChunkTimeout = maps:get(chunk_timeout_ms, Opts, ?CHUNK_RECV_TIMEOUT_MS),
     ProgressFn   = maps:get(progress_fn,      Opts, fun(_B, _F) -> ok end),

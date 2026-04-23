@@ -1,8 +1,9 @@
 %%% @doc Mesh presence announcer.
 %%%
-%%% Publishes a presence fact to the {realm}.hecate.presence topic.
-%%% Called once after probes complete (initial announcement)
-%%% and every 60s by the coordinator heartbeat timer.
+%%% Publishes a presence fact on the app-tier topic built via
+%%% `hecate_topics`: `{realm}/beam-campus/hecate/presence/announced_v1`.
+%%% Called once after probes complete (initial announcement) and every
+%%% 60s by the coordinator heartbeat timer.
 %%% @end
 -module(announce_mesh_presence).
 
@@ -11,8 +12,7 @@
 -spec announce(pid(), map()) -> ok | {error, term()}.
 announce(Client, ProbeResults) ->
     Identity = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>),
-    Realm = application:get_env(hecate, realm, <<"io.macula">>),
-    Topic = <<Realm/binary, ".hecate.presence">>,
+    Topic = hecate_topics:app_fact(<<"presence">>, <<"announced">>, 1),
     Version = app_version(),
     Capabilities = derive_capabilities(ProbeResults),
 

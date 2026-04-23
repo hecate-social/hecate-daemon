@@ -34,7 +34,7 @@ start_link() ->
 %% Useful for eunit + operator diagnostics.
 -spec advertised_procedure() -> binary().
 advertised_procedure() ->
-    procedure_uri(hecate_topics:realm()).
+    procedure_uri().
 
 %%====================================================================
 %% gen_server callbacks
@@ -42,7 +42,7 @@ advertised_procedure() ->
 
 init([]) ->
     Realm = hecate_topics:realm(),
-    Procedure = procedure_uri(Realm),
+    Procedure = procedure_uri(),
     Handler = fun(Args) -> handle_realm_gitops_init:handle(Realm, Args) end,
     ok = hecate_mesh_client:register_advertisement(Procedure, Handler),
     logger:info("[respond_to_realm_gitops_init] Advertised ~s", [Procedure]),
@@ -60,6 +60,6 @@ terminate(_Reason, #state{procedure = Procedure}) ->
 %% Internal
 %%====================================================================
 
--spec procedure_uri(binary()) -> binary().
-procedure_uri(Realm) when is_binary(Realm) ->
-    <<Realm/binary, ".config.gitops.initiate">>.
+-spec procedure_uri() -> binary().
+procedure_uri() ->
+    hecate_topics:realm_hope(<<"gitops">>, <<"initiate">>, 1).

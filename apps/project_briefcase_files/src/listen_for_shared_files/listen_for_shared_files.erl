@@ -1,4 +1,7 @@
-%%% @doc Mesh listener for `<realm>.briefcase.file_shared` FACTs.
+%%% @doc Mesh listener for briefcase `file_shared_v1` FACTs.
+%%%
+%%% Subscribes to the app-tier topic built via `hecate_topics`:
+%%%     `{realm}/beam-campus/hecate/briefcase/file_shared_v1`
 %%%
 %%% When another peer in the realm publishes a `file_shared` FACT, we
 %%% dispatch an `announce_file_v1` command. The aggregate writes a
@@ -26,7 +29,7 @@ start_link() ->
 
 init([]) ->
     Realm = application:get_env(hecate, realm, <<"io.macula">>),
-    Topic = <<Realm/binary, ".briefcase.file_shared">>,
+    Topic = hecate_topics:app_fact(<<"briefcase">>, <<"file_shared">>, 1),
     Self  = self(),
     Callback = fun(Fact) ->
         Self ! {shared_fact, Fact},

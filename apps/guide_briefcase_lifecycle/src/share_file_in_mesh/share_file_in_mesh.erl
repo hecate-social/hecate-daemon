@@ -1,11 +1,11 @@
 %%% @doc Publish a briefcase file as a mesh integration fact.
 %%%
 %%% Called after a successful local `upload_file_v1` dispatch. Publishes
-%%% `file_shared_v1` to the realm-scoped topic:
-%%%     `<realm>.briefcase.file_shared`
+%%% `file_shared_v1` to the app-tier topic built via `hecate_topics`:
+%%%     `{realm}/beam-campus/hecate/briefcase/file_shared_v1`
 %%%
 %%% Subscribers on other peers in the realm receive this fact and may
-%%% fetch the content via the `<realm>.briefcase.get_chunk` RPC.
+%%% fetch the content via the briefcase `get_chunk` hope.
 %%%
 %%% Integration fact schema (stable contract; distinct from internal
 %%% `file_uploaded_v1` domain event):
@@ -25,7 +25,7 @@
 %%% @end
 -module(share_file_in_mesh).
 
--export([share/1, topic/1]).
+-export([share/1, topic/0]).
 
 -spec share(map()) -> ok | {error, term()}.
 share(#{file_id := FileId, realm := Realm, path := Path,
@@ -42,7 +42,7 @@ share(#{file_id := FileId, realm := Realm, path := Path,
         author_did    => AuthorDid,
         shared_at     => erlang:system_time(millisecond)
     },
-    Topic = topic(Realm),
+    Topic = topic(),
     try hecate_mesh_client:publish(Topic, Fact) of
         ok -> ok;
         {error, Reason} ->
@@ -60,6 +60,6 @@ share(#{file_id := FileId, realm := Realm, path := Path,
 share(_Incomplete) ->
     {error, missing_fields}.
 
--spec topic(binary()) -> binary().
-topic(Realm) when is_binary(Realm) ->
-    <<Realm/binary, ".briefcase.file_shared">>.
+-spec topic() -> binary().
+topic() ->
+    hecate_topics:app_fact(<<"briefcase">>, <<"file_shared">>, 1).
