@@ -228,15 +228,16 @@ start_ui() {
         (cd "$UI_DIR" && npm install)
     fi
 
-    # Vite on a different port (1421) so prod-local can coexist with
-    # dev's Vite on 1420 during A/B comparisons.
+    # Vite port is fixed at 1420 in vite.config.ts (strictPort) and
+    # tauri.conf.json devUrl. Prod-local and dev can't coexist on one
+    # host — stop dev first if it's running.
     (cd "$UI_DIR" && HECATE_SOCKET_PATH="$PROD_LOCAL_SOCK" \
-        VITE_PORT=1421 npm run dev) &
+        npm run dev) &
     VITE_PID=$!
 
-    echo -n "  Waiting for Vite on :1421"
+    echo -n "  Waiting for Vite on :1420"
     for i in $(seq 1 30); do
-        if ss -tlnp 2>/dev/null | grep -q ":1421 "; then
+        if ss -tlnp 2>/dev/null | grep -q ":1420 "; then
             echo " ready!"
             return 0
         fi
@@ -259,10 +260,10 @@ start_web() {
         exit 1
     fi
 
-    if ! ss -tlnp 2>/dev/null | grep -q ":1421 "; then
+    if ! ss -tlnp 2>/dev/null | grep -q ":1420 "; then
         start_ui
     else
-        echo "  Vite already running on :1421"
+        echo "  Vite already running on :1420"
     fi
 
     echo ""
@@ -270,7 +271,7 @@ start_web() {
     echo "  Socket: $PROD_LOCAL_SOCK"
     echo ""
     cd "$WEB_DIR"
-    HECATE_SOCKET_PATH="$PROD_LOCAL_SOCK" VITE_PORT=1421 cargo tauri dev
+    HECATE_SOCKET_PATH="$PROD_LOCAL_SOCK" cargo tauri dev
 }
 
 case "$MODE" in
