@@ -54,7 +54,12 @@ terminate(_Reason, _State) -> ok.
 %%% Internal
 %%% ===================================================================
 
-process_fact(Fact) ->
+%% hecate_mesh delivers mesh publications as `#{topic, payload}`
+%% envelopes where payload is the decoded fact. Some callers also
+%% feed the raw payload directly (tests, replays) — accept both.
+process_fact(#{payload := Payload}) when is_map(Payload) ->
+    process_fact(Payload);
+process_fact(Fact) when is_map(Fact) ->
     case to_command_payload(Fact) of
         {ok, Payload} ->
             dispatch_announce(Payload);
@@ -62,7 +67,10 @@ process_fact(Fact) ->
             logger:warning("[briefcase] malformed shared fact: ~p (~p)",
                            [Fact, Reason]),
             ok
-    end.
+    end;
+process_fact(Other) ->
+    logger:warning("[briefcase] unexpected shared_fact shape: ~p", [Other]),
+    ok.
 
 dispatch_announce(Payload) ->
     Cmd = announce_file_v1:new(Payload),
