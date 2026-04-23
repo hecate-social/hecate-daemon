@@ -49,7 +49,12 @@ activate() ->
 
 -spec is_activated() -> boolean().
 is_activated() ->
-    gen_server:call(?MODULE, is_activated).
+    %% Read from persistent_term (lock-free) to avoid blocking on the
+    %% gen_server queue during boot contention. The activate/deactivate
+    %% transitions update the flag inside handle_call so a legitimate
+    %% stale read can only happen during the exact instant of transition,
+    %% which is acceptable for this probe-style use.
+    persistent_term:get({?MODULE, activated}, false).
 
 %% @doc Register a subscription to be applied when mesh activates.
 %% Returns immediately. Safe to call during init/1.
@@ -173,6 +178,11 @@ init([]) ->
         _ -> ok
     end,
 
+    %% Seed the lock-free activated flag. is_activated/0 reads it from
+    %% persistent_term to avoid blocking on this gen_server's call queue
+    %% during boot contention.
+    persistent_term:put({?MODULE, activated}, false),
+
     {ok, #state{
         client = undefined,
         activated = false,
@@ -214,6 +224,7 @@ handle_call(activate, _From, #state{activated = false} = State) ->
     %% Run mesh proof ceremony (non-blocking)
     mesh_proof_coordinator:run_probes(),
 
+    persistent_term:put({?MODULE, activated}, true),
     logger:info("[hecate_mesh] Mesh activated"),
     {reply, ok, State#state{client = Client, activated = true,
                             pending_subs = [], pending_advs = [],
