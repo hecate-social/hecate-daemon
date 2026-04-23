@@ -76,3 +76,14 @@ jobs:
             echo "Warning: Found TODOs in source code"
           fi
         continue-on-error: true
+
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Forbid inline mesh topic strings
+        # Fails the build on inline topic literals — drift like the
+        # dot-form realm publisher (silently dead for months) cannot
+        # land. See scripts/check-no-inline-topics.sh for patterns +
+        # exemptions and macula's docs/guides/TOPIC_NAMING_GUIDE.md
+        # for the canonical builders.
+        run: ./scripts/check-no-inline-topics.sh
