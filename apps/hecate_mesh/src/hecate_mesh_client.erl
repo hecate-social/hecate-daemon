@@ -555,16 +555,48 @@ get_multi_status(Client) when is_pid(Client) ->
     end;
 get_multi_status(_) -> #{}.
 
-%% @private Does the local realm_memberships_store have any confirmed
-%% membership? Used by reactivate_if_confirmed to decide whether the
-%% mesh should come up automatically on boot/restart.
+%% @private Does the event store have a realm_membership_confirmed_v1
+%% event that hasn't been ended/resigned? Used by reactivate_if_confirmed
+%% to decide whether the mesh should come up automatically on boot.
+%%
+%% Intentionally reads the event store directly rather than the ETS
+%% projection: ETS-backed projections are wiped on restart while evoq's
+%% subscription checkpoint persists, so the projection can be stale-empty
+%% after a restart even when the store has confirmed events. The event
+%% store is the source of truth.
 has_confirmed_membership() ->
-    try project_realm_memberships_store:list_confirmed() of
-        {ok, [_ | _]} -> true;
-        _ -> false
+    try
+        case evoq_event_store:read_all_global(realm_memberships_store, 0, 1000) of
+            {ok, Events} -> confirmed_not_ended(Events);
+            _ -> false
+        end
     catch
         _:_ -> false
     end.
+
+confirmed_not_ended(Events) ->
+    %% Group by membership_id: confirmed sets live=true, ended/resigned clears.
+    Status = lists:foldl(fun(E, Acc) ->
+        Type = event_type(E),
+        Data = maps:get(data, E, #{}),
+        MId  = maps:get(membership_id, Data,
+                        maps:get(<<"membership_id">>, Data, undefined)),
+        case {Type, MId} of
+            {_, undefined}                         -> Acc;
+            {<<"realm_membership_confirmed_v1">>, Id} -> Acc#{Id => live};
+            {<<"realm_membership_ended_v1">>,    Id} -> Acc#{Id => ended};
+            {<<"realm_membership_resigned_v1">>, Id} -> Acc#{Id => ended};
+            {<<"realm_membership_revoked_v1">>,  Id} -> Acc#{Id => ended};
+            _                                       -> Acc
+        end
+    end, #{}, Events),
+    lists:any(fun(S) -> S =:= live end, maps:values(Status)).
+
+event_type(#{event_type := T}) -> T;
+event_type(#{<<"event_type">> := T}) -> T;
+event_type({evoq_event, _EventId, T, _StreamId, _Version, _Data, _Metadata,
+            _Tags, _Timestamp, _Epoch, _DataCT, _MetaCT}) -> T;
+event_type(_) -> undefined.
 
 ensure_binary(B) when is_binary(B) -> B;
 ensure_binary(S) when is_list(S) -> list_to_binary(S).
