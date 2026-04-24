@@ -328,9 +328,8 @@ announce_with_capabilities() ->
 
     receive
         {CaptureRef, Topic, Payload} ->
-            %% Topic is {realm}.hecate.presence
-            Realm = application:get_env(hecate, realm, <<"io.macula">>),
-            ExpectedTopic = <<Realm/binary, ".hecate.presence">>,
+            %% Topic is {realm}/beam-campus/hecate/presence/announced_v1
+            ExpectedTopic = hecate_topics:app_fact(<<"presence">>, <<"announced">>, 1),
             ?assertEqual(ExpectedTopic, Topic),
             ?assert(is_list(maps:get(capabilities, Payload))),
             Caps = maps:get(capabilities, Payload),
