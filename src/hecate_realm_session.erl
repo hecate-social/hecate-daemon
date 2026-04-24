@@ -70,7 +70,24 @@ cancel() ->
 %%%===================================================================
 
 init([]) ->
-    {ok, #state{status = idle}}.
+    %% Hydrate from the event store: if a previous run has a live
+    %% realm membership on disk, don't force the operator to re-join
+    %% the realm on every boot. Consider "live" as any non-ended
+    %% membership event (initiated / confirmed / secured) so we also
+    %% survive the wrong_expected_version dispatch bug that prevents
+    %% the confirmed event from persisting — the operator's intent to
+    %% be joined is still recorded via the initiated event.
+    case find_live_membership() of
+        {ok, MembershipId, RealmUrl} ->
+            logger:info("[realm_session] hydrated prior membership ~s (realm=~s)",
+                        [MembershipId, RealmUrl]),
+            hecate_web_events:broadcast(realm_join_status, #{status => joined}),
+            {ok, #state{status = joined,
+                        membership_id = MembershipId,
+                        realm_url = RealmUrl}};
+        none ->
+            {ok, #state{status = idle}}
+    end.
 
 handle_call({start_joining, _Opts}, _From, #state{status = joining} = State) ->
     %% Already joining, return current session
@@ -373,3 +390,73 @@ state_to_map(#state{} = S) ->
             Remaining = max(0, ExpiresAt - erlang:system_time(second)),
             Map#{expires_in => Remaining}
     end.
+
+%% @private Look up the most recent live membership on disk.
+%% "Live" = has an initiated/confirmed/secured event and hasn't been
+%% ended/resigned/revoked. Prefers the most recent live membership by
+%% event order (last-wins). Returns the realm_url from the initiated
+%% event's data so we don't re-derive it from config.
+-spec find_live_membership() -> {ok, binary(), binary()} | none.
+find_live_membership() ->
+    try
+        case evoq_event_store:read_all_global(realm_memberships_store, 0, 1000) of
+            {ok, Events} -> select_live(Events);
+            _            -> none
+        end
+    catch _:_ -> none
+    end.
+
+select_live(Events) ->
+    %% Walk forward. For each MembershipId, track last-live status and
+    %% the realm_url last seen in its initiated event (Hanko-era flow
+    %% persists it there). At the end, return the most-recently-live
+    %% membership by global event order.
+    {Status, RealmUrls, LastLive} = lists:foldl(fun(E, {S, U, LL}) ->
+        Type = event_type(E),
+        Data = event_data(E),
+        MId  = membership_id(Data),
+        case {Type, MId} of
+            {_, undefined} -> {S, U, LL};
+            {<<"realm_membership_initiated_v1">>, MembId} ->
+                RU = realm_url_field(Data),
+                {maps:put(MembId, live, S), maps:put(MembId, RU, U), MembId};
+            {<<"realm_membership_confirmed_v1">>, MembId} -> {maps:put(MembId, live, S),  U, MembId};
+            {<<"realm_credentials_secured_v1">>,  MembId} -> {maps:put(MembId, live, S),  U, MembId};
+            {<<"realm_membership_ended_v1">>,     MembId} -> {maps:put(MembId, ended, S), U, LL};
+            {<<"realm_membership_resigned_v1">>,  MembId} -> {maps:put(MembId, ended, S), U, LL};
+            {<<"realm_membership_revoked_v1">>,   MembId} -> {maps:put(MembId, ended, S), U, LL};
+            _                                             -> {S, U, LL}
+        end
+    end, {#{}, #{}, undefined}, Events),
+    case LastLive of
+        undefined -> none;
+        Id ->
+            case maps:get(Id, Status, undefined) of
+                live ->
+                    RU = maps:get(Id, RealmUrls, undefined),
+                    {ok, Id, default_if_undef(RU, default_realm_url())};
+                _ ->
+                    none
+            end
+    end.
+
+default_if_undef(undefined, Default) -> Default;
+default_if_undef(V, _) -> V.
+
+membership_id(#{membership_id := Id})       -> Id;
+membership_id(#{<<"membership_id">> := Id}) -> Id;
+membership_id(_)                            -> undefined.
+
+realm_url_field(#{realm_url := R})       -> R;
+realm_url_field(#{<<"realm_url">> := R}) -> R;
+realm_url_field(_)                       -> undefined.
+
+event_type(#{event_type := T})       -> T;
+event_type(#{<<"event_type">> := T}) -> T;
+event_type({evoq_event, _, T, _, _, _, _, _, _, _, _, _}) -> T;
+event_type(_) -> undefined.
+
+event_data(#{data := D})       -> D;
+event_data(#{<<"data">> := D}) -> D;
+event_data({evoq_event, _, _, _, _, D, _, _, _, _, _, _}) -> D;
+event_data(_) -> #{}.
