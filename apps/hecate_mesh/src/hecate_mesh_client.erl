@@ -268,7 +268,10 @@ handle_call(get_status, _From, #state{client = Client, realm = Realm,
 handle_call({publish, _Topic, _Payload}, _From, #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
 handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) ->
-    macula_multi_relay:publish(Client, Topic, Payload),
+    %% Wrap: a busy multi_relay can stall this long enough to trip the
+    %% 5s default gen_server timeout, and the exit would kill mesh_client
+    %% (the observed crash mode at boot-time under heavy catch-up load).
+    _ = safe_mesh_call(fun() -> macula_multi_relay:publish(Client, Topic, Payload) end),
     {reply, ok, State};
 
 handle_call({subscribe, Topic, Callback}, _From, #state{activated = false} = State) ->
@@ -563,45 +566,58 @@ safe_mesh_call(Fun) ->
     end.
 
 get_multi_status(Client) when is_pid(Client) ->
-    case macula_multi_relay:get_status(Client) of
+    %% Wrap in safe_mesh_call — macula_multi_relay can be busy
+    %% draining pending subs/advs at activation time; its default
+    %% 5s gen_server:call timeout would otherwise kill mesh_client.
+    case safe_mesh_call(fun() -> macula_multi_relay:get_status(Client) end) of
         {ok, MS} -> MS;
         _ -> #{}
     end;
 get_multi_status(_) -> #{}.
 
-%% @private Does the event store have a realm_membership_confirmed_v1
-%% event that hasn't been ended/resigned? Used by reactivate_if_confirmed
+%% @private Does the event store show ANY realm membership activity
+%% that hasn't been explicitly ended? Used by reactivate_if_confirmed
 %% to decide whether the mesh should come up automatically on boot.
 %%
 %% Intentionally reads the event store directly rather than the ETS
 %% projection: ETS-backed projections are wiped on restart while evoq's
 %% subscription checkpoint persists, so the projection can be stale-empty
-%% after a restart even when the store has confirmed events. The event
-%% store is the source of truth.
+%% after a restart even when the store has events.
+%%
+%% Also intentionally permissive about event type: a stream that has
+%% only `realm_membership_initiated_v1` (no confirmed_v1 persisted —
+%% an observed failure mode when the confirm dispatch trips a
+%% wrong_expected_version in Ra) still counts as an intent to be on
+%% the mesh. Mesh activation is topological (connect to relays) and
+%% doesn't require a cert to be present; the per-node cert matters
+%% for realm-authenticated RPCs only.
 has_confirmed_membership() ->
     try
         case evoq_event_store:read_all_global(realm_memberships_store, 0, 1000) of
-            {ok, Events} -> confirmed_not_ended(Events);
+            {ok, Events} -> any_live_membership(Events);
             _ -> false
         end
     catch
         _:_ -> false
     end.
 
-confirmed_not_ended(Events) ->
-    %% Group by membership_id: confirmed sets live=true, ended/resigned clears.
+any_live_membership(Events) ->
+    %% For each membership_id, mark its status based on the events.
+    %% Any non-ended status counts as live (initiated or confirmed).
     Status = lists:foldl(fun(E, Acc) ->
         Type = event_type(E),
         Data = maps:get(data, E, #{}),
         MId  = maps:get(membership_id, Data,
                         maps:get(<<"membership_id">>, Data, undefined)),
         case {Type, MId} of
-            {_, undefined}                         -> Acc;
-            {<<"realm_membership_confirmed_v1">>, Id} -> Acc#{Id => live};
-            {<<"realm_membership_ended_v1">>,    Id} -> Acc#{Id => ended};
-            {<<"realm_membership_resigned_v1">>, Id} -> Acc#{Id => ended};
-            {<<"realm_membership_revoked_v1">>,  Id} -> Acc#{Id => ended};
-            _                                       -> Acc
+            {_, undefined}                            -> Acc;
+            {<<"realm_membership_initiated_v1">>, Id} -> maps:put(Id, live, Acc);
+            {<<"realm_membership_confirmed_v1">>, Id} -> maps:put(Id, live, Acc);
+            {<<"realm_credentials_secured_v1">>,  Id} -> maps:put(Id, live, Acc);
+            {<<"realm_membership_ended_v1">>,     Id} -> maps:put(Id, ended, Acc);
+            {<<"realm_membership_resigned_v1">>,  Id} -> maps:put(Id, ended, Acc);
+            {<<"realm_membership_revoked_v1">>,   Id} -> maps:put(Id, ended, Acc);
+            _                                          -> Acc
         end
     end, #{}, Events),
     lists:any(fun(S) -> S =:= live end, maps:values(Status)).
