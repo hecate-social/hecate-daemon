@@ -175,7 +175,15 @@ init([]) ->
             erlang:send_after(3000, self(), join_with_token);
         {_, true} ->
             erlang:send_after(2000, self(), auto_activate);
-        _ -> ok
+        _ ->
+            %% Self-heal on restart: if a realm membership has already
+            %% been confirmed locally (persisted in replicated
+            %% realm_memberships_store), activate automatically. The
+            %% confirmed-activate PM only re-fires on fresh events, so
+            %% a mesh_client crash post-activation leaves the mesh off
+            %% forever without this hook. Delay gives the store time to
+            %% be queryable.
+            erlang:send_after(5000, self(), reactivate_if_confirmed)
     end,
 
     %% Seed the lock-free activated flag. is_activated/0 reads it from
@@ -350,6 +358,29 @@ handle_info(auto_activate, #state{activated = false} = State) ->
 handle_info(auto_activate, State) ->
     {noreply, State};
 
+%% On boot / after a supervisor-restart, if the local store already
+%% has a confirmed realm membership, activate automatically. The
+%% confirmed-activate PM only re-fires on new events, so a crash
+%% post-activation would otherwise leave the mesh dark. Silent no-op
+%% if no credentials.
+handle_info(reactivate_if_confirmed, #state{activated = true} = State) ->
+    {noreply, State};
+handle_info(reactivate_if_confirmed, #state{activated = false} = State) ->
+    case has_confirmed_membership() of
+        true ->
+            logger:info("[hecate_mesh] Re-activating mesh for pre-existing realm membership"),
+            case handle_call(activate, {self(), make_ref()}, State) of
+                {reply, ok, NewState} -> {noreply, NewState};
+                {reply, Other, NewState} ->
+                    logger:warning("[hecate_mesh] Reactivate failed: ~p", [Other]),
+                    %% Retry in a minute — relays might be transiently unreachable.
+                    erlang:send_after(60000, self(), reactivate_if_confirmed),
+                    {noreply, NewState}
+            end;
+        false ->
+            {noreply, State}
+    end;
+
 %% Join realm via token — activate mesh first, then call join RPC
 handle_info(join_with_token, #state{activated = false} = State) ->
     logger:info("[hecate_mesh] Join token set — activating mesh first"),
@@ -523,6 +554,17 @@ get_multi_status(Client) when is_pid(Client) ->
         _ -> #{}
     end;
 get_multi_status(_) -> #{}.
+
+%% @private Does the local realm_memberships_store have any confirmed
+%% membership? Used by reactivate_if_confirmed to decide whether the
+%% mesh should come up automatically on boot/restart.
+has_confirmed_membership() ->
+    try project_realm_memberships_store:list_confirmed() of
+        {ok, [_ | _]} -> true;
+        _ -> false
+    catch
+        _:_ -> false
+    end.
 
 ensure_binary(B) when is_binary(B) -> B;
 ensure_binary(S) when is_list(S) -> list_to_binary(S).
