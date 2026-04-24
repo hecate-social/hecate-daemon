@@ -49,8 +49,22 @@ export HECATE_SOCKET_PATH="$HOME/.hecate-prodlocal/hecate-daemon/sockets/api.soc
 # of prod-local vs dev.
 export MACULA_MODE=client
 
-# Real production relays (override via env if testing an alt fleet).
-export MACULA_RELAYS="${MACULA_RELAYS:-https://relays-hetzner-nuremberg.macula.io:4433,https://relays-hetzner-helsinki.macula.io:4433,https://relays-linode-paris.macula.io:4433}"
+# Relay fleet — use the same BE virtual identities as the beam nodes
+# (see macula-demo/infrastructure/beam0*/hecate-daemon.env.example).
+# Sharing relay identities with the beams is required for the relay
+# server's pubsub fanout — fanout doesn't cross identity boundaries
+# even when two virtuals share a physical box. Override via
+# MACULA_RELAYS env if testing an alt fleet.
+export MACULA_RELAYS="${MACULA_RELAYS:-https://relay-be-leuven.macula.io:4433,https://relay-be-antwerp.macula.io:4433,https://relay-be-ghent.macula.io:4433}"
+
+# BEAM cluster cookie + peers (lab topology: laptop <-> beam00..03).
+# Settings live here (tracked, survives --clear) rather than in the
+# ephemeral prod-local env file. They match
+# macula-demo/infrastructure/beam0*/hecate-daemon.env.example so the
+# attended laptop shares identity with the headless fleet and can
+# pg-broadcast realm credentials to them.
+export HECATE_ERLANG_COOKIE="${HECATE_ERLANG_COOKIE:-ZMFTAHTHAYKXRVMPPQIZ}"
+export HECATE_CLUSTER_PEERS="${HECATE_CLUSTER_PEERS:-hecate@beam00.lab,hecate@beam01.lab,hecate@beam02.lab,hecate@beam03.lab}"
 
 # Force real-mesh backend even if a stray env var tries to flip it.
 # The inproc backend is strictly dev/test territory.
