@@ -289,18 +289,23 @@ rewrap_on_rotation() ->
                  <<"realm_shared_key_stored_v1">>, Event, #{},
                  on_realm_key_rotated_rewrap_licenses:default_config()),
 
-    %% Wait for the projection to advance to k_realm_version = 2.
+    %% Wait until THIS test's license appears at k_realm_version = 2.
+    %% The inorder cases above also left active v1 licenses that the
+    %% rewrap PM picks up, so Entries2 may hold more than one row —
+    %% what we care about is that our new license landed at v2, not
+    %% the row count or ordering.
+    HasOurs = fun(Entries) ->
+        lists:any(fun(E) -> maps:get(license_id, E) =:= LicenseId end, Entries)
+    end,
     wait_until(fun() ->
         case project_share_licenses_store:list_active_for_realm_version(?REALM, 2) of
-            {ok, [_ | _]} -> true;
+            {ok, Entries} -> HasOurs(Entries);
             _             -> false
         end
     end, 3000),
 
     {ok, Entries2} = project_share_licenses_store:list_active_for_realm_version(?REALM, 2),
-    ?assertEqual(1, length(Entries2)),
-    [Entry | _] = Entries2,
-    ?assertEqual(LicenseId, maps:get(license_id, Entry)).
+    ?assert(HasOurs(Entries2)).
 
 %%====================================================================
 %% Helpers
