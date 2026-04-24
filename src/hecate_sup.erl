@@ -1,18 +1,20 @@
 %%%-------------------------------------------------------------------
 %%% @doc Hecate top-level supervisor.
 %%%
-%%% Supervision tree:
+%%% Supervision tree (tier-1 business workers):
 %%% ```
 %%% hecate_sup (one_for_one)
 %%% ├── hecate_identity      - MRI + keypair (encrypted file)
 %%% ├── hecate_realm_session - Realm join flow
 %%% ├── hecate_ucan          - UCAN wallet (in-memory)
-%%% ├── hecate_plugin_loader - In-VM plugin loader
-%%% └── hecate_boot_tracker  - Telemetry-driven boot tracker
+%%% └── hecate_plugin_loader - In-VM plugin loader
 %%% '''
 %%%
-%%% Note: hecate_mesh and hecate_api are now umbrella apps started
-%%% separately via the release configuration.
+%%% Boot-infrastructure workers (boot_tracker, store spawning, post-boot
+%%% sequencing) live in the tier-0 boot_daemon app.
+%%%
+%%% Note: hecate_mesh and hecate_api are umbrella apps started separately
+%%% via the release configuration.
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_sup).
@@ -41,7 +43,7 @@ start_link(StoreIds) ->
     Args :: [atom()],
     SupFlags :: supervisor:sup_flags(),
     ChildSpecs :: [supervisor:child_spec()].
-init(StoreIds) ->
+init(_StoreIds) ->
     SupFlags = #{
         strategy => one_for_one,
         intensity => 10,
@@ -79,17 +81,6 @@ init(StoreIds) ->
             start => {hecate_plugin_loader, start_link, []},
             restart => permanent,
             type => worker
-        },
-
-        %% Boot tracker — telemetry-driven store readiness tracking.
-        %% Must start BEFORE stores are spawned so telemetry handler
-        %% is registered to catch [reckon_db, store, started] events.
-        #{
-            id => hecate_boot_tracker,
-            start => {hecate_boot_tracker, start_link, [StoreIds]},
-            restart => permanent,
-            type => worker
         }
     ],
-
     {ok, {SupFlags, ChildSpecs}}.

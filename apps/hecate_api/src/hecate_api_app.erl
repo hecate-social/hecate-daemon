@@ -6,7 +6,7 @@
 start(_StartType, _StartArgs) ->
     logger:info("[hecate_api] Starting"),
     %% All blocking work (subscriptions, route swap, readiness) is now
-    %% handled by hecate_boot_tracker after stores report ready via telemetry.
+    %% handled by boot_daemon's boot_tracker after stores report ready.
     hecate_api_sup:start_link().
 
 stop(_State) ->

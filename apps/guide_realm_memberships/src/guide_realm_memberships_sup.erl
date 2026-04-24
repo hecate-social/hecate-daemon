@@ -95,6 +95,32 @@ init([]) ->
             type => worker,
             modules => [evoq_event_handler,
                         on_realm_membership_ended_unsubscribe_from_revoked]
+        },
+        %% Relay local realm events to cluster peers via pg (outbound).
+        %% Lets an attended node's OAuth flow propagate to headless
+        %% beams clustered to the same node. Idempotent — receivers
+        %% that are already in state no-op.
+        #{
+            id => relay_realm_events_to_peers,
+            start => {evoq_event_handler, start_link,
+                      [relay_realm_events_to_peers, #{}, #{}]},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [evoq_event_handler,
+                        relay_realm_events_to_peers]
+        },
+        %% Inbound listener for relayed realm events (the cluster-
+        %% inherited-join seam). Joins the boot_daemon pg group and
+        %% re-dispatches initiated/confirmed/credentials-secured
+        %% commands against the local store.
+        #{
+            id => listen_for_inherited_realm_memberships,
+            start => {listen_for_inherited_realm_memberships, start_link, []},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [listen_for_inherited_realm_memberships]
         }
     ],
     {ok, {SupFlags, Children}}.

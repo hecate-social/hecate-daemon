@@ -55,7 +55,7 @@ handle_get(Req0, _State) ->
 
 get_boot_phase() ->
     try
-        Status = hecate_boot_tracker:get_status(),
+        Status = boot_daemon:get_status(),
         maps:get(boot_phase, Status, <<"unknown">>)
     catch _:_ ->
         case hecate_lifecycle:get_state() of

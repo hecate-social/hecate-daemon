@@ -10,7 +10,8 @@
         reckon_db,
         evoq,
         reckon_evoq,
-        shared
+        shared,
+        boot_daemon
     ]},
     {env, []},
     {modules, []},

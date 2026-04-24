@@ -39,7 +39,7 @@ init(Req0, State) ->
 maybe_add_boot_status(running, Response) ->
     Response;
 maybe_add_boot_status(_NotRunning, Response) ->
-    BootStatus = try hecate_boot_tracker:get_status()
+    BootStatus = try boot_daemon:get_status()
                  catch _:_ ->
                      #{boot_phase => <<"initializing">>,
                        stores => #{},

@@ -108,7 +108,7 @@ handle_cast({run_probes, IsInitial}, State) ->
         is_initial_run = IsInitial
     },
     case IsInitial of
-        true -> hecate_boot_tracker:set_phase(probing_mesh);
+        true -> boot_daemon:set_phase(probing_mesh);
         false -> ok
     end,
     self() ! {check_mesh, 0},
@@ -278,7 +278,7 @@ complete_probes(#state{probes = Probes, start_time = StartTime} = State) ->
 
 transition_to_running(#state{is_initial_run = true} = State) ->
     hecate_lifecycle:set_state(running),
-    hecate_boot_tracker:set_running(),
+    boot_daemon:set_running(),
     logger:info("[mesh_proof] Daemon ready — transitioning to running"),
     Ref = erlang:send_after(?HEARTBEAT_INTERVAL_MS, self(), heartbeat),
     {noreply, State#state{heartbeat_ref = Ref}};

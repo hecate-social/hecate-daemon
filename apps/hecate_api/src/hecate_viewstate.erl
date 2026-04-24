@@ -112,7 +112,7 @@ startup_viewstate() ->
         running ->
             #{done => true, steps => running_steps()};
         _ ->
-            Boot = try hecate_boot_tracker:get_status() catch _:_ -> #{} end,
+            Boot = try boot_daemon:get_status() catch _:_ -> #{} end,
             #{done => false, steps => boot_steps(Boot)}
     end.
 

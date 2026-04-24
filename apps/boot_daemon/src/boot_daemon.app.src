@@ -1,0 +1,18 @@
+{application, boot_daemon, [
+    {description, "Tier-0 boot orchestrator: store spawn + readiness + cluster cookie + pg relay"},
+    {vsn, "0.1.0"},
+    {registered, [boot_daemon_sup, boot_tracker]},
+    {mod, {boot_daemon_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        reckon_db,
+        evoq,
+        reckon_evoq,
+        shared
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

@@ -18,6 +18,11 @@
     reckon_db,
     reckon_evoq,
 
+    %% Tier-0 boot orchestrator: store spawn + readiness + pg seam.
+    %% hecate_app:start/2 calls boot_daemon:register_stores/1 to hand
+    %% over the store catalog.
+    boot_daemon,
+
     %% Mesh infrastructure (MUST start before domain apps with listeners)
     hecate_mesh
 

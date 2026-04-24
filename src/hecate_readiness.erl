@@ -50,7 +50,7 @@ await_projections() ->
         %% Local-first: daemon is ready when projections are caught up.
         %% Mesh connects later via POST /api/mesh/activate.
         hecate_lifecycle:set_state(running),
-        hecate_boot_tracker:set_running(),
+        boot_daemon:set_running(),
         logger:info("[readiness] Daemon ready (local mode)")
     end).
 

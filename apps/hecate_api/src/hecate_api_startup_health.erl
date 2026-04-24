@@ -29,7 +29,7 @@ init(Req0, State) ->
     {ok, Req, State}.
 
 boot_status() ->
-    try hecate_boot_tracker:get_status()
+    try boot_daemon:get_status()
     catch _:_ ->
         #{boot_phase => <<"initializing">>,
           stores => #{},
