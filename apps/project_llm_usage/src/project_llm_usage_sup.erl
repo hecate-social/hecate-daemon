@@ -16,6 +16,12 @@ init([]) ->
           restart => permanent, type => worker},
         #{id => llm_call_tracked_v1_to_llm_calls,
           start => {evoq_projection, start_link, [llm_call_tracked_v1_to_llm_calls, #{}, #{store_id => llm_store}]},
+          restart => permanent, type => worker},
+        #{id => llm_detected_v1_to_llms,
+          start => {evoq_projection, start_link, [llm_detected_v1_to_llms, #{}, #{store_id => llm_store}]},
+          restart => permanent, type => worker},
+        #{id => llm_removed_v1_to_llms,
+          start => {evoq_projection, start_link, [llm_removed_v1_to_llms, #{}, #{store_id => llm_store}]},
           restart => permanent, type => worker}
     ],
     {ok, {#{strategy => one_for_one, intensity => 10, period => 10}, Children}}.

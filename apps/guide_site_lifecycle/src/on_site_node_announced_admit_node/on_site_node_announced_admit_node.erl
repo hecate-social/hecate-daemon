@@ -58,7 +58,7 @@ terminate(_Reason, _State) ->
 maybe_admit(Node) ->
     NodeName = atom_to_binary(Node),
     SiteId = guide_site_lifecycle_app:site_id(),
-    admit_with_retry(SiteId, NodeName, 3).
+    admit_with_retry(SiteId, NodeName, 10).
 
 notify_web(NodeName) ->
     case project_site_store:get() of
@@ -82,6 +82,9 @@ admit_with_retry(SiteId, NodeName, Retries) ->
         {error, node_already_admitted} ->
             ok;
         {error, {wrong_expected_version, _, _}} ->
+            timer:sleep(500),
+            admit_with_retry(SiteId, NodeName, Retries - 1);
+        {error, not_initiated} ->
             timer:sleep(500),
             admit_with_retry(SiteId, NodeName, Retries - 1);
         {error, Reason} ->

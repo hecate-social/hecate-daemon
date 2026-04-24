@@ -1,9 +1,9 @@
 %%% @doc Handler for admit_node command
 -module(maybe_admit_node).
 
--export([handle/1, handle_from_map/1, dispatch/2]).
+-export([handle/1, handle_from_map/1, dispatch/2, dispatch_with_retry/2]).
 
--dialyzer({nowarn_function, [dispatch/2, handle/1]}).
+-dialyzer({nowarn_function, [dispatch/2, dispatch_with_retry/2, handle/1]}).
 
 -include_lib("evoq/include/evoq.hrl").
 
@@ -43,3 +43,27 @@ dispatch(SiteId, Cmd) ->
         adapter => reckon_evoq_adapter,
         consistency => eventual
     }).
+
+%% @doc Dispatch with retry for the boot-time race where admit_node
+%% fires before the site aggregate has replayed its
+%% `site_initiated_v1` event. Retries on `not_initiated` and
+%% `{wrong_expected_version,_,_}` with 500ms backoff, up to 10
+%% attempts (~5s window).
+-spec dispatch_with_retry(binary(), admit_node_v1:admit_node_v1()) ->
+    {ok, non_neg_integer(), [map()]} | {error, term()}.
+dispatch_with_retry(SiteId, Cmd) ->
+    dispatch_with_retry(SiteId, Cmd, 10).
+
+dispatch_with_retry(SiteId, Cmd, 0) ->
+    dispatch(SiteId, Cmd);
+dispatch_with_retry(SiteId, Cmd, Retries) ->
+    case dispatch(SiteId, Cmd) of
+        {error, not_initiated} ->
+            timer:sleep(500),
+            dispatch_with_retry(SiteId, Cmd, Retries - 1);
+        {error, {wrong_expected_version, _, _}} ->
+            timer:sleep(500),
+            dispatch_with_retry(SiteId, Cmd, Retries - 1);
+        Other ->
+            Other
+    end.

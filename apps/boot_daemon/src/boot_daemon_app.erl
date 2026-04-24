@@ -30,6 +30,7 @@
 start(_StartType, _StartArgs) ->
     logger:info("[boot_daemon] Starting"),
     apply_cluster_cookie(),
+    ensure_pg_scope(),
     boot_daemon_sup:start_link().
 
 -spec stop(term()) -> ok.
@@ -48,4 +49,15 @@ apply_cluster_cookie() ->
         Cookie when is_list(Cookie) ->
             erlang:set_cookie(node(), list_to_atom(Cookie)),
             logger:info("[boot_daemon] Cluster cookie applied from HECATE_ERLANG_COOKIE")
+    end.
+
+%% @private Start the default pg scope before any listener subscribes.
+%% `pg:start_link/0` is idempotent — returns `{error, {already_started, _}}`
+%% when the scope is already up. Running it here removes the cold-start
+%% race where `guide_realm_memberships` workers `pg:join/2` before the
+%% scope exists and retry 2s later.
+ensure_pg_scope() ->
+    case pg:start_link() of
+        {ok, _Pid} -> ok;
+        {error, {already_started, _Pid}} -> ok
     end.

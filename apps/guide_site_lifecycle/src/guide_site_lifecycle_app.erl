@@ -57,7 +57,7 @@ auto_admit_self(SiteId) ->
     NodeName = atom_to_binary(node()),
     Now = erlang:system_time(millisecond),
     Cmd = admit_node_v1:new(NodeName, Now),
-    case maybe_admit_node:dispatch(SiteId, Cmd) of
+    case maybe_admit_node:dispatch_with_retry(SiteId, Cmd) of
         {ok, _Version, _Events} ->
             logger:info("[site] Node admitted: ~s", [NodeName]);
         {error, node_already_admitted} ->

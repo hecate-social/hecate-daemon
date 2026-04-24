@@ -80,14 +80,17 @@ dispatch_inherited(<<"realm_membership_initiated_v1">>, Payload) ->
              initiate_realm_membership);
 
 dispatch_inherited(<<"realm_membership_confirmed_v1">>, Payload) ->
-    %% Confirm requires the aggregate to be initiated locally; if the
-    %% initiate broadcast arrived out of order (or was missed because
-    %% this node booted late), synthesise one from the confirm payload
-    %% — it carries membership_id + realm_id, which is enough.
-    NormPayload = normalize(Payload),
-    _ = dispatch(maybe_initiate_realm_membership, handle_from_map,
-                 [NormPayload], initiate_realm_membership),
-    dispatch(maybe_confirm_realm_membership, handle_from_map, [NormPayload],
+    %% Confirm requires the aggregate to be initiated locally.
+    %% The initiate event is always broadcast first (relay PM subscribes
+    %% to both and evoq delivers in append order per stream), so the
+    %% ordering race is only possible when this node booted between the
+    %% two broadcasts. In that case `not_initiated` is silently
+    %% swallowed in do_apply and the subsequent replay on next boot
+    %% catches up from the store. We do NOT synthesise an initiate from
+    %% the confirm payload: `realm_membership_confirmed_v1` carries
+    %% `realm_id`, not `realm_url` — dispatching initiate with a confirm
+    %% payload always fails with `realm_url_required`.
+    dispatch(maybe_confirm_realm_membership, handle_from_map, [normalize(Payload)],
              confirm_realm_membership);
 
 dispatch_inherited(<<"realm_credentials_secured_v1">>, Payload) ->
