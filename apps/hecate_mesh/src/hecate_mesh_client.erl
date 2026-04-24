@@ -627,13 +627,14 @@ has_confirmed_membership() ->
     end.
 
 any_live_membership(Events) ->
-    %% For each membership_id, mark its status based on the events.
-    %% Any non-ended status counts as live (initiated or confirmed).
     Status = lists:foldl(fun(E, Acc) ->
         Type = event_type(E),
-        Data = maps:get(data, E, #{}),
-        MId  = maps:get(membership_id, Data,
-                        maps:get(<<"membership_id">>, Data, undefined)),
+        Data = event_data(E),
+        MId  = case Data of
+            #{membership_id := Id}           -> Id;
+            #{<<"membership_id">> := Id}     -> Id;
+            _                                -> undefined
+        end,
         case {Type, MId} of
             {_, undefined}                            -> Acc;
             {<<"realm_membership_initiated_v1">>, Id} -> maps:put(Id, live, Acc);
@@ -647,11 +648,21 @@ any_live_membership(Events) ->
     end, #{}, Events),
     lists:any(fun(S) -> S =:= live end, maps:values(Status)).
 
-event_type(#{event_type := T}) -> T;
-event_type(#{<<"event_type">> := T}) -> T;
+event_type(#{event_type := T})         -> T;
+event_type(#{<<"event_type">> := T})   -> T;
 event_type({evoq_event, _EventId, T, _StreamId, _Version, _Data, _Metadata,
             _Tags, _Timestamp, _Epoch, _DataCT, _MetaCT}) -> T;
 event_type(_) -> undefined.
+
+%% evoq_event records carry Data as element 6 (1-indexed) — 6th after
+%% the record tag. maps:get on a record raises badmap, which the
+%% try/catch in has_confirmed_membership silently swallows, making
+%% every event look like it has no membership_id.
+event_data(#{data := D})                                -> D;
+event_data(#{<<"data">> := D})                          -> D;
+event_data({evoq_event, _EventId, _Type, _StreamId, _Version, D, _Metadata,
+            _Tags, _Timestamp, _Epoch, _DataCT, _MetaCT}) -> D;
+event_data(_) -> #{}.
 
 ensure_binary(B) when is_binary(B) -> B;
 ensure_binary(S) when is_list(S) -> list_to_binary(S).
