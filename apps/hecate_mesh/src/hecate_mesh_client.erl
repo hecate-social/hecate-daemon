@@ -124,6 +124,13 @@ discover_subscribers(_Topic) ->
 %%====================================================================
 
 init([]) ->
+    %% macula_multi_relay is a gen_server that dies if its internal
+    %% gen_server:call to a relay client times out (happens often on
+    %% cross-relay RPCs to the realm server). We link to it via
+    %% start_link/1 at activate/0, so without trap_exit an upstream
+    %% death cascades to us. Trap it so we can catch the EXIT in
+    %% handle_info, reset state, and re-activate cleanly.
+    erlang:process_flag(trap_exit, true),
     Realm = application:get_env(hecate, realm, <<"io.macula">>),
     Identity = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>),
     Bootstrap = case os:getenv("MACULA_RELAYS") of
@@ -463,6 +470,24 @@ handle_info({realm_credentials, _Credentials}, State) ->
 
 handle_info(ensure_pg_membership, State) ->
     ensure_pg_membership(),
+    {noreply, State};
+
+%% Linked multi_relay died (common on cross-relay RPC timeouts from
+%% the realm server). Don't die with it — drop the reference, mark
+%% inactive, schedule a re-activate. Pending subs/advs are lost but
+%% the call-sites re-register on demand. Log at info so operators
+%% can see the self-heal is happening.
+handle_info({'EXIT', Pid, Reason},
+            #state{client = Pid, activated = true} = State) ->
+    logger:warning("[hecate_mesh] multi_relay died (~p) — will reactivate", [Reason]),
+    persistent_term:put({?MODULE, activated}, false),
+    erlang:send_after(1500, self(), reactivate_if_confirmed),
+    {noreply, State#state{client = undefined, activated = false,
+                          pending_subs = [], pending_advs = [],
+                          pending_stream_advs = []}};
+%% Trap_exit catches exits from worker procs we spawn for rpc_call
+%% and stream_call; those are normal completion signals, drop them.
+handle_info({'EXIT', _Pid, _Reason}, State) ->
     {noreply, State};
 
 handle_info(_Info, State) ->
