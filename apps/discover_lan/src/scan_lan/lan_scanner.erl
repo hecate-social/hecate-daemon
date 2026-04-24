@@ -112,6 +112,7 @@ do_scan() ->
 dispatch_spot(#{mac := MAC, ip := IP, hostname := Hostname} = Host) ->
     Cmd = #{
         mac => list_to_binary(MAC),
+        observer => atom_to_binary(node()),
         ip => list_to_binary(IP),
         hostname => Hostname,
         interface => list_to_binary(maps:get(interface, Host, "")),

@@ -8,6 +8,7 @@
 
 -record(lan_machine_spotted_v1, {
     mac       :: binary(),
+    observer  :: binary(),
     ip        :: binary(),
     hostname  :: binary(),
     interface :: binary(),
@@ -21,10 +22,11 @@
 
 event_type() -> <<"lan_machine_spotted_v1">>.
 
-new(#{mac := MAC, ip := IP, hostname := Hostname,
+new(#{mac := MAC, observer := Observer, ip := IP, hostname := Hostname,
       interface := Iface, ssh := SSH, hecate := Hecate} = Opts) ->
     #lan_machine_spotted_v1{
         mac = MAC,
+        observer = Observer,
         ip = IP,
         hostname = Hostname,
         interface = Iface,
@@ -37,6 +39,7 @@ new(#{mac := MAC, ip := IP, hostname := Hostname,
 to_map(#lan_machine_spotted_v1{} = E) ->
     #{
         mac => E#lan_machine_spotted_v1.mac,
+        observer => E#lan_machine_spotted_v1.observer,
         ip => E#lan_machine_spotted_v1.ip,
         hostname => E#lan_machine_spotted_v1.hostname,
         interface => E#lan_machine_spotted_v1.interface,
@@ -49,6 +52,7 @@ to_map(#lan_machine_spotted_v1{} = E) ->
 from_map(#{mac := MAC, ip := IP} = M) ->
     {ok, #lan_machine_spotted_v1{
         mac = MAC,
+        observer = maps:get(observer, M, <<"unknown">>),
         ip = IP,
         hostname = maps:get(hostname, M, IP),
         interface = maps:get(interface, M, <<>>),

@@ -8,6 +8,7 @@
 
 -record(lan_machine_dismissed_v1, {
     mac          :: binary(),
+    observer     :: binary(),
     dismissed_at :: integer()
 }).
 
@@ -16,16 +17,18 @@
 
 event_type() -> <<"lan_machine_dismissed_v1">>.
 
-new(MAC) ->
+new(#{mac := MAC, observer := Observer} = Opts) ->
     #lan_machine_dismissed_v1{
         mac = MAC,
-        dismissed_at = erlang:system_time(millisecond)
+        observer = Observer,
+        dismissed_at = maps:get(dismissed_at, Opts, erlang:system_time(millisecond))
     }.
 
 -spec to_map(lan_machine_dismissed_v1()) -> map().
 to_map(#lan_machine_dismissed_v1{} = E) ->
     #{
         mac => E#lan_machine_dismissed_v1.mac,
+        observer => E#lan_machine_dismissed_v1.observer,
         dismissed_at => E#lan_machine_dismissed_v1.dismissed_at
     }.
 
@@ -33,6 +36,7 @@ to_map(#lan_machine_dismissed_v1{} = E) ->
 from_map(#{mac := MAC} = M) ->
     {ok, #lan_machine_dismissed_v1{
         mac = MAC,
+        observer = maps:get(observer, M, <<"unknown">>),
         dismissed_at = maps:get(dismissed_at, M, 0)
     }};
 from_map(_) ->

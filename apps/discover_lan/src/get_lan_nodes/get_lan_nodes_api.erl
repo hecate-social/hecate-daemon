@@ -43,7 +43,8 @@ handle_scan(Req0, _State) ->
     hecate_api_utils:json_ok(#{scanning => true}, Req0).
 
 handle_dismiss(MAC, Req0, _State) ->
-    case maybe_dismiss_lan_machine:dispatch(MAC) of
+    Observer = atom_to_binary(node()),
+    case maybe_dismiss_lan_machine:dispatch(MAC, Observer) of
         {ok, _V, _Events} ->
             hecate_api_utils:json_ok(#{dismissed => true, mac => MAC}, Req0);
         {error, already_dismissed} ->

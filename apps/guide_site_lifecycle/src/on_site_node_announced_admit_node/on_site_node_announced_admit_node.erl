@@ -81,7 +81,7 @@ admit_with_retry(SiteId, NodeName, Retries) ->
             notify_web(NodeName);
         {error, node_already_admitted} ->
             ok;
-        {error, {wrong_expected_version, _}} ->
+        {error, {wrong_expected_version, _, _}} ->
             timer:sleep(500),
             admit_with_retry(SiteId, NodeName, Retries - 1);
         {error, Reason} ->

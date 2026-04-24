@@ -208,8 +208,9 @@ run_post_boot(ReadyStoreIds) ->
 %% @private Set up Erlang-level clustering (optional) and Khepri
 %% store joins (explicit opt-in).
 %%
-%% Three layers, each opt-in:
-%%   HECATE_ERLANG_COOKIE=<atom>        set the distribution cookie
+%% HECATE_ERLANG_COOKIE is applied earlier in hecate_app:start/2 so
+%% site_id (cookie-derived) is stable before stores boot.
+%%
 %%   HECATE_CLUSTER_PEERS=<csv>         connect_node on each peer (pg
 %%                                      broadcast works at this level)
 %%   HECATE_AUTOJOIN_STORES=true        spawn Khepri store joins against
@@ -221,20 +222,10 @@ run_post_boot(ReadyStoreIds) ->
 %%                                      known to share the same state
 %%                                      or local state is expendable)
 maybe_join_cluster(StoreIds) ->
-    Cookie   = os:getenv("HECATE_ERLANG_COOKIE"),
     Peers    = os:getenv("HECATE_CLUSTER_PEERS"),
     AutoJoin = os:getenv("HECATE_AUTOJOIN_STORES") =:= "true",
-    _ = maybe_apply_cookie(Cookie),
     ConnectedPeers = maybe_connect_peers(Peers),
     maybe_spawn_store_joins(AutoJoin, ConnectedPeers, StoreIds).
-
-maybe_apply_cookie(false) ->
-    logger:info("[boot] No cluster cookie — keeping vm.args default"),
-    skipped;
-maybe_apply_cookie(Cookie) when is_list(Cookie) ->
-    erlang:set_cookie(node(), list_to_atom(Cookie)),
-    logger:info("[boot] Cluster cookie applied from HECATE_ERLANG_COOKIE"),
-    applied.
 
 maybe_connect_peers(false) ->
     logger:info("[boot] No cluster peers — staying Erlang-unconnected"),

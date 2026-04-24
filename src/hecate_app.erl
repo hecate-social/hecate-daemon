@@ -68,6 +68,13 @@ start(_StartType, _StartArgs) ->
     application:set_env(macula, quic_max_conn_per_ip, 50),
     application:set_env(macula, quic_max_conn_global_per_sec, 200),
 
+    %% 0. Apply Erlang cluster cookie BEFORE anything that depends on it.
+    %%    site_id is derived from the cookie (guide_site_lifecycle_app:site_id/0),
+    %%    so if this were deferred to boot_tracker:maybe_join_cluster the
+    %%    site aggregate could auto-initiate under the wrong cookie and
+    %%    subsequent admit attempts would fail with not_initiated.
+    apply_cluster_cookie(),
+
     %% 1. Create namespaced directory layout
     shared_paths:ensure_layout(),
 
@@ -94,6 +101,17 @@ start(_StartType, _StartArgs) ->
         {error, ReckonReason} ->
             logger:error("Failed to start ReckonDB: ~p", [ReckonReason]),
             {error, {reckon_db_start_failed, ReckonReason}}
+    end.
+
+%% @private Apply HECATE_ERLANG_COOKIE if set. Idempotent — no-op when
+%% the env var is absent, so single-node / dev setups behave unchanged.
+apply_cluster_cookie() ->
+    case os:getenv("HECATE_ERLANG_COOKIE") of
+        false ->
+            logger:info("No HECATE_ERLANG_COOKIE set — keeping vm.args default");
+        Cookie when is_list(Cookie) ->
+            erlang:set_cookie(node(), list_to_atom(Cookie)),
+            logger:info("Cluster cookie applied from HECATE_ERLANG_COOKIE")
     end.
 
 %% @private Start the Unix socket with a minimal startup-health-only dispatch.

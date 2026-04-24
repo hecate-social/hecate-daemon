@@ -13,12 +13,15 @@
 -spec handle_from_map(map()) -> {ok, [map()]} | {error, term()}.
 handle_from_map(Payload) ->
     MAC = maps:get(mac, Payload, maps:get(<<"mac">>, Payload, <<>>)),
-    case byte_size(MAC) of
-        0 -> {error, mac_required};
+    Observer = maps:get(observer, Payload, maps:get(<<"observer">>, Payload, <<>>)),
+    case {byte_size(MAC), byte_size(Observer)} of
+        {0, _} -> {error, mac_required};
+        {_, 0} -> {error, observer_required};
         _ ->
             Event = #{
                 event_type => <<"lan_machine_spotted_v1">>,
                 mac => MAC,
+                observer => Observer,
                 ip => maps:get(ip, Payload, maps:get(<<"ip">>, Payload, <<>>)),
                 hostname => maps:get(hostname, Payload, maps:get(<<"hostname">>, Payload, <<>>)),
                 interface => maps:get(interface, Payload, maps:get(<<"interface">>, Payload, <<>>)),
@@ -30,8 +33,8 @@ handle_from_map(Payload) ->
     end.
 
 -spec dispatch(map()) -> {ok, non_neg_integer(), [map()]} | {error, term()}.
-dispatch(#{mac := MAC} = ScanResult) ->
-    StreamId = lan_machine_aggregate:stream_id(MAC),
+dispatch(#{mac := MAC, observer := Observer} = ScanResult) ->
+    StreamId = lan_machine_aggregate:stream_id(MAC, Observer),
     Payload = ScanResult#{command_type => spot_lan_machine},
     EvoqCmd = #evoq_command{
         command_type = spot_lan_machine,

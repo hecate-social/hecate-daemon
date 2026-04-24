@@ -1,8 +1,14 @@
 %%% @doc Aggregate for LAN machines.
 %%%
-%%% Each machine gets its own stream keyed by MAC address.
-%%% Stream: lanmachine-{mac} (e.g., lanmachine-aa:bb:cc:dd:ee:ff)
-%%% Lives in site_store alongside the site aggregate.
+%%% Each observer (BEAM node) owns its own observation of each MAC.
+%%% Stream: lanmachine-{mac}-{observer_node} — keyed by (MAC, observer)
+%%% so host00 and beam02 never contend on the same stream even when
+%%% they spot the same machine.
+%%%
+%%% Lives in site_store alongside the site aggregate. site_store is
+%%% clustered (Khepri/Ra); per-observer streams keep lan-observation
+%%% writes conflict-free while the store still replicates all views
+%%% cluster-wide (any node can query what any other node sees).
 -module(lan_machine_aggregate).
 -behaviour(evoq_aggregate).
 
@@ -10,7 +16,7 @@
 -include("lan_machine_status.hrl").
 
 -export([init/1, execute/2, apply/2]).
--export([state_module/0, stream_id/1]).
+-export([state_module/0, stream_id/2]).
 
 -spec state_module() -> module().
 state_module() -> lan_machine_state.
@@ -18,9 +24,9 @@ state_module() -> lan_machine_state.
 init(AggregateId) ->
     {ok, lan_machine_state:new(AggregateId)}.
 
--spec stream_id(binary()) -> binary().
-stream_id(MAC) ->
-    <<"lanmachine-", MAC/binary>>.
+-spec stream_id(binary(), binary()) -> binary().
+stream_id(MAC, Observer) ->
+    <<"lanmachine-", MAC/binary, "-", Observer/binary>>.
 
 execute(State, #{command_type := CmdType} = Payload) ->
     do_execute(CmdType, State, Payload);
@@ -41,9 +47,9 @@ do_execute(spot_lan_machine, State, Payload) ->
         false -> {error, no_change}  %% idempotent — no change
     end;
 
-do_execute(dismiss_lan_machine, State, _Payload) ->
+do_execute(dismiss_lan_machine, State, Payload) ->
     case State#lan_machine_state.status band ?LAN_MACHINE_DISMISSED of
-        0 -> maybe_dismiss_lan_machine:handle_from_map(#{});
+        0 -> maybe_dismiss_lan_machine:handle_from_map(Payload);
         _ -> {error, already_dismissed}
     end;
 
