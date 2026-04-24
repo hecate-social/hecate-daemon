@@ -294,19 +294,33 @@ handle_call({advertise, Procedure, Handler}, _From, #state{client = Client} = St
 
 handle_call({rpc_call, _Procedure, _Args, _Timeout}, _From, #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
-handle_call({rpc_call, Procedure, Args, Timeout}, _From, #state{client = Client} = State) ->
-    Result = safe_mesh_call(fun() -> macula_multi_relay:call(Client, Procedure, Args, Timeout) end),
-    {reply, Result, State};
+handle_call({rpc_call, Procedure, Args, Timeout}, From, #state{client = Client} = State) ->
+    %% Async: don't block the gen_server mailbox for the full RPC
+    %% timeout (often 30s), which starves every other caller
+    %% (subscribes, publishes, status checks). Spawn a worker, reply
+    %% via gen_server:reply/2 when it returns.
+    spawn(fun() ->
+        Result = safe_mesh_call(fun() ->
+            macula_multi_relay:call(Client, Procedure, Args, Timeout)
+        end),
+        gen_server:reply(From, Result)
+    end),
+    {noreply, State};
 
 handle_call({call_stream, _Procedure, _Args, _Timeout}, _From,
             #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
-handle_call({call_stream, Procedure, Args, Timeout}, _From,
+handle_call({call_stream, Procedure, Args, Timeout}, From,
             #state{client = Client} = State) ->
-    Result = safe_mesh_call(fun() ->
-        macula_multi_relay:call_stream(Client, Procedure, Args, Timeout)
+    %% Same async treatment as rpc_call — stream opens can block for
+    %% the full Timeout while the remote handshake completes.
+    spawn(fun() ->
+        Result = safe_mesh_call(fun() ->
+            macula_multi_relay:call_stream(Client, Procedure, Args, Timeout)
+        end),
+        gen_server:reply(From, Result)
     end),
-    {reply, Result, State};
+    {noreply, State};
 
 handle_call(_Request, _From, State) ->
     {reply, {error, unknown}, State}.
