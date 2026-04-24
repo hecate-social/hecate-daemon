@@ -184,79 +184,6 @@ rpc_nonce_mismatch() ->
 
     ?assertMatch({error, {nonce_mismatch, _}}, Result).
 
-probe_content_test_() ->
-    {foreach,
-        fun setup_macula_content_mock/0,
-        fun cleanup_macula_content_mock/1,
-        [
-            {"content probe succeeds on store+fetch",
-             fun content_round_trip/0},
-            {"content probe fails on store error",
-             fun content_store_fails/0},
-            {"content probe detects content mismatch",
-             fun content_mismatch/0}
-        ]
-    }.
-
-content_round_trip() ->
-    FakeManifest = #{chunks => [<<"chunk1">>]},
-    meck:expect(macula_content, store, fun(_Payload) ->
-        {ok, FakeManifest}
-    end),
-    meck:expect(macula_content, mcid, fun(Payload) ->
-        crypto:hash(sha256, Payload)
-    end),
-    meck:expect(macula_content, fetch, fun(_MCID) ->
-        %% We need to return the same payload that was stored.
-        %% Since the probe generates a random payload, we capture it.
-        %% The mock for store already ran, so we stored whatever was passed.
-        %% For this test, we trust the round-trip by returning what was stored.
-        {ok, get(stored_payload)}
-    end),
-    meck:expect(macula_content, mcid_to_string, fun(MCID) ->
-        <<"mcid1-", (binary:encode_hex(MCID))/binary>>
-    end),
-    meck:expect(macula_content, get_chunks, fun(_Manifest) ->
-        [<<"chunk1">>]
-    end),
-
-    %% Capture the stored payload
-    meck:expect(macula_content, store, fun(Payload) ->
-        put(stored_payload, Payload),
-        {ok, FakeManifest}
-    end),
-
-    {ok, Detail} = probe_mesh_content:run(self()),
-
-    ?assert(is_binary(maps:get(mcid, Detail))),
-    ?assert(is_integer(maps:get(round_trip_ms, Detail))),
-    ?assert(maps:get(size, Detail) > 0).
-
-content_store_fails() ->
-    meck:expect(macula_content, store, fun(_Payload) ->
-        {error, disk_full}
-    end),
-
-    Result = probe_mesh_content:run(self()),
-
-    ?assertMatch({error, {store_failed, disk_full}}, Result).
-
-content_mismatch() ->
-    FakeManifest = #{chunks => []},
-    meck:expect(macula_content, store, fun(_Payload) ->
-        {ok, FakeManifest}
-    end),
-    meck:expect(macula_content, mcid, fun(Payload) ->
-        crypto:hash(sha256, Payload)
-    end),
-    meck:expect(macula_content, fetch, fun(_MCID) ->
-        {ok, <<"totally_different_data">>}
-    end),
-
-    Result = probe_mesh_content:run(self()),
-
-    ?assertMatch({error, content_mismatch}, Result).
-
 %%====================================================================
 %% Coordinator Tests
 %%====================================================================
@@ -320,8 +247,7 @@ announce_with_capabilities() ->
     ProbeResults = #{
         pubsub => #{status => passed},
         rpc => #{status => passed},
-        dht => #{status => failed},
-        content => #{status => passed}
+        dht => #{status => failed}
     },
 
     ok = announce_mesh_presence:announce(self(), ProbeResults),
@@ -335,8 +261,7 @@ announce_with_capabilities() ->
             Caps = maps:get(capabilities, Payload),
             ?assert(lists:member(pubsub, Caps)),
             ?assert(lists:member(rpc, Caps)),
-            ?assertNot(lists:member(dht, Caps)),
-            ?assert(lists:member(content, Caps))
+            ?assertNot(lists:member(dht, Caps))
     after 1000 ->
         ?assert(false)
     end.
@@ -362,14 +287,6 @@ setup_macula_mock() ->
 
 cleanup_macula_mock(_) ->
     meck:unload(macula),
-    ok.
-
-setup_macula_content_mock() ->
-    meck:new(macula_content, [non_strict]),
-    ok.
-
-cleanup_macula_content_mock(_) ->
-    meck:unload(macula_content),
     ok.
 
 setup_coordinator() ->

@@ -1,14 +1,14 @@
 %%% @doc Mesh proof coordinator.
 %%%
-%%% Orchestrates the mesh proof-of-participation ceremony. Runs 4
-%%% probes (pubsub, rpc, dht, content) in parallel, collects results,
+%%% Orchestrates the mesh proof-of-participation ceremony. Runs 3
+%%% probes (pubsub, rpc, dht) in parallel, collects results,
 %%% announces presence, and transitions the daemon to running.
 %%%
 %%% Lifecycle:
 %%%   1. Starts with proof_status = pending
 %%%   2. run_probes/0 called by hecate_readiness -> waiting_mesh
 %%%   3. Polls hecate_mesh:is_connected() every 500ms (up to 10s)
-%%%   4. Connected: spawns 4 probes as monitored processes -> probing
+%%%   4. Connected: spawns 3 probes as monitored processes -> probing
 %%%   5. Collects results via messages + DOWN monitors
 %%%   6. Per-probe 5s timeout (kills probe if exceeded)
 %%%   7. After all probes: presence announcement -> completed
@@ -31,8 +31,7 @@
 -define(PROBES, [
     {pubsub, probe_mesh_pubsub},
     {rpc,    probe_mesh_rpc},
-    {dht,    probe_mesh_dht},
-    {content, probe_mesh_content}
+    {dht,    probe_mesh_dht}
 ]).
 
 -record(state, {
