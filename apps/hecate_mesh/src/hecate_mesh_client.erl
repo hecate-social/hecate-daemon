@@ -629,24 +629,23 @@ has_confirmed_membership() ->
 any_live_membership(Events) ->
     Status = lists:foldl(fun(E, Acc) ->
         Type = event_type(E),
-        Data = event_data(E),
-        MId  = case Data of
-            #{membership_id := Id}           -> Id;
-            #{<<"membership_id">> := Id}     -> Id;
-            _                                -> undefined
-        end,
+        MId  = membership_id(event_data(E)),
         case {Type, MId} of
-            {_, undefined}                            -> Acc;
-            {<<"realm_membership_initiated_v1">>, Id} -> maps:put(Id, live, Acc);
-            {<<"realm_membership_confirmed_v1">>, Id} -> maps:put(Id, live, Acc);
-            {<<"realm_credentials_secured_v1">>,  Id} -> maps:put(Id, live, Acc);
-            {<<"realm_membership_ended_v1">>,     Id} -> maps:put(Id, ended, Acc);
-            {<<"realm_membership_resigned_v1">>,  Id} -> maps:put(Id, ended, Acc);
-            {<<"realm_membership_revoked_v1">>,   Id} -> maps:put(Id, ended, Acc);
-            _                                          -> Acc
+            {_, undefined}                                 -> Acc;
+            {<<"realm_membership_initiated_v1">>, MembId}  -> maps:put(MembId, live, Acc);
+            {<<"realm_membership_confirmed_v1">>, MembId}  -> maps:put(MembId, live, Acc);
+            {<<"realm_credentials_secured_v1">>,  MembId}  -> maps:put(MembId, live, Acc);
+            {<<"realm_membership_ended_v1">>,     MembId}  -> maps:put(MembId, ended, Acc);
+            {<<"realm_membership_resigned_v1">>,  MembId}  -> maps:put(MembId, ended, Acc);
+            {<<"realm_membership_revoked_v1">>,   MembId}  -> maps:put(MembId, ended, Acc);
+            _                                               -> Acc
         end
     end, #{}, Events),
     lists:any(fun(S) -> S =:= live end, maps:values(Status)).
+
+membership_id(#{membership_id := Id})        -> Id;
+membership_id(#{<<"membership_id">> := Id})  -> Id;
+membership_id(_)                             -> undefined.
 
 event_type(#{event_type := T})         -> T;
 event_type(#{<<"event_type">> := T})   -> T;
