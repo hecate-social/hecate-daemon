@@ -22,11 +22,19 @@
 ]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_continue/2,
+         handle_info/2, terminate/2]).
 
 -define(SERVER, ?MODULE).
 -define(POLL_INTERVAL, 2000).
 -define(SESSION_TTL, 600). %% 10 minutes
+
+%% Hydrate cadence: probe every 1s for up to 120 attempts (2 min). If
+%% realm_memberships_store never reports ready in that window we stay
+%% idle rather than blocking the operator's UI on a dead boot.
+-define(HYDRATE_FIRST_DELAY_MS,   500).
+-define(HYDRATE_RETRY_DELAY_MS,  1000).
+-define(HYDRATE_MAX_ATTEMPTS,     120).
 
 %% Suppress supertype warnings (returns specific maps, spec uses map())
 -dialyzer({nowarn_function, [do_start_joining/1, create_join_session/2, poll_session/2,
@@ -70,24 +78,18 @@ cancel() ->
 %%%===================================================================
 
 init([]) ->
-    %% Hydrate from the event store: if a previous run has a live
-    %% realm membership on disk, don't force the operator to re-join
-    %% the realm on every boot. Consider "live" as any non-ended
-    %% membership event (initiated / confirmed / secured) so we also
-    %% survive the wrong_expected_version dispatch bug that prevents
-    %% the confirmed event from persisting — the operator's intent to
-    %% be joined is still recorded via the initiated event.
-    case find_live_membership() of
-        {ok, MembershipId, RealmUrl} ->
-            logger:info("[realm_session] hydrated prior membership ~s (realm=~s)",
-                        [MembershipId, RealmUrl]),
-            hecate_web_events:broadcast(realm_join_status, #{status => joined}),
-            {ok, #state{status = joined,
-                        membership_id = MembershipId,
-                        realm_url = RealmUrl}};
-        none ->
-            {ok, #state{status = idle}}
-    end.
+    %% Hydrate happens in handle_continue so init/1 returns instantly.
+    %% Reading realm_memberships_store from init used to block the
+    %% entire hecate_sup boot by ~90s: the store itself can't spawn
+    %% until hecate_sup finishes starting its children, but the child
+    %% (realm_session) was waiting on the store's read via
+    %% reckon_gater's retry loop. Defer the probe and drive it from
+    %% handle_info — same outcome, no deadlock.
+    {ok, #state{status = idle}, {continue, hydrate}}.
+
+handle_continue(hydrate, State) ->
+    schedule_hydrate_probe(1, ?HYDRATE_FIRST_DELAY_MS),
+    {noreply, State}.
 
 handle_call({start_joining, _Opts}, _From, #state{status = joining} = State) ->
     %% Already joining, return current session
@@ -122,6 +124,44 @@ handle_call(cancel, _From, _State) ->
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
+
+handle_info({hydrate_probe, _Attempt}, #state{status = Status} = State)
+  when Status =/= idle ->
+    %% Someone joined (or started joining) before the probe fired —
+    %% no point racing the hydrate against a live session.
+    {noreply, State};
+handle_info({hydrate_probe, Attempt}, State) ->
+    Self = self(),
+    spawn(fun() ->
+        Self ! {hydrate_result, probe_live_membership(), Attempt}
+    end),
+    {noreply, State};
+
+handle_info({hydrate_result, {hydrated, MembershipId, RealmUrl}, _Attempt},
+            #state{status = idle} = State) ->
+    logger:info("[realm_session] hydrated prior membership ~s (realm=~s)",
+                [MembershipId, RealmUrl]),
+    hecate_web_events:broadcast(realm_join_status, #{status => joined}),
+    {noreply, State#state{status = joined,
+                          membership_id = MembershipId,
+                          realm_url = RealmUrl}};
+handle_info({hydrate_result, empty, _Attempt}, #state{status = idle} = State) ->
+    logger:info("[realm_session] no prior live membership — staying idle"),
+    {noreply, State};
+handle_info({hydrate_result, not_ready, Attempt},
+            #state{status = idle} = State)
+  when Attempt < ?HYDRATE_MAX_ATTEMPTS ->
+    schedule_hydrate_probe(Attempt + 1, ?HYDRATE_RETRY_DELAY_MS),
+    {noreply, State};
+handle_info({hydrate_result, not_ready, _Attempt},
+            #state{status = idle} = State) ->
+    logger:warning("[realm_session] realm_memberships_store never became "
+                   "readable within ~bs — staying idle",
+                   [?HYDRATE_MAX_ATTEMPTS * ?HYDRATE_RETRY_DELAY_MS div 1000]),
+    {noreply, State};
+handle_info({hydrate_result, _Outcome, _Attempt}, State) ->
+    %% State changed while the probe was in flight — drop the result.
+    {noreply, State};
 
 handle_info(poll, #state{status = joining, session_id = SessionId, realm_url = RealmUrl} = State) ->
     case poll_session(RealmUrl, SessionId) of
@@ -391,20 +431,47 @@ state_to_map(#state{} = S) ->
             Map#{expires_in => Remaining}
     end.
 
-%% @private Look up the most recent live membership on disk.
-%% "Live" = has an initiated/confirmed/secured event and hasn't been
-%% ended/resigned/revoked. Prefers the most recent live membership by
-%% event order (last-wins). Returns the realm_url from the initiated
-%% event's data so we don't re-derive it from config.
--spec find_live_membership() -> {ok, binary(), binary()} | none.
-find_live_membership() ->
-    try
-        case evoq_event_store:read_all_global(realm_memberships_store, 0, 1000) of
-            {ok, Events} -> select_live(Events);
-            _            -> none
-        end
-    catch _:_ -> none
+%% @private Three-state probe for the live-membership read.
+%%
+%% The hydrate loop needs to tell "store isn't up yet, try again" apart
+%% from "store is up, you truly have no prior membership" — both used
+%% to collapse into `none`, which meant every transient not-ready
+%% dropped the operator back to the join page on boot.
+-spec probe_live_membership() ->
+    {hydrated, binary(), binary()} | empty | not_ready.
+probe_live_membership() ->
+    case is_store_ready(realm_memberships_store) of
+        false -> not_ready;
+        true  -> read_and_select()
     end.
+
+-spec read_and_select() ->
+    {hydrated, binary(), binary()} | empty | not_ready.
+read_and_select() ->
+    try evoq_event_store:read_all_global(realm_memberships_store, 0, 1000) of
+        {ok, Events}        -> classify(select_live(Events));
+        {error, no_workers} -> not_ready;
+        {error, _}          -> not_ready
+    catch
+        %% reckon_gater can exit with no_workers after its own retry
+        %% exhausts before the store's workers come online.
+        _:_ -> not_ready
+    end.
+
+classify({ok, Id, RealmUrl}) -> {hydrated, Id, RealmUrl};
+classify(none)               -> empty.
+
+%% @private True once the store's manager is registered. Workers may
+%% still be spawning, but the read path will then handle short-lived
+%% no_workers as not_ready and we'll retry from handle_info.
+-spec is_store_ready(atom()) -> boolean().
+is_store_ready(StoreId) ->
+    MgrName = reckon_db_naming:store_mgr_name(StoreId),
+    is_pid(whereis(MgrName)).
+
+-spec schedule_hydrate_probe(pos_integer(), non_neg_integer()) -> reference().
+schedule_hydrate_probe(Attempt, DelayMs) ->
+    erlang:send_after(DelayMs, self(), {hydrate_probe, Attempt}).
 
 select_live(Events) ->
     %% Walk forward. For each MembershipId, track last-live status and
