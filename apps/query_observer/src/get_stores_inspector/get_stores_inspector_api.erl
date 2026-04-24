@@ -21,8 +21,8 @@ handle_get(Req0, _State) ->
     hecate_api_utils:json_ok(#{items => Items, total => length(Items)}, Req0).
 
 discover_stores() ->
-    %% Try esdb_gater_api:list_stores/0 first (richer metadata)
-    case catch esdb_gater_api:list_stores() of
+    %% Try reckon_gater_api:list_stores/0 first (richer metadata)
+    case catch reckon_gater_api:list_stores() of
         {ok, StoreList} when is_list(StoreList) ->
             StoreList;
         _ ->
