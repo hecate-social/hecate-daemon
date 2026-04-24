@@ -299,12 +299,13 @@ start_store_subscriptions(StoreIds) ->
         end
     end, StoreIds).
 
-%% @private Connect Erlang peers (HECATE_CLUSTER_PEERS) and optionally
-%% do Khepri store joins (HECATE_AUTOJOIN_STORES=true). Cookie is
-%% applied in boot_daemon_app:start/2, before any of this.
+%% @private Khepri store joins (HECATE_AUTOJOIN_STORES=true). Erlang
+%% peer-connect lives in boot_daemon_app:start/2 — it doesn't need
+%% stores to be ready and running it here would race with
+%% mesh_proof_coordinator:set_running/0 short-circuiting the post-boot
+%% sequence whenever realm credentials are cached. Store joins DO need
+%% stores, hence they stay here.
 %%
-%%   HECATE_CLUSTER_PEERS=<csv>    connect_node on each peer (pg
-%%                                 broadcast works at this level)
 %%   HECATE_AUTOJOIN_STORES=true   spawn Khepri store joins against
 %%                                 the first connected peer (DANGER:
 %%                                 replaces local store data with a
@@ -314,20 +315,9 @@ start_store_subscriptions(StoreIds) ->
 %%                                 same state or local state is
 %%                                 expendable).
 maybe_join_cluster(StoreIds) ->
-    Peers    = os:getenv("HECATE_CLUSTER_PEERS"),
     AutoJoin = os:getenv("HECATE_AUTOJOIN_STORES") =:= "true",
-    ConnectedPeers = maybe_connect_peers(Peers),
+    ConnectedPeers = [N || N <- nodes(), N =/= node()],
     maybe_spawn_store_joins(AutoJoin, ConnectedPeers, StoreIds).
-
-maybe_connect_peers(false) ->
-    logger:info("[boot_tracker] No cluster peers — staying Erlang-unconnected"),
-    [];
-maybe_connect_peers(Peers) when is_list(Peers) ->
-    PeerNodes = [list_to_atom(string:trim(N)) || N <- string:split(Peers, ",", all), N =/= ""],
-    Connected = [P || P <- PeerNodes, net_kernel:connect_node(P) =:= true],
-    logger:info("[boot_tracker] Erlang cluster: ~b/~b peers connected (~p)",
-                [length(Connected), length(PeerNodes), Connected]),
-    Connected.
 
 maybe_spawn_store_joins(false, _Connected, _StoreIds) ->
     logger:info("[boot_tracker] HECATE_AUTOJOIN_STORES not 'true' — Khepri stores stay local "

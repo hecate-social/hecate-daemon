@@ -31,6 +31,7 @@ start(_StartType, _StartArgs) ->
     logger:info("[boot_daemon] Starting"),
     apply_cluster_cookie(),
     ensure_pg_scope(),
+    connect_cluster_peers(),
     boot_daemon_sup:start_link().
 
 -spec stop(term()) -> ok.
@@ -60,4 +61,41 @@ ensure_pg_scope() ->
     case pg:start_link() of
         {ok, _Pid} -> ok;
         {error, {already_started, _Pid}} -> ok
+    end.
+
+%% @private Connect Erlang peers listed in HECATE_CLUSTER_PEERS so the
+%% pg seam reaches them before any store replay or mesh activation.
+%%
+%% Peer-connect used to live in boot_tracker's post-boot sequence, but
+%% post-boot only fires after the poll loop sees every expected store
+%% ready. `mesh_proof_coordinator:set_running/0` can change the boot
+%% phase out of `booting_stores` before that poll completes — which
+%% happens whenever realm credentials are already cached from a prior
+%% session and the mesh activates in <1s. Once the phase is no longer
+%% `booting_stores`, the poll_stores handler bails, `trigger_post_boot`
+%% never runs, and peer-connect is silently dropped.
+%%
+%% Peer-connect has no dependency on stores, projections, or mesh — it
+%% just needs the cookie applied and the pg scope up. Both happen in
+%% this function's callers above, so peer-connect is safe here at
+%% tier-0 boot time. Store-level Khepri joins (HECATE_AUTOJOIN_STORES)
+%% stay in post-boot because they DO need stores running.
+%%
+%% Fired in a spawned process so an unreachable peer (e.g. the other
+%% node hasn't finished its own BEAM startup yet) never blocks this
+%% node's boot. One-shot: if we miss a peer, its own boot_daemon will
+%% connect back when it starts.
+connect_cluster_peers() ->
+    case os:getenv("HECATE_CLUSTER_PEERS") of
+        false ->
+            logger:info("[boot_daemon] No HECATE_CLUSTER_PEERS — staying Erlang-unconnected");
+        Peers when is_list(Peers) ->
+            PeerNodes = [list_to_atom(string:trim(N)) ||
+                         N <- string:split(Peers, ",", all), N =/= ""],
+            spawn(fun() ->
+                Connected = [P || P <- PeerNodes,
+                                  net_kernel:connect_node(P) =:= true],
+                logger:info("[boot_daemon] Erlang cluster: ~b/~b peers connected (~p)",
+                            [length(Connected), length(PeerNodes), Connected])
+            end)
     end.
