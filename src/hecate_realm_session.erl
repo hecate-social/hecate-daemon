@@ -310,7 +310,18 @@ handle_join_confirmed(Data, #state{membership_id = MembershipId} = State) ->
 dispatch_initiate_membership(#{membership_id := MembershipId, realm_url := RealmUrl}) ->
     Now = erlang:system_time(millisecond),
     Cmd = initiate_realm_membership_v1:new(MembershipId, RealmUrl, Now),
-    maybe_initiate_realm_membership:dispatch(Cmd).
+    Result = maybe_initiate_realm_membership:dispatch(Cmd),
+    case Result of
+        {ok, Version, Events} ->
+            logger:info("[realm_session] initiate_realm_membership dispatched "
+                        "~s version=~p events=~p",
+                        [MembershipId, Version, length(Events)]);
+        {error, Reason} ->
+            logger:warning("[realm_session] initiate_realm_membership FAILED "
+                           "~s: ~p",
+                           [MembershipId, Reason])
+    end,
+    Result.
 
 -spec dispatch_confirm_membership(binary(), binary() | undefined, binary(), binary() | undefined) -> ok.
 dispatch_confirm_membership(_MembershipId, undefined, _Provider, _RealmUrl) ->
