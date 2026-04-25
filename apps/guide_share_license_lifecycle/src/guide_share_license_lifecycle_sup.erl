@@ -23,8 +23,8 @@ init([]) ->
         emitter(license_accepted_v1_to_pg),
         emitter(license_ended_v1_to_pg),
 
-        %% Single-event mesh emitter: issuer-side revoke → mesh FACT.
-        emitter(share_license_revoked_v1_to_mesh),
+        %% Single-event DHT emitter: issuer-side revoke → 0x24 record.
+        emitter(share_license_revoked_v1_to_dht),
 
         %% Batched mesh emitter: gen_server owns the buffer + flush
         %% timer; evoq handler `license_issued_v1_to_batch` forwards

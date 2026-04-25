@@ -140,33 +140,59 @@ do_publish_or_drop(BatchId, _Realm, undefined, _Entries) ->
     logger:warning("[licenses_batch_emit] batch=~s missing issuer_did; dropping",
                    [BatchId]);
 do_publish_or_drop(BatchId, Realm, Issuer, Entries) ->
-    Topic = hecate_topics:org_fact(<<"licenses">>, <<"issued_batch">>, 1),
-    Fact = #{
-        event_type => <<"licenses_issued_batch_v1">>,
-        realm      => Realm,
-        batch_id   => BatchId,
-        issuer_did => Issuer,
-        entries    => [to_batch_entry(E) || E <- Entries]},
+    case hecate_identity:signing_keypair() of
+        {ok, KeyPair} ->
+            do_put_signed(KeyPair, BatchId, Realm, Issuer, Entries);
+        not_initialized ->
+            logger:warning("[licenses_batch_emit] identity not initialised; "
+                           "drop batch=~s", [BatchId])
+    end.
+
+%% Type tag 0x22 = `license_issued_batch_v1' (PLAN_DHT_FIRST.md §1).
+%% Each batch lands at its own DHT slot keyed by batch_id so concurrent
+%% issuers don't overwrite each other.
+-define(TYPE_LICENSE_ISSUED_BATCH_V1, 16#22).
+-define(BATCH_TTL_MS, 90 * 24 * 60 * 60 * 1000). %% 90 days
+
+do_put_signed(KeyPair, BatchId, Realm, Issuer, Entries) ->
+    Payload = #{
+        {text, <<"event_type">>} => <<"licenses_issued_batch_v1">>,
+        {text, <<"realm">>}      => Realm,
+        {text, <<"batch_id">>}   => BatchId,
+        {text, <<"issuer_did">>} => Issuer,
+        {text, <<"entries">>}    => [to_batch_entry(E) || E <- Entries]},
+    SignerPub = macula_identity:public(KeyPair),
+    Unsigned = macula_record:envelope(?TYPE_LICENSE_ISSUED_BATCH_V1,
+                                       SignerPub, Payload,
+                                       #{ttl_ms     => ?BATCH_TTL_MS,
+                                         subject_id => sha256(BatchId)}),
+    Signed = macula_record:sign(Unsigned, KeyPair),
     log_publish(BatchId, Realm, length(Entries),
-                hecate_mesh:publish(Topic, Fact)).
+                hecate_mesh:put_record(Signed)).
 
 log_publish(BatchId, Realm, Count, ok) ->
-    logger:info("[licenses_batch_emit] batch=~s entries=~b realm=~s",
+    logger:info("[licenses_batch_emit] batch=~s entries=~b realm=~s -> 0x22 record",
                 [BatchId, Count, Realm]);
 log_publish(BatchId, _Realm, _Count, {error, Reason}) ->
-    logger:warning("[licenses_batch_emit] publish failed batch=~s: ~p",
+    logger:warning("[licenses_batch_emit] put_record failed batch=~s: ~p",
                    [BatchId, Reason]).
 
+sha256(B) when is_binary(B) -> crypto:hash(sha256, B);
+sha256(L) when is_list(L)   -> crypto:hash(sha256, list_to_binary(L)).
+
 to_batch_entry(E) ->
-    #{license_id      => gf(license_id, E),
-      grantee         => gf(grantee, E),
-      file_id         => gf(file_id, E),
-      wrap_strategy   => atom_to_binary(
-                             to_atom(gf(wrap_strategy, E)), utf8),
-      wrapped_cek     => base64:encode(gf(wrapped_cek, E, <<>>)),
-      k_realm_version => gf(k_realm_version, E),
-      issued_at       => gf(issued_at, E),
-      expires_at      => gf(expires_at, E)}.
+    %% CBOR-safe text-keyed map (Part 6 §9 forbids bare atoms).
+    #{
+        {text, <<"license_id">>}      => gf(license_id, E),
+        {text, <<"grantee">>}         => gf(grantee, E),
+        {text, <<"file_id">>}         => gf(file_id, E),
+        {text, <<"wrap_strategy">>}   => atom_to_binary(
+                                             to_atom(gf(wrap_strategy, E)), utf8),
+        {text, <<"wrapped_cek">>}     => base64:encode(gf(wrapped_cek, E, <<>>)),
+        {text, <<"k_realm_version">>} => gf(k_realm_version, E),
+        {text, <<"issued_at">>}       => gf(issued_at, E),
+        {text, <<"expires_at">>}      => gf(expires_at, E)
+    }.
 
 gf(K, M) -> gf(K, M, undefined).
 gf(K, M, Default) ->

@@ -19,6 +19,7 @@
     get_public_key/0,
     get_encryption_public_key/0,
     encryption_keypair/0,
+    signing_keypair/0,
     agent_id/0,
     sign/1,
     verify/2,
@@ -71,10 +72,18 @@ get_encryption_public_key() ->
     gen_server:call(?SERVER, get_encryption_public_key).
 
 %% @doc Full X25519 keypair — use sparingly; the private key should
-%% only be consumed by `hecate_did_crypto:unwrap_with_privkey/2`.
+%% only be consumed by `hecate_did_crypto:unwrap_with_privkey/2'.
 -spec encryption_keypair() -> {ok, {binary(), binary()}} | not_initialized.
 encryption_keypair() ->
     gen_server:call(?SERVER, encryption_keypair).
+
+%% @doc Ed25519 signing keypair shaped to fit `macula_identity:key_pair()',
+%% so `macula_record:sign/2' can sign DHT records with the daemon's
+%% identity directly. Caller must not leak the private key off-process.
+-spec signing_keypair() -> {ok, #{public := binary(), private := binary()}}
+                         | not_initialized.
+signing_keypair() ->
+    gen_server:call(?SERVER, signing_keypair).
 
 -spec agent_id() -> binary().
 agent_id() ->
@@ -146,6 +155,14 @@ handle_call(encryption_keypair, _From,
             #state{encryption_public_key = Pub,
                    encryption_private_key = Priv} = State) ->
     {reply, {ok, {Pub, Priv}}, State};
+
+handle_call(signing_keypair, _From,
+            #state{public_key = undefined} = State) ->
+    {reply, not_initialized, State};
+handle_call(signing_keypair, _From,
+            #state{public_key = Pub,
+                   private_key = Priv} = State) ->
+    {reply, {ok, #{public => Pub, private => Priv}}, State};
 
 handle_call({sign, _Data}, _From, #state{private_key = undefined} = State) ->
     {reply, not_initialized, State};

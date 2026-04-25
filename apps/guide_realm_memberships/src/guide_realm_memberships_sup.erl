@@ -34,14 +34,14 @@ init([]) ->
                         on_realm_shared_key_stored_announce_public_key]
         },
         #{
-            id => identity_public_key_announced_v1_to_mesh,
+            id => identity_public_key_announced_v1_to_dht,
             start => {evoq_event_handler, start_link,
-                      [identity_public_key_announced_v1_to_mesh, #{}, #{}]},
+                      [identity_public_key_announced_v1_to_dht, #{}, #{}]},
             restart => permanent,
             shutdown => 5000,
             type => worker,
             modules => [evoq_event_handler,
-                        identity_public_key_announced_v1_to_mesh]
+                        identity_public_key_announced_v1_to_dht]
         },
         #{
             id => catch_up_realm_keys,
@@ -51,16 +51,16 @@ init([]) ->
             type => worker,
             modules => [catch_up_realm_keys]
         },
-        %% Resignation mesh emitter (single-event, not batched).
+        %% Resignation DHT emitter (single-event, not batched).
         #{
-            id => realm_membership_resigned_v1_to_mesh,
+            id => realm_membership_resigned_v1_to_dht,
             start => {evoq_event_handler, start_link,
-                      [realm_membership_resigned_v1_to_mesh, #{}, #{}]},
+                      [realm_membership_resigned_v1_to_dht, #{}, #{}]},
             restart => permanent,
             shutdown => 5000,
             type => worker,
             modules => [evoq_event_handler,
-                        realm_membership_resigned_v1_to_mesh]
+                        realm_membership_resigned_v1_to_dht]
         },
         %% Admin-revoke listener: subscribes only after a confirmed
         %% membership exists (gated by the two PMs below).

@@ -150,29 +150,53 @@ do_publish_or_drop(BatchId, _Realm, _Issuer, undefined, _Entries) ->
     logger:warning("[licenses_rewrapped_batch] batch=~s missing new_k_realm_version; dropping",
                    [BatchId]);
 do_publish_or_drop(BatchId, Realm, Issuer, NewVer, Entries) ->
-    Topic = hecate_topics:org_fact(<<"licenses">>, <<"rewrapped_batch">>, 1),
-    Fact = #{
-        event_type          => <<"licenses_rewrapped_batch_v1">>,
-        realm               => Realm,
-        batch_id            => BatchId,
-        issuer_did          => Issuer,
-        new_k_realm_version => NewVer,
-        entries             => [to_batch_entry(E) || E <- Entries]},
+    case hecate_identity:signing_keypair() of
+        {ok, KeyPair} ->
+            do_put_signed(KeyPair, BatchId, Realm, Issuer, NewVer, Entries);
+        not_initialized ->
+            logger:warning("[licenses_rewrapped_batch] identity not initialised; "
+                           "drop batch=~s", [BatchId])
+    end.
+
+%% Type tag 0x23 = `license_rewrapped_batch_v1' (PLAN_DHT_FIRST.md §1).
+-define(TYPE_LICENSE_REWRAPPED_BATCH_V1, 16#23).
+-define(BATCH_TTL_MS, 90 * 24 * 60 * 60 * 1000). %% 90 days
+
+do_put_signed(KeyPair, BatchId, Realm, Issuer, NewVer, Entries) ->
+    Payload = #{
+        {text, <<"event_type">>}          => <<"licenses_rewrapped_batch_v1">>,
+        {text, <<"realm">>}               => Realm,
+        {text, <<"batch_id">>}            => BatchId,
+        {text, <<"issuer_did">>}          => Issuer,
+        {text, <<"new_k_realm_version">>} => NewVer,
+        {text, <<"entries">>}             => [to_batch_entry(E) || E <- Entries]},
+    SignerPub = macula_identity:public(KeyPair),
+    Unsigned = macula_record:envelope(?TYPE_LICENSE_REWRAPPED_BATCH_V1,
+                                       SignerPub, Payload,
+                                       #{ttl_ms     => ?BATCH_TTL_MS,
+                                         subject_id => sha256(BatchId)}),
+    Signed = macula_record:sign(Unsigned, KeyPair),
     log_publish(BatchId, Realm, length(Entries),
-                hecate_mesh:publish(Topic, Fact)).
+                hecate_mesh:put_record(Signed)).
 
 log_publish(BatchId, Realm, Count, ok) ->
-    logger:info("[licenses_rewrapped_batch] batch=~s entries=~b realm=~s",
+    logger:info("[licenses_rewrapped_batch] batch=~s entries=~b realm=~s -> 0x23 record",
                 [BatchId, Count, Realm]);
 log_publish(BatchId, _Realm, _Count, {error, Reason}) ->
-    logger:warning("[licenses_rewrapped_batch] publish failed batch=~s: ~p",
+    logger:warning("[licenses_rewrapped_batch] put_record failed batch=~s: ~p",
                    [BatchId, Reason]).
 
+sha256(B) when is_binary(B) -> crypto:hash(sha256, B);
+sha256(L) when is_list(L)   -> crypto:hash(sha256, list_to_binary(L)).
+
 to_batch_entry(E) ->
-    #{license_id      => gf(license_id, E),
-      grantee         => gf(grantee, E),
-      new_wrapped_cek => base64:encode(gf(new_wrapped_cek, E, <<>>)),
-      rewrapped_at    => gf(rewrapped_at, E)}.
+    %% CBOR-safe text-keyed map (Part 6 §9 forbids bare atoms).
+    #{
+        {text, <<"license_id">>}      => gf(license_id, E),
+        {text, <<"grantee">>}         => gf(grantee, E),
+        {text, <<"new_wrapped_cek">>} => base64:encode(gf(new_wrapped_cek, E, <<>>)),
+        {text, <<"rewrapped_at">>}    => gf(rewrapped_at, E)
+    }.
 
 gf(K, M) -> gf(K, M, undefined).
 gf(K, M, Default) ->

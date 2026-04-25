@@ -15,7 +15,8 @@
 
 -export([start_link/0, activate/0, is_activated/0]).
 -export([get_client/0, get_status/0, publish/2, subscribe/2,
-         unsubscribe/1, discover_subscribers/1, advertise/2, call/3, call/4]).
+         unsubscribe/1, discover_subscribers/1, advertise/2, call/3, call/4,
+         put_record/1, find_record/1, find_records_by_type/1]).
 -export([register_subscription/2, register_advertisement/2,
          unregister_advertisement/1,
          register_stream_advertisement/3, call_stream/4]).
@@ -97,6 +98,27 @@ get_client() ->
 
 publish(Topic, Payload) ->
     gen_server:call(?MODULE, {publish, Topic, Payload}).
+
+%% @doc Put a signed `macula_record:record()' into the mesh DHT.
+%% PLAN_DHT_FIRST.md — emitters use this instead of `publish/2' so
+%% their facts survive station-side state-replication regardless of
+%% pub/sub fan-out.
+-spec put_record(macula_record:record()) -> ok | {error, term()}.
+put_record(Record) when is_map(Record) ->
+    gen_server:call(?MODULE, {put_record, Record}).
+
+%% @doc Fetch a signed record by its `macula_record:storage_key/1'.
+-spec find_record(<<_:256>>) -> {ok, macula_record:record()} | {error, term()}.
+find_record(Key) when is_binary(Key), byte_size(Key) =:= 32 ->
+    gen_server:call(?MODULE, {find_record, Key}).
+
+%% @doc List every locally-known signed record of a given type tag.
+%% Coverage is the connected station's local view; cross-station
+%% completeness requires polling multiple seeds.
+-spec find_records_by_type(macula_record:type_tag()) ->
+        {ok, [macula_record:record()]} | {error, term()}.
+find_records_by_type(Type) when is_integer(Type), Type >= 1, Type =< 16#FF ->
+    gen_server:call(?MODULE, {find_records_by_type, Type}).
 
 subscribe(Topic, Callback) ->
     gen_server:call(?MODULE, {subscribe, Topic, Callback}).
@@ -280,6 +302,39 @@ handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) -
     %% (the observed crash mode at boot-time under heavy catch-up load).
     _ = safe_mesh_call(fun() -> macula_multi_relay:publish(Client, Topic, Payload) end),
     {reply, ok, State};
+
+%% -- DHT record operations (PLAN_DHT_FIRST.md) -----------------------
+
+handle_call({put_record, _R}, _From, #state{activated = false} = State) ->
+    {reply, {error, not_activated}, State};
+handle_call({put_record, Record}, _From, #state{client = Client} = State) ->
+    Result = safe_mesh_call(
+               fun() ->
+                   macula_multi_relay:call(Client, <<"_dht.put_record">>,
+                                           Record, 5000)
+               end),
+    {reply, classify_put(Result), State};
+
+handle_call({find_record, _Key}, _From, #state{activated = false} = State) ->
+    {reply, {error, not_activated}, State};
+handle_call({find_record, Key}, _From, #state{client = Client} = State) ->
+    Result = safe_mesh_call(
+               fun() ->
+                   macula_multi_relay:call(Client, <<"_dht.find_record">>,
+                                           #{key => Key}, 5000)
+               end),
+    {reply, classify_find(Result), State};
+
+handle_call({find_records_by_type, _Type}, _From, #state{activated = false} = State) ->
+    {reply, {error, not_activated}, State};
+handle_call({find_records_by_type, Type}, _From, #state{client = Client} = State) ->
+    Result = safe_mesh_call(
+               fun() ->
+                   macula_multi_relay:call(Client,
+                                           <<"_dht.find_records_by_type">>,
+                                           #{type => Type}, 5000)
+               end),
+    {reply, classify_list(Result), State};
 
 handle_call({subscribe, Topic, Callback}, _From, #state{activated = false} = State) ->
     %% Queue it — will be applied on activate
@@ -589,6 +644,20 @@ safe_mesh_call(Fun) ->
         exit:{noproc, _} -> {error, mesh_not_started};
         exit:{{timeout, _}, _} -> {error, mesh_timeout}
     end.
+
+%% Reply shaping for the DHT record RPC handlers.
+classify_put({ok, ok})       -> ok;
+classify_put({ok, Reply})    -> {error, {unexpected_reply, Reply}};
+classify_put({error, _} = E) -> E.
+
+classify_find({ok, #{type := _, payload := _} = R}) -> {ok, R};
+classify_find({ok, not_found})                      -> {error, not_found};
+classify_find({ok, Reply})                          -> {error, {unexpected_reply, Reply}};
+classify_find({error, _} = E)                       -> E.
+
+classify_list({ok, Records}) when is_list(Records)  -> {ok, Records};
+classify_list({ok, Reply})                          -> {error, {unexpected_reply, Reply}};
+classify_list({error, _} = E)                       -> E.
 
 get_multi_status(Client) when is_pid(Client) ->
     %% Wrap in safe_mesh_call — macula_multi_relay can be busy

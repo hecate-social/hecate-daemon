@@ -1,10 +1,11 @@
 -module(licenses_issued_batch_emitter_tests).
 -include_lib("eunit/include/eunit.hrl").
 
-%% Fixture: start the emitter + stub out hecate_mesh:publish via meck.
-%% The stub writes into a named ETS table; tests poll it. Using ETS
-%% (not the test process' mailbox) works regardless of which process
-%% the meck stub runs in.
+%% Fixture: start the emitter + stub out hecate_mesh:put_record/1 and
+%% hecate_identity:signing_keypair/0 via meck. The stub writes captured
+%% records into a named ETS table; tests poll it. Using ETS (not the
+%% test process' mailbox) works regardless of which process the meck
+%% stub runs in.
 
 -define(PUB_TAB, licenses_issued_batch_emitter_tests_pubs).
 
@@ -12,19 +13,24 @@ setup() ->
     application:set_env(hecate, realm, <<"io.macula">>),
     ensure_pub_table(),
     ets:delete_all_objects(?PUB_TAB),
+    KeyPair = macula_identity:generate(),
     meck:new(hecate_mesh, [passthrough, non_strict]),
-    meck:expect(hecate_mesh, publish,
-                fun(Topic, Fact) ->
+    meck:expect(hecate_mesh, put_record,
+                fun(Record) ->
                     ets:insert(?PUB_TAB,
                                {erlang:unique_integer([monotonic]),
-                                Topic, Fact}),
+                                Record}),
                     ok
                 end),
+    meck:new(hecate_identity, [passthrough, non_strict]),
+    meck:expect(hecate_identity, signing_keypair,
+                fun() -> {ok, KeyPair} end),
     {ok, Pid} = licenses_issued_batch_emitter:start_link(),
     Pid.
 
 cleanup(Pid) ->
     gen_server:stop(Pid),
+    meck:unload(hecate_identity),
     meck:unload(hecate_mesh),
     ets:delete_all_objects(?PUB_TAB).
 
@@ -49,16 +55,19 @@ forces_flush_on_demand(_Pid) ->
         ok = licenses_issued_batch_emitter:buffer(evt(<<"b1">>, <<"lic-2">>)),
         ?assertEqual(1, licenses_issued_batch_emitter:pending()),
         ok = licenses_issued_batch_emitter:flush(<<"b1">>),
-        Fact = wait_for_publish(2000),
-        ?assertEqual(<<"b1">>, maps:get(batch_id, Fact)),
-        ?assertEqual(2, length(maps:get(entries, Fact)))
+        Record = wait_for_publish(2000),
+        Payload = macula_record:payload(Record),
+        ?assertEqual(<<"b1">>, maps:get({text, <<"batch_id">>}, Payload)),
+        Entries = maps:get({text, <<"entries">>}, Payload),
+        ?assertEqual(2, length(Entries))
     end.
 
 flushes_on_quiescence(_Pid) ->
     fun() ->
         ok = licenses_issued_batch_emitter:buffer(evt(<<"bQ">>, <<"lic-q">>)),
-        Fact = wait_for_publish(1500),
-        ?assertEqual(<<"bQ">>, maps:get(batch_id, Fact))
+        Record = wait_for_publish(1500),
+        Payload = macula_record:payload(Record),
+        ?assertEqual(<<"bQ">>, maps:get({text, <<"batch_id">>}, Payload))
     end.
 
 batches_same_batch_id(_Pid) ->
@@ -67,8 +76,10 @@ batches_same_batch_id(_Pid) ->
         [ok = licenses_issued_batch_emitter:buffer(evt(BatchId, lic_id(I)))
          || I <- lists:seq(1, 5)],
         ok = licenses_issued_batch_emitter:flush(BatchId),
-        Fact = wait_for_publish(2000),
-        ?assertEqual(5, length(maps:get(entries, Fact)))
+        Record = wait_for_publish(2000),
+        Entries = maps:get({text, <<"entries">>},
+                           macula_record:payload(Record)),
+        ?assertEqual(5, length(Entries))
     end.
 
 skips_batch_missing_realm(_Pid) ->
@@ -117,5 +128,5 @@ assert_not_expired(_) -> erlang:error(timeout_waiting_for_publish).
 
 first_fact() ->
     Key = ets:first(?PUB_TAB),
-    [{Key, _Topic, Fact}] = ets:lookup(?PUB_TAB, Key),
-    Fact.
+    [{Key, Record}] = ets:lookup(?PUB_TAB, Key),
+    Record.

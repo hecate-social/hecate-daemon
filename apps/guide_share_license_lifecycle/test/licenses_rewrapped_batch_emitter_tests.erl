@@ -7,19 +7,24 @@ setup() ->
     application:set_env(hecate, realm, <<"io.macula">>),
     ensure_pub_table(),
     ets:delete_all_objects(?PUB_TAB),
+    KeyPair = macula_identity:generate(),
     meck:new(hecate_mesh, [passthrough, non_strict]),
-    meck:expect(hecate_mesh, publish,
-                fun(Topic, Fact) ->
+    meck:expect(hecate_mesh, put_record,
+                fun(Record) ->
                     ets:insert(?PUB_TAB,
                                {erlang:unique_integer([monotonic]),
-                                Topic, Fact}),
+                                Record}),
                     ok
                 end),
+    meck:new(hecate_identity, [passthrough, non_strict]),
+    meck:expect(hecate_identity, signing_keypair,
+                fun() -> {ok, KeyPair} end),
     {ok, Pid} = licenses_rewrapped_batch_emitter:start_link(),
     Pid.
 
 cleanup(Pid) ->
     gen_server:stop(Pid),
+    meck:unload(hecate_identity),
     meck:unload(hecate_mesh),
     ets:delete_all_objects(?PUB_TAB).
 
@@ -45,9 +50,10 @@ forces_flush_on_demand(_Pid) ->
         ok = licenses_rewrapped_batch_emitter:buffer(evt(<<"b1">>, <<"lic-2">>, 2)),
         ?assertEqual(1, licenses_rewrapped_batch_emitter:pending()),
         ok = licenses_rewrapped_batch_emitter:flush(<<"b1">>),
-        Fact = wait_for_publish(2000),
-        ?assertEqual(<<"b1">>, maps:get(batch_id, Fact)),
-        ?assertEqual(2, length(maps:get(entries, Fact)))
+        Record = wait_for_publish(2000),
+        Payload = macula_record:payload(Record),
+        ?assertEqual(<<"b1">>, maps:get({text, <<"batch_id">>}, Payload)),
+        ?assertEqual(2, length(maps:get({text, <<"entries">>}, Payload)))
     end.
 
 coalesces_same_batch_id(_Pid) ->
@@ -56,20 +62,23 @@ coalesces_same_batch_id(_Pid) ->
         [ok = licenses_rewrapped_batch_emitter:buffer(evt(BatchId, lic_id(I), 3))
          || I <- lists:seq(1, 4)],
         ok = licenses_rewrapped_batch_emitter:flush(BatchId),
-        Fact = wait_for_publish(2000),
-        ?assertEqual(4, length(maps:get(entries, Fact))),
-        ?assertEqual(3, maps:get(new_k_realm_version, Fact))
+        Record = wait_for_publish(2000),
+        Payload = macula_record:payload(Record),
+        ?assertEqual(4, length(maps:get({text, <<"entries">>}, Payload))),
+        ?assertEqual(3, maps:get({text, <<"new_k_realm_version">>}, Payload))
     end.
 
 publishes_new_version(_Pid) ->
     fun() ->
         ok = licenses_rewrapped_batch_emitter:buffer(evt(<<"bv">>, <<"lic-v">>, 7)),
         ok = licenses_rewrapped_batch_emitter:flush(<<"bv">>),
-        Fact = wait_for_publish(2000),
-        ?assertEqual(7, maps:get(new_k_realm_version, Fact)),
-        [Entry] = maps:get(entries, Fact),
+        Record = wait_for_publish(2000),
+        Payload = macula_record:payload(Record),
+        ?assertEqual(7, maps:get({text, <<"new_k_realm_version">>}, Payload)),
+        [Entry] = maps:get({text, <<"entries">>}, Payload),
         %% wrapped CEK is base64-encoded on the wire
-        ?assertEqual(<<0, 1, 2, 3>>, base64:decode(maps:get(new_wrapped_cek, Entry)))
+        ?assertEqual(<<0, 1, 2, 3>>,
+                     base64:decode(maps:get({text, <<"new_wrapped_cek">>}, Entry)))
     end.
 
 drops_missing_realm(_Pid) ->
@@ -124,5 +133,5 @@ assert_not_expired(_) -> erlang:error(timeout_waiting_for_publish).
 
 first_fact() ->
     Key = ets:first(?PUB_TAB),
-    [{Key, _Topic, Fact}] = ets:lookup(?PUB_TAB, Key),
-    Fact.
+    [{Key, Record}] = ets:lookup(?PUB_TAB, Key),
+    Record.

@@ -7,6 +7,10 @@
     advertise/2,
     call/3,
     call/4,
+    %% DHT record API (PLAN_DHT_FIRST.md)
+    put_record/1,
+    find_record/1,
+    find_records_by_type/1,
     get_client/0,
     get_status/0,
     is_connected/0,
@@ -45,6 +49,22 @@ call(Procedure, Args, Timeout) ->
 -spec call(binary(), map(), map(), timeout()) -> {ok, term()} | {error, term()}.
 call(Procedure, Args, _Opts, Timeout) ->
     hecate_mesh_client:call(Procedure, Args, Timeout).
+
+%% @doc Put a signed `macula_record:record()' into the mesh DHT.
+-spec put_record(macula_record:record()) -> ok | {error, term()}.
+put_record(Record) ->
+    hecate_mesh_client:put_record(Record).
+
+%% @doc Fetch a record by its `macula_record:storage_key/1'.
+-spec find_record(<<_:256>>) -> {ok, macula_record:record()} | {error, term()}.
+find_record(Key) ->
+    hecate_mesh_client:find_record(Key).
+
+%% @doc List every locally-known record of a given type tag.
+-spec find_records_by_type(macula_record:type_tag()) ->
+        {ok, [macula_record:record()]} | {error, term()}.
+find_records_by_type(Type) ->
+    hecate_mesh_client:find_records_by_type(Type).
 
 -spec get_client() -> {ok, pid()} | {error, term()}.
 get_client() ->
