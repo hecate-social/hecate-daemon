@@ -33,19 +33,18 @@
     pending_subs :: [{binary(), fun()}],
     pending_advs :: [{binary(), fun()}],
     pending_stream_advs = [] :: [{binary(), atom(), fun()}],
-    %% V2 station-client pool — owns one macula_station_client per relay
-    %% URL. DHT operations (put_record, find_record, find_records_by_type)
-    %% route through here because V1 macula_mesh_client is rejected by V2
-    %% hecate-station's peering listener. PubSub / RPC still ride V1
-    %% (macula_multi_relay) until stations expose those surfaces.
+    %% Station-client pool — one macula_station_client per relay URL.
+    %% DHT operations (put_record, find_record, find_records_by_type)
+    %% route through here over peering. PubSub / RPC still ride
+    %% macula_multi_relay until stations expose those surfaces.
     station_clients   = #{} :: #{binary() => pid()},
     station_monitors  = #{} :: #{reference() => binary()}
 }).
 
-%% Backoff between respawning a single dead V2 station-client. Short
+%% Backoff between respawning a single dead station-client. Short
 %% enough that a transient peering loss recovers within a poll cycle.
 -define(STATION_RESPAWN_MS, 5_000).
-%% Per-call deadline on V2 DHT ops. Generous — first call after
+%% Per-call deadline on DHT ops. Generous — first call after
 %% start_link blocks until peering CONNECT/HELLO completes.
 -define(STATION_DHT_TIMEOUT_MS, 8_000).
 
@@ -272,10 +271,10 @@ handle_call(activate, _From, #state{activated = false} = State) ->
     %% Drain pending registrations (best-effort, don't crash on failure)
     drain_pending(Client, PendingSubs, PendingAdvs, PendingStreamAdvs),
 
-    %% Spin up the V2 station-client pool. DHT operations route through
-    %% it because V1 macula_mesh_client is rejected by V2 stations.
+    %% Spin up the station-client pool. DHT ops route through it over
+    %% peering; pubsub/RPC continue via macula_multi_relay.
     {StationClients, StationMonitors} = start_station_pool(Relays),
-    logger:info("[hecate_mesh] V2 station-client pool: ~b alive (of ~b seeds)",
+    logger:info("[hecate_mesh] Station-client pool: ~b alive (of ~b seeds)",
                 [maps:size(StationClients), length(Relays)]),
 
     %% Run mesh proof ceremony (non-blocking)
@@ -327,16 +326,16 @@ handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) -
 
 %% -- DHT record operations (PLAN_DHT_FIRST.md) -----------------------
 %%
-%% Routed through the V2 station-client pool (macula 3.9+). Spawned
-%% off so the gen_server keeps serving other calls while peering
-%% completes; the worker replies to the caller via gen_server:reply/2.
+%% Routed through the station-client pool. Spawned off so the
+%% gen_server keeps serving other calls while peering completes;
+%% the worker replies to the caller via gen_server:reply/2.
 
 handle_call({put_record, _R}, _From, #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
-handle_call({put_record, Record}, From, #state{station_clients = V2} = State) ->
+handle_call({put_record, Record}, From, #state{station_clients = Pool} = State) ->
     spawn(fun() ->
         gen_server:reply(From,
-            dht_via_stations(maps:values(V2),
+            dht_via_stations(maps:values(Pool),
                 fun(P) -> macula_station_client:put_record(P, Record,
                                                            ?STATION_DHT_TIMEOUT_MS) end))
     end),
@@ -344,10 +343,10 @@ handle_call({put_record, Record}, From, #state{station_clients = V2} = State) ->
 
 handle_call({find_record, _Key}, _From, #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
-handle_call({find_record, Key}, From, #state{station_clients = V2} = State) ->
+handle_call({find_record, Key}, From, #state{station_clients = Pool} = State) ->
     spawn(fun() ->
         gen_server:reply(From,
-            dht_via_stations(maps:values(V2),
+            dht_via_stations(maps:values(Pool),
                 fun(P) -> macula_station_client:find_record(P, Key,
                                                             ?STATION_DHT_TIMEOUT_MS) end))
     end),
@@ -355,10 +354,10 @@ handle_call({find_record, Key}, From, #state{station_clients = V2} = State) ->
 
 handle_call({find_records_by_type, _Type}, _From, #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
-handle_call({find_records_by_type, Type}, From, #state{station_clients = V2} = State) ->
+handle_call({find_records_by_type, Type}, From, #state{station_clients = Pool} = State) ->
     spawn(fun() ->
         gen_server:reply(From,
-            dht_via_stations(maps:values(V2),
+            dht_via_stations(maps:values(Pool),
                 fun(P) ->
                     case macula_station_client:find_records_by_type(P, Type,
                                                                     ?STATION_DHT_TIMEOUT_MS) of
@@ -578,17 +577,17 @@ handle_info({'EXIT', Pid, Reason},
 handle_info({'EXIT', _Pid, _Reason}, State) ->
     {noreply, State};
 
-%% V2 station-client in the pool died — respawn it after a short
+%% A station-client in the pool died — respawn it after a short
 %% backoff. Other pool members keep serving DHT calls in the meantime.
 handle_info({'DOWN', Ref, process, _Pid, Reason},
-            #state{station_clients = V2, station_monitors = Mons} = State) ->
+            #state{station_clients = Pool, station_monitors = Mons} = State) ->
     case maps:take(Ref, Mons) of
         {Url, NewMons} ->
             logger:warning(
-              "[hecate_mesh] V2 station-client for ~s died: ~p — respawning",
+              "[hecate_mesh] Station-client for ~s died: ~p — respawning",
               [Url, Reason]),
             erlang:send_after(?STATION_RESPAWN_MS, self(), {respawn_station, Url}),
-            {noreply, State#state{station_clients  = maps:remove(Url, V2),
+            {noreply, State#state{station_clients  = maps:remove(Url, Pool),
                                   station_monitors = NewMons}};
         error ->
             {noreply, State}
@@ -597,18 +596,18 @@ handle_info({'DOWN', Ref, process, _Pid, Reason},
 handle_info({respawn_station, Url}, #state{activated = false} = State) ->
     %% Mesh deactivated mid-respawn — drop the timer, the next activate
     %% rebuilds the whole pool.
-    logger:debug("[hecate_mesh] Skip V2 respawn for ~s (mesh deactivated)", [Url]),
+    logger:debug("[hecate_mesh] Skip station respawn for ~s (mesh deactivated)", [Url]),
     {noreply, State};
-handle_info({respawn_station, Url}, #state{station_clients = V2,
+handle_info({respawn_station, Url}, #state{station_clients = Pool,
                                       station_monitors = Mons} = State) ->
     case start_station_client(Url) of
         {ok, Pid, Ref} ->
-            logger:info("[hecate_mesh] V2 station-client respawned for ~s", [Url]),
-            {noreply, State#state{station_clients  = V2#{Url => Pid},
+            logger:info("[hecate_mesh] Station-client respawned for ~s", [Url]),
+            {noreply, State#state{station_clients  = Pool#{Url => Pid},
                                   station_monitors = Mons#{Ref => Url}}};
         {error, Reason} ->
             logger:warning(
-              "[hecate_mesh] V2 station-client respawn for ~s failed: ~p — retry",
+              "[hecate_mesh] Station-client respawn for ~s failed: ~p — retry",
               [Url, Reason]),
             erlang:send_after(?STATION_RESPAWN_MS, self(), {respawn_station, Url}),
             {noreply, State}
@@ -716,10 +715,10 @@ safe_mesh_call(Fun) ->
 
 %% Reply shaping for the DHT record RPC handlers.
 %%--------------------------------------------------------------------
-%% V2 station-client pool helpers
+%% Station-client pool helpers
 %%--------------------------------------------------------------------
 
-%% Spin up one V2 station-client per relay seed. Returns the maps
+%% Spin up one station-client per relay seed. Returns the maps
 %% {Url => Pid} and {MonitorRef => Url}. Failed seeds get a delayed
 %% respawn message so the pool eventually reaches full size.
 start_station_pool(Relays) ->
@@ -729,7 +728,7 @@ start_station_pool(Relays) ->
                 {Clients#{Url => Pid}, Mons#{Ref => Url}};
             {error, Reason} ->
                 logger:warning(
-                  "[hecate_mesh] V2 station-client init for ~s failed: ~p — retry",
+                  "[hecate_mesh] Station-client init for ~s failed: ~p — retry",
                   [Url, Reason]),
                 erlang:send_after(?STATION_RESPAWN_MS, self(), {respawn_station, Url}),
                 {Clients, Mons}
@@ -745,8 +744,8 @@ start_station_client(Url) ->
             E
     end.
 
-%% Try the operation against each V2 client in turn. Succeed on the
-%% first connected client that returns ok / {ok, _}; on disconnected
+%% Try the operation against each station-client in turn. Succeed on
+%% the first connected client that returns ok / {ok, _}; on disconnected
 %% / timeout / error, fall through to the next. Empty pool returns
 %% {error, no_station_connected}.
 dht_via_stations([], _Op) ->
@@ -768,8 +767,8 @@ try_next_station({error, _Reason}, Rest, Op) ->
     %% Fall through to next pool member on per-call failure.
     dht_via_stations(Rest, Op).
 
-%% (V1 classify_put/find/list helpers retired — DHT operations now route
-%% through macula_station_client which handles its own classification.)
+%% DHT operations route through macula_station_client which handles
+%% its own result classification.
 
 get_multi_status(Client) when is_pid(Client) ->
     %% Wrap in safe_mesh_call — macula_multi_relay can be busy

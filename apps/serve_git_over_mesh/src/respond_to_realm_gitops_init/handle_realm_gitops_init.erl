@@ -21,12 +21,12 @@
 %%%
 %%% ## Caller-DID plumbing — provisional
 %%%
-%%% Macula V2 is expected to surface the verified caller DID in the
-%%% envelope passed to the advertisement handler. Until that lands, we
-%%% require the caller to supply `caller_did` explicitly in the request
-%%% map. This is called out in module-level docs so the contract is
-%%% explicit; it is NOT a security hole — the DID still has to be in
-%%% the allowlist.
+%%% The peering layer is expected to surface the verified caller DID
+%%% in the envelope passed to the advertisement handler. Until that
+%%% lands, we require the caller to supply `caller_did` explicitly in
+%%% the request map. This is called out in module-level docs so the
+%%% contract is explicit; it is NOT a security hole — the DID still
+%%% has to be in the allowlist.
 %%% @end
 -module(handle_realm_gitops_init).
 

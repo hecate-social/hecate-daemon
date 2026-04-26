@@ -76,10 +76,10 @@ returns on failure.
 
 ### Caller-DID plumbing note
 
-Macula V2 is expected to surface the verified caller DID in the handler
-envelope. Until that lands, the responder requires `caller_did` in the
-request map. This is NOT a security hole — the DID still has to clear
-the allowlist.
+The peering layer is expected to surface the verified caller DID in
+the handler envelope. Until that lands, the responder requires
+`caller_did` in the request map. This is NOT a security hole — the
+DID still has to clear the allowlist.
 
 ## Storage layout
 
