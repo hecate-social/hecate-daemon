@@ -29,6 +29,7 @@ init([]) ->
 
     Children = [MeshBackendChild]
                ++ proof_children(BackendMod)
+               ++ daemon_announcer_children(BackendMod)
                ++ realm_pm_children(),
     {ok, {SupFlags, Children}}.
 
@@ -63,6 +64,20 @@ proof_children(hecate_mesh_client) ->
        type => supervisor,
        modules => [mesh_proof_coordinator_sup]}];
 proof_children(_InprocOrOther) ->
+    [].
+
+%% Daemon presence announcer — periodically puts a signed
+%% `node_record' (kind=daemon) so realm topology dashboards can
+%% render the daemon. Only meaningful with the real backend; inproc
+%% has no DHT to publish into.
+daemon_announcer_children(hecate_mesh_client) ->
+    [#{id => announce_daemon_presence,
+       start => {announce_daemon_presence, start_link, []},
+       restart => permanent,
+       shutdown => 5000,
+       type => worker,
+       modules => [announce_daemon_presence]}];
+daemon_announcer_children(_InprocOrOther) ->
     [].
 
 %% The realm-confirmed → activate PM is relevant to both backends:
