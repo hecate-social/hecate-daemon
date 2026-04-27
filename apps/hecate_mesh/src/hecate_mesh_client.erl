@@ -33,7 +33,7 @@
     pending_subs :: [{binary(), fun()}],
     pending_advs :: [{binary(), fun()}],
     pending_stream_advs = [] :: [{binary(), atom(), fun()}],
-    %% Station-client pool — one macula_station_client per relay URL.
+    %% Station-client pool — one macula_station_link per relay URL.
     %% DHT operations (put_record, find_record, find_records_by_type)
     %% route through here over peering. PubSub / RPC still ride
     %% macula_multi_relay until stations expose those surfaces.
@@ -339,7 +339,7 @@ handle_call({put_record, Record}, From, #state{station_clients = Pool} = State) 
     spawn(fun() ->
         gen_server:reply(From,
             dht_via_stations(maps:values(Pool),
-                fun(P) -> macula_station_client:put_record(P, Record,
+                fun(P) -> macula_station_link:put_record(P, Record,
                                                            ?STATION_DHT_TIMEOUT_MS) end))
     end),
     {noreply, State};
@@ -350,7 +350,7 @@ handle_call({find_record, Key}, From, #state{station_clients = Pool} = State) ->
     spawn(fun() ->
         gen_server:reply(From,
             dht_via_stations(maps:values(Pool),
-                fun(P) -> macula_station_client:find_record(P, Key,
+                fun(P) -> macula_station_link:find_record(P, Key,
                                                             ?STATION_DHT_TIMEOUT_MS) end))
     end),
     {noreply, State};
@@ -362,7 +362,7 @@ handle_call({find_records_by_type, Type}, From, #state{station_clients = Pool} =
         gen_server:reply(From,
             dht_via_stations(maps:values(Pool),
                 fun(P) ->
-                    case macula_station_client:find_records_by_type(P, Type,
+                    case macula_station_link:find_records_by_type(P, Type,
                                                                     ?STATION_DHT_TIMEOUT_MS) of
                         {ok, Records} -> {ok, Records};
                         Other -> Other
@@ -753,7 +753,7 @@ start_station_pool(Relays) ->
     end, {#{}, #{}}, Relays).
 
 start_station_client(Url) ->
-    case macula_station_client:start_link(#{seed => Url}) of
+    case macula_station_link:start_link(#{seed => Url}) of
         {ok, Pid} ->
             Ref = erlang:monitor(process, Pid),
             {ok, Pid, Ref};
@@ -768,7 +768,7 @@ start_station_client(Url) ->
 dht_via_stations([], _Op) ->
     {error, no_station_connected};
 dht_via_stations([Pid | Rest], Op) ->
-    case macula_station_client:is_connected(Pid) of
+    case macula_station_link:is_connected(Pid) of
         true ->
             try_next_station(Op(Pid), Rest, Op);
         false when Rest =:= [] ->
@@ -784,7 +784,7 @@ try_next_station({error, _Reason}, Rest, Op) ->
     %% Fall through to next pool member on per-call failure.
     dht_via_stations(Rest, Op).
 
-%% DHT operations route through macula_station_client which handles
+%% DHT operations route through macula_station_link which handles
 %% its own result classification.
 
 get_multi_status(Client) when is_pid(Client) ->

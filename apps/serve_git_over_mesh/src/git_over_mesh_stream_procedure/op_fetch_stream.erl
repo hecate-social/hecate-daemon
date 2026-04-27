@@ -45,7 +45,7 @@ run_git(Git, RepoDir, Extra, Stdin, Stream) ->
              Stream).
 
 finalize(#{ok := true}, Stream) ->
-    macula:close(Stream),
+    macula:close_stream(Stream),
     ok;
 finalize(#{ok := false, exit_status := Status}, Stream) ->
     macula:abort(Stream, <<"upload_pack_failed">>,

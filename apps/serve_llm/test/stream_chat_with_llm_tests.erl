@@ -109,7 +109,7 @@ run_bridge_loop(Stream, Ref) ->
                 {error, _} -> ok
             end;
         {llm_done, Ref} ->
-            macula:close(Stream),
+            macula:close_stream(Stream),
             ok;
         {llm_error, Ref, Reason} ->
             macula:abort(Stream, <<"llm_error">>, fmt(Reason)),

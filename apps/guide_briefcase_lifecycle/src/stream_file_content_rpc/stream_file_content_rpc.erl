@@ -128,7 +128,7 @@ finalize(Stream, ok) ->
     %% Emit explicit EOF frame before closing so peers can distinguish
     %% clean end-of-stream from a truncated transfer.
     _ = macula:send(Stream, hecate_file_frame:encode_eof()),
-    macula:close(Stream),
+    macula:close_stream(Stream),
     ok;
 finalize(_Stream, {error, _Reason}) ->
     %% macula:send already returned the error — peer is gone or stream

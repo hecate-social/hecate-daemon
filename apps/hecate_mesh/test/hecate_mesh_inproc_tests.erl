@@ -113,7 +113,7 @@ stream_roundtrip_via_macula_local(_Pid) ->
             fun(Stream, _Args) ->
                 macula:send(Stream, <<"chunk1">>),
                 macula:send(Stream, <<"chunk2">>),
-                macula:close(Stream)
+                macula:close_stream(Stream)
             end),
         {ok, Stream} = hecate_mesh_inproc:call_stream(
             ?STREAM_PROC, #{}, #{}, 1000),

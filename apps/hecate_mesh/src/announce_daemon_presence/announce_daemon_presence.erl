@@ -3,7 +3,7 @@
 %%% Mirrors `hecate_station_announcer' in daemon space — periodically
 %%% publishes a signed `node_record' (`type=0x01') tagged with
 %%% `kind=daemon' into the relay-mesh DHT via the per-relay
-%%% `macula_station_client' pool. Records are refreshed before TTL
+%%% `macula_station_link' pool. Records are refreshed before TTL
 %%% expires (default: refresh at 75% of TTL). On graceful shutdown
 %%% the announcer publishes a signed tombstone so subscribers learn
 %%% the daemon is gone without waiting for TTL.

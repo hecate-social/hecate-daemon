@@ -91,7 +91,7 @@ bridge_loop(Stream, Ref) ->
         {llm_chunk, Ref, ChunkMap} ->
             handle_send(macula:send(Stream, ChunkMap, msgpack), Stream, Ref);
         {llm_done, Ref} ->
-            macula:close(Stream),
+            macula:close_stream(Stream),
             ok;
         {llm_error, Ref, Reason} ->
             macula:abort(Stream, <<"llm_error">>, format(Reason)),
