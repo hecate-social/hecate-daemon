@@ -62,7 +62,13 @@ jobs:
         uses: erlef/setup-beam@v1
         with:
           otp-version: '27.0'
-          rebar3-version: 'latest'
+
+      - name: Install rebar3
+        run: |
+          curl -L -o rebar3 https://s3.amazonaws.com/rebar3/rebar3
+          chmod +x rebar3
+          sudo mv rebar3 /usr/local/bin/rebar3
+          rebar3 version
 
       - name: Get dependencies
         run: rebar3 get-deps

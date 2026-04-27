@@ -19,7 +19,16 @@ jobs:
         uses: erlef/setup-beam@v1
         with:
           otp-version: '28.0'
-          rebar3-version: 'latest'
+
+      # rebar3 installed manually — setup-beam's rebar3-version lookup
+      # keeps failing on GitHub releases pagination cap. Canonical S3
+      # binary works regardless of action quirks.
+      - name: Install rebar3
+        run: |
+          curl -L -o rebar3 https://s3.amazonaws.com/rebar3/rebar3
+          chmod +x rebar3
+          sudo mv rebar3 /usr/local/bin/rebar3
+          rebar3 version
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -59,7 +68,16 @@ jobs:
         uses: erlef/setup-beam@v1
         with:
           otp-version: '28.0'
-          rebar3-version: 'latest'
+
+      # rebar3 installed manually — setup-beam's rebar3-version lookup
+      # keeps failing on GitHub releases pagination cap. Canonical S3
+      # binary works regardless of action quirks.
+      - name: Install rebar3
+        run: |
+          curl -L -o rebar3 https://s3.amazonaws.com/rebar3/rebar3
+          chmod +x rebar3
+          sudo mv rebar3 /usr/local/bin/rebar3
+          rebar3 version
 
       - name: Check formatting (if elvis available)
         run: |
