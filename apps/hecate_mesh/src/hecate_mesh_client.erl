@@ -118,12 +118,15 @@ publish(Topic, Payload) ->
 %% pub/sub fan-out.
 -spec put_record(macula_record:record()) -> ok | {error, term()}.
 put_record(Record) when is_map(Record) ->
-    gen_server:call(?MODULE, {put_record, Record}).
+    %% Worker timeout = STATION_DHT_TIMEOUT_MS (8s); add cushion so
+    %% the caller doesn't `exit({timeout, _})' before the worker has
+    %% had its chance to reply with a clean `{error, timeout}'.
+    safe_call({put_record, Record}, ?STATION_DHT_TIMEOUT_MS + 5_000).
 
 %% @doc Fetch a signed record by its `macula_record:storage_key/1'.
 -spec find_record(<<_:256>>) -> {ok, macula_record:record()} | {error, term()}.
 find_record(Key) when is_binary(Key), byte_size(Key) =:= 32 ->
-    gen_server:call(?MODULE, {find_record, Key}).
+    safe_call({find_record, Key}, ?STATION_DHT_TIMEOUT_MS + 5_000).
 
 %% @doc List every locally-known signed record of a given type tag.
 %% Coverage is the connected station's local view; cross-station
@@ -131,7 +134,7 @@ find_record(Key) when is_binary(Key), byte_size(Key) =:= 32 ->
 -spec find_records_by_type(macula_record:type_tag()) ->
         {ok, [macula_record:record()]} | {error, term()}.
 find_records_by_type(Type) when is_integer(Type), Type >= 1, Type =< 16#FF ->
-    gen_server:call(?MODULE, {find_records_by_type, Type}).
+    safe_call({find_records_by_type, Type}, ?STATION_DHT_TIMEOUT_MS + 5_000).
 
 subscribe(Topic, Callback) ->
     gen_server:call(?MODULE, {subscribe, Topic, Callback}).
@@ -711,6 +714,20 @@ safe_mesh_call(Fun) ->
         exit:{timeout, _} -> {error, mesh_timeout};
         exit:{noproc, _} -> {error, mesh_not_started};
         exit:{{timeout, _}, _} -> {error, mesh_timeout}
+    end.
+
+%% gen_server:call wrapper for the DHT record API. The handle_call
+%% spawns a worker that replies asynchronously after up to
+%% STATION_DHT_TIMEOUT_MS. The caller's gen_server:call timeout
+%% must exceed that or the caller exits with {timeout, _} before
+%% the worker has a chance to send `{error, timeout}'. Catch the
+%% race here and surface it as `{error, timeout}'.
+safe_call(Msg, Timeout) ->
+    try gen_server:call(?MODULE, Msg, Timeout)
+    catch
+        exit:{timeout, _}      -> {error, timeout};
+        exit:{noproc, _}       -> {error, not_started};
+        exit:{{timeout, _}, _} -> {error, timeout}
     end.
 
 %% Reply shaping for the DHT record RPC handlers.
