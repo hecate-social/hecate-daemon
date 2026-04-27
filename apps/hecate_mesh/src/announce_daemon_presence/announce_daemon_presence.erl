@@ -106,11 +106,21 @@ code_change(_OldVsn, S, _Extra) ->
 %%                                    same backoff
 %%   `{error, _Other}'              — log + sleep `refresh_ms' anyway
 publish_node_record(TtlMs) ->
-    case hecate_identity:signing_keypair() of
+    %% hecate_identity may not be up yet when we boot — both apps
+    %% are children of the daemon's top-level sup and there is no
+    %% start-order guarantee across siblings. `gen_server:call/2'
+    %% on a non-existent server raises `exit({noproc, _})'; catch
+    %% it and surface as `{error, no_identity}' so the announcer's
+    %% backoff loop applies.
+    try hecate_identity:signing_keypair() of
         {ok, KeyPair} ->
             do_publish(KeyPair, TtlMs);
         not_initialized ->
             logger:debug("[announce_daemon_presence] identity not initialised"),
+            {error, no_identity}
+    catch
+        exit:{noproc, _} ->
+            logger:debug("[announce_daemon_presence] hecate_identity not running"),
             {error, no_identity}
     end.
 
