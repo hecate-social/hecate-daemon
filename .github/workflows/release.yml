@@ -62,8 +62,7 @@ jobs:
         uses: erlef/setup-beam@v1
         with:
           otp-version: '27.0'
-          rebar3-version: '3.27.0'
-          version-type: strict
+          rebar3-version: 'latest'
 
       - name: Get dependencies
         run: rebar3 get-deps
