@@ -28,6 +28,12 @@ setup() ->
                 fun() -> {ok, KeyPair} end),
     meck:new(hecate_mesh, [non_strict, passthrough]),
     meck:expect(hecate_mesh, put_record, fun(_R) -> ok end),
+    %% Stub the geo lookup — without this the announcer's first
+    %% refresh tick would invoke hackney for ~15s of timeouts in
+    %% offline unit-test environments before falling through.
+    meck:new(geo_check, [non_strict]),
+    meck:expect(geo_check, get_public_ip,
+                fun() -> {error, test_offline} end),
     KeyPair.
 
 cleanup(_KeyPair) ->
@@ -40,6 +46,7 @@ cleanup(_KeyPair) ->
     end,
     catch meck:unload(hecate_mesh),
     catch meck:unload(hecate_identity),
+    catch meck:unload(geo_check),
     ok.
 
 %%====================================================================
@@ -62,6 +69,9 @@ announcer_test_() ->
          end,
          fun(KeyPair) ->
              ?_test(graceful_shutdown_publishes_tombstone(KeyPair))
+         end,
+         fun(KeyPair) ->
+             ?_test(geo_lookup_success_enriches_payload(KeyPair))
          end
      ]}.
 
@@ -100,6 +110,35 @@ not_activated_does_not_crash(_KeyPair) ->
     %% Wait for the call to land via meck's history.
     wait_until_call_count(1, 1_000),
     ?assert(is_process_alive(Pid)),
+    catch announce_daemon_presence:stop(Pid).
+
+%% When geo_check resolves, the announcer must merge city/country/lat/lng
+%% from the lookup into the announce-record payload so the realm
+%% topology can render the daemon at its physical position. Without
+%% this the daemon's record carries `lat = nil, lng = nil' and the
+%% topology JS hook skips rendering.
+geo_lookup_success_enriches_payload(_KeyPair) ->
+    meck:expect(geo_check, get_public_ip,
+                fun() -> {ok, {93, 184, 216, 34}} end),
+    meck:expect(geo_check, get_location,
+                fun(_IP) -> {ok, #{country => <<"BE">>,
+                                   city    => <<"Tienen">>,
+                                   lat     => 50.8092,
+                                   lng     => 4.9389}}
+                end),
+    {ok, Pid} = announce_daemon_presence:start_link(),
+    unlink(Pid),
+    Record = wait_for_put_record(),
+    Payload = macula_record:payload(Record),
+    ?assertEqual({text, <<"BE">>},     maps:get({text, <<"country">>}, Payload)),
+    ?assertEqual({text, <<"Tienen">>}, maps:get({text, <<"city">>},    Payload)),
+    %% lat/lng travel as text in the canonical CBOR form (geo
+    %% coordinates are float-canonicalisation-fragile across language
+    %% impls, so macula encodes them as decimal text strings).
+    ?assertMatch({text, <<"50.", _/binary>>},
+                 maps:get({text, <<"lat">>}, Payload)),
+    ?assertMatch({text, <<"4.", _/binary>>},
+                 maps:get({text, <<"lng">>}, Payload)),
     catch announce_daemon_presence:stop(Pid).
 
 graceful_shutdown_publishes_tombstone(_KeyPair) ->

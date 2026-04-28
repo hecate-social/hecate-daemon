@@ -49,7 +49,13 @@
 -record(state, {
     ttl_ms         :: pos_integer(),
     refresh_ms     :: pos_integer(),
-    timer_ref      :: reference() | undefined
+    timer_ref      :: reference() | undefined,
+    %% Self-geolocation. Resolved lazily on first publish via the
+    %% geo_check library (public-IP discovery → MaxMind GeoIP DB).
+    %% Cached for the daemon's lifetime — daemons don't move. Empty
+    %% map until resolved; merged into the announce opts so the realm
+    %% topology can render daemons by city/country/lat/lng.
+    geo            :: map() | undefined
 }).
 
 %%====================================================================
@@ -75,7 +81,7 @@ init([]) ->
     %% Fire once on init so daemons appear in the realm topology
     %% as soon as mesh activates, not after the first 7.5 min tick.
     self() ! {refresh, undefined},
-    {ok, #state{ttl_ms = Ttl, refresh_ms = RefreshMs}}.
+    {ok, #state{ttl_ms = Ttl, refresh_ms = RefreshMs, geo = undefined}}.
 
 handle_call(_Msg, _From, S) ->
     {reply, {error, unknown_call}, S}.
@@ -84,8 +90,9 @@ handle_cast(_Msg, S) ->
     {noreply, S}.
 
 handle_info({refresh, _OldRef}, #state{ttl_ms = Ttl} = S) ->
-    Next = on_refresh_result(publish_node_record(Ttl), S),
-    {noreply, schedule(Next, S)};
+    S1   = ensure_geo(S),
+    Next = on_refresh_result(publish_node_record(Ttl, geo_or_empty(S1)), S1),
+    {noreply, schedule(Next, S1)};
 handle_info(_, S) ->
     {noreply, S}.
 
@@ -105,7 +112,7 @@ code_change(_OldVsn, S, _Extra) ->
 %%   `{error, no_station_connected}'— activated but no relays up;
 %%                                    same backoff
 %%   `{error, _Other}'              — log + sleep `refresh_ms' anyway
-publish_node_record(TtlMs) ->
+publish_node_record(TtlMs, Geo) ->
     %% hecate_identity may not be up yet when we boot — both apps
     %% are children of the daemon's top-level sup and there is no
     %% start-order guarantee across siblings. `gen_server:call/2'
@@ -114,7 +121,7 @@ publish_node_record(TtlMs) ->
     %% backoff loop applies.
     try hecate_identity:signing_keypair() of
         {ok, KeyPair} ->
-            do_publish(KeyPair, TtlMs);
+            do_publish(KeyPair, TtlMs, Geo);
         not_initialized ->
             logger:debug("[announce_daemon_presence] identity not initialised"),
             {error, no_identity}
@@ -124,12 +131,17 @@ publish_node_record(TtlMs) ->
             {error, no_identity}
     end.
 
-do_publish(KeyPair, TtlMs) ->
+do_publish(KeyPair, TtlMs, Geo) ->
     Pub      = macula_identity:public(KeyPair),
     Hostname = node_hostname(),
-    Opts     = #{ttl_ms   => TtlMs,
+    Base     = #{ttl_ms   => TtlMs,
                  kind     => <<"daemon">>,
                  hostname => Hostname},
+    %% `Geo' is the cached geo_check result (city/country/lat/lng or
+    %% empty). Merge into opts so the realm topology can render the
+    %% daemon at its physical location. macula_record:node_record/4
+    %% silently ignores unknown keys, so an empty `Geo' is safe.
+    Opts     = maps:merge(Base, Geo),
     Unsigned = macula_record:node_record(Pub, [], 0, Opts),
     Signed   = macula_record:sign(Unsigned, KeyPair),
     hecate_mesh:put_record(Signed).
@@ -188,6 +200,54 @@ do_publish_tombstone(KeyPair, Reason) ->
 %%====================================================================
 %% Helpers
 %%====================================================================
+
+%% Resolve self-geolocation lazily. The first refresh tick fires
+%% before mesh is activated, but we attempt the lookup on every tick
+%% until it succeeds — hackney + locus are both up by the time the
+%% daemon's `hecate_mesh' app boots, so a typical first attempt
+%% succeeds within seconds. Cached in state for the daemon's lifetime
+%% (daemons don't move).
+ensure_geo(#state{geo = undefined} = S) ->
+    case discover_geo() of
+        {ok, Geo} ->
+            logger:info("[announce_daemon_presence] resolved self-geo: ~p", [Geo]),
+            S#state{geo = Geo};
+        {error, Reason} ->
+            logger:debug(
+              "[announce_daemon_presence] geo lookup deferred: ~p", [Reason]),
+            S
+    end;
+ensure_geo(S) ->
+    S.
+
+geo_or_empty(#state{geo = undefined}) -> #{};
+geo_or_empty(#state{geo = G})         -> G.
+
+discover_geo() ->
+    on_public_ip(geo_check:get_public_ip()).
+
+on_public_ip({ok, IP}) ->
+    on_location(geo_check:get_location(IP));
+on_public_ip({error, _Reason} = E) ->
+    E.
+
+on_location({ok, Loc}) ->
+    {ok, normalize_location(Loc)};
+on_location({error, _Reason} = E) ->
+    E.
+
+%% MaxMind returns lat/lng as floats and city/country as binaries
+%% (or `undefined' when the DB has no entry). Drop undefined fields so
+%% they don't mask a sibling's good value when this map is merged into
+%% announcer opts.
+normalize_location(Loc) ->
+    Picked = #{
+        country => maps:get(country, Loc, undefined),
+        city    => maps:get(city,    Loc, undefined),
+        lat     => maps:get(lat,     Loc, undefined),
+        lng     => maps:get(lng,     Loc, undefined)
+    },
+    maps:filter(fun(_K, V) -> V =/= undefined andalso V =/= null end, Picked).
 
 %% Best-effort hostname for the daemon. Used by realm dashboards to
 %% render daemons by their machine name. Falls back to the BEAM node

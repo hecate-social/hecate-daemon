@@ -8,6 +8,7 @@
         stdlib,
         macula,
         evoq,
+        geo_check,
         guide_realm_memberships,
         project_realm_memberships
     ]},
