@@ -520,33 +520,46 @@ handle_info(join_with_token, State) ->
     erlang:send_after(1000, self(), do_join_with_token),
     {noreply, State};
 
-handle_info(do_join_with_token, #state{client = undefined} = State) ->
-    logger:warning("[hecate_mesh] No mesh client — retrying join in 3s"),
+handle_info(do_join_with_token,
+            #state{station_clients = Pool} = State) when map_size(Pool) =:= 0 ->
+    logger:warning("[hecate_mesh] No station_link pool yet — retrying join in 3s"),
     erlang:send_after(3000, self(), do_join_with_token),
     {noreply, State};
-handle_info(do_join_with_token, #state{client = Client} = State) ->
+handle_info(do_join_with_token,
+            #state{station_clients = Pool, realm = Realm} = State) ->
     Token = list_to_binary(os:getenv("HECATE_REALM_JOIN_TOKEN")),
     NodeName = State#state.identity,
     SiteId = case State#state.site of
         #{<<"site_id">> := Id} -> Id;
         _ -> undefined
     end,
-    logger:info("[hecate_mesh] Joining realm with token ~s...", [binary:part(Token, 0, min(7, byte_size(Token)))]),
+    logger:info("[hecate_mesh] Joining realm with token ~s...",
+                [binary:part(Token, 0, min(7, byte_size(Token)))]),
     Args = #{
         <<"token">> => Token,
         <<"node_name">> => NodeName,
         <<"site_id">> => SiteId
     },
+    %% V2 path: macula-realm advertises `join_with_token_v1' on every
+    %% relay it's connected to via `macula_station_link:advertise'.
+    %% Any station in our pool routes the CALL to the realm via its
+    %% per-conn remote-advertise registry. Procedure URI is the same
+    %% string the realm registers (built via `realm_hope`).
+    [LinkPid | _] = maps:values(Pool),
+    RealmTag = macula_realm:id(Realm),
     spawn(fun() ->
         Procedure = hecate_topics:realm_hope(<<"membership">>, <<"join_with_token">>, 1),
-        case catch macula:call(Client, Procedure, Args, 10000) of
+        case catch macula_station_link:call(LinkPid, RealmTag, Procedure, Args, 10000) of
             {ok, Result} ->
-                logger:info("[hecate_mesh] Realm join succeeded: ~p", [maps:get(<<"realm_id">>, Result, <<"?">>)]),
+                logger:info("[hecate_mesh] Realm join succeeded: ~p",
+                            [maps:get(<<"realm_id">>, Result, <<"?">>)]),
                 store_join_credentials(Result);
             {error, Reason} ->
-                logger:error("[hecate_mesh] Realm join failed: ~p", [Reason]);
+                logger:error("[hecate_mesh] Realm join failed: ~p", [Reason]),
+                erlang:send_after(5000, hecate_mesh_client, do_join_with_token);
             Other ->
-                logger:error("[hecate_mesh] Realm join unexpected: ~p", [Other])
+                logger:error("[hecate_mesh] Realm join unexpected: ~p", [Other]),
+                erlang:send_after(5000, hecate_mesh_client, do_join_with_token)
         end
     end),
     {noreply, State};
