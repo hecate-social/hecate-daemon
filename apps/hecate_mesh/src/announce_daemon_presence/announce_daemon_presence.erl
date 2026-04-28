@@ -141,10 +141,24 @@ do_publish(KeyPair, TtlMs, Geo) ->
     %% empty). Merge into opts so the realm topology can render the
     %% daemon at its physical location. macula_record:node_record/4
     %% silently ignores unknown keys, so an empty `Geo' is safe.
-    Opts     = maps:merge(Base, Geo),
+    Opts0    = maps:merge(Base, Geo),
+    %% Pin this daemon to its primary parent station so the realm
+    %% topology view draws a line from the daemon dot to its relay
+    %% marker. V1 macula-relay achieved the same via `relay_target'
+    %% in each handler's process dictionary; in V2 we encode the
+    %% link directly in the announce record's `station_id' field.
+    Opts     = with_parent_station(Opts0),
     Unsigned = macula_record:node_record(Pub, [], 0, Opts),
     Signed   = macula_record:sign(Unsigned, KeyPair),
     hecate_mesh:put_record(Signed).
+
+with_parent_station(Opts) ->
+    case hecate_mesh_client:connected_peer_pubkeys() of
+        [Pubkey | _] when is_binary(Pubkey), byte_size(Pubkey) =:= 32 ->
+            Opts#{station_id => Pubkey};
+        _ ->
+            Opts
+    end.
 
 on_refresh_result(ok, _S) ->
     refresh;

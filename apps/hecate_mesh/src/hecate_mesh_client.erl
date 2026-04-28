@@ -14,6 +14,7 @@
 -behaviour(gen_server).
 
 -export([start_link/0, activate/0, is_activated/0]).
+-export([connected_peer_pubkeys/0]).
 -export([get_client/0, get_status/0, publish/2, subscribe/2,
          unsubscribe/1, discover_subscribers/1, advertise/2, call/3, call/4,
          put_record/1, find_record/1, find_records_by_type/1]).
@@ -333,6 +334,14 @@ handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) -
 %% gen_server keeps serving other calls while peering completes;
 %% the worker replies to the caller via gen_server:reply/2.
 
+handle_call(connected_peer_pubkeys, _From,
+            #state{station_clients = Pool} = State) ->
+    Pubkeys =
+        [PK
+         || P <- maps:values(Pool),
+            is_pid(P), is_process_alive(P),
+            {ok, PK} <- [safe_peer_node_id(P)]],
+    {reply, Pubkeys, State};
 handle_call({put_record, _R}, _From, #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
 handle_call({put_record, Record}, From, #state{station_clients = Pool} = State) ->
@@ -722,6 +731,22 @@ safe_mesh_call(Fun) ->
 %% must exceed that or the caller exits with {timeout, _} before
 %% the worker has a chance to send `{error, timeout}'. Catch the
 %% race here and surface it as `{error, timeout}'.
+%% @doc Pubkeys of currently-connected station_link peers. Used by
+%% the announce path to set `station_id' on each daemon presence
+%% record so the realm topology can render daemons attached to
+%% their parent relay (V1 parity).
+-spec connected_peer_pubkeys() -> [macula_identity:pubkey()].
+connected_peer_pubkeys() ->
+    case safe_call(connected_peer_pubkeys, 1_000) of
+        L when is_list(L) -> L;
+        _                 -> []
+    end.
+
+safe_peer_node_id(LinkPid) ->
+    try macula_station_link:peer_node_id(LinkPid)
+    catch _:_ -> {error, exception}
+    end.
+
 safe_call(Msg, Timeout) ->
     try gen_server:call(?MODULE, Msg, Timeout)
     catch
