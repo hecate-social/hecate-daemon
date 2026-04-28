@@ -223,8 +223,63 @@ ensure_geo(S) ->
 geo_or_empty(#state{geo = undefined}) -> #{};
 geo_or_empty(#state{geo = G})         -> G.
 
+%% Geo discovery prefers explicit env vars over the GeoIP DB lookup.
+%% Operators set HECATE_GEO_LAT/LNG/CITY/COUNTRY on each beam node
+%% (different per node so daemons don't stack into a single marker
+%% on the realm map). Falls back to geo_check (locus + MaxMind
+%% GeoLite2-City) when env vars aren't set — locus may not have a
+%% DB available in every container.
 discover_geo() ->
-    on_public_ip(geo_check:get_public_ip()).
+    case env_geo() of
+        {ok, Geo} -> {ok, Geo};
+        error     -> on_public_ip(geo_check:get_public_ip())
+    end.
+
+env_geo() ->
+    Lat = env_float("HECATE_GEO_LAT"),
+    Lng = env_float("HECATE_GEO_LNG"),
+    City    = env_binary("HECATE_GEO_CITY"),
+    Country = env_binary("HECATE_GEO_COUNTRY"),
+    on_env_geo(Lat, Lng, City, Country).
+
+on_env_geo({ok, Lat}, {ok, Lng}, City, Country)
+  when is_float(Lat); is_integer(Lat) ->
+    {ok, drop_undefined(#{lat     => Lat,
+                          lng     => Lng,
+                          city    => unwrap_optional(City),
+                          country => unwrap_optional(Country)})};
+on_env_geo(_, _, _, _) ->
+    error.
+
+env_float(Var) ->
+    case os:getenv(Var) of
+        false -> error;
+        ""    -> error;
+        S     -> parse_number(S)
+    end.
+
+parse_number(S) ->
+    case string:to_float(S) of
+        {F, []} -> {ok, F};
+        _       ->
+            case string:to_integer(S) of
+                {I, []} -> {ok, float(I)};
+                _       -> error
+            end
+    end.
+
+env_binary(Var) ->
+    case os:getenv(Var) of
+        false -> error;
+        ""    -> error;
+        S     -> {ok, list_to_binary(S)}
+    end.
+
+unwrap_optional({ok, V}) -> V;
+unwrap_optional(error)   -> undefined.
+
+drop_undefined(M) ->
+    maps:filter(fun(_K, V) -> V =/= undefined andalso V =/= null end, M).
 
 on_public_ip({ok, IP}) ->
     on_location(geo_check:get_location(IP));
@@ -247,7 +302,7 @@ normalize_location(Loc) ->
         lat     => maps:get(lat,     Loc, undefined),
         lng     => maps:get(lng,     Loc, undefined)
     },
-    maps:filter(fun(_K, V) -> V =/= undefined andalso V =/= null end, Picked).
+    drop_undefined(Picked).
 
 %% Best-effort hostname for the daemon. Used by realm dashboards to
 %% render daemons by their machine name. Falls back to the BEAM node
