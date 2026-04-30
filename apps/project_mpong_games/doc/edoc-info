@@ -1,0 +1,4 @@
+%% encoding: UTF-8
+{application,project_mpong_games}.
+{modules,[champion_registered_v1_to_champions,game_lifecycle_to_mpong_games,
+          project_mpong_games_app,project_mpong_games_sup]}.
