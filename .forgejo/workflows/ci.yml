@@ -110,12 +110,14 @@ jobs:
             type=ref,event=branch
             type=sha,prefix=
 
-      - name: Build and push (amd64 only — multi-arch handled by GHA on tag)
+      # Defaults to native single-platform (amd64 on beam02-builder), no
+      # manifest list, no attestation — zot rejects the OCI image index
+      # that buildx emits when `platforms` or `provenance: false` is set
+      # explicitly. Multi-arch lives in GHA on tag.
+      - name: Build and push
         uses: https://github.com/docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          provenance: false
