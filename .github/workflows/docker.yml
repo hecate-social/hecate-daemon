@@ -1,24 +1,23 @@
-name: Docker Build & Push
+name: Docker Build & Push (multi-arch release)
 
+# Tag-only. Push-to-main builds happen on the Forgejo runner
+# (.forgejo/workflows/ci.yml) and only produce amd64. This workflow
+# handles multi-arch release builds (amd64 + arm64) on tags, using
+# GitHub-hosted runners (ubuntu-latest for amd64, ubuntu-22.04-arm for
+# arm64). Both arches push to registry.macula.io; the manifest job
+# combines them and writes :latest.
 on:
   push:
-    branches: [main]
     tags: ['v*']
-  pull_request:
-    branches: [main]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  REGISTRY: registry.macula.io
+  IMAGE_NAME: registry.macula.io/hecate-daemon
 
 jobs:
-  # Build amd64 - runs on every push
   build-amd64:
     name: Build (amd64)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout code
@@ -27,46 +26,37 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry
-        if: github.event_name != 'pull_request'
+      - name: Log in to registry.macula.io
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.MACULA_REGISTRY_USER }}
+          password: ${{ secrets.MACULA_REGISTRY_TOKEN }}
 
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.IMAGE_NAME }}
           tags: |
-            # For main branch: tag as 'main' only (NOT latest — manifest job owns latest)
-            type=ref,event=branch
-            # For tags: use version suffix for multi-arch manifest later
-            type=semver,pattern={{version}},suffix=-amd64,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=sha,prefix=
+            type=semver,pattern={{version}},suffix=-amd64
+            type=sha,prefix=,suffix=-amd64
 
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: linux/amd64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=amd64
           cache-to: type=gha,scope=amd64,mode=max
-          provenance: false  # Avoid creating manifest list for single arch
+          provenance: false
 
-  # Build arm64 - only runs on tags (releases)
   build-arm64:
     name: Build (arm64)
     runs-on: ubuntu-22.04-arm
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - name: Checkout code
@@ -75,18 +65,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry
+      - name: Log in to registry.macula.io
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.MACULA_REGISTRY_USER }}
+          password: ${{ secrets.MACULA_REGISTRY_TOKEN }}
 
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}},suffix=-arm64
 
@@ -100,55 +90,48 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=arm64
           cache-to: type=gha,scope=arm64,mode=max
-          provenance: false  # Avoid creating manifest list for single arch
+          provenance: false
 
-  # Create multi-arch manifest (tags only)
   manifest:
-    name: Create Manifest
+    name: Create multi-arch manifest
     runs-on: ubuntu-latest
     needs: [build-amd64, build-arm64]
-    # Only run for tags when both arches complete
-    if: startsWith(github.ref, 'refs/tags/v') && needs.build-amd64.result == 'success' && needs.build-arm64.result == 'success'
-    permissions:
-      contents: read
-      packages: write
+    if: needs.build-amd64.result == 'success' && needs.build-arm64.result == 'success'
 
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GitHub Container Registry
+      - name: Log in to registry.macula.io
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.MACULA_REGISTRY_USER }}
+          password: ${{ secrets.MACULA_REGISTRY_TOKEN }}
 
       - name: Extract version
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Create and push manifest
+      - name: Create and push manifests
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          IMAGE="${{ env.IMAGE_NAME }}"
 
-          echo "Creating manifest for ${IMAGE}:${VERSION}"
+          # Full version manifest (e.g. :1.2.3)
           docker manifest create "${IMAGE}:${VERSION}" \
             "${IMAGE}:${VERSION}-amd64" \
             "${IMAGE}:${VERSION}-arm64"
           docker manifest push "${IMAGE}:${VERSION}"
 
-          # Also tag as latest
-          echo "Creating manifest for ${IMAGE}:latest"
+          # :latest = latest tagged release
           docker manifest create "${IMAGE}:latest" \
             "${IMAGE}:${VERSION}-amd64" \
             "${IMAGE}:${VERSION}-arm64"
           docker manifest push "${IMAGE}:latest"
 
-          # Major.minor tag
+          # Major.minor convenience tag (e.g. :1.2)
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
-          echo "Creating manifest for ${IMAGE}:${MAJOR_MINOR}"
           docker manifest create "${IMAGE}:${MAJOR_MINOR}" \
             "${IMAGE}:${VERSION}-amd64" \
             "${IMAGE}:${VERSION}-arm64"
