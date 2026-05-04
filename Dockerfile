@@ -19,6 +19,9 @@ RUN apk add --no-cache \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --default-toolchain stable --profile minimal
 ENV PATH="/root/.cargo/bin:${PATH}"
+# musl-targeted rustup defaults to crt-static, which can't produce
+# cdylibs (the macula_quic NIF needs one). Disable it.
+ENV RUSTFLAGS="-C target-feature=-crt-static"
 
 # Install rebar3
 RUN curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 && \
