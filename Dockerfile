@@ -6,12 +6,19 @@ FROM erlang:27-alpine AS builder
 
 WORKDIR /build
 
-# Install build dependencies (Rust for NIFs, Perl for OpenSSL, etc.)
+# Install build dependencies (Perl for OpenSSL, etc.)
+# Rust intentionally NOT pulled from apk: Alpine 3.22 ships rustc 1.87,
+# but macula 3.15.x's Rust NIF deps (time@0.3.47, time-core@0.1.8,
+# time-macros@0.2.27) require rustc 1.88+. Use rustup for current stable.
 RUN apk add --no-cache \
     git curl bash \
     build-base cmake \
-    rust cargo \
     perl linux-headers
+
+# Install Rust via rustup (always current stable)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --default-toolchain stable --profile minimal
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install rebar3
 RUN curl -fsSL https://s3.amazonaws.com/rebar3/rebar3 -o /usr/local/bin/rebar3 && \
