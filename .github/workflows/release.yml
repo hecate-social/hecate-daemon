@@ -1,58 +1,35 @@
-name: Release
+name: Release (Codeberg)
+
+# Tag-only. Per-arch matrix builds the Erlang release tarball and a
+# self-extracting executable on GitHub-hosted runners (Codeberg has no
+# hosted runners; per workspace policy GitHub stays for build only).
+# Final job creates a Codeberg Release and uploads all assets.
+#
+# Replaces the previous softprops/action-gh-release flow that targeted
+# GitHub Releases. macOS targets stay disabled (macula_nifs Rust NIFs
+# fail to link on macOS CI).
 
 on:
   push:
     tags:
       - 'v*'
 
-permissions:
-  contents: write
-  actions: write
-
 jobs:
-  cleanup-artifacts:
-    name: Clean up old artifacts
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete all existing artifacts
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data } = await github.rest.actions.listArtifactsForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 100,
-            });
-            for (const artifact of data.artifacts) {
-              await github.rest.actions.deleteArtifact({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                artifact_id: artifact.id,
-              });
-              console.log(`Deleted artifact: ${artifact.name} (${artifact.id})`);
-            }
-
   build-release:
     name: Build Release (${{ matrix.os }}-${{ matrix.arch }})
-    needs: cleanup-artifacts
     runs-on: ${{ matrix.runner }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          # Use Ubuntu 20.04 for Linux builds for wider glibc compatibility
-          # (Ubuntu 20.04 has GLIBC 2.31, works on most systems)
+          # Ubuntu 20.04 for Linux amd64 — wider glibc compatibility
+          # (GLIBC 2.31, runs on most distros).
           - os: linux
             arch: amd64
             runner: ubuntu-20.04
           - os: linux
             arch: arm64
-            runner: ubuntu-22.04-arm  # 20.04-arm not available, 22.04 is oldest arm64
-          # darwin-arm64 disabled: macula_nifs Rust NIFs fail to link on
-          # macOS CI (missing BEAM NIF symbols). Re-enable when precompiled
-          # NIF binaries are available or CI toolchain is fixed.
-          # - os: darwin
-          #   arch: arm64
-          #   runner: macos-latest
+            runner: ubuntu-22.04-arm   # 20.04-arm not available; 22.04 is oldest arm64
 
     steps:
       - name: Checkout code
@@ -79,87 +56,114 @@ jobs:
       - name: Build release
         run: rebar3 as prod tar
 
-      - name: Create self-extracting executable
+      - name: Create self-extracting executable + tarball alias
         run: |
           chmod +x scripts/make-self-extracting.sh
           TARBALL=$(find _build/prod/rel/hecate -name 'hecate-*.tar.gz' | head -n 1)
           ./scripts/make-self-extracting.sh "$TARBALL" "hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}"
-          # Also keep the tarball for users who prefer it
           cp "$TARBALL" "hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
 
-      - name: Upload executable
+      - name: Stage release assets
+        run: |
+          mkdir -p /tmp/release-assets
+          cp "hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}" /tmp/release-assets/
+          cp "hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" /tmp/release-assets/
+          ls -la /tmp/release-assets/
+
+      - name: Upload artifacts (intermediate)
         uses: actions/upload-artifact@v4
         with:
-          name: hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}
-          path: hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}
-          retention-days: 1
+          name: release-${{ matrix.os }}-${{ matrix.arch }}
+          path: /tmp/release-assets/
+          if-no-files-found: error
 
-      - name: Upload tarball
-        uses: actions/upload-artifact@v4
-        with:
-          name: hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}-tarball
-          path: hecate-daemon-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
-          retention-days: 1
-
-  create-release:
-    name: Create GitHub Release
-    needs: build-release
+  publish-codeberg-release:
+    name: Publish to Codeberg Releases
     runs-on: ubuntu-latest
+    needs: build-release
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          path: /tmp/release-assets-merged
+          pattern: release-*
+          merge-multiple: true
 
-      - name: List artifacts
-        run: ls -R artifacts
+      - name: List collected assets
+        run: ls -la /tmp/release-assets-merged/
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          files: |
-            artifacts/hecate-daemon-linux-amd64/hecate-daemon-linux-amd64
-            artifacts/hecate-daemon-linux-arm64/hecate-daemon-linux-arm64
-            artifacts/hecate-daemon-*-tarball/*.tar.gz
-          body: |
-            ## Installation
-
-            **Recommended: Use the installer**
-            ```bash
-            curl -fsSL https://macula.io/hecate/install.sh | bash
-            ```
-
-            **Single executable (includes bundled Erlang runtime):**
-            ```bash
-            # Linux (amd64)
-            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-linux-amd64 -o hecate
-            chmod +x hecate
-            ./hecate start
-
-            # Linux (arm64)
-            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-linux-arm64 -o hecate
-            chmod +x hecate
-            ./hecate start
-            ```
-
-            **Tarball (for advanced users):**
-            ```bash
-            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-linux-amd64.tar.gz | tar xz
-            ```
-
-            ## Documentation
-
-            - [README](https://github.com/hecate-social/hecate-daemon/blob/main/README.md)
-            - [API Documentation](https://github.com/hecate-social/hecate-daemon/blob/main/docs/API.md)
-            - [Architecture](https://github.com/hecate-social/hecate-daemon/blob/main/docs/ARCHITECTURE.md)
-
-            See [CHANGELOG.md](https://github.com/hecate-social/hecate-daemon/blob/main/CHANGELOG.md) for changes.
+      - name: Create Codeberg Release + upload assets
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CB_TOKEN: ${{ secrets.CODEBERG_RELEASE_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: hecate-social/hecate-daemon
+        run: |
+          set -euo pipefail
+          BODY=$(cat <<EOF
+          ## Installation
+
+          **Recommended: Use the installer**
+          \`\`\`bash
+          curl -fsSL https://codeberg.org/hecate-social/hecate-install/raw/branch/main/install.sh | bash
+          \`\`\`
+
+          **Single executable (includes bundled Erlang runtime):**
+          \`\`\`bash
+          # Linux (amd64)
+          curl -fsSL https://codeberg.org/hecate-social/hecate-daemon/releases/download/${TAG}/hecate-daemon-linux-amd64 -o hecate
+          chmod +x hecate
+          ./hecate start
+
+          # Linux (arm64)
+          curl -fsSL https://codeberg.org/hecate-social/hecate-daemon/releases/download/${TAG}/hecate-daemon-linux-arm64 -o hecate
+          chmod +x hecate
+          ./hecate start
+          \`\`\`
+
+          **Tarball (advanced):**
+          \`\`\`bash
+          curl -fsSL https://codeberg.org/hecate-social/hecate-daemon/releases/download/${TAG}/hecate-daemon-linux-amd64.tar.gz | tar xz
+          \`\`\`
+
+          ## Documentation
+
+          - [README](https://codeberg.org/hecate-social/hecate-daemon/src/branch/main/README.md)
+          - [API](https://codeberg.org/hecate-social/hecate-daemon/src/branch/main/docs/API.md)
+          - [Architecture](https://codeberg.org/hecate-social/hecate-daemon/src/branch/main/docs/ARCHITECTURE.md)
+
+          See [CHANGELOG.md](https://codeberg.org/hecate-social/hecate-daemon/src/branch/main/CHANGELOG.md) for changes.
+          EOF
+          )
+
+          # Create the release. If it already exists (re-tag scenario),
+          # look up the existing release id by tag and reuse it.
+          CREATE=$(curl -sS -o /tmp/release.json -w "%{http_code}" \
+              -H "Authorization: token ${CB_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -X POST "https://codeberg.org/api/v1/repos/${REPO}/releases" \
+              -d "$(jq -n --arg tag "$TAG" --arg name "Release $TAG" --arg body "$BODY" \
+                  '{tag_name:$tag, name:$name, body:$body, draft:false, prerelease:false}')")
+          if [ "$CREATE" = "201" ]; then
+              REL_ID=$(jq -r .id < /tmp/release.json)
+              echo "Created Codeberg release id=$REL_ID"
+          else
+              echo "Create returned $CREATE; looking up existing release by tag..."
+              curl -sS -H "Authorization: token ${CB_TOKEN}" \
+                  "https://codeberg.org/api/v1/repos/${REPO}/releases/tags/${TAG}" \
+                  > /tmp/release.json
+              REL_ID=$(jq -r .id < /tmp/release.json)
+              echo "Existing release id=$REL_ID"
+          fi
+
+          # Upload each asset.
+          for f in /tmp/release-assets-merged/*; do
+              name=$(basename "$f")
+              echo "Uploading $name..."
+              curl -sS -o /dev/null -w "  %{http_code}\n" \
+                  -H "Authorization: token ${CB_TOKEN}" \
+                  -X POST "https://codeberg.org/api/v1/repos/${REPO}/releases/${REL_ID}/assets?name=${name}" \
+                  -F "attachment=@${f}"
+          done
+
+          echo "Codeberg release: https://codeberg.org/${REPO}/releases/tag/${TAG}"
