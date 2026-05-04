@@ -1,18 +1,21 @@
-name: Docker Build & Push (multi-arch release)
+name: Docker Build & Push (Codeberg Container Registry)
 
-# Tag-only. Push-to-main builds happen on the Forgejo runner
-# (.forgejo/workflows/ci.yml) and only produce amd64. This workflow
-# handles multi-arch release builds (amd64 + arm64) on tags, using
-# GitHub-hosted runners (ubuntu-latest for amd64, ubuntu-22.04-arm for
-# arm64). Both arches push to registry.macula.io; the manifest job
-# combines them and writes :latest.
+# Push to main → :main + :<sha> (amd64 only, fast)
+# Push to tag  → :vX.Y.Z + :vX.Y + :latest (multi-arch amd64+arm64)
+#
+# Runs on GitHub-hosted runners; targets codeberg.org/hecate-social/hecate-daemon
+# (the Codeberg-native container registry, no Big-Tech in the artifact path).
+# Self-hosted Forgejo + zot were retired here in favour of this single
+# pipeline. Auth uses CODEBERG_PUBLISHER_USER + CODEBERG_PACKAGE_TOKEN
+# repository secrets.
 on:
   push:
+    branches: [main]
     tags: ['v*']
 
 env:
-  REGISTRY: registry.macula.io
-  IMAGE_NAME: registry.macula.io/hecate-daemon
+  REGISTRY: codeberg.org
+  IMAGE_NAME: codeberg.org/hecate-social/hecate-daemon
 
 jobs:
   build-amd64:
@@ -26,12 +29,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to registry.macula.io
+      - name: Log in to Codeberg Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.MACULA_REGISTRY_USER }}
-          password: ${{ secrets.MACULA_REGISTRY_TOKEN }}
+          username: ${{ secrets.CODEBERG_PUBLISHER_USER }}
+          password: ${{ secrets.CODEBERG_PACKAGE_TOKEN }}
 
       - name: Extract metadata
         id: meta
@@ -39,8 +42,11 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}},suffix=-amd64
-            type=sha,prefix=,suffix=-amd64
+            # On main: :main + :<sha>
+            type=ref,event=branch,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,prefix=,enable=${{ github.ref == 'refs/heads/main' }}
+            # On tag: per-arch tags merged later by manifest job
+            type=semver,pattern={{version}},suffix=-amd64,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -57,6 +63,7 @@ jobs:
   build-arm64:
     name: Build (arm64)
     runs-on: ubuntu-22.04-arm
+    if: startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - name: Checkout code
@@ -65,12 +72,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to registry.macula.io
+      - name: Log in to Codeberg Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.MACULA_REGISTRY_USER }}
-          password: ${{ secrets.MACULA_REGISTRY_TOKEN }}
+          username: ${{ secrets.CODEBERG_PUBLISHER_USER }}
+          password: ${{ secrets.CODEBERG_PACKAGE_TOKEN }}
 
       - name: Extract metadata
         id: meta
@@ -93,21 +100,21 @@ jobs:
           provenance: false
 
   manifest:
-    name: Create multi-arch manifest
+    name: Create multi-arch manifest (tag only)
     runs-on: ubuntu-latest
     needs: [build-amd64, build-arm64]
-    if: needs.build-amd64.result == 'success' && needs.build-arm64.result == 'success'
+    if: startsWith(github.ref, 'refs/tags/v') && needs.build-amd64.result == 'success' && needs.build-arm64.result == 'success'
 
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to registry.macula.io
+      - name: Log in to Codeberg Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.MACULA_REGISTRY_USER }}
-          password: ${{ secrets.MACULA_REGISTRY_TOKEN }}
+          username: ${{ secrets.CODEBERG_PUBLISHER_USER }}
+          password: ${{ secrets.CODEBERG_PACKAGE_TOKEN }}
 
       - name: Extract version
         id: version
@@ -118,19 +125,16 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           IMAGE="${{ env.IMAGE_NAME }}"
 
-          # Full version manifest (e.g. :1.2.3)
           docker manifest create "${IMAGE}:${VERSION}" \
             "${IMAGE}:${VERSION}-amd64" \
             "${IMAGE}:${VERSION}-arm64"
           docker manifest push "${IMAGE}:${VERSION}"
 
-          # :latest = latest tagged release
           docker manifest create "${IMAGE}:latest" \
             "${IMAGE}:${VERSION}-amd64" \
             "${IMAGE}:${VERSION}-arm64"
           docker manifest push "${IMAGE}:latest"
 
-          # Major.minor convenience tag (e.g. :1.2)
           MAJOR_MINOR=$(echo "$VERSION" | cut -d. -f1,2)
           docker manifest create "${IMAGE}:${MAJOR_MINOR}" \
             "${IMAGE}:${VERSION}-amd64" \
