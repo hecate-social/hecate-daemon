@@ -110,7 +110,45 @@ The callback-vs-subscriber-pid shape change applies here too.
 
 This is the daemon-driving-the-SDK list. Each gap is a candidate for macula 3.16.0.
 
-### 3.1 GAP — pool status / introspection
+### 3.0 GAP — pool-aware non-streaming RPC
+
+**V2 today** has `macula_client` (pool) for pubsub only and `macula_station_link` (per-station) for everything else including RPC. There's no `macula:call(Pool, Realm, Procedure, Args, Timeout)` that fans out across a pool's links automatically.
+
+**Daemon behaviour** today: hand-rolls the fan-out via `dht_via_stations/2` (`hecate_mesh_client.erl:806-823`). Phase A reuses the same shape for RPC.
+
+**Proposed SDK addition (3.16.0):**
+```erlang
+-spec macula:call(pool(), realm(), procedure(), term(), pos_integer()) ->
+    {ok, term()} | {error, term()}.
+-spec macula:advertise(pool(), realm(), procedure(), handler()) ->
+    ok | {error, term()}.
+-spec macula:unadvertise(pool(), realm(), procedure()) -> ok.
+```
+
+Internal: pool picks first connected station (advertise fans out to all). Resolves the daemon's hand-rolled `via_any_station/2` and `via_all_stations/2` helpers into one place.
+
+### 3.1 GAP — pool-aware streaming RPC
+
+**V2 today** routes streaming RPC through `macula_mesh_client` (V1) or local-only `macula_stream_local`. `macula_station_link` has NO stream variants. So `macula:call_stream(Client, Procedure, Args)` falls through to V1 mesh_client.
+
+**Daemon needs** streaming RPC for git fetch (`relay_git_rpc_api`) and inproc paths (`hecate_mesh_inproc.erl`). Currently uses V1 multi_relay.
+
+**Proposed SDK addition (3.16.0):**
+```erlang
+-spec macula_station_link:call_stream(pid(), <<_:256>>, binary(), term(), map()) ->
+    {ok, stream()} | {error, term()}.
+-spec macula_station_link:advertise_stream(pid(), <<_:256>>, binary(),
+                                            stream_mode(), stream_handler()) ->
+    ok | {error, term()}.
+-spec macula_station_link:unadvertise_stream(pid(), <<_:256>>, binary()) -> ok.
+%% + pool-level wrappers in macula:
+-spec macula:call_stream(pool(), realm(), procedure(), term(), map()) ->
+    {ok, stream()} | {error, term()}.
+-spec macula:advertise_stream(pool(), realm(), procedure(), stream_mode(),
+                               stream_handler()) -> ok | {error, term()}.
+```
+
+### 3.2 GAP — pool status / introspection
 
 **V1 had** `macula_multi_relay:get_status/1 -> {ok, #{relays, connections, …}}` returning a map summarising health per relay.
 
@@ -134,7 +172,7 @@ This is the daemon-driving-the-SDK list. Each gap is a candidate for macula 3.16
 
 Single-call summary the daemon can drop straight onto `/api/mesh/activate`.
 
-### 3.2 GAP — subscribe-with-callback shim
+### 3.3 GAP — subscribe-with-callback shim
 
 **V1** subscribers passed a callback `fun((Topic, Payload) -> any())`.
 
@@ -154,17 +192,17 @@ Internally spawns a tiny receiver that invokes the fun and traps crashes.
 
 **Decision:** propose for 3.16.0, leave easy to remove if you'd rather keep the SDK message-based-only.
 
-### 3.3 GAP — `connect/2` opts surface
+### 3.4 GAP — `connect/2` opts surface
 
 V1's `macula_multi_relay:start_link` took `#{relays, realm, identity, site, connections}`. V2's `macula:connect(Seeds, Opts)` accepts a less-documented `Opts` map. Need to verify what's accepted; `site` and `connections` (from V1) may have no V2 equivalent or different names.
 
 **Action:** read `macula_client:connect/2` thoroughly during Stage 2; if any V1 opt has no V2 equivalent and is in active use, surface as 3.16 gap.
 
-### 3.4 GAP — pool dedup config exposure
+### 3.5 GAP — pool dedup config exposure
 
 V1 had implicit dedup. V2's `macula_client` doc references `dedup_window_ms` / `dedup_sweep_ms`. Verify these are caller-tunable; if not, expose for callers that need different windows (e.g. weather-publishing stub vs. realm-control daemon).
 
-### 3.5 NON-GAPS (worth flagging as deliberate)
+### 3.6 NON-GAPS (worth flagging as deliberate)
 
 - **realm-per-call vs per-pool** — V2 takes realm on each publish/subscribe call. V1 took it once at start_link. This is an INTENTIONAL improvement (multi-realm per pool), not a gap. Daemon's `state.realm` becomes a default that's passed in on each call.
 - **`connected_peer_pubkeys`** — already-V2 in the daemon (line 337-344), just calls `macula_station_link:peer_node_id/1` over the local pool. No change needed.
@@ -175,14 +213,26 @@ V1 had implicit dedup. V2's `macula_client` doc references `dedup_window_ms` / `
 
 Each step is a self-contained commit with tests + smoke validation against the live BE fleet.
 
-### Phase A — daemon RPC surface (smaller scope, validates pattern)
+### Phase A — daemon RPC surface
 
-1. **Add `macula:` facade calls alongside multi_relay calls** (no removal yet) — call/advertise/call_stream/advertise_stream. Run both, compare results in tests.
-2. **Switch RPC handlers to `macula:advertise`** + delete multi_relay advertise paths.
-3. **Switch RPC callers to `macula:call`** + delete multi_relay call paths.
-4. **Switch streaming RPC** in `relay_git_rpc_api`, `inproc` paths.
+#### A1 (non-streaming RPC, lands on current SDK 3.15.x)
 
-Validation: `serve_git_over_mesh` integration tests; live `git clone` over mesh to a daemon.
+1. Reuse the existing `station_clients` pool for RPC. Generalise `dht_via_stations/2` into:
+   - `via_any_station/2` — first-connected, first-success (for `call`)
+   - `via_all_stations/2` — fan-out to all, accept partial success (for `advertise`/`unadvertise`)
+2. Replace `macula_multi_relay:advertise/3` calls with `macula_station_link:advertise/4` via `via_all_stations`.
+3. Replace `macula_multi_relay:call/4` calls with `macula_station_link:call/5` via `via_any_station`.
+4. Replace `macula_multi_relay:unadvertise/2` similarly.
+5. Migrate `drain_pending` advertise replays to V2.
+
+Validation: `serve_git_over_mesh` non-streaming integration tests; daemon CT.
+
+#### A2 (streaming RPC, lands on SDK 3.16.0 — blocked on §3.1 gap)
+
+6. Replace `macula_multi_relay:call_stream/4` with `macula_station_link:call_stream/5` (3.16).
+7. Replace `macula_multi_relay:advertise_stream/4` with `macula_station_link:advertise_stream/5` (3.16).
+
+Validation: live `git clone` / `git fetch` over mesh to a daemon.
 
 ### Phase B — daemon pubsub surface
 

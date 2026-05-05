@@ -272,12 +272,17 @@ handle_call(activate, _From, #state{activated = false} = State) ->
         connections => Connections
     }),
 
-    %% Drain pending registrations (best-effort, don't crash on failure)
-    drain_pending(Client, PendingSubs, PendingAdvs, PendingStreamAdvs),
+    %% Drain V1-path pending registrations (subs, stream_advs).
+    %% Non-streaming advs migrate to V2 via the station_link pool —
+    %% drained below once the pool is alive.
+    drain_pending_v1(Client, PendingSubs, PendingStreamAdvs),
 
     %% Spin up the station-client pool. DHT ops route through it over
-    %% peering; pubsub/RPC continue via macula_multi_relay.
+    %% peering; subscribe / publish / streaming RPC continue on V1
+    %% (macula_multi_relay) until Phase B + A2 land. Phase A1 routes
+    %% non-streaming RPC advertise / call / unadvertise via V2.
     {StationClients, StationMonitors} = start_station_pool(Relays),
+    drain_pending_advs_v2(maps:values(StationClients), Realm, PendingAdvs),
     logger:info("[hecate_mesh] Station-client pool: ~b alive (of ~b seeds)",
                 [maps:size(StationClients), length(Relays)]),
 
@@ -397,22 +402,22 @@ handle_call({unsubscribe, SubRef}, _From, #state{client = Client} = State) ->
 handle_call({advertise, Procedure, Handler}, _From, #state{activated = false} = State) ->
     NewAdvs = [{Procedure, Handler} | State#state.pending_advs],
     {reply, {ok, queued}, State#state{pending_advs = NewAdvs}};
-handle_call({advertise, Procedure, Handler}, _From, #state{client = Client} = State) ->
-    Result = safe_mesh_call(fun() -> macula_multi_relay:advertise(Client, Procedure, Handler) end),
+handle_call({advertise, Procedure, Handler}, _From,
+            #state{station_clients = Pool, realm = Realm} = State) ->
+    Result = advertise_via_stations(maps:values(Pool), Realm, Procedure, Handler),
     {reply, Result, State};
 
 handle_call({rpc_call, _Procedure, _Args, _Timeout}, _From, #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
-handle_call({rpc_call, Procedure, Args, Timeout}, From, #state{client = Client} = State) ->
+handle_call({rpc_call, Procedure, Args, Timeout}, From,
+            #state{station_clients = Pool, realm = Realm} = State) ->
     %% Async: don't block the gen_server mailbox for the full RPC
     %% timeout (often 30s), which starves every other caller
     %% (subscribes, publishes, status checks). Spawn a worker, reply
     %% via gen_server:reply/2 when it returns.
     spawn(fun() ->
-        Result = safe_mesh_call(fun() ->
-            macula_multi_relay:call(Client, Procedure, Args, Timeout)
-        end),
-        gen_server:reply(From, Result)
+        gen_server:reply(From,
+            call_via_any_station(maps:values(Pool), Realm, Procedure, Args, Timeout))
     end),
     {noreply, State};
 
@@ -444,8 +449,11 @@ handle_cast({register_sub, Topic, Callback}, #state{client = Client} = State) ->
 
 handle_cast({register_adv, Procedure, Handler}, #state{activated = false} = State) ->
     {noreply, State#state{pending_advs = [{Procedure, Handler} | State#state.pending_advs]}};
-handle_cast({register_adv, Procedure, Handler}, #state{client = Client} = State) ->
-    spawn(fun() -> safe_mesh_call(fun() -> macula_multi_relay:advertise(Client, Procedure, Handler) end) end),
+handle_cast({register_adv, Procedure, Handler},
+            #state{station_clients = Pool, realm = Realm} = State) ->
+    spawn(fun() ->
+        advertise_via_stations(maps:values(Pool), Realm, Procedure, Handler)
+    end),
     {noreply, State};
 
 handle_cast({register_stream_adv, Procedure, Mode, Handler},
@@ -465,8 +473,11 @@ handle_cast({unregister_adv, Procedure}, #state{activated = false} = State) ->
     %% Drop the pending entry if present; nothing else to do while dormant.
     Pending = [{P, H} || {P, H} <- State#state.pending_advs, P =/= Procedure],
     {noreply, State#state{pending_advs = Pending}};
-handle_cast({unregister_adv, Procedure}, #state{client = Client} = State) ->
-    spawn(fun() -> safe_mesh_call(fun() -> macula_multi_relay:unadvertise(Client, Procedure) end) end),
+handle_cast({unregister_adv, Procedure},
+            #state{station_clients = Pool, realm = Realm} = State) ->
+    spawn(fun() ->
+        unadvertise_via_stations(maps:values(Pool), Realm, Procedure)
+    end),
     {noreply, State};
 
 handle_cast(_Msg, State) ->
@@ -710,25 +721,91 @@ terminate(_Reason, #state{client = Client}) ->
 %% Internal
 %%====================================================================
 
-drain_pending(Client, Subs, Advs, StreamAdvs) ->
+drain_pending_v1(Client, Subs, StreamAdvs) ->
     lists:foreach(fun({Topic, Callback}) ->
         case safe_mesh_call(fun() -> macula_multi_relay:subscribe(Client, Topic, Callback) end) of
             {ok, _} -> logger:info("[hecate_mesh] Subscribed: ~s", [Topic]);
             {error, R} -> logger:warning("[hecate_mesh] Subscribe ~s failed: ~p", [Topic, R])
         end
     end, Subs),
-    lists:foreach(fun({Procedure, Handler}) ->
-        case safe_mesh_call(fun() -> macula_multi_relay:advertise(Client, Procedure, Handler) end) of
-            {ok, _} -> logger:info("[hecate_mesh] Advertised: ~s", [Procedure]);
-            {error, R} -> logger:warning("[hecate_mesh] Advertise ~s failed: ~p", [Procedure, R])
-        end
-    end, Advs),
     lists:foreach(fun({Procedure, Mode, Handler}) ->
         case safe_mesh_call(fun() -> macula_multi_relay:advertise_stream(Client, Procedure, Mode, Handler) end) of
             ok -> logger:info("[hecate_mesh] Stream-advertised: ~s (mode=~p)", [Procedure, Mode]);
             {error, R} -> logger:warning("[hecate_mesh] Stream-advertise ~s failed: ~p", [Procedure, R])
         end
     end, StreamAdvs).
+
+drain_pending_advs_v2(LinkPids, Realm, Advs) ->
+    lists:foreach(fun({Procedure, Handler}) ->
+        case advertise_via_stations(LinkPids, Realm, Procedure, Handler) of
+            ok -> logger:info("[hecate_mesh] Advertised (v2): ~s", [Procedure]);
+            {error, R} -> logger:warning("[hecate_mesh] Advertise (v2) ~s failed: ~p",
+                                          [Procedure, R])
+        end
+    end, Advs).
+
+%%--------------------------------------------------------------------
+%% V2 RPC fan-out helpers.
+%%
+%% advertise_via_stations / unadvertise_via_stations: register the
+%% handler on every CURRENTLY-CONNECTED station_link in the pool so
+%% any peer-routed CALL reaches us regardless of which station
+%% carried it. Returns ok if at least one station accepted; aggregate
+%% failures are logged but not fatal.
+%%
+%% call_via_any_station: try each connected link in turn, return the
+%% first non-error response. Mirrors `dht_via_stations/2' for the RPC
+%% surface.
+%%--------------------------------------------------------------------
+
+advertise_via_stations(LinkPids, Realm, Procedure, Handler) ->
+    fan_out(connected_only(LinkPids),
+            fun(P) -> macula_station_link:advertise(P,
+                                                     macula_realm:id(Realm),
+                                                     Procedure,
+                                                     Handler) end,
+            advertise).
+
+unadvertise_via_stations(LinkPids, Realm, Procedure) ->
+    fan_out(connected_only(LinkPids),
+            fun(P) -> macula_station_link:unadvertise(P,
+                                                       macula_realm:id(Realm),
+                                                       Procedure) end,
+            unadvertise).
+
+call_via_any_station([], _Realm, _Procedure, _Args, _Timeout) ->
+    {error, no_station_connected};
+call_via_any_station([Pid | Rest], Realm, Procedure, Args, Timeout) ->
+    case macula_station_link:is_connected(Pid) of
+        false when Rest =:= [] -> {error, not_connected};
+        false                  -> call_via_any_station(Rest, Realm, Procedure, Args, Timeout);
+        true                   -> try_call_then_next(
+                                    macula_station_link:call(Pid,
+                                                              macula_realm:id(Realm),
+                                                              Procedure,
+                                                              Args,
+                                                              Timeout),
+                                    Rest, Realm, Procedure, Args, Timeout)
+    end.
+
+try_call_then_next({ok, _} = R, _Rest, _Realm, _Procedure, _Args, _Timeout) -> R;
+try_call_then_next({error, _} = E, [], _Realm, _Procedure, _Args, _Timeout) -> E;
+try_call_then_next({error, _Reason}, Rest, Realm, Procedure, Args, Timeout) ->
+    call_via_any_station(Rest, Realm, Procedure, Args, Timeout).
+
+connected_only(LinkPids) ->
+    [P || P <- LinkPids,
+          is_pid(P), is_process_alive(P),
+          macula_station_link:is_connected(P)].
+
+fan_out([], _Op, _Tag) ->
+    {error, no_station_connected};
+fan_out(Pids, Op, _Tag) ->
+    Results = [Op(P) || P <- Pids],
+    case lists:any(fun (ok) -> true; ({ok, _}) -> true; (_) -> false end, Results) of
+        true  -> ok;
+        false -> {error, all_stations_failed}
+    end.
 
 safe_mesh_call(Fun) ->
     try Fun()
