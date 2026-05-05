@@ -406,13 +406,13 @@ handle_call({unsubscribe, SubRef}, _From, #state{client = Client} = State) ->
     Result = safe_mesh_call(fun() -> macula_multi_relay:unsubscribe(Client, SubRef) end),
     {reply, Result, State};
 
-handle_call({advertise, Procedure, Handler}, _From, #state{activated = false} = State) ->
+handle_call({advertise, Procedure, Handler}, _From, State) ->
+    %% Always queue + kick the drain loop. If stations are connected,
+    %% the retry tick (scheduled at zero delay) lands the adv this
+    %% tick. If not, the loop keeps retrying until they handshake.
     NewAdvs = [{Procedure, Handler} | State#state.pending_advs],
+    erlang:send_after(0, self(), drain_pending_advs_v2),
     {reply, {ok, queued}, State#state{pending_advs = NewAdvs}};
-handle_call({advertise, Procedure, Handler}, _From,
-            #state{station_clients = Pool, realm = Realm} = State) ->
-    Result = advertise_via_stations(maps:values(Pool), Realm, Procedure, Handler),
-    {reply, Result, State};
 
 handle_call({rpc_call, _Procedure, _Args, _Timeout}, _From, #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
@@ -454,14 +454,11 @@ handle_cast({register_sub, Topic, Callback}, #state{client = Client} = State) ->
     spawn(fun() -> safe_mesh_call(fun() -> macula_multi_relay:subscribe(Client, Topic, Callback) end) end),
     {noreply, State};
 
-handle_cast({register_adv, Procedure, Handler}, #state{activated = false} = State) ->
-    {noreply, State#state{pending_advs = [{Procedure, Handler} | State#state.pending_advs]}};
-handle_cast({register_adv, Procedure, Handler},
-            #state{station_clients = Pool, realm = Realm} = State) ->
-    spawn(fun() ->
-        advertise_via_stations(maps:values(Pool), Realm, Procedure, Handler)
-    end),
-    {noreply, State};
+handle_cast({register_adv, Procedure, Handler}, State) ->
+    %% Same path as the call form: queue + nudge the drain loop.
+    NewAdvs = [{Procedure, Handler} | State#state.pending_advs],
+    erlang:send_after(0, self(), drain_pending_advs_v2),
+    {noreply, State#state{pending_advs = NewAdvs}};
 
 handle_cast({register_stream_adv, Procedure, Mode, Handler},
             #state{activated = false} = State) ->
