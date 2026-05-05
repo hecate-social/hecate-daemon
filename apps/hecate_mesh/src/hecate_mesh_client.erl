@@ -272,9 +272,9 @@ handle_call(activate, _From, #state{activated = false} = State) ->
         connections => Connections
     }),
 
-    %% Drain V1-path pending registrations (subs, stream_advs).
-    %% Non-streaming advs migrate to V2 via the station_link pool —
-    %% drained below once the pool is alive.
+    %% Drain V1-path pending registrations (subs, stream_advs) — these
+    %% block on macula_multi_relay which guarantees a connected client
+    %% before returning from start_link/1, so they always succeed.
     drain_pending_v1(Client, PendingSubs, PendingStreamAdvs),
 
     %% Spin up the station-client pool. DHT ops route through it over
@@ -282,9 +282,16 @@ handle_call(activate, _From, #state{activated = false} = State) ->
     %% (macula_multi_relay) until Phase B + A2 land. Phase A1 routes
     %% non-streaming RPC advertise / call / unadvertise via V2.
     {StationClients, StationMonitors} = start_station_pool(Relays),
-    drain_pending_advs_v2(maps:values(StationClients), Realm, PendingAdvs),
     logger:info("[hecate_mesh] Station-client pool: ~b alive (of ~b seeds)",
                 [maps:size(StationClients), length(Relays)]),
+
+    %% V2 advs cannot drain immediately — start_station_pool returns
+    %% before any station_link finishes its CONNECT/HELLO handshake,
+    %% so connected_only/1 sees an empty list. Schedule a retry loop
+    %% that re-attempts every second until each adv lands on at least
+    %% one connected station. PendingAdvs stays in state so the loop
+    %% can mutate it as advs succeed.
+    erlang:send_after(0, self(), drain_pending_advs_v2),
 
     %% Run mesh proof ceremony (non-blocking)
     mesh_proof_coordinator:run_probes(),
@@ -294,7 +301,7 @@ handle_call(activate, _From, #state{activated = false} = State) ->
     {reply, ok, State#state{client = Client, activated = true,
                             station_clients = StationClients,
                             station_monitors = StationMonitors,
-                            pending_subs = [], pending_advs = [],
+                            pending_subs = [],
                             pending_stream_advs = []}};
 
 %% -- Status ------------------------------------------------------------
@@ -634,6 +641,22 @@ handle_info({respawn_station, Url}, #state{activated = false} = State) ->
     %% rebuilds the whole pool.
     logger:debug("[hecate_mesh] Skip station respawn for ~s (mesh deactivated)", [Url]),
     {noreply, State};
+handle_info(drain_pending_advs_v2, #state{activated = false} = State) ->
+    {noreply, State};
+handle_info(drain_pending_advs_v2,
+            #state{station_clients = Pool, realm = Realm,
+                   pending_advs = PendingAdvs} = State) ->
+    %% Try each pending adv; keep the ones that fail so we can retry
+    %% on the next tick. Successful advs get logged and dropped.
+    Remaining = lists:filter(
+        fun({Procedure, Handler}) ->
+            attempt_keep_pending(advertise_via_stations(maps:values(Pool),
+                                                        Realm, Procedure, Handler),
+                                 Procedure)
+        end, PendingAdvs),
+    schedule_drain_advs_if_pending(Remaining),
+    {noreply, State#state{pending_advs = Remaining}};
+
 handle_info({respawn_station, Url}, #state{station_clients = Pool,
                                       station_monitors = Mons} = State) ->
     case start_station_client(Url) of
@@ -735,14 +758,25 @@ drain_pending_v1(Client, Subs, StreamAdvs) ->
         end
     end, StreamAdvs).
 
-drain_pending_advs_v2(LinkPids, Realm, Advs) ->
-    lists:foreach(fun({Procedure, Handler}) ->
-        case advertise_via_stations(LinkPids, Realm, Procedure, Handler) of
-            ok -> logger:info("[hecate_mesh] Advertised (v2): ~s", [Procedure]);
-            {error, R} -> logger:warning("[hecate_mesh] Advertise (v2) ~s failed: ~p",
-                                          [Procedure, R])
-        end
-    end, Advs).
+%% Per-adv result handler for the periodic V2 drain. `true' means keep
+%% the adv on pending_advs and retry next tick; `false' means it
+%% landed and we drop it.
+attempt_keep_pending(ok, Procedure) ->
+    logger:info("[hecate_mesh] Advertised (v2): ~s", [Procedure]),
+    false;
+attempt_keep_pending({error, no_station_connected}, _Procedure) ->
+    %% Stations still handshaking — silent, will retry.
+    true;
+attempt_keep_pending({error, Reason}, Procedure) ->
+    logger:warning("[hecate_mesh] Advertise (v2) ~s failed: ~p — retrying",
+                   [Procedure, Reason]),
+    true.
+
+schedule_drain_advs_if_pending([]) ->
+    ok;
+schedule_drain_advs_if_pending(_Pending) ->
+    erlang:send_after(1000, self(), drain_pending_advs_v2),
+    ok.
 
 %%--------------------------------------------------------------------
 %% V2 RPC fan-out helpers.
