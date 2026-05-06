@@ -138,17 +138,20 @@ get_neighborhood() ->
 
 current_relay_info() ->
     case get_status() of
-        {ok, #{multi_relay := #{connections := Conns}}} ->
-            primary_relay_info(Conns);
+        {ok, #{station_links := Links}} ->
+            first_connected_relay(Links);
         _ -> null
     end.
 
-primary_relay_info([]) -> null;
-primary_relay_info([#{relay := Url, role := <<"primary">>, alive := true} | _]) ->
+%% V2 has no primary/secondary distinction; every connected station is
+%% equal. The first connected entry stands in for "current relay" for
+%% UI purposes.
+first_connected_relay([]) -> null;
+first_connected_relay([#{relay := Url, alive := true, connected := true} | _]) ->
     Hostname = extract_hostname(Url),
     enrich_relay(Hostname);
-primary_relay_info([_ | Rest]) ->
-    primary_relay_info(Rest).
+first_connected_relay([_ | Rest]) ->
+    first_connected_relay(Rest).
 
 extract_hostname(Url) ->
     Stripped = re:replace(Url, <<"^https?://">>, <<>>, [{return, binary}]),

@@ -325,20 +325,26 @@ handle_call(is_activated, _From, #state{activated = A} = State) ->
 handle_call(get_client, _From, #state{client = Client} = State) ->
     {reply, {ok, Client}, State};
 
-handle_call(get_status, _From, #state{client = Client, realm = Realm,
-                                       identity = Identity, relays = Relays,
-                                       connections = Connections,
-                                       activated = Activated} = State) ->
-    MultiStatus = get_multi_status(Client),
+handle_call(get_status, _From,
+            #state{client = Client, pool = Pool, realm = Realm,
+                   identity = Identity, relays = Relays,
+                   station_clients = StationClients,
+                   activated = Activated} = State) ->
+    PoolStatus = get_pool_status(Pool),
+    StationLinks = station_links_view(StationClients),
     Status = #{
-        connected => is_pid(Client),
+        connected => is_pid(Pool),
         activated => Activated,
         realm => Realm,
         identity => Identity,
+        node_id => maps:get(self_node_id, PoolStatus, undefined),
         relays => Relays,
-        connections => Connections,
-        multi_relay => MultiStatus,
-        mode => multi_relay
+        pool => PoolStatus,
+        station_links => StationLinks,
+        %% Streaming RPC still rides V1 multi_relay until SDK 3.17 §A4.
+        %% Surface its liveness so debug tooling can tell if streaming
+        %% is up. Goes away when streaming migrates to station_link.
+        streaming_client_alive => is_pid(Client) andalso is_process_alive(Client)
     },
     {reply, {ok, Status}, State};
 
@@ -990,15 +996,24 @@ try_next_station({error, _Reason}, Rest, Op) ->
 %% DHT operations route through macula_station_link which handles
 %% its own result classification.
 
-get_multi_status(Client) when is_pid(Client) ->
-    %% Wrap in safe_mesh_call — macula_multi_relay can be busy
-    %% draining pending subs/advs at activation time; its default
-    %% 5s gen_server:call timeout would otherwise kill mesh_client.
-    case safe_mesh_call(fun() -> macula_multi_relay:get_status(Client) end) of
-        {ok, MS} -> MS;
+get_pool_status(undefined) -> #{};
+get_pool_status(Pool) when is_pid(Pool) ->
+    case safe_mesh_call(fun() -> macula:status(Pool) end) of
+        {ok, S} -> S;
         _ -> #{}
+    end.
+
+station_links_view(StationClients) ->
+    [#{relay     => Url,
+       alive     => is_pid(Pid) andalso is_process_alive(Pid),
+       connected => safe_is_connected(Pid)}
+     || {Url, Pid} <- maps:to_list(StationClients)].
+
+safe_is_connected(Pid) when is_pid(Pid) ->
+    try macula_station_link:is_connected(Pid)
+    catch _:_ -> false
     end;
-get_multi_status(_) -> #{}.
+safe_is_connected(_) -> false.
 
 %% @private Does the event store show ANY realm membership activity
 %% that hasn't been explicitly ended? Used by reactivate_if_confirmed
