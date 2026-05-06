@@ -24,7 +24,13 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2]).
 
 -record(state, {
-    client :: pid() | undefined,        %% macula_multi_relay pid (nil until activated)
+    %% V1 macula_multi_relay pid. Streaming RPC (call_stream /
+    %% advertise_stream) still rides this until SDK 3.17 §A4 lands
+    %% station-link streaming. Phase B drops pubsub from this path.
+    client :: pid() | undefined,
+    %% V2 macula_client pool — pubsub (Phase B). One pool, N
+    %% station_links inside it, realm-per-call.
+    pool :: pid() | undefined,
     activated :: boolean(),
     realm :: binary(),
     identity :: binary(),
@@ -36,8 +42,7 @@
     pending_stream_advs = [] :: [{binary(), atom(), fun()}],
     %% Station-client pool — one macula_station_link per relay URL.
     %% DHT operations (put_record, find_record, find_records_by_type)
-    %% route through here over peering. PubSub / RPC still ride
-    %% macula_multi_relay until stations expose those surfaces.
+    %% and non-streaming RPC route through here over peering.
     station_clients   = #{} :: #{binary() => pid()},
     station_monitors  = #{} :: #{reference() => binary()}
 }).
@@ -272,15 +277,23 @@ handle_call(activate, _From, #state{activated = false} = State) ->
         connections => Connections
     }),
 
-    %% Drain V1-path pending registrations (subs, stream_advs) — these
-    %% block on macula_multi_relay which guarantees a connected client
-    %% before returning from start_link/1, so they always succeed.
-    drain_pending_v1(Client, PendingSubs, PendingStreamAdvs),
+    %% V2 pool for pubsub (Phase B). Realm/site/connections are V1-
+    %% only opts and are silently ignored by the V2 connector — the
+    %% facade emits a one-shot logger:notice if they slip through.
+    %% Identity is auto-generated; pubsub auth is per-payload, not
+    %% per-link. dedup defaults (60s window) are fine for now.
+    {ok, Pool} = macula:connect(Relays, #{}),
 
-    %% Spin up the station-client pool. DHT ops route through it over
-    %% peering; subscribe / publish / streaming RPC continue on V1
-    %% (macula_multi_relay) until Phase B + A2 land. Phase A1 routes
-    %% non-streaming RPC advertise / call / unadvertise via V2.
+    %% Drain V1-path pending stream-advs — block on macula_multi_relay
+    %% which guarantees a connected client before returning from
+    %% start_link/1. Pubsub subs drain via V2 pool below.
+    drain_pending_stream_advs(Client, PendingStreamAdvs),
+    drain_pending_subs_v2(Pool, Realm, PendingSubs),
+
+    %% Spin up the station-client pool. DHT ops + non-streaming RPC
+    %% (Phase A) route through here over peering. Pubsub now rides
+    %% the V2 macula:connect pool above. Streaming RPC remains on
+    %% macula_multi_relay until SDK 3.17 §A4 lands.
     {StationClients, StationMonitors} = start_station_pool(Relays),
     logger:info("[hecate_mesh] Station-client pool: ~b alive (of ~b seeds)",
                 [maps:size(StationClients), length(Relays)]),
@@ -298,7 +311,7 @@ handle_call(activate, _From, #state{activated = false} = State) ->
 
     persistent_term:put({?MODULE, activated}, true),
     logger:info("[hecate_mesh] Mesh activated"),
-    {reply, ok, State#state{client = Client, activated = true,
+    {reply, ok, State#state{client = Client, pool = Pool, activated = true,
                             station_clients = StationClients,
                             station_monitors = StationMonitors,
                             pending_subs = [],
@@ -333,11 +346,14 @@ handle_call(get_status, _From, #state{client = Client, realm = Realm,
 
 handle_call({publish, _Topic, _Payload}, _From, #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
-handle_call({publish, Topic, Payload}, _From, #state{client = Client} = State) ->
-    %% Wrap: a busy multi_relay can stall this long enough to trip the
-    %% 5s default gen_server timeout, and the exit would kill mesh_client
-    %% (the observed crash mode at boot-time under heavy catch-up load).
-    _ = safe_mesh_call(fun() -> macula_multi_relay:publish(Client, Topic, Payload) end),
+handle_call({publish, Topic, Payload}, _From,
+            #state{pool = Pool, realm = Realm} = State) ->
+    %% V2 publish — `macula:publish/4' returns ok as soon as one
+    %% connected station accepts the PUBLISH frame. Wrap with
+    %% safe_mesh_call: the pool pid can be dead-but-still-referenced
+    %% in the brief window between an EXIT message arriving and the
+    %% EXIT handler running.
+    _ = safe_mesh_call(fun() -> macula:publish(Pool, macula_realm:id(Realm), Topic, Payload) end),
     {reply, ok, State};
 
 %% -- DHT record operations (PLAN_DHT_FIRST.md) -----------------------
@@ -396,14 +412,18 @@ handle_call({subscribe, Topic, Callback}, _From, #state{activated = false} = Sta
     %% Queue it — will be applied on activate
     NewSubs = [{Topic, Callback} | State#state.pending_subs],
     {reply, {ok, queued}, State#state{pending_subs = NewSubs}};
-handle_call({subscribe, Topic, Callback}, _From, #state{client = Client} = State) ->
-    Result = safe_mesh_call(fun() -> macula_multi_relay:subscribe(Client, Topic, Callback) end),
+handle_call({subscribe, Topic, Callback}, _From,
+            #state{pool = Pool, realm = Realm} = State) ->
+    Result = safe_mesh_call(fun() ->
+        macula:subscribe_callback(Pool, macula_realm:id(Realm), Topic,
+                                   wrap_v1_callback(Callback))
+    end),
     {reply, Result, State};
 
 handle_call({unsubscribe, _SubRef}, _From, #state{activated = false} = State) ->
     {reply, {error, not_activated}, State};
-handle_call({unsubscribe, SubRef}, _From, #state{client = Client} = State) ->
-    Result = safe_mesh_call(fun() -> macula_multi_relay:unsubscribe(Client, SubRef) end),
+handle_call({unsubscribe, SubRef}, _From, #state{pool = Pool} = State) ->
+    Result = safe_mesh_call(fun() -> macula:unsubscribe(Pool, SubRef) end),
     {reply, Result, State};
 
 handle_call({advertise, Procedure, Handler}, _From, State) ->
@@ -450,8 +470,12 @@ handle_call(_Request, _From, State) ->
 
 handle_cast({register_sub, Topic, Callback}, #state{activated = false} = State) ->
     {noreply, State#state{pending_subs = [{Topic, Callback} | State#state.pending_subs]}};
-handle_cast({register_sub, Topic, Callback}, #state{client = Client} = State) ->
-    spawn(fun() -> safe_mesh_call(fun() -> macula_multi_relay:subscribe(Client, Topic, Callback) end) end),
+handle_cast({register_sub, Topic, Callback},
+            #state{pool = Pool, realm = Realm} = State) ->
+    spawn(fun() ->
+        macula:subscribe_callback(Pool, macula_realm:id(Realm), Topic,
+                                   wrap_v1_callback(Callback))
+    end),
     {noreply, State};
 
 handle_cast({register_adv, Procedure, Handler}, State) ->
@@ -603,13 +627,27 @@ handle_info(ensure_pg_membership, State) ->
 %% the realm server). Don't die with it — drop the reference, mark
 %% inactive, schedule a re-activate. Pending subs/advs are lost but
 %% the call-sites re-register on demand. Log at info so operators
-%% can see the self-heal is happening.
+%% can see the self-heal is happening. Tear the V2 pool down too so
+%% reactivate rebuilds both halves cleanly.
 handle_info({'EXIT', Pid, Reason},
-            #state{client = Pid, activated = true} = State) ->
+            #state{client = Pid, pool = Pool, activated = true} = State) ->
     logger:warning("[hecate_mesh] multi_relay died (~p) — will reactivate", [Reason]),
+    catch close_pool(Pool),
     persistent_term:put({?MODULE, activated}, false),
     erlang:send_after(1500, self(), reactivate_if_confirmed),
-    {noreply, State#state{client = undefined, activated = false,
+    {noreply, State#state{client = undefined, pool = undefined,
+                          activated = false,
+                          pending_subs = [], pending_advs = [],
+                          pending_stream_advs = []}};
+%% Symmetric: V2 pool died. Tear multi_relay down too, reactivate.
+handle_info({'EXIT', Pid, Reason},
+            #state{pool = Pid, client = Client, activated = true} = State) ->
+    logger:warning("[hecate_mesh] V2 pool died (~p) — will reactivate", [Reason]),
+    catch macula_multi_relay:stop(Client),
+    persistent_term:put({?MODULE, activated}, false),
+    erlang:send_after(1500, self(), reactivate_if_confirmed),
+    {noreply, State#state{client = undefined, pool = undefined,
+                          activated = false,
                           pending_subs = [], pending_advs = [],
                           pending_stream_advs = []}};
 %% Trap_exit catches exits from worker procs we spawn for rpc_call
@@ -733,27 +771,46 @@ store_join_credentials(Result) ->
             logger:error("[hecate_mesh] Failed to store realm membership: ~p", [Reason])
     end.
 
-terminate(_Reason, #state{client = Client}) ->
+terminate(_Reason, #state{client = Client, pool = Pool}) ->
     catch macula_multi_relay:stop(Client),
+    catch close_pool(Pool),
     ok.
 
 %%====================================================================
 %% Internal
 %%====================================================================
 
-drain_pending_v1(Client, Subs, StreamAdvs) ->
+drain_pending_subs_v2(Pool, Realm, Subs) ->
+    RealmTag = macula_realm:id(Realm),
     lists:foreach(fun({Topic, Callback}) ->
-        case safe_mesh_call(fun() -> macula_multi_relay:subscribe(Client, Topic, Callback) end) of
-            {ok, _} -> logger:info("[hecate_mesh] Subscribed: ~s", [Topic]);
+        case macula:subscribe_callback(Pool, RealmTag, Topic, wrap_v1_callback(Callback)) of
+            {ok, _} -> logger:info("[hecate_mesh] Subscribed (v2): ~s", [Topic]);
             {error, R} -> logger:warning("[hecate_mesh] Subscribe ~s failed: ~p", [Topic, R])
         end
-    end, Subs),
+    end, Subs).
+
+drain_pending_stream_advs(Client, StreamAdvs) ->
     lists:foreach(fun({Procedure, Mode, Handler}) ->
         case safe_mesh_call(fun() -> macula_multi_relay:advertise_stream(Client, Procedure, Mode, Handler) end) of
             ok -> logger:info("[hecate_mesh] Stream-advertised: ~s (mode=~p)", [Procedure, Mode]);
             {error, R} -> logger:warning("[hecate_mesh] Stream-advertise ~s failed: ~p", [Procedure, R])
         end
     end, StreamAdvs).
+
+%% V1 pubsub callbacks were 1-arg `fun((Payload) -> any())'. V2's
+%% `macula:subscribe_callback/4' expects 3-arg `fun((Topic, Payload,
+%% Meta) -> any())'. Wrap at the boundary so existing call sites keep
+%% their 1-arg shape; future cleanup can update them to consume Topic
+%% / Meta directly.
+wrap_v1_callback(Callback) when is_function(Callback, 1) ->
+    fun(_Topic, Payload, _Meta) -> Callback(Payload) end;
+wrap_v1_callback(Callback) when is_function(Callback, 3) ->
+    %% Already V2-shape — pass through.
+    Callback.
+
+close_pool(undefined) -> ok;
+close_pool(Pool) when is_pid(Pool) ->
+    macula:close(Pool).
 
 %% Per-adv result handler for the periodic V2 drain. `true' means keep
 %% the adv on pending_advs and retry next tick; `false' means it
