@@ -121,29 +121,26 @@ dispatch(Realm, RepoId, Op, Stdin) ->
     end.
 
 call_via_mesh(Procedure, Args) ->
-    %% Client is a macula_multi_relay pid; dispatch via multi_relay
-    %% (macula:call routes via macula_mesh_client, which does not handle
-    %% multi_relay pids). See hecate_mesh_client.erl:279.
-    case hecate_mesh_client:get_client() of
-        {ok, Client} when is_pid(Client) ->
-            try macula_multi_relay:call(Client, Procedure, Args, ?CALL_TIMEOUT_MS) of
-                {ok, Result} when is_map(Result) ->
-                    Result;
-                {ok, Other} ->
-                    #{ok => false,
-                      error => <<"unexpected_reply_shape">>,
-                      reply => io_fmt(Other)};
-                {error, Reason} ->
-                    #{ok => false, error => fmt_error(Reason), procedure => Procedure}
-            catch
-                Class:Ex ->
-                    #{ok => false,
-                      error => <<"rpc_exception">>,
-                      class => atom_to_binary(Class),
-                      detail => io_fmt(Ex)}
-            end;
-        _ ->
-            #{ok => false, error => <<"mesh_client_unavailable">>}
+    %% Routes through `hecate_mesh_client:call/3' which dispatches
+    %% to the V2 station-client pool inside the daemon. The pool
+    %% picks a healthy station_link and runs the unary CALL there.
+    try hecate_mesh_client:call(Procedure, Args, ?CALL_TIMEOUT_MS) of
+        {ok, Result} when is_map(Result) ->
+            Result;
+        {ok, Other} ->
+            #{ok => false,
+              error => <<"unexpected_reply_shape">>,
+              reply => io_fmt(Other)};
+        {error, not_activated} ->
+            #{ok => false, error => <<"mesh_client_unavailable">>};
+        {error, Reason} ->
+            #{ok => false, error => fmt_error(Reason), procedure => Procedure}
+    catch
+        Class:Ex ->
+            #{ok => false,
+              error => <<"rpc_exception">>,
+              class => atom_to_binary(Class),
+              detail => io_fmt(Ex)}
     end.
 
 %%====================================================================

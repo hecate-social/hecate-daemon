@@ -113,9 +113,10 @@ stream_procedure_uri(Realm, RepoId) ->
 make_handler(RepoId) ->
     %% macula SDK requires handlers to return {ok, Result} | {error, Reason}.
     %% git_over_mesh_procedure:handle/2 returns a bare map (with its own
-    %% ok/error keys); wrap the success path so macula_mesh_client's
-    %% format_call_result/2 can encode the reply. If the handler crashes
-    %% macula will catch and translate — nothing to do here.
+    %% ok/error keys); wrap the success path so the V2 pool's
+    %% station_link can encode the RESULT frame. If the handler crashes
+    %% the SDK catches and translates to a BOLT#4 error — nothing to do
+    %% here.
     fun(Args) -> {ok, git_over_mesh_procedure:handle(RepoId, Args)} end.
 
 make_stream_handler(RepoId) ->
