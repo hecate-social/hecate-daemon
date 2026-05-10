@@ -1,0 +1,40 @@
+{application, serve_dns_over_mesh, [
+    {description, "DNS-over-Mesh daemon-local resolver — translates RFC 1035 queries on *.macula.io. into Macula DHT lookups + signed-record verification."},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {serve_dns_over_mesh_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        macula
+    ]},
+    {env, [
+        %% Default UDP/TCP listener bind. Binds to loopback by default —
+        %% an operator who wants port-53 on a public interface should
+        %% (a) explicitly opt in by setting `bind' to "0.0.0.0" / "::"
+        %% and (b) handle the privileged-port capability themselves
+        %% (e.g. iptables redirect from 53 -> 5353, or CAP_NET_BIND_SERVICE
+        %% on the BEAM binary). Default 5353 avoids the capability
+        %% requirement entirely.
+        {bind,        "127.0.0.1"},
+        {udp_port,    5353},
+        {tcp_port,    5353},
+        %% DoH path on the daemon's existing HTTP/3 endpoint. The
+        %% listener is mounted on whatever Cowboy server hecate_api
+        %% already runs; this path is routed there.
+        {doh_path,    "/dns-query"},
+        %% Mesh-eligible suffix. All qnames under this suffix are
+        %% considered authoritative-from-mesh; everything else
+        %% short-circuits to REFUSED so the daemon never accidentally
+        %% answers for the global DNS.
+        {mesh_suffix, "macula.io."},
+        %% Total resolution budget per query. Above this -> SERVFAIL
+        %% with EDE("dht_timeout"). Tuned to keep p95 cold lookup
+        %% under the 800ms DNS-over-mesh success criterion with
+        %% margin for jitter.
+        {resolve_timeout_ms, 1500}
+    ]},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"Codeberg", "https://codeberg.org/hecate-social/hecate-daemon"}]}
+]}.
