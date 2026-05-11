@@ -1,9 +1,10 @@
 %%% @doc Supervisor for the watch_mri desk.
 %%%
-%%% Two workers:
-%%%   - watch_mri: subscription registry (gen_server)
-%%%   - watch_mri_dispatcher: routes incoming push events from
-%%%     macula to per-subscription mailboxes
+%%% One worker: watch_mri — the subscription registry + change-
+%%% driven delivery engine. (The earlier scaffold had a separate
+%%% watch_mri_dispatcher; folded into watch_mri since the change
+%%% stream comes from the invalidation PMs, not a second macula
+%%% subscription.)
 -module(watch_mri_sup).
 -behaviour(supervisor).
 
@@ -18,11 +19,6 @@ init([]) ->
           start   => {watch_mri, start_link, []},
           restart => permanent,
           type    => worker,
-          modules => [watch_mri]},
-        #{id      => watch_mri_dispatcher,
-          start   => {watch_mri_dispatcher, start_link, []},
-          restart => permanent,
-          type    => worker,
-          modules => [watch_mri_dispatcher]}
+          modules => [watch_mri]}
     ],
     {ok, {SupFlags, Children}}.

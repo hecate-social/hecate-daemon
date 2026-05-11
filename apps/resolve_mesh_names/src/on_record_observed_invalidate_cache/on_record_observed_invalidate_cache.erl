@@ -120,13 +120,21 @@ handle_tombstone(_) ->
 dispatch_tombstone(?TYPE_REALM_DIRECTORY, RealmPk)
   when is_binary(RealmPk), byte_size(RealmPk) =:= 32 ->
     case cache_records:realm_id_for_pubkey(RealmPk) of
-        {ok, RealmId} -> cache_invalidate:by_realm(RealmId);
-        not_found     -> ok       %% we don't cache this realm; nothing to do
+        {ok, RealmId} ->
+            cache_invalidate:by_realm(RealmId),
+            catch watch_mri:realm_changed(RealmId, tombstoned),
+            ok;
+        not_found ->
+            ok       %% we don't cache this realm; nothing to do
     end;
 %% Any other tombstone (RME, FRTL, leaf types): can't reverse the
 %% hashed storage key → nuke L5 so the next resolve re-walks.
 %% RME/FRTL also force L3 re-validation on the next chain walk
 %% because verify_trust_chain re-checks expires_at + signature.
+%% (No watch notification — we can't pin the affected realm from a
+%% hashed key, and a broadcast-to-all-watchers would be too
+%% chatty; watchers get fresh data on their next resolve or on a
+%% subsequent realm-scoped change.)
 dispatch_tombstone(_OtherType, _SupKey) ->
     [cache_records:delete(l5, K) || K <- cache_records:all_keys(l5)],
     ok.
@@ -138,8 +146,12 @@ dispatch_tombstone(_OtherType, _SupKey) ->
 handle_rme_observed(#{key := RealmPk}) when is_binary(RealmPk),
                                             byte_size(RealmPk) =:= 32 ->
     case cache_records:realm_id_for_pubkey(RealmPk) of
-        {ok, RealmId} -> cache_invalidate:by_realm(RealmId);
-        not_found     -> ok
+        {ok, RealmId} ->
+            cache_invalidate:by_realm(RealmId),
+            catch watch_mri:realm_changed(RealmId, changed),
+            ok;
+        not_found ->
+            ok
     end;
 handle_rme_observed(_) ->
     ok.

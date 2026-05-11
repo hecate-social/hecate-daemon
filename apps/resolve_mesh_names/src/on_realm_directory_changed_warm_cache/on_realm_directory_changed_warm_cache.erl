@@ -101,18 +101,26 @@ code_change(_Old, S, _Ex) -> {ok, S}.
 handle_dir_changed(#{key := RealmPk}) when is_binary(RealmPk),
                                            byte_size(RealmPk) =:= 32 ->
     case cache_records:realm_id_for_pubkey(RealmPk) of
-        {ok, RealmId} -> cache_invalidate:by_realm(RealmId);
-        not_found     -> ok
+        {ok, RealmId} ->
+            cache_invalidate:by_realm(RealmId),
+            catch watch_mri:realm_changed(RealmId, changed),
+            ok;
+        not_found ->
+            ok
     end;
 handle_dir_changed(_) ->
     ok.
 
 handle_frtl_changed(#{key := FoundationPk}) when is_binary(FoundationPk),
                                                  byte_size(FoundationPk) =:= 32 ->
-    %% Invalidate every realm anchored to this foundation.
+    %% Invalidate every realm anchored to this foundation + notify
+    %% any watchers in those realms.
     Affected = [RealmId || {RealmId, FPk} <- trust_anchors:list(),
                             FPk =:= FoundationPk],
-    [cache_invalidate:by_realm(RealmId) || RealmId <- Affected],
+    [begin
+         cache_invalidate:by_realm(RealmId),
+         catch watch_mri:realm_changed(RealmId, changed)
+     end || RealmId <- Affected],
     ok;
 handle_frtl_changed(_) ->
     ok.
