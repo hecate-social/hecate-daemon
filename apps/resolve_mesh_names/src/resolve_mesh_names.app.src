@@ -1,0 +1,38 @@
+{application, resolve_mesh_names, [
+    {description, "Tier-1 mesh-native naming service. Exposes resolve / watch / describe / verify_trust_chain / backlinks over MRIs and signed records. Push-invalidated cache. Consumed by every Tier-2 wire bridge (serve_dns_over_mesh, serve_https_over_mesh, etc.)."},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {resolve_mesh_names_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        macula
+    ]},
+    {env, [
+        %% Trust-chain timeouts (PLAN_RESOLVE_MESH_NAMES_PART1 §7.2).
+        {single_dht_lookup_timeout_ms,    600},
+        {dht_lookup_retry_attempts,       3},
+        {trust_chain_total_timeout_ms,    1500},
+        {describe_total_timeout_ms,       2000},
+        {watch_setup_timeout_ms,          300},
+
+        %% Cache TTL fallback sweep period (PLAN PART1 §6.3).
+        %% Push invalidation is primary; this is the safety net for
+        %% entries we missed a push notification for.
+        {cache_ttl_sweep_period_ms,       30000},
+
+        %% Trust-chain grace window: how far past not_after a record
+        %% may still be accepted (clock-skew tolerance).
+        {trust_chain_grace_window_ms,     300000},
+
+        %% Default backlinks page size (PLAN PART1 §4.2).
+        {backlinks_page_size,             50},
+
+        %% Whether watch/3 delivers the current value on subscribe.
+        %% Lower-surprise default. Advanced callers can opt out.
+        {watch_delivers_current_value,    true}
+    ]},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [{"Codeberg", "https://codeberg.org/hecate-social/hecate-daemon"}]}
+]}.
