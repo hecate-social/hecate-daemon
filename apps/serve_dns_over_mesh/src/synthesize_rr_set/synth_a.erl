@@ -1,11 +1,34 @@
-%%% @doc Per-qtype RRset synthesiser for QTYPE `a'. Phase 0
-%%% stub — see PLAN_DNS_OVER_MESH_PART1 §7 for the per-qtype
-%%% record-source mapping + RR encoding rules.
+%%% @doc QTYPE A synthesiser. PLAN_DNS_OVER_MESH_PART1 §7:
+%%% `station_endpoint.host_advertised', filtered to IPv4 addresses.
+%%% One A RR per advertised v4 host. (Macula stations are normally
+%%% v6-only via macula-net, so this is usually empty → NODATA;
+%%% present for completeness + dual-stack stations.)
 %%% @end
 -module(synth_a).
 
--export([synth/1]).
+-export([rrs/3]).
 
--spec synth(Leaf :: map()) -> {ok, [term()]} | {error, atom()}.
-synth(_Leaf) ->
-    {error, synth_a_not_yet_implemented}.
+-spec rrs(QName :: binary(), VRs :: [map()], Opts :: map()) -> [map()].
+rrs(QName, VRs, Opts) ->
+    lists:flatmap(
+      fun(#{record_type := station_endpoint} = VR) ->
+              Ttl   = synthesize_rr_set:rr_ttl(VR, Opts),
+              Hosts = host_advertised(VR),
+              [#{name => QName, type => a, ttl => Ttl, rdata => Addr}
+               || H <- Hosts, {ok, Addr} <- [parse_v4(H)]];
+         (_) ->
+              []
+      end, VRs).
+
+host_advertised(#{payload := P}) when is_map(P) ->
+    maps:get({text, <<"host_advertised">>}, P, []);
+host_advertised(_) ->
+    [].
+
+parse_v4(Host) when is_binary(Host) ->
+    case inet:parse_address(binary_to_list(Host)) of
+        {ok, {_, _, _, _} = V4} -> {ok, V4};
+        _                       -> {error, not_v4}
+    end;
+parse_v4(_) ->
+    {error, not_v4}.
