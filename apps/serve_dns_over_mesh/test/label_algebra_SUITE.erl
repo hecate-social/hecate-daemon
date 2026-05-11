@@ -23,7 +23,7 @@
     device/1,
     proc_dotted/1,
     topic_dotted/1,
-    station_needs_macula_4_3_0/1,
+    station_roundtrip/1,
     reverse_v6_signals_lookup_required/1,
     rejects_non_mesh_suffix/1,
     rejects_oversized_qname/1,
@@ -42,7 +42,7 @@ all() ->
         device,
         proc_dotted,
         topic_dotted,
-        station_needs_macula_4_3_0,
+        station_roundtrip,
         reverse_v6_signals_lookup_required,
         rejects_non_mesh_suffix,
         rejects_oversized_qname,
@@ -105,15 +105,18 @@ topic_dotted(_Config) ->
 %% Special-case stubs (gated on SDK / lookup desk)
 %%====================================================================
 
-station_needs_macula_4_3_0(_Config) ->
-    %% qname_station depends on macula_z32 (lands in macula 4.3.0)
-    %% and the station MRI type registration. Until then both
-    %% directions return {error, macula_z32_unavailable} — verified
-    %% honest, not lying.
-    {error, macula_z32_unavailable} =
-        qname_to_mri:resolve(<<"abcdefg._st.macula.io.">>),
-    {error, macula_z32_unavailable} =
-        qname_to_mri:format(<<"mri:station:abcdefg">>),
+station_roundtrip(_Config) ->
+    %% Generate a real Ed25519-pubkey-sized random buffer, z32-encode
+    %% it, build the station qname, parse it, and round-trip the
+    %% MRI back to the qname. Verifies the full bridge ↔ macula 4.3.0
+    %% integration: z32 codec + station MRI type + qname_station's
+    %% special case in the dispatcher.
+    Pubkey = crypto:strong_rand_bytes(32),
+    Z32 = macula_z32:encode(Pubkey),
+    QName = <<Z32/binary, "._st.macula.io.">>,
+    ExpectedMri = <<"mri:station:", Z32/binary>>,
+    {ok, ExpectedMri} = qname_to_mri:resolve(QName),
+    {ok, QName} = qname_to_mri:format(ExpectedMri),
     ok.
 
 reverse_v6_signals_lookup_required(_Config) ->
