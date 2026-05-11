@@ -7,6 +7,9 @@
 %%%   - A from a station_endpoint with v4 hosts → A RRs
 %%%   - SRV → `0 0 <quic_port> <station-qname>'
 %%%   - TXT with alpn → one TXT RR; without alpn → nodata
+%%%   - AAAA / SRV / TXT off a payload in macula's CBOR-decoded key
+%%%     form (host_advertised/alpn as bare atoms, quic_port as
+%%%     {text, ...}, alpn value {text, _}-wrapped) — the live-wire shape
 %%%   - SOA from a realm_directory → one SOA RR
 %%%   - TLSA → notimp; ANY → notimp; unknown qtype → nodata
 %%%   - PTR / NS with no source records → nodata
@@ -24,6 +27,7 @@
     srv_from_station_endpoint/1,
     txt_with_alpn/1,
     txt_nodata_without_alpn/1,
+    synth_handles_cbor_decoded_payload/1,
     soa_from_realm_directory/1,
     tlsa_is_notimp/1,
     any_is_notimp/1,
@@ -42,6 +46,7 @@ all() ->
         srv_from_station_endpoint,
         txt_with_alpn,
         txt_nodata_without_alpn,
+        synth_handles_cbor_decoded_payload,
         soa_from_realm_directory,
         tlsa_is_notimp,
         any_is_notimp,
@@ -75,6 +80,28 @@ station_vr(StationPk, Hosts, Port, Alpn, ExpAtMs) ->
     P  = case Alpn of
              undefined -> P0;
              A -> P0#{ {text, <<"alpn">>} => {text, A} }
+         end,
+    #{record_type => station_endpoint,
+      mri         => <<"mri:station:x">>,
+      payload     => P,
+      signer_pubkey => StationPk,
+      chain       => [],
+      expires_at  => ExpAtMs,
+      version     => <<0:128>>,
+      observed_at => erlang:system_time(millisecond)}.
+
+%% A station_endpoint verified record whose payload is in the form
+%% `macula_record:decode/1' (CBOR) actually produces after a DHT
+%% round-trip: `host_advertised' / `alpn' as bare atom keys (those
+%% atoms pre-exist in loaded code), `quic_port' still `{text, ...}'
+%% (no such atom), the scalar `alpn' value `{text, _}'-wrapped, but
+%% the `host_advertised' list elements bare binaries.
+station_vr_decoded(StationPk, Hosts, Port, Alpn, ExpAtMs) ->
+    P0 = #{ {text, <<"quic_port">>} => Port,
+            host_advertised => Hosts },
+    P  = case Alpn of
+             undefined -> P0;
+             A -> P0#{ alpn => {text, A} }
          end,
     #{record_type => station_endpoint,
       mri         => <<"mri:station:x">>,
@@ -161,6 +188,29 @@ txt_nodata_without_alpn(_Config) ->
     StPk = crypto:strong_rand_bytes(32),
     VR   = station_vr(StPk, [<<"::1">>], 4433, undefined, future(120000)),
     nodata = synthesize_rr_set:synth(<<"sx._st.macula.io.">>, txt, [VR], #{}),
+    ok.
+
+%%====================================================================
+%% CBOR-decoded payload key form (the live-wire shape)
+%%====================================================================
+
+synth_handles_cbor_decoded_payload(_Config) ->
+    StPk = crypto:strong_rand_bytes(32),
+    VR   = station_vr_decoded(StPk, [<<"2001:db8:dead:beef::1">>, <<"192.0.2.7">>],
+                              4433, <<"macula/1">>, future(120000)),
+    QN   = <<"sx._st.macula.io.">>,
+    %% AAAA: the v6 host comes through despite the bare-atom key.
+    {answer, [#{type := aaaa, rdata := {16#2001,16#db8,16#dead,16#beef,0,0,0,1}}]} =
+        synthesize_rr_set:synth(QN, aaaa, [VR], #{}),
+    %% A: the v4 host comes through too.
+    {answer, [#{type := a, rdata := {192,0,2,7}}]} =
+        synthesize_rr_set:synth(QN, a, [VR], #{}),
+    %% SRV: quic_port (still {text, ...}-keyed) → port 4433.
+    {answer, [#{type := srv, rdata := {0, 0, 4433, _Target}}]} =
+        synthesize_rr_set:synth(QN, srv, [VR], #{}),
+    %% TXT: alpn ({text, _}-wrapped value under the atom key) → "alpn=macula/1".
+    {answer, [#{type := txt, rdata := [<<"alpn=macula/1">>]}]} =
+        synthesize_rr_set:synth(QN, txt, [VR], #{}),
     ok.
 
 %%====================================================================

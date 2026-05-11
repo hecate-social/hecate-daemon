@@ -87,37 +87,28 @@ harness/
 └── ebin/                          ← compiled output (gitignored)
 ```
 
-## Current result (2026-05-11): FAIL — and that's the harness doing its job
-
-The harness verdict is currently **FAIL**, and the failure is real — it caught a
-bug that the unit tests miss:
+## Expected result: PASS
 
 ```
 [PASS]  raw DHT round-trip (find_record)
-[PASS]  Tier-1 resolve returns the v6 record         <- resolve_mesh_names is fine
-[FAIL]  DNS AAAA answer carries the v6 address        <- serve_dns_over_mesh bug
+[PASS]  Tier-1 resolve returns the v6 record
+[PASS]  DNS AAAA answer carries the v6 address
 [PASS]  DNS SRV answer is non-empty
-[PASS]  both cache PMs subscribed to the pool          <- the 8be7a58 wiring works live
-[FAIL]  external DNS client returns the v6             <- knock-on from the AAAA bug
+[PASS]  both cache PMs subscribed to the pool
+[PASS]  external DNS client returns the v6
+VERDICT: PASS — resolve_mesh_names + serve_dns_over_mesh verified live against the mesh, no stubs.
 ```
 
-`resolve_mesh_names` works end-to-end against the live mesh — `put_record` →
-`find_record` → `resolve` (with self-rooted station trust verification) → cache →
-the two cache-invalidation PMs subscribed to the pool: all green.
-
-The bug is in `serve_dns_over_mesh`'s RR synthesisers. `macula_record:decode/1`
-(CBOR) `binary_to_existing_atom`s text-string payload keys, so a decoded
-`station_endpoint` record's payload comes back with **mixed key forms** —
-`host_advertised` and `alpn` as bare atoms (those atoms pre-exist in loaded
-code), but `quic_port` as `{text, <<"quic_port">>}` (no such atom). `synth_srv`
-reads `{text, <<"quic_port">>}` so SRV works by luck; `synth_aaaa` / `synth_a`
-read `{text, <<"host_advertised">>}` and `synth_txt` reads `{text, <<"alpn">>}`
-— neither matches the decoded form, so AAAA is empty and TXT is missing. The
-`synthesize_rr_set` CT suite constructs verified-record fixtures with the
-`{text, ...}` form directly (never through CBOR), which is why it's green while
-this fails. Fix: read the payload fields tolerantly (atom ⊕ `{text, bin}` ⊕ bare
-bin) — in the synth modules, or by normalising the payload once in
-`resolve_mri:build_verified_record` so every VR consumer gets a stable shape.
+(A `FAIL` here means either the live mesh is unreachable / broken, or a real
+regression — read the per-check lines. On its very first run this harness caught
+a `serve_dns_over_mesh` bug the unit tests missed: `macula_record:decode/1` (CBOR)
+`binary_to_existing_atom`s text-string payload keys, so a CBOR-round-tripped
+`station_endpoint` payload comes back with mixed key forms — `host_advertised` /
+`alpn` as bare atoms, `quic_port` as `{text, <<"quic_port">>}` — and the
+`synth_*` modules read only the `{text, ...}` form, so AAAA/TXT came back empty
+while the CT fixtures' `{text, ...}`-keyed records masked it. Fixed: the `synth_*`
+modules now read payload fields via `synthesize_rr_set:payload_field/4`, which
+tolerates atom ⊕ `{text, bin}` ⊕ bare-bin keys and unwraps `{text, V}` values.)
 
 ## Caveats
 

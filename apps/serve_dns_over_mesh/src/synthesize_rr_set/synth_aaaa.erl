@@ -19,10 +19,15 @@ rrs(QName, VRs, Opts) ->
       end, VRs).
 
 host_advertised(#{payload := P}) when is_map(P) ->
-    maps:get({text, <<"host_advertised">>}, P, []);
+    case synthesize_rr_set:payload_field(P, host_advertised, <<"host_advertised">>, []) of
+        L when is_list(L) -> L;
+        _                 -> []
+    end;
 host_advertised(_) ->
     [].
 
+%% Host strings may arrive bare or, defensively, `{text, Bin}'-wrapped.
+parse_v6({text, B}) when is_binary(B) -> parse_v6(B);
 parse_v6(Host) when is_binary(Host) ->
     case inet:parse_address(binary_to_list(Host)) of
         {ok, {_, _, _, _, _, _, _, _} = V6} -> {ok, V6};

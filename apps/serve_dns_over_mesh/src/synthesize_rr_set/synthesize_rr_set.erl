@@ -26,10 +26,23 @@
 %%% RR TTL (PART1 §7.1): clamp((expires_at - now) // 1000,
 %%% min_rr_ttl, max_rr_ttl). Defaults 60 / 3600, app env
 %%% configurable. `rr_ttl/2' is exported for the per-qtype modules.
+%%%
+%%% Reading payload fields: a verified record's `payload' is the raw
+%%% macula_record payload, and `macula_record:decode/1' (CBOR) is
+%%% non-deterministic about key form — it `binary_to_existing_atom's
+%%% text-string keys, so a decoded `station_endpoint' payload comes
+%%% back with `host_advertised'/`alpn' as bare atoms but `quic_port'
+%%% as `{text, <<"quic_port">>}', and a scalar text value stays
+%%% wrapped (`{text, Bin}') while text values inside a list come back
+%%% as bare binaries. The per-qtype modules read payload fields via
+%%% `payload_field/4' (tries atom ⊕ `{text, bin}' ⊕ bare-bin keys,
+%%% unwraps a `{text, V}' value) so they work on both freshly-built
+%%% and CBOR-round-tripped records. `rr_ttl/2', `station_qname/1',
+%%% `payload_field/4' are exported for the per-qtype modules.
 %%% @end
 -module(synthesize_rr_set).
 
--export([synth/4, rr_ttl/2, station_qname/1]).
+-export([synth/4, rr_ttl/2, station_qname/1, payload_field/4]).
 
 -define(DEFAULT_MIN_RR_TTL, 60).
 -define(DEFAULT_MAX_RR_TTL, 3600).
@@ -88,6 +101,35 @@ station_qname(Pubkey) ->
         {error, _} ->
             undefined
     end.
+
+%% @doc Read a payload field, tolerating macula's CBOR-decode key
+%% forms: the field may be keyed by `{text, BinKey}', by the bare
+%% atom `AtomKey' (macula's decode atom-converts text keys whose atom
+%% pre-exists in loaded code), or by the bare binary `BinKey'. A
+%% `{text, V}'-wrapped binary value is unwrapped; everything else
+%% (lists, integers, bare binaries) is returned as-is. Returns
+%% `Default' if no key form is present.
+-spec payload_field(map(), atom(), binary(), term()) -> term().
+payload_field(P, AtomKey, BinKey, Default) when is_map(P) ->
+    Raw = case maps:find({text, BinKey}, P) of
+              {ok, V0} -> V0;
+              error ->
+                  case maps:find(AtomKey, P) of
+                      {ok, V1} -> V1;
+                      error    -> maps:get(BinKey, P, Default)
+                  end
+          end,
+    unwrap_text(Raw);
+payload_field(_, _, _, Default) ->
+    Default.
+
+%% @doc Unwrap a `{text, Bin}'-wrapped binary; pass anything else
+%% through unchanged. (macula's CBOR codec wraps scalar text values
+%% but leaves text values inside lists bare — useful for normalising
+%% individual list elements too.)
+-spec unwrap_text(term()) -> term().
+unwrap_text({text, B}) when is_binary(B) -> B;
+unwrap_text(V) -> V.
 
 %%====================================================================
 %% Helpers

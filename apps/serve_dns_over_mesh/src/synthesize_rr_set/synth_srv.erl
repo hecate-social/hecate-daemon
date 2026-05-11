@@ -31,6 +31,6 @@ rrs(QName, VRs, Opts) ->
       end, VRs).
 
 quic_port(#{payload := P}) when is_map(P) ->
-    maps:get({text, <<"quic_port">>}, P, undefined);
+    synthesize_rr_set:payload_field(P, quic_port, <<"quic_port">>, undefined);
 quic_port(_) ->
     undefined.

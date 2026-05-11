@@ -21,10 +21,9 @@ rrs(QName, VRs, Opts) ->
       end, VRs).
 
 txt_strings(#{payload := P}) when is_map(P) ->
-    case maps:get({text, <<"alpn">>}, P, undefined) of
-        {text, A} when is_binary(A) -> [<<"alpn=", A/binary>>];
-        A when is_binary(A)          -> [<<"alpn=", A/binary>>];
-        _                            -> []
+    case synthesize_rr_set:payload_field(P, alpn, <<"alpn">>, undefined) of
+        A when is_binary(A) -> [<<"alpn=", A/binary>>];
+        _                   -> []
     end;
 txt_strings(_) ->
     [].
