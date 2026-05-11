@@ -25,10 +25,17 @@
         {bind,        "127.0.0.1"},
         {udp_port,    5353},
         {tcp_port,    5353},
-        %% DoH path on the daemon's existing HTTP/3 endpoint. The
-        %% listener is mounted on whatever Cowboy server hecate_api
-        %% already runs; this path is routed there.
+        %% TCP connection idle timeout (RFC 7766 §6.2.3). A
+        %% connection with no query for this long is closed.
+        {tcp_idle_timeout_ms, 30000},
+        %% DoH path on the daemon's existing HTTP server. listen_doh
+        %% is a Cowboy handler discovered by hecate_api's route
+        %% aggregator and mounted at this path.
         {doh_path,    "/dns-query"},
+        %% Per-RR TTL bounds for synthesised RRsets (PART1 §7.1):
+        %% clamp(record.expires_at - now, min_rr_ttl, max_rr_ttl).
+        {min_rr_ttl,  60},
+        {max_rr_ttl,  3600},
         %% Mesh-eligible suffix. All qnames under this suffix are
         %% considered authoritative-from-mesh; everything else
         %% short-circuits to REFUSED so the daemon never accidentally

@@ -4,13 +4,15 @@
 %%% Supervises desk supervisors only. After the 2026-05-11 split
 %%% (PLAN_DNS_OVER_MESH re-rooting), this slice is a thin wire
 %%% bridge — naming + trust verification + caching all live in
-%%% `resolve_mesh_names'. So the supervised desks are just the
-%%% three listeners (UDP, TCP, DoH); the qname↔MRI codec,
-%%% RRset synthesis, and response composition are pure-function
-%%% modules with no process.
+%%% `resolve_mesh_names'. The supervised desks are the two
+%%% connection-oriented listeners (UDP, TCP). The DoH transport is
+%%% a request-driven Cowboy handler (`listen_doh', auto-discovered
+%%% by hecate_api's route aggregator) with no process of its own —
+%%% nothing to supervise. The qname↔MRI codec, serve_query
+%%% pipeline, RRset synthesis, and response composition are
+%%% pure-function modules.
 %%%
-%%% one_for_one: the listeners are independent enough that one
-%%% failing shouldn't take the others down.
+%%% one_for_one: UDP and TCP are independent.
 %%% @end
 -module(serve_dns_over_mesh_sup).
 -behaviour(supervisor).
@@ -28,8 +30,7 @@ init([]) ->
     },
     Children = [
         desk_sup(listen_udp_sup),
-        desk_sup(listen_tcp_sup),
-        desk_sup(listen_doh_sup)
+        desk_sup(listen_tcp_sup)
     ],
     {ok, {SupFlags, Children}}.
 

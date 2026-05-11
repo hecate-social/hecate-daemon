@@ -30,6 +30,7 @@
     guide_briefcase_lifecycle, project_briefcase_files, query_briefcase_files,
     guide_repo_lifecycle, project_repos, query_repos,
     announce_ref_updates, serve_git_over_mesh,
+    serve_dns_over_mesh,   %% DoH endpoint (/dns-query) via listen_doh:routes/0
     query_observer
 ]).
 
