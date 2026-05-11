@@ -11,7 +11,7 @@
 %%% returns `{error, X_not_yet_implemented}'. Phase 1 implementations
 %%% replace the stubs without touching this module's signatures.
 %%% @end
--module(library_api).
+-module(resolve_mesh_names_api).
 
 -export([
     resolve/2,
