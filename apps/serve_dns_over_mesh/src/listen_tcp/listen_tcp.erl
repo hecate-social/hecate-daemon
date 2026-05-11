@@ -6,7 +6,7 @@
 %%% read/write cycle, AXFR/IXFR refusal (RFC 5936/1995 -> REFUSED
 %%% with EDE("zone_transfer_disabled")), idle-timeout drop.
 %%% @end
--module(listen_tcp_53).
+-module(listen_tcp).
 -behaviour(gen_server).
 
 -export([start_link/0]).

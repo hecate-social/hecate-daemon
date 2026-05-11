@@ -14,7 +14,7 @@
 %%% client-advertised UDP payload size) the response sets TC=1 to
 %%% force TCP retry.
 %%% @end
--module(listen_udp_53).
+-module(listen_udp).
 -behaviour(gen_server).
 
 -export([start_link/0]).
