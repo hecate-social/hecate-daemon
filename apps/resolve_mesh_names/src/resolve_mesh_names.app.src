@@ -9,9 +9,19 @@
         macula
     ]},
     {env, [
-        %% Trust-chain timeouts (PLAN_RESOLVE_MESH_NAMES_PART1 §7.2).
-        {single_dht_lookup_timeout_ms,    600},
+        %% DHT lookup tunables (lookup_via_dht).
+        %% Note: macula's find_record/2 enforces its own internal
+        %% 5000ms per-call timeout — we don't override that. Our
+        %% retry just iterates up to N attempts on
+        %% not_found / timeout (the substrate-flake error shapes).
         {dht_lookup_retry_attempts,       3},
+        {dht_lookup_retry_delay_ms,       50},
+        %% Overall deadline including dedup wait. Generous default
+        %% — typical fast path is <100ms; this only matters when
+        %% the dedup gen_server is overloaded or the macula SDK
+        %% hangs near its 5000ms cap × max_attempts.
+        {total_lookup_timeout_ms,         20000},
+        %% Trust-chain timeouts (PLAN_RESOLVE_MESH_NAMES_PART1 §7.2).
         {trust_chain_total_timeout_ms,    1500},
         {describe_total_timeout_ms,       2000},
         {watch_setup_timeout_ms,          300},
