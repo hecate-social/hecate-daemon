@@ -6,7 +6,13 @@
     {applications, [
         kernel,
         stdlib,
-        macula
+        macula,
+        %% Tier-1 mesh-native naming. The bridge consumes
+        %% resolve_mesh_names:library_api for actual resolution +
+        %% trust verification. Without this dep, listeners would
+        %% boot before the naming service and the first query
+        %% would crash.
+        resolve_mesh_names
     ]},
     {env, [
         %% Default UDP/TCP listener bind. Binds to loopback by default —
