@@ -40,7 +40,17 @@
 
         %% Whether watch/3 delivers the current value on subscribe.
         %% Lower-surprise default. Advanced callers can opt out.
-        {watch_delivers_current_value,    true}
+        {watch_delivers_current_value,    true},
+
+        %% Compiled-in foundation seeds, loaded by trust_anchors at
+        %% boot. List of `{RealmId :: binary(), FoundationPubkey :: <<_:32/binary>>}`
+        %% tuples. Empty by default — operator config (sys.config or
+        %% release overlay) supplies the canonical realms' anchors
+        %% (`io.macula', `io.beamcampus'). Without seeds the daemon
+        %% boots but every resolve returns `{error, no_trust_root}'
+        %% until anchors are installed via `hecate names trust import'
+        %% or runtime put.
+        {compiled_in_seeds,               []}
     ]},
     {modules, []},
     {licenses, ["Apache-2.0"]},
