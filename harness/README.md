@@ -8,6 +8,7 @@ Not CT suites, not run in CI — run them by hand.
 | `run-live-dns-harness.sh` | end-to-end **verification** of `resolve_mesh_names` + `serve_dns_over_mesh`: publish a record, resolve it back through every layer, PASS/FAIL table. |
 | `mesh-weather.sh` | a **read-only snapshot** of the mesh from this vantage point — pool identity, this box's geo, the stations it seeds from with city / IPv6 / ping RTT. |
 | `mesh-propagation.sh` | a **two-role probe** — `--publish` here, `--resolve <z32>` on another box — measuring how long a record takes to cross the mesh (and the great-circle distance between the two vantages). |
+| `mesh-bench.sh` | **quantitative latency probes** — fires *N* round-trips of `find_record` / `put_record` / pub/sub publish→deliver against the live mesh and reports min/p50/p90/p99/max/mean + a histogram per probe. The `bench_mesh` engine in harness-script form. |
 | `demo.sh` | a **narrated walk-through** for screencasts / showing people: connect → mint an identity → publish → resolve (Tier-1) → resolve over DNS. |
 
 All four run in a bare `erl` node — **no Erlang distribution** (no `-name`/`-sname` → no epmd registration → no libcluster / `*@host00.lab` cluster-discovery flood), **no `-heart`** (no resurrection crash-loop), **no disk writes** (no reckon_db / sqlite / `~/.hecate` — they run in a throwaway `/tmp` cwd the wrapper deletes on exit). Any record they publish is a transient test artefact under the RFC 3849 documentation prefix (`2001:db8::/32`) and self-expires (~5-min TTL).
@@ -60,6 +61,21 @@ harness/mesh-propagation.sh --resolve <z32> [--key <hex>] [--pub-geo LAT,LNG]
 `--resolve <z32>` (machine B): derive the storage key from the z32 (`sha256("station_endpoint" ‖ pubkey)`), poll `find_record` until it lands, then report time-to-resolve (from pool-up to found), retry count, whether the record's key matches the z32 (the propagation proof), `macula_record:verify` result, the advertised v6, and — with `--pub-geo` (printed by `--publish`) + `HECATE_GEO_*` set here — the great-circle distance between the two vantage points.
 
 > A cross-station replica can come back with a non-canonical payload encoding, so `macula_record:verify` intermittently returns `signature_invalid` even though the record's key matches the published z32 — reported as a quirk, not a hard failure (the key-match is what proves it crossed).
+
+---
+
+## `mesh-bench.sh` — quantitative latency probes
+
+```sh
+harness/mesh-bench.sh [-n ITERATIONS] [--probes p,p,...]
+```
+
+Connects a transient pool, then fires *N* (default 30) round-trips of each probe and reports min/p50/p90/p99/max/mean (ms) + a log-bucket histogram + ok/fail counts:
+- `dht_find` — put one signed `station_endpoint` once, then `find_record` it back N times (steady-state DHT read latency)
+- `dht_put` — re-put that record N times (DHT write latency)
+- `pubsub` — subscribe to a private `_bench.*` topic, publish a seq'd payload N times, time publish→deliver (relies on the station echoing self-publishes — verified working)
+
+`--probes dht_find,pubsub` runs a subset. RPC, content-block (`put_content`/`get_content`), and stream-throughput (`call_stream`) probes are follow-ups (the unary-RPC pool API in macula 4.3 needs nailing down — the daemon's existing `probe_mesh_rpc` calls a removed `macula:advertise/3`/`call/3`). This is the engine that becomes a daemon slice + `GET /api/mesh/bench` + a hecate-web `/mesh/bench` chart + a `hecate mesh bench` CLI command.
 
 ---
 
