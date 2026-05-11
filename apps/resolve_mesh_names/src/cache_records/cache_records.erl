@@ -29,7 +29,7 @@
 -behaviour(gen_server).
 
 -export([start_link/0, get/2, put/5, delete/2, all_keys/1, size/1,
-         layer_table/1]).
+         layer_table/1, realm_id_for_pubkey/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
@@ -111,6 +111,20 @@ layer_table(l2) -> ?L2_TABLE;
 layer_table(l3) -> ?L3_TABLE;
 layer_table(l4) -> ?L4_TABLE;
 layer_table(l5) -> ?L5_TABLE.
+
+%% @doc Reverse-lookup: given a realm root pubkey, find the
+%% dotted-string realm-id that maps to it in L1. Used by the
+%% invalidation PMs to translate a pushed record's realm pubkey
+%% back into the cache's realm-id key space. O(N) scan over L1
+%% entries; N is the number of distinct realms the daemon has
+%% resolved, typically small.
+-spec realm_id_for_pubkey(Pubkey :: binary()) ->
+    {ok, binary()} | not_found.
+realm_id_for_pubkey(Pubkey) ->
+    ets:foldl(fun
+        ({RealmId, {Pk, _Exp, _Ver}}, _Acc) when Pk =:= Pubkey -> {ok, RealmId};
+        (_, Acc) -> Acc
+    end, not_found, ?L1_TABLE).
 
 %%====================================================================
 %% gen_server callbacks
