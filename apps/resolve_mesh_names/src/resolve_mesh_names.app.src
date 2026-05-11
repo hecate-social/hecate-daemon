@@ -6,7 +6,12 @@
     {applications, [
         kernel,
         stdlib,
-        macula
+        macula,
+        %% The daemon's mesh client. The cache-invalidation PMs poll
+        %% `hecate_mesh:get_client/0' for the live V2 pool so they can
+        %% subscribe to record-push events; boot order must put
+        %% hecate_mesh ahead of this app.
+        hecate_mesh
     ]},
     {env, [
         %% DHT lookup tunables (lookup_via_dht).
@@ -30,6 +35,12 @@
         %% Push invalidation is primary; this is the safety net for
         %% entries we missed a push notification for.
         {cache_ttl_sweep_period_ms,       30000},
+
+        %% How often the cache-invalidation PMs re-poll
+        %% `hecate_mesh:get_client/0' for the live mesh pool while it
+        %% isn't up yet (cold boot, pre-realm-join) or after a pool
+        %% death. Cheap (a persistent_term read); silent on miss.
+        {mesh_subscribe_retry_ms,         5000},
 
         %% Trust-chain grace window: how far past not_after a record
         %% may still be accepted (clock-skew tolerance).

@@ -17,7 +17,7 @@
 -module(hecate_mesh_client).
 -behaviour(gen_server).
 
--export([start_link/0, activate/0, is_activated/0]).
+-export([start_link/0, activate/0, is_activated/0, get_client/0]).
 -export([connected_peer_pubkeys/0]).
 -export([get_status/0, publish/2, subscribe/2,
          unsubscribe/1, discover_subscribers/1, advertise/2, call/3, call/4,
@@ -77,6 +77,23 @@ is_activated() ->
     %% stale read can only happen during the exact instant of transition,
     %% which is acceptable for this probe-style use.
     persistent_term:get({?MODULE, activated}, false).
+
+%% @doc Return the live V2 `macula_client' pool pid for direct SDK
+%% calls (`macula:find_record/2', `macula:subscribe_records/3',
+%% `macula:publish/4', ...). Used by the DNS-over-mesh listeners and
+%% the resolve_mesh_names cache-invalidation PMs.
+%%
+%% Lock-free read from persistent_term, mirroring `is_activated/0' —
+%% never blocks on this gen_server's call queue (which can be held by
+%% an in-progress `activate/0' for several seconds). Returns
+%% `{error, not_activated}' until `activate/0' has built the pool, and
+%% again after a pool death until reactivation rebuilds it.
+-spec get_client() -> {ok, pid()} | {error, not_activated}.
+get_client() ->
+    case persistent_term:get({?MODULE, pool}, undefined) of
+        Pool when is_pid(Pool) -> {ok, Pool};
+        _                      -> {error, not_activated}
+    end.
 
 %% @doc Register a subscription to be applied when mesh activates.
 %% Returns immediately. Safe to call during init/1.
@@ -234,10 +251,11 @@ init([]) ->
             erlang:send_after(5000, self(), reactivate_if_confirmed)
     end,
 
-    %% Seed the lock-free activated flag. is_activated/0 reads it from
-    %% persistent_term to avoid blocking on this gen_server's call queue
-    %% during boot contention.
+    %% Seed the lock-free activated flag + pool handle. is_activated/0
+    %% and get_client/0 read these from persistent_term to avoid blocking
+    %% on this gen_server's call queue during boot contention.
     persistent_term:put({?MODULE, activated}, false),
+    persistent_term:put({?MODULE, pool}, undefined),
 
     {ok, #state{
         pool = undefined,
@@ -295,6 +313,7 @@ handle_call(activate, _From, #state{activated = false} = State) ->
     mesh_proof_coordinator:run_probes(),
 
     persistent_term:put({?MODULE, activated}, true),
+    persistent_term:put({?MODULE, pool}, Pool),
     logger:info("[hecate_mesh] Mesh activated"),
     {reply, ok, State#state{pool = Pool, activated = true,
                             station_clients = StationClients,
@@ -621,6 +640,7 @@ handle_info({'EXIT', Pid, Reason},
             #state{pool = Pid, activated = true} = State) ->
     logger:warning("[hecate_mesh] V2 pool died (~p) — will reactivate", [Reason]),
     persistent_term:put({?MODULE, activated}, false),
+    persistent_term:put({?MODULE, pool}, undefined),
     erlang:send_after(1500, self(), reactivate_if_confirmed),
     {noreply, State#state{pool = undefined,
                           activated = false,
@@ -748,6 +768,7 @@ store_join_credentials(Result) ->
     end.
 
 terminate(_Reason, #state{pool = Pool}) ->
+    persistent_term:put({?MODULE, pool}, undefined),
     catch close_pool(Pool),
     ok.
 
