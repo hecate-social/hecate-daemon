@@ -75,23 +75,18 @@ main() ->
 %%====================================================================
 
 run(Opts) ->
-    say("=== live_dns_harness ==="),
-    {ok, _} = application:ensure_all_started(macula),
+    M = harness_mesh,
+    M:say("~ts", [M:bold("live mesh-naming harness  —  resolve_mesh_names + serve_dns_over_mesh, end to end")]),
+    Relays = maps:get(relays, Opts),
+    {ok, Pool} = M:connect(#{relays => Relays, connect_budget_ms => 40000}),
+    %% Publish the pool where the daemon's plumbing reads it: the DNS listeners
+    %% fetch it per query via hecate_mesh:get_client/0, and the cache-invalidation
+    %% PMs poll the same to bootstrap-subscribe.
+    persistent_term:put({hecate_mesh_client, pool}, Pool),
     _ = application:load(resolve_mesh_names),
     _ = application:load(serve_dns_over_mesh),
 
-    Relays = maps:get(relays, Opts),
-    say("connecting V2 macula pool to ~b relay(s):", [length(Relays)]),
-    [say("    ~s", [R]) || R <- Relays],
-    {ok, Pool} = macula:connect(Relays, #{}),
-    %% Publish the pool where the daemon's plumbing reads it: the DNS
-    %% listeners fetch it per query via hecate_mesh:get_client/0, and
-    %% the cache-invalidation PMs poll the same to bootstrap-subscribe.
-    persistent_term:put({hecate_mesh_client, pool}, Pool),
-
-    say("waiting for the pool to reach a connected station ..."),
-    ok = wait_connected(Pool, 40000),
-    say("pool connected: ~p", [Pool]),
+    stations_section(M, Relays),
 
     ReqPort = maps:get(dns_port, Opts, 5353),
     ok = application:set_env(serve_dns_over_mesh, udp_port, ReqPort),
@@ -99,12 +94,11 @@ run(Opts) ->
     {ok, _} = resolve_mesh_names_sup:start_link(),
     {ok, _} = serve_dns_over_mesh_sup:start_link(),
     DnsPort = wait_listener(2000),
-    say("resolve_mesh_names + serve_dns_over_mesh started; listen_udp bound on 127.0.0.1:~p", [DnsPort]),
-
-    %% Give the PMs a beat to run their first bootstrap_subscribe.
-    timer:sleep(800),
+    timer:sleep(800),                          %% let the PMs run their first bootstrap_subscribe
     PmInfo = pm_subscription_info(),
-    say("cache-invalidation PM subscriptions: ~p", [PmInfo]),
+    M:hdr("daemon-side wiring"),
+    M:kv("serve_dns_over_mesh listen_udp", io_lib:format("bound on 127.0.0.1:~p", [DnsPort])),
+    M:kv("cache-invalidation PMs", pm_summary(M, PmInfo)),
 
     %% ---- publish a fresh, self-signed station_endpoint ----
     KP = #{public := Pub} = macula_identity:generate(),
@@ -115,16 +109,15 @@ run(Opts) ->
     Z32  = macula_z32:encode(Pub),
     Mri  = <<"mri:station:", Z32/binary>>,
     QName = <<Z32/binary, "._st.macula.io">>,
-    say(""),
-    say("published station identity:"),
-    say("    pubkey (z32)  : ~s", [Z32]),
-    say("    storage_key   : ~s", [hex(Key)]),
-    say("    station MRI   : ~s", [Mri]),
-    say("    dns name      : ~s", [QName]),
-    say("    host_advertised: ~s   quic_port: ~b   alpn: ~s", [?TEST_V6, ?TEST_PORT, ?TEST_ALPN]),
+    M:hdr("publishing a station_endpoint into the live DHT"),
+    M:kv("identity (z32)", Z32),
+    M:kv("storage key", hex(Key)),
+    M:kv("station MRI", Mri),
+    M:kv("dns name", QName),
+    M:kv("advertises", io_lib:format("AAAA ~s  ·  SRV port ~b  ·  alpn ~s", [?TEST_V6, ?TEST_PORT, ?TEST_ALPN])),
     dbg("built record payload: ~p", [maps:get(payload, Rec, '<none>')]),
     ok = abort_unless_ok(put_retry(Pool, Rec, 8), {put_record_failed, '_'}),
-    say("    macula:put_record/2 -> ok"),
+    M:kv("macula:put_record/2", M:green("ok")),
 
     %% ---- (a) raw DHT round-trip ----
     A = case find_retry(Pool, Key, 8) of
@@ -134,35 +127,31 @@ run(Opts) ->
                      andalso (maps:get(type, R2, undefined) =:= maps:get(type, Rec))};
             FErr -> FErr
         end,
-    say("(a) macula:find_record/2 round-trip          -> ~p", [A]),
-
     %% ---- (b) Tier-1 resolve + self-rooted trust verification ----
     B = resolve_mesh_names_api:resolve(Pool, Mri),
-    Bv6 = case B of
+    {Bv6, BStr} = case B of
               {ok, [VR | _]} ->
                   V = host_v6_of(VR),
-                  say("(b) resolve_mesh_names_api:resolve/3        -> {ok, record_type=~p, signer=~s, host_v6=~p}",
-                      [maps:get(record_type, VR, undefined),
-                       short_hex(maps:get(signer_pubkey, VR, <<>>)), V]),
                   dbg("VR = ~p", [VR]),
-                  V;
+                  {V, io_lib:format("{ok, record_type=~p, signer=~s, host_v6=~p}",
+                                    [maps:get(record_type, VR, undefined),
+                                     short_hex(maps:get(signer_pubkey, VR, <<>>)), V])};
               Other ->
-                  say("(b) resolve_mesh_names_api:resolve/3        -> ~p", [Other]),
-                  undefined
+                  {undefined, io_lib:format("~p", [Other])}
           end,
-
     %% ---- (c) DNS wire bridge, in-process (the listen_udp code path) ----
-    CA   = dns_probe(Pool, QName, ?QT_AAAA),
-    CS   = dns_probe(Pool, QName, ?QT_SRV),
-    say("(c) serve_query/3  AAAA ~s                   -> ~p", [QName, CA]),
-    say("(c) serve_query/3  SRV  ~s                   -> ~p", [QName, CS]),
-
+    CA = dns_probe(Pool, QName, ?QT_AAAA),
+    CS = dns_probe(Pool, QName, ?QT_SRV),
     %% ---- (d) external DNS client over the live UDP socket ----
     D = case DnsPort of
             undefined -> {skipped, no_listener};
             P -> external_dns(QName, P)
         end,
-    say("(d) external DNS client (AAAA over :~p)      -> ~p", [DnsPort, D]),
+    M:hdr("resolving it back"),
+    M:kv("(a) macula:find_record/2 round-trip", io_lib:format("~p", [A])),
+    M:kv("(b) resolve_mesh_names_api:resolve/3", BStr),
+    M:kv("(c) serve_query/3 AAAA / SRV", io_lib:format("~p  /  ~p", [CA, CS])),
+    M:kv("(d) external DNS (nslookup over the live socket)", io_lib:format("~p", [D])),
 
     %% ---- verdict ----
     Checks = [
@@ -178,37 +167,35 @@ run(Opts) ->
     case maps:get(keep_alive_s, Opts, 0) of
         0 -> ok;
         N when DnsPort =/= undefined ->
-            say(""),
-            say("keeping the listener up for ~b s — try, e.g.:", [N]),
-            say("    nslookup -port=~p -type=AAAA ~s 127.0.0.1", [DnsPort, QName]),
-            say("    doggo ~s @127.0.0.1:~p AAAA", [QName, DnsPort]),
+            M:say(""),
+            M:say("~ts", [M:dim(io_lib:format("keeping the listener up for ~b s — try, e.g.:", [N]))]),
+            M:say("    ~ts", [M:cyan(io_lib:format("nslookup -port=~p -type=AAAA ~s 127.0.0.1", [DnsPort, QName]))]),
+            M:say("    ~ts", [M:cyan(io_lib:format("doggo ~s @127.0.0.1:~p AAAA", [QName, DnsPort]))]),
             timer:sleep(N * 1000);
         _ -> ok
     end,
     Verdict.
 
-%%====================================================================
-%% Mesh-pool readiness
-%%====================================================================
+%% A quick "stations seeded from" table — same shape as mesh-weather's.
+stations_section(M, Relays) ->
+    M:say(""),
+    M:say("~ts", [M:dim("pinging the seed stations …")]),
+    Rows = [begin
+                Host = M:host_of_url(U),
+                {City, CC} = M:city_of_host(Host),
+                {PingC, Reach} = case M:ping_rtt(Host) of
+                    {ok, {Mn, Av}} -> {lists:flatten(io_lib:format("~.1f / ~.1f", [Mn, Av])), M:green("up")};
+                    {error, _}     -> {M:dim("    —"), M:red("unreachable")}
+                end,
+                [Host, City ++ ", " ++ CC, binary_to_list(M:resolve_v6(Host)), PingC, Reach]
+            end || U <- Relays],
+    M:hdr("stations this pool seeds from"),
+    M:table(["host", "city", "ipv6", "ping min / avg (ms)", "reach"], Rows).
 
-%% Retry a harmless DHT probe until the pool answers from a connected
-%% station (i.e. returns `not_found' for a key that doesn't exist),
-%% or the deadline expires.
-wait_connected(_Pool, Budget) when Budget =< 0 ->
-    throw(mesh_not_connected_within_budget);
-wait_connected(Pool, Budget) ->
-    T0 = erlang:monotonic_time(millisecond),
-    case catch macula:find_record(Pool, <<0:256>>) of
-        {error, not_found}             -> ok;
-        {ok, _}                        -> ok;            %% (improbable, but: connected)
-        {error, _Transient}            -> retry_connect(Pool, Budget, T0);
-        {'EXIT', _}                    -> retry_connect(Pool, Budget, T0)
-    end.
-
-retry_connect(Pool, Budget, T0) ->
-    timer:sleep(1500),
-    Spent = erlang:monotonic_time(millisecond) - T0,
-    wait_connected(Pool, Budget - Spent).
+pm_summary(M, Info) ->
+    Parts = [io_lib:format("~s=~ts subs", [Mod, case St of #{n_subs := N} when N >= 1 -> M:green(integer_to_list(N)); #{n_subs := N} -> M:red(integer_to_list(N)); _ -> M:red("?") end])
+             || {Mod, St} <- Info],
+    lists:flatten(lists:join("  ·  ", Parts)).
 
 %%====================================================================
 %% DNS-bridge listener readiness
@@ -396,23 +383,21 @@ unwrap_text(B) -> B.
 %%====================================================================
 
 report(Checks) ->
-    say(""),
-    say("---------------------------------------------------------------"),
-    AllPass = lists:foldl(
+    M = harness_mesh,
+    M:hdr("verdict"),
+    {Rows, AllPass} = lists:mapfoldl(
         fun({Label, Bool}, Acc) ->
-            {Mark, Pass} = case Bool of
-                               true  -> {"PASS", true};
-                               false -> {"FAIL", false};
-                               skip  -> {"skip", true};
-                               _     -> {"FAIL", false}
-                           end,
-            say("  [~s]  ~s", [Mark, Label]),
-            Acc andalso Pass
+            case Bool of
+                true  -> {[M:green("PASS"), Label], Acc};
+                skip  -> {[M:dim("skip"),  Label], Acc};
+                _     -> {[M:red("FAIL"),  Label], false}
+            end
         end, true, Checks),
-    say("---------------------------------------------------------------"),
+    M:table(["", "check"], Rows),
+    M:say(""),
     case AllPass of
-        true  -> say("  VERDICT: PASS — resolve_mesh_names + serve_dns_over_mesh verified live against the mesh, no stubs."), pass;
-        false -> say("  VERDICT: FAIL — see the per-check lines above."), fail
+        true  -> M:say("  ~ts", [M:green("✓ PASS — resolve_mesh_names + serve_dns_over_mesh verified live against the mesh, no stubs.")]), pass;
+        false -> M:say("  ~ts", [M:red("✗ FAIL — see the per-check lines above (× a mesh blip, or a real regression).")]), fail
     end.
 
 %%====================================================================
@@ -453,12 +438,9 @@ short_hex(Bin) when is_binary(Bin) ->
     H = hex(Bin),
     lists:sublist(H, 16) ++ "...".
 
-say(Fmt) -> say(Fmt, []).
-say(Fmt, Args) -> io:format("[harness] " ++ Fmt ++ "~n", Args).
-
 %% Verbose dump — only when HARNESS_DEBUG is set.
 dbg(Fmt, Args) ->
     case os:getenv("HARNESS_DEBUG") of
         V when V =:= false; V =:= "" -> ok;
-        _ -> io:format("[harness] [debug] " ++ Fmt ++ "~n", Args)
+        _ -> harness_mesh:say("~ts " ++ Fmt, [harness_mesh:dim("[debug]") | Args])
     end.
