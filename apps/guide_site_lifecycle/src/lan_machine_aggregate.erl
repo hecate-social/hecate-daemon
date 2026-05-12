@@ -41,9 +41,9 @@ apply(State, Event) ->
 %% ===================================================================
 
 do_execute(spot_lan_machine, State, Payload) ->
-    %% Only produce event if this is first spot OR something changed
+    %% Only produce event if this is first spot OR something changed.
     case should_spot(State, Payload) of
-        true -> maybe_spot_lan_machine:handle_from_map(Payload);
+        true -> maybe_spot_lan_machine:handle_from_map(carry_forward(State, Payload));
         false -> {error, no_change}  %% idempotent — no change
     end;
 
@@ -94,3 +94,19 @@ hecate_running(M) when is_map(M) ->
     maps:get(running, M, maps:get(<<"running">>, M, false));
 hecate_running(_) ->
     false.
+
+%% @private Fill fields the scanner left out of this spot from the
+%% stored state, so a transient reverse-DNS / SSH-probe miss never
+%% blanks a previously-known value when some *other* field triggers a
+%% new spot event. (The scanner omits hostname/ssh on a probe miss —
+%% see lan_scanner:dispatch_spot/1.)
+carry_forward(#lan_machine_state{} = S, Payload) ->
+    Stored = #{
+        ip        => S#lan_machine_state.ip,
+        hostname  => S#lan_machine_state.hostname,
+        interface => S#lan_machine_state.interface,
+        ssh       => S#lan_machine_state.ssh,
+        hecate    => S#lan_machine_state.hecate
+    },
+    Defaults = maps:filter(fun(_K, V) -> V =/= undefined end, Stored),
+    maps:merge(Defaults, Payload).

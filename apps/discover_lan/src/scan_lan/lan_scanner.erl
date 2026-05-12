@@ -109,19 +109,31 @@ do_scan() ->
     logger:debug("[lan_scanner] Scan complete: ~b hosts found", [length(Probed)]).
 
 %% @private Dispatch a spot command for a probed host.
-dispatch_spot(#{mac := MAC, ip := IP, hostname := Hostname} = Host) ->
-    Cmd = #{
+%%
+%% `hostname' / `ssh' go into the command only when this scan got a
+%% definite answer (`hostname_resolved' / `ssh_probed'). Otherwise
+%% the key is omitted and the lan_machine aggregate carries the
+%% stored value forward (see lan_machine_aggregate:carry_forward/2 +
+%% should_spot/2). Without that, transient reverse-DNS / SSH-probe
+%% flakiness toggled the fields and recorded a spot event on nearly
+%% every scan.
+dispatch_spot(#{mac := MAC, ip := IP} = Host) ->
+    Base = #{
         mac => list_to_binary(MAC),
         observer => atom_to_binary(node()),
         ip => list_to_binary(IP),
-        hostname => Hostname,
         interface => list_to_binary(maps:get(interface, Host, "")),
-        ssh => maps:get(ssh_available, Host, false),
         hecate => maps:get(hecate, Host, #{running => false})
     },
+    Cmd = include_if(maps:get(ssh_probed, Host, false), ssh, maps:get(ssh_available, Host, false),
+            include_if(maps:get(hostname_resolved, Host, false), hostname, maps:get(hostname, Host, <<>>),
+                Base)),
     dispatch_spot_safe(Cmd);
 dispatch_spot(_) ->
     ok.
+
+include_if(false, _Key, _Value, Map) -> Map;
+include_if(true, Key, Value, Map)    -> Map#{Key => Value}.
 
 %%%===================================================================
 %%% ARP table
@@ -182,13 +194,14 @@ parse_arp_command(Output) ->
 %%%===================================================================
 
 %% @private Resolve IP to hostname via DNS/mDNS.
--spec resolve_hostname(string()) -> binary().
+%% `{ok, Bin}' on a real PTR; `not_found' when the lookup fails or
+%% times out (the caller keeps whatever it had instead of flapping
+%% the name to the bare IP and back).
+-spec resolve_hostname(string()) -> {ok, binary()} | not_found.
 resolve_hostname(IP) ->
     case inet:gethostbyaddr(IP) of
-        {ok, {hostent, Hostname, _, _, _, _}} ->
-            list_to_binary(Hostname);
-        _ ->
-            list_to_binary(IP)
+        {ok, {hostent, Hostname, _, _, _, _}} -> {ok, list_to_binary(Hostname)};
+        _                                     -> not_found
     end.
 
 %%%===================================================================
@@ -219,15 +232,27 @@ collect_results(Ref, Remaining, Acc) ->
         Acc
     end.
 
-%% @private Probe a single host: resolve hostname + check for hecate.
+%% @private Probe a single host: resolve hostname + ssh + hecate.
+%% `hostname_resolved' / `ssh_probed' record whether THIS cycle got a
+%% definite answer; dispatch_spot/1 uses them so a transient miss
+%% doesn't blank a previously-known value via a new spot event. The
+%% ETS cache still always carries `hostname'/`ssh_available' (with the
+%% IP / false as the "couldn't tell" placeholder) for the UI.
 probe_host(#{ip := IP} = Host) ->
-    Hostname = resolve_hostname(IP),
-    HecateInfo = probe_hecate(IP, Hostname),
-    SSHAvailable = probe_ssh(IP),
+    {Hostname, Resolved} = case resolve_hostname(IP) of
+        {ok, H}   -> {H, true};
+        not_found -> {list_to_binary(IP), false}
+    end,
+    {SSH, SSHProbed} = case probe_ssh(IP) of
+        unknown   -> {false, false};
+        Available -> {Available, true}
+    end,
     Host#{
         hostname => Hostname,
-        ssh_available => SSHAvailable,
-        hecate => HecateInfo
+        hostname_resolved => Resolved,
+        ssh_available => SSH,
+        ssh_probed => SSHProbed,
+        hecate => probe_hecate(IP, Hostname)
     }.
 
 %% @private Check if hecate-daemon is running on the host.
@@ -260,15 +285,21 @@ check_cluster_membership(Hostname) ->
             false
     end.
 
-%% @private Check if SSH is available (port 22 open).
--spec probe_ssh(string()) -> boolean().
+%% @private Check if SSH (port 22) is open.
+%% `true' = connected; `false' = explicitly refused (port closed);
+%% `unknown' = timed out / unreachable this cycle (don't treat that
+%% as "no ssh" — a 1s probe on a busy LAN flakes, and flipping the
+%% flag records a spurious spot event).
+-spec probe_ssh(string()) -> true | false | unknown.
 probe_ssh(IP) ->
     case gen_tcp:connect(IP, 22, [binary, {active, false}], 1_000) of
         {ok, Socket} ->
             gen_tcp:close(Socket),
             true;
+        {error, econnrefused} ->
+            false;
         {error, _} ->
-            false
+            unknown
     end.
 
 
