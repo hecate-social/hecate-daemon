@@ -73,37 +73,29 @@ terminate(_Reason, _) -> ok.
 %% Dispatch
 %%====================================================================
 
-dispatch_inherited(<<"realm_membership_initiated_v1">>, Payload) ->
-    dispatch(maybe_initiate_realm_membership, handle_from_map, [normalize(Payload)],
-             initiate_realm_membership);
+dispatch_inherited(<<"realm_membership_initiated_v1">>, _Payload) ->
+    %% Informational only. We do NOT replicate the attended node's
+    %% membership record — when its `realm_credentials_secured_v1'
+    %% arrives we mint our OWN membership locally (with our own cert
+    %% from /api/v1/cluster/provision). So nothing to do here.
+    logger:debug("[inherit_realm] noted peer realm_membership_initiated_v1"),
+    ok;
 
-dispatch_inherited(<<"realm_membership_confirmed_v1">>, Payload) ->
-    %% Confirm requires the aggregate to be initiated locally.
-    %% The initiate event is always broadcast first (relay PM subscribes
-    %% to both and evoq delivers in append order per stream), so the
-    %% ordering race is only possible when this node booted between the
-    %% two broadcasts. In that case `not_initiated` is silently
-    %% swallowed in do_apply and the subsequent replay on next boot
-    %% catches up from the store. We do NOT synthesise an initiate from
-    %% the confirm payload: `realm_membership_confirmed_v1` carries
-    %% `realm_id`, not `realm_url` — dispatching initiate with a confirm
-    %% payload always fails with `realm_url_required`.
-    dispatch(maybe_confirm_realm_membership, handle_from_map, [normalize(Payload)],
-             confirm_realm_membership);
+dispatch_inherited(<<"realm_membership_confirmed_v1">>, _Payload) ->
+    logger:debug("[inherit_realm] noted peer realm_membership_confirmed_v1"),
+    ok;
 
 dispatch_inherited(<<"realm_credentials_secured_v1">>, Payload) ->
-    %% We do NOT store the attended node's creds blob — that would run
-    %% this node with the attended node's identity. Instead, hand the
-    %% inherited (cookie-encrypted) blob to hecate_realm_session, which
-    %% decrypts it, takes ONLY the refresh token, and calls the realm's
-    %% /api/v1/cluster/provision endpoint with OUR own pubkey to mint
-    %% OUR own per-node certificate. HTTP — do it off this gen_server.
+    %% Hand the inherited (cookie-encrypted) blob to hecate_realm_session,
+    %% which decrypts it, takes ONLY the refresh token, calls the realm's
+    %% /api/v1/cluster/provision with OUR own pubkey to get OUR own
+    %% per-node cert, and mints OUR own local membership (initiate ->
+    %% confirm -> secure). HTTP — do it off this gen_server.
     NP = normalize(Payload),
     MembershipId = maps:get(membership_id, NP, <<>>),
     EncCreds = maps:get(encrypted_credentials, NP, <<>>),
-    case {byte_size(MembershipId), byte_size(EncCreds)} of
-        {0, _} -> logger:warning("[inherit_realm] inherited creds: no membership_id");
-        {_, 0} -> logger:warning("[inherit_realm] inherited creds: no encrypted_credentials");
+    case byte_size(EncCreds) of
+        0 -> logger:warning("[inherit_realm] inherited creds: no encrypted_credentials");
         _ ->
             spawn(fun() ->
                 catch hecate_realm_session:provision_from_inherited_creds(MembershipId, EncCreds)
@@ -116,8 +108,7 @@ dispatch_inherited(Other, _) ->
     ok.
 
 %% @private evoq events arrive with atom OR binary keys depending on
-%% the path. Flatten to atom keys so handle_from_map's atomised lookups
-%% succeed without needing dual-key logic in every downstream module.
+%% the path. Flatten to atom keys for downstream lookups.
 normalize(Payload) when is_map(Payload) ->
     maps:fold(fun
         (K, V, Acc) when is_binary(K) ->
@@ -127,35 +118,6 @@ normalize(Payload) when is_map(Payload) ->
         (K, V, Acc) ->
             Acc#{K => V}
     end, #{}, Payload).
-
-dispatch(Module, Fun, Args, Label) ->
-    case code:ensure_loaded(Module) of
-        {module, Module} ->
-            case erlang:function_exported(Module, Fun, length(Args)) of
-                true -> do_apply(Module, Fun, Args, Label);
-                false ->
-                    logger:warning("[inherit_realm] ~p:~p/~b not exported; skipping ~p",
-                                   [Module, Fun, length(Args), Label])
-            end;
-        {error, LoadReason} ->
-            logger:warning("[inherit_realm] cannot load ~p (~p); skipping ~p",
-                           [Module, LoadReason, Label])
-    end.
-
-do_apply(Module, Fun, Args, Label) ->
-    try apply(Module, Fun, Args) of
-        {ok, _V, _E}              -> ok;
-        {ok, _Events}             -> ok;
-        {error, already_initiated} -> ok;
-        {error, already_confirmed} -> ok;
-        {error, credentials_already_secured} -> ok;
-        {error, not_initiated}    -> ok;   %% raced initiate ordering — will retry next event
-        {error, Reason} ->
-            logger:warning("[inherit_realm] ~p dispatch failed: ~p", [Label, Reason])
-    catch Class:Reason:Stack ->
-        logger:warning("[inherit_realm] ~p dispatch exception ~p:~p~n~p",
-                       [Label, Class, Reason, Stack])
-    end.
 
 %%====================================================================
 %% pg helpers

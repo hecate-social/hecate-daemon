@@ -435,33 +435,48 @@ is_anonymous_mri(MRI) when is_binary(MRI) ->
     end;
 is_anonymous_mri(_) -> false.
 
-do_provision_from_inherited(MembershipId, EncryptedCreds) ->
+do_provision_from_inherited(_InheritedMembershipId, EncryptedCreds) ->
     case hecate_crypto:decrypt(EncryptedCreds) of
         {ok, Serialized} ->
-            provision_with_decrypted(MembershipId, safe_binary_to_term(Serialized));
+            provision_with_decrypted(safe_binary_to_term(Serialized));
         {error, Reason} ->
             logger:warning("[realm_session] cannot decrypt inherited creds: ~p", [Reason]),
             ok
     end.
 
-provision_with_decrypted(MembershipId, #{refresh_token := RT})
+provision_with_decrypted(#{refresh_token := RT})
   when is_binary(RT), byte_size(RT) > 0 ->
     RealmUrl = default_realm_url(),
     case cluster_provision(RealmUrl, RT) of
         {ok, #{org_identity := OrgMri, cert_pem := CertPem} = Provisioned}
           when is_binary(OrgMri), is_binary(CertPem) ->
             NodeAppMri = maps:get(node_app_mri, Provisioned, undefined),
+            Owner = extract_owner_from_mri(OrgMri),
             logger:info("[realm_session] cluster-provisioned own node cert (~s) under ~s",
                         [default_if_undef(NodeAppMri, <<"?">>), OrgMri]),
-            update_identity_owner(extract_owner_from_mri(OrgMri)),
-            dispatch_secure_credentials(MembershipId, #{
-                refresh_token => RT,
-                org_identity  => OrgMri,
-                cert_pem      => CertPem,
-                node_app_mri  => NodeAppMri
-            }),
-            hecate_web_events:broadcast(realm_join_status, #{status => joined}),
-            ok;
+            update_identity_owner(Owner),
+            %% Mint THIS node's OWN membership locally — initiate ->
+            %% confirm -> secure_credentials, in order (eventual
+            %% consistency = each dispatch returns after persist, so
+            %% the aggregate is in the right state for the next step).
+            %% A fresh membership_id; not a copy of the attended
+            %% node's membership record.
+            NewMId = generate_membership_id(),
+            case dispatch_initiate_membership(#{membership_id => NewMId, realm_url => RealmUrl}) of
+                {ok, _V, _E} ->
+                    dispatch_confirm_membership(NewMId, Owner, <<"cluster-provision">>, RealmUrl),
+                    dispatch_secure_credentials(NewMId, #{
+                        refresh_token => RT,
+                        org_identity  => OrgMri,
+                        cert_pem      => CertPem,
+                        node_app_mri  => NodeAppMri
+                    }),
+                    hecate_web_events:broadcast(realm_join_status, #{status => joined}),
+                    ok;
+                {error, Reason} ->
+                    logger:warning("[realm_session] failed to initiate own membership: ~p", [Reason]),
+                    ok
+            end;
         {ok, Other} ->
             logger:warning("[realm_session] cluster-provision returned incomplete: ~p", [Other]),
             ok;
@@ -469,7 +484,7 @@ provision_with_decrypted(MembershipId, #{refresh_token := RT})
             logger:warning("[realm_session] cluster-provision failed: ~p", [Reason]),
             ok
     end;
-provision_with_decrypted(_MembershipId, _Other) ->
+provision_with_decrypted(_Other) ->
     logger:warning("[realm_session] inherited creds carry no usable refresh_token"),
     ok.
 
