@@ -16,7 +16,7 @@
 set -eu
 
 NODES=(beam00 beam01 beam02 beam03)
-IMAGE=ghcr.io/hecate-social/hecate-daemon:main
+IMAGE=codeberg.org/hecate-social/hecate-daemon:main
 MODE="rolling"
 
 for arg in "$@"; do

@@ -40,7 +40,7 @@ NODE_PEERS[beam01]="beam00.lab,host00.lab"
 NODE_PEERS[beam02]=""
 NODE_PEERS[beam03]=""
 
-DAEMON_IMAGE="ghcr.io/hecate-social/hecate-daemon:latest"
+DAEMON_IMAGE="codeberg.org/hecate-social/hecate-daemon:latest"
 
 ALL_NODES=(beam00 beam01 beam02 beam03)
 

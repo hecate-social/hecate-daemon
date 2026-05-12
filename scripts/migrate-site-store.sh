@@ -11,7 +11,7 @@
 # Sequence:
 #   1. Stop hecate-daemon on all 4 beams (in parallel)
 #   2. Wipe /fast/.hecate/hecate-daemon/reckon-db/site on each (sudo)
-#   3. docker pull ghcr.io/hecate-social/hecate-daemon:main
+#   3. docker pull codeberg.org/hecate-social/hecate-daemon:main
 #   4. Start hecate-daemon on each
 #
 # Usage:
@@ -24,7 +24,7 @@ set -eu
 
 NODES=(beam00 beam01 beam02 beam03)
 SITE_DIR=/fast/.hecate/hecate-daemon/reckon-db/site
-IMAGE=ghcr.io/hecate-social/hecate-daemon:main
+IMAGE=codeberg.org/hecate-social/hecate-daemon:main
 
 ssh_quiet() {
     ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new "rl@${1}.lab" "${2}" 2>&1 \
