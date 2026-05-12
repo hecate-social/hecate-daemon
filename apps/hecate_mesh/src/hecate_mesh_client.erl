@@ -331,7 +331,11 @@ handle_call(get_status, _From,
                    identity = Identity, relays = Relays,
                    station_clients = StationClients,
                    activated = Activated} = State) ->
-    PoolStatus = get_pool_status(Pool),
+    %% `macula:status/1' returns `self_node_id' as a raw 32-byte
+    %% Ed25519 pubkey — not valid UTF-8, so `json:encode' chokes
+    %% ({invalid_byte,_}) when this map reaches mesh_status_api /
+    %% mesh_events_stream_api. Hex it here at the boundary.
+    PoolStatus = hexify_node_id(get_pool_status(Pool)),
     StationLinks = station_links_view(StationClients),
     Status = #{
         connected => is_pid(Pool),
@@ -999,6 +1003,13 @@ get_pool_status(Pool) when is_pid(Pool) ->
         {ok, S} -> S;
         _ -> #{}
     end.
+
+%% Render the raw-binary `self_node_id' field (if any) as hex so the
+%% status map is JSON-encodable.
+hexify_node_id(#{self_node_id := B} = S) when is_binary(B) ->
+    S#{self_node_id => binary:encode_hex(B)};
+hexify_node_id(S) ->
+    S.
 
 station_links_view(StationClients) ->
     [#{relay     => Url,
