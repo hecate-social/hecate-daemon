@@ -16,7 +16,8 @@
     roles_path/0
 ]).
 
--define(REPO_URL, "https://github.com/hecate-social/hecate-agents.git").
+%% Codeberg is canonical post-migration; GitHub is a read-only mirror.
+-define(REPO_URL, "https://codeberg.org/hecate-social/hecate-agents.git").
 -define(DIR_NAME, "hecate-agents").
 
 %% @doc Return the local path to the hecate-agents repo.
