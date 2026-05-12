@@ -65,17 +65,32 @@ do_execute(_Unknown, _State, _Payload) ->
 should_spot(#lan_machine_state{status = 0}, _Payload) ->
     true;  %% never spotted before
 should_spot(State, Payload) ->
-    %% Check if IP, hostname, SSH, or hecate status changed
+    %% Check if IP, hostname, SSH, or hecate-running status changed.
+    %%
+    %% NOTE: the stored state carries the `hecate' map with BINARY keys
+    %% (it round-tripped through JSON in the event store), while a
+    %% fresh scan payload uses ATOM keys. The old code did
+    %% `maps:get(running, OldMap)' against the new value, so for any
+    %% host actually running hecate the lookup missed the binary key,
+    %% defaulted to `false', and reported a change on EVERY scan. That
+    %% is what grew this per-machine stream into thousands of events
+    %% and kept the optimistic-concurrency retry loop spinning. Extract
+    %% `running' key-type-agnostically on both sides.
     OldIP = State#lan_machine_state.ip,
     OldHostname = State#lan_machine_state.hostname,
     OldSSH = State#lan_machine_state.ssh,
-    OldHecateRunning = maps:get(running, State#lan_machine_state.hecate, false),
+    OldHecateRunning = hecate_running(State#lan_machine_state.hecate),
     NewIP = maps:get(ip, Payload, maps:get(<<"ip">>, Payload, OldIP)),
     NewHostname = maps:get(hostname, Payload, maps:get(<<"hostname">>, Payload, OldHostname)),
     NewSSH = maps:get(ssh, Payload, maps:get(<<"ssh">>, Payload, OldSSH)),
     NewHecate = maps:get(hecate, Payload, maps:get(<<"hecate">>, Payload, #{})),
-    NewHecateRunning = maps:get(running, NewHecate, maps:get(<<"running">>, NewHecate, false)),
+    NewHecateRunning = hecate_running(NewHecate),
     (NewIP =/= OldIP) orelse
     (NewHostname =/= OldHostname) orelse
     (NewSSH =/= OldSSH) orelse
     (NewHecateRunning =/= OldHecateRunning).
+
+hecate_running(M) when is_map(M) ->
+    maps:get(running, M, maps:get(<<"running">>, M, false));
+hecate_running(_) ->
+    false.

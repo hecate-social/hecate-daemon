@@ -24,7 +24,11 @@
 
 -define(SERVER, ?MODULE).
 -define(MESH_WAIT_INTERVAL_MS, 500).
--define(MESH_WAIT_TIMEOUT_MS, 10_000).
+%% Station links to the relay fleet take a while to complete the
+%% CONNECT/HELLO handshake (and may flap), so give the pool more than
+%% the old 10s to surface a healthy link before declaring the mesh
+%% unreachable and skipping the probes.
+-define(MESH_WAIT_TIMEOUT_MS, 30_000).
 -define(PROBE_TIMEOUT_MS, 5_000).
 -define(HEARTBEAT_INTERVAL_MS, 60_000).
 
@@ -124,9 +128,9 @@ handle_info({check_mesh, Elapsed}, #state{proof_status = waiting_mesh} = State) 
     skip_probes(State);
 
 handle_info({check_mesh, Elapsed}, #state{proof_status = waiting_mesh} = State) ->
-    case hecate_mesh:is_connected() of
+    case mesh_has_healthy_link() of
         true ->
-            logger:info("[mesh_proof] Mesh connected — launching probes"),
+            logger:info("[mesh_proof] Mesh has a healthy station link — launching probes"),
             launch_probes(State);
         false ->
             erlang:send_after(?MESH_WAIT_INTERVAL_MS, self(), {check_mesh, Elapsed + ?MESH_WAIT_INTERVAL_MS}),
@@ -206,6 +210,22 @@ handle_info(_Msg, State) ->
     {noreply, State}.
 
 %% -- Internal --------------------------------------------------------
+
+%% `hecate_mesh:is_connected/0' flips true the moment the V2 pool
+%% process exists — long before any station link has finished its
+%% CONNECT/HELLO. Launching probes then guarantees
+%% {publish_failed,not_connected} / {call_failed,no_healthy_station}.
+%% Gate on the pool actually reporting a healthy link instead.
+mesh_has_healthy_link() ->
+    case hecate_mesh:get_client() of
+        {ok, Pool} when is_pid(Pool) ->
+            case macula:status(Pool) of
+                {ok, #{healthy_links := N}} when N > 0 -> true;
+                _ -> false
+            end;
+        _ ->
+            false
+    end.
 
 launch_probes(State) ->
     {ok, Client} = hecate_mesh:get_client(),

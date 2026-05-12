@@ -195,6 +195,13 @@ start_daemon() {
            "$DAEMON_DIR/_build/default/lib/evoq" \
            "$DAEMON_DIR/_build/default/lib/reckon_evoq" \
            "$DAEMON_DIR/_build/default/lib/reckon_gater"
+    # Reassemble the release tree from scratch each run. relx in
+    # dev_mode symlinks app dirs and never prunes — so a module that
+    # was deleted from a slice lingers in the old rel/ as a stale
+    # .beam, and overlay scripts/configs from a previous layout stick
+    # around too. Wiping rel/hecate keeps `rebar3 release' honest and
+    # stops cruft accumulating across rebuilds.
+    rm -rf "$DAEMON_DIR/_build/default/rel/hecate"
     (cd "$DAEMON_DIR" && rebar3 compile 2>&1 | tail -1)
 
     "$SCRIPT_DIR/prod-start.sh" &
