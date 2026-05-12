@@ -153,15 +153,23 @@ handle_cast(Msg, State) ->
     logger:warning("[boot_tracker] unexpected cast: ~p", [Msg]),
     {noreply, State}.
 
-handle_info(poll_stores, #state{boot_phase = booting_stores} = State) ->
+%% Keep polling until post-boot is triggered — NOT while boot_phase is
+%% `booting_stores'. The phase is cosmetic (it's what the early
+%% health socket reports) and `mesh_proof_coordinator' flips it to
+%% `probing_mesh' / `running' the moment the mesh activates, which
+%% races the store-spawn loop (mesh auto-activates ~5s in; 15 Ra
+%% stores take longer to all register on a cold disk). Gating the
+%% poll on the phase meant: phase leaves `booting_stores' mid-spawn →
+%% this poll stops rescheduling → `trigger_post_boot' never fires →
+%% the API route table is never hot-swapped → every `/api/*' 404s and
+%% the daemon is wedged at the early health-only socket forever.
+handle_info(poll_stores, #state{post_boot_triggered = false} = State) ->
     #state{expected_stores = Expected, ready_stores = Ready, start_time = StartTime} = State,
     %% Don't call reckon_db_sup:which_stores/0 — it does supervisor:which_children/1
     %% which blocks when the supervisor is busy starting stores. Check each
     %% manager's registered name instead (cheap + non-blocking).
     Running = [S || S <- Expected, is_store_registered(S)],
-    NewlyReady = [S || S <- Running,
-                       lists:member(S, Expected),
-                       not maps:is_key(S, Ready)],
+    NewlyReady = [S || S <- Running, not maps:is_key(S, Ready)],
     Now = erlang:monotonic_time(millisecond),
     NewReady = lists:foldl(fun(S, Acc) -> Acc#{S => Now} end, Ready, NewlyReady),
 
@@ -181,12 +189,14 @@ handle_info(poll_stores, #state{boot_phase = booting_stores} = State) ->
     end;
 
 handle_info(poll_stores, State) ->
+    %% post-boot already done — stop polling.
     {noreply, State};
 
-handle_info(boot_timeout, #state{boot_phase = booting_stores} = State) ->
+handle_info(boot_timeout, #state{post_boot_triggered = false} = State) ->
     #state{expected_stores = Expected, ready_stores = Ready} = State,
     Missing = [S || S <- Expected, not maps:is_key(S, Ready)],
-    logger:warning("[boot_tracker] boot_timeout ~bms, missing: ~p", [?BOOT_TIMEOUT_MS, Missing]),
+    logger:warning("[boot_tracker] boot_timeout ~bms, missing: ~p — forcing post-boot",
+                   [?BOOT_TIMEOUT_MS, Missing]),
     logger:warning("[boot_tracker] partial boot (~b/~b stores)", [map_size(Ready), length(Expected)]),
     trigger_post_boot(State);
 
