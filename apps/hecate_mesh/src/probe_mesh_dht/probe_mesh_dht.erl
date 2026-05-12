@@ -1,28 +1,23 @@
-%%% @doc Mesh proof probe: DHT identity and routing table.
+%%% @doc Mesh proof probe: pool identity and link health.
 %%%
-%%% Verifies that this node has a DHT identity and can query
-%%% its routing table. Zero peers is valid (solo dev node) -
-%%% the probe verifies DHT participation, not peer count.
+%%% Verifies that this node has a mesh identity and at least a
+%%% snapshot of its station-link pool. Zero healthy links is valid
+%%% (solo dev node, mesh not yet reachable) — the probe verifies
+%%% pool participation, not link count.
 %%% @end
 -module(probe_mesh_dht).
 
 -export([run/1]).
 
--spec run(pid()) -> {ok, map()} | {error, term()}.
-run(Client) ->
-    case macula:get_node_id(Client) of
-        {ok, NodeIdBin} ->
-            NodeIdHex = binary:encode_hex(NodeIdBin),
-            Peers = case macula:get_known_peers(Client) of
-                {ok, P} -> P;
-                _ -> []
-            end,
-            PeerCount = length(Peers),
+-spec run(macula:pool()) -> {ok, map()} | {error, term()}.
+run(Pool) ->
+    case macula:status(Pool) of
+        {ok, #{self_node_id := NodeId, healthy_links := Links}} ->
             {ok, #{
-                node_id => NodeIdHex,
-                peer_count => PeerCount,
-                solo_node => PeerCount =:= 0
+                node_id => binary:encode_hex(NodeId),
+                peer_count => Links,
+                solo_node => Links =:= 0
             }};
         {error, Reason} ->
-            {error, {no_node_id, Reason}}
+            {error, {no_status, Reason}}
     end.

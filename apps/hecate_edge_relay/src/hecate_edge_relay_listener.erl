@@ -67,7 +67,7 @@ handle_info({quic, new_conn, Conn, ConnInfo}, #state{listener = Listener} = Stat
     {noreply, State};
 
 handle_info({quic, new_stream, Stream, StreamProps}, State) ->
-    catch quicer:setopt(Stream, active, false),
+    catch macula_quic:setopt(Stream, active, false),
     Conn = case StreamProps of
         #{conn := C} -> C;
         _ -> get(pending_conn)
@@ -78,9 +78,9 @@ handle_info({quic, new_stream, Stream, StreamProps}, State) ->
             {noreply, State};
         _ ->
             {ok, Pid} = hecate_edge_relay_handler:start_link(Conn, Stream),
-            case quicer:controlling_process(Stream, Pid) of
+            case macula_quic:controlling_process(Stream, Pid) of
                 ok ->
-                    _ = quicer:controlling_process(Conn, Pid),
+                    _ = macula_quic:controlling_process(Conn, Pid),
                     Pid ! ownership_transferred,
                     ?LOG_INFO("[edge_relay] Handler ~p started for LAN client", [Pid]),
                     {noreply, State#state{handlers = [Pid | State#state.handlers]}};
@@ -127,7 +127,7 @@ terminate(_Reason, #state{listener = Listener}) ->
 %%====================================================================
 
 %% macula_quic:listen/2 expects {cert, Path} and {key, Path} —
-%% it internally converts to {certfile, ...} for quicer.
+%% it converts to {certfile, ...} internally for the Quinn NIF.
 %% Do NOT pass macula_tls:quic_server_opts() which uses {certfile, ...} directly.
 build_listen_opts() ->
     {CertPath, KeyPath} = macula_tls:get_cert_paths(),
@@ -143,7 +143,7 @@ build_listen_opts() ->
     ].
 
 register_accept(Listener) ->
-    case quicer:async_accept(Listener, #{}) of
+    case macula_quic:async_accept(Listener, #{}) of
         {ok, _} -> ok;
         {error, Reason} ->
             ?LOG_WARNING("[edge_relay] async_accept failed: ~p", [Reason]),
@@ -151,17 +151,17 @@ register_accept(Listener) ->
     end.
 
 complete_handshake(Conn) ->
-    case quicer:handshake(Conn) of
+    case macula_quic:handshake(Conn) of
         ok -> accept_streams(Conn);
         {ok, _} -> accept_streams(Conn);
         {error, Reason} ->
             ?LOG_ERROR("[edge_relay] Handshake failed: ~p", [Reason]),
-            catch quicer:close_connection(Conn)
+            catch macula_quic:close_connection(Conn)
     end.
 
 accept_streams(Conn) ->
     put(pending_conn, Conn),
-    case quicer:async_accept_stream(Conn, #{}) of
+    case macula_quic:async_accept_stream(Conn, #{}) of
         {ok, _} -> ok;
         {error, Reason} ->
             ?LOG_WARNING("[edge_relay] async_accept_stream failed: ~p", [Reason]),

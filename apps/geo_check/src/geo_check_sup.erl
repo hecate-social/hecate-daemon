@@ -77,8 +77,11 @@ start_locus_loader(LoaderId, {file, Path}) ->
 
 %% @private Try to load from local file if MaxMind key not available
 start_locus_from_file(LoaderId, DbName, CacheFile) ->
+    %% CacheFile is the gzip-compressed locus cache (`.mmdb.gz'); also
+    %% accept a plain `.mmdb' dropped next to it by hand.
     LocalPaths = [
         CacheFile,
+        filename:rootname(CacheFile),
         "priv/" ++ DbName ++ ".mmdb",
         "/usr/share/GeoIP/" ++ DbName ++ ".mmdb",
         "/var/lib/GeoIP/" ++ DbName ++ ".mmdb"
@@ -93,6 +96,10 @@ start_locus_from_file(LoaderId, DbName, CacheFile) ->
     end.
 
 %% @private Resolve cache directory: $MAXMIND_HOME (default ~/.maxmind)
+%% locus stores its on-disk cache gzip-compressed and validates that the
+%% `database_cache_file' path ends in `.mmdb.gz' (see
+%% locus_loader:validate_loader_opts/2). Anything else is rejected with
+%% `{invalid_opt, {database_cache_file, _}}'.
 cache_path(DbName) ->
     Home = case os:getenv("MAXMIND_HOME") of
         false ->
@@ -102,7 +109,7 @@ cache_path(DbName) ->
             end ++ "/.maxmind";
         Dir -> Dir
     end,
-    Home ++ "/" ++ DbName ++ ".mmdb".
+    Home ++ "/" ++ DbName ++ ".mmdb.gz".
 
 %% @private Find first existing file in list
 find_existing_file([]) ->

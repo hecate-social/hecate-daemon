@@ -53,7 +53,7 @@ init({Conn, Stream}) ->
 %%====================================================================
 
 handle_info(ownership_transferred, #state{stream = Stream} = State) ->
-    quicer:setopt(Stream, active, true),
+    macula_quic:setopt(Stream, active, true),
     ?LOG_INFO("[edge_handler] Ownership received, stream active"),
     {noreply, State};
 

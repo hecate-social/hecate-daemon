@@ -70,7 +70,7 @@ pick_cheap_model(Model) ->
 
 get_available_small_model() ->
     %% Check if any local models are available via Ollama
-    case chat_to_llm:list_models() of
+    case manage_providers:list_all_models() of
         {ok, Models} when is_list(Models), Models =/= [] ->
             %% Prefer small models for extraction
             SmallPrefs = [<<"llama3.2:1b">>, <<"llama3.2:3b">>,

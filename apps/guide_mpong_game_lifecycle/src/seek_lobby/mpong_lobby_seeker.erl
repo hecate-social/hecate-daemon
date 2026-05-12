@@ -414,13 +414,12 @@ get_geo_location(IP) ->
         _ -> {undefined, undefined}
     end.
 
+%% NAT classification (mapping/filtering policy) isn't surfaced by the
+%% current macula transport — it will arrive with the macula-net
+%% NAT-traversal work. Until then lobby tech metadata reports it as
+%% unknown rather than calling a module that doesn't exist.
 get_nat_type() ->
-    case catch macula_nat_detector:get_local_profile() of
-        {ok, #{mapping_policy := M, filtering_policy := F}} ->
-            iolist_to_binary(io_lib:format("~s/~s", [M, F]));
-        _ ->
-            <<"unknown">>
-    end.
+    <<"unknown">>.
 
 %%====================================================================
 %% Internal: Helpers

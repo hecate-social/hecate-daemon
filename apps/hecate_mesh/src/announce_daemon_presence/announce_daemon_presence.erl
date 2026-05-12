@@ -194,11 +194,17 @@ publish_tombstone_if_graceful(normal)          -> publish_tombstone(normal);
 publish_tombstone_if_graceful(_)               -> ok.
 
 publish_tombstone(Reason) ->
-    case hecate_identity:signing_keypair() of
+    %% Runs from terminate/2 — on a full-node shutdown `hecate_identity'
+    %% (and the mesh) may already be gone. Best-effort only; never let
+    %% a dead dependency turn a clean shutdown into a crash report.
+    try hecate_identity:signing_keypair() of
         {ok, KeyPair} ->
             do_publish_tombstone(KeyPair, Reason);
         not_initialized ->
             ok
+    catch
+        exit:_ -> ok;
+        error:_ -> ok
     end.
 
 do_publish_tombstone(KeyPair, Reason) ->

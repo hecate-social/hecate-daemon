@@ -1,11 +1,8 @@
 %%% @doc Mesh proof probe: RPC advertise + call round-trip.
 %%%
-%%% Advertises a procedure, calls it, and verifies the nonce echoes
-%%% back. Proves the advertise-call pipeline works.
-%%%
-%%% Note: macula RPC has a local shortcut - if the procedure is
-%%% registered locally, the call executes in-process (zero-network).
-%%% This still proves the advertise/call pipeline works.
+%%% Advertises a procedure on the realm, calls it, and verifies the
+%%% nonce echoes back. Proves the V2 pool advertise/call pipeline
+%%% works end to end.
 %%% @end
 -module(probe_mesh_rpc).
 
@@ -13,13 +10,13 @@
 
 -define(TIMEOUT_MS, 3000).
 
--spec run(pid()) -> {ok, map()} | {error, term()}.
-run(Client) ->
+-spec run(macula:pool()) -> {ok, map()} | {error, term()}.
+run(Pool) ->
+    RealmId = realm_id(),
     Nonce = crypto:strong_rand_bytes(16),
     NonceHex = binary:encode_hex(Nonce),
-    {ok, NodeId} = macula:get_node_id(Client),
-    NodeIdHex = binary:encode_hex(NodeId),
-    Procedure = <<"hecate.proof.rpc.", NodeIdHex/binary>>,
+    {ok, #{self_node_id := NodeId}} = macula:status(Pool),
+    Procedure = <<"hecate.proof.rpc.", (binary:encode_hex(NodeId))/binary>>,
 
     Handler = fun(Args) ->
         RecvNonce = maps:get(<<"nonce">>, Args, maps:get(nonce, Args, undefined)),
@@ -27,23 +24,21 @@ run(Client) ->
     end,
 
     Start = erlang:monotonic_time(millisecond),
-    case macula:advertise(Client, Procedure, Handler) of
-        {ok, AdvRef} ->
+    case macula:advertise(Pool, RealmId, Procedure, Handler, #{}) of
+        ok ->
             timer:sleep(100),
             CallResult = try
-                macula:call(Client, Procedure, #{nonce => NonceHex})
+                macula:call(Pool, RealmId, Procedure, #{nonce => NonceHex}, ?TIMEOUT_MS)
             catch
                 Class:Ex ->
                     {error, {call_exception, Class, Ex}}
             end,
-            macula:unadvertise(Client, AdvRef),
+            macula:unadvertise(Pool, RealmId, Procedure),
             case CallResult of
                 {ok, #{echo := EchoNonce}} when EchoNonce =:= NonceHex ->
-                    Elapsed = erlang:monotonic_time(millisecond) - Start,
-                    {ok, #{round_trip_ms => Elapsed}};
+                    {ok, #{round_trip_ms => erlang:monotonic_time(millisecond) - Start}};
                 {ok, #{<<"echo">> := EchoNonce}} when EchoNonce =:= NonceHex ->
-                    Elapsed = erlang:monotonic_time(millisecond) - Start,
-                    {ok, #{round_trip_ms => Elapsed}};
+                    {ok, #{round_trip_ms => erlang:monotonic_time(millisecond) - Start}};
                 {ok, Other} ->
                     {error, {nonce_mismatch, Other}};
                 {error, CallErr} ->
@@ -52,3 +47,6 @@ run(Client) ->
         {error, AdvErr} ->
             {error, {advertise_failed, AdvErr}}
     end.
+
+realm_id() ->
+    macula_realm:id(application:get_env(hecate, realm, <<"io.macula">>)).

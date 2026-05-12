@@ -9,9 +9,10 @@
 
 -export([announce/2]).
 
--spec announce(pid(), map()) -> ok | {error, term()}.
-announce(Client, ProbeResults) ->
+-spec announce(macula:pool(), map()) -> ok | {error, term()}.
+announce(Pool, ProbeResults) ->
     Identity = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>),
+    RealmId = macula_realm:id(application:get_env(hecate, realm, <<"io.macula">>)),
     Topic = hecate_topics:app_fact(<<"presence">>, <<"announced">>, 1),
     Version = app_version(),
     Capabilities = derive_capabilities(ProbeResults),
@@ -23,10 +24,10 @@ announce(Client, ProbeResults) ->
         timestamp => erlang:system_time(millisecond)
     },
 
-    case macula:publish(Client, Topic, Fact) of
+    case macula:publish(Pool, RealmId, Topic, Fact) of
         ok ->
-            PeerCount = case macula:list_nodes(Client) of
-                {ok, Peers} -> map_size(Peers);
+            PeerCount = case macula:status(Pool) of
+                {ok, #{healthy_links := N}} -> N;
                 _ -> 0
             end,
             broadcast_pg(mesh_presence_announced, #{
