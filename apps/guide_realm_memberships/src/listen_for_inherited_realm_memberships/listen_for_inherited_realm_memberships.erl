@@ -56,6 +56,31 @@ handle_info(retry_join, #{joined := false, group := Group} = State) ->
             {noreply, State}
     end;
 
+handle_info({inherited_realm_event, <<"realm_credentials_secured_v1">>, Payload, FromNode}, State) ->
+    logger:info("[inherit_realm] received realm_credentials_secured_v1 from ~p", [FromNode]),
+    %% The relay re-delivers this many times during a catch-up replay;
+    %% only act on the first one this session (the spawned worker also
+    %% re-checks for an existing membership via probe_live_membership,
+    %% but the flag avoids a swarm of concurrent HTTP provisions).
+    case maps:get(provision_triggered, State, false) of
+        true ->
+            {noreply, State};
+        false ->
+            NP = normalize(Payload),
+            MembershipId = maps:get(membership_id, NP, <<>>),
+            EncCreds = maps:get(encrypted_credentials, NP, <<>>),
+            case byte_size(EncCreds) of
+                0 ->
+                    logger:warning("[inherit_realm] inherited creds: no encrypted_credentials"),
+                    {noreply, State};
+                _ ->
+                    spawn(fun() ->
+                        catch hecate_realm_session:provision_from_inherited_creds(MembershipId, EncCreds)
+                    end),
+                    {noreply, State#{provision_triggered => true}}
+            end
+    end;
+
 handle_info({inherited_realm_event, EventType, Payload, FromNode}, State) ->
     logger:info("[inherit_realm] received ~s from ~p", [EventType, FromNode]),
     dispatch_inherited(EventType, Payload),
@@ -85,26 +110,11 @@ dispatch_inherited(<<"realm_membership_confirmed_v1">>, _Payload) ->
     logger:debug("[inherit_realm] noted peer realm_membership_confirmed_v1"),
     ok;
 
-dispatch_inherited(<<"realm_credentials_secured_v1">>, Payload) ->
-    %% Hand the inherited (cookie-encrypted) blob to hecate_realm_session,
-    %% which decrypts it, takes ONLY the refresh token, calls the realm's
-    %% /api/v1/cluster/provision with OUR own pubkey to get OUR own
-    %% per-node cert, and mints OUR own local membership (initiate ->
-    %% confirm -> secure). HTTP — do it off this gen_server.
-    NP = normalize(Payload),
-    MembershipId = maps:get(membership_id, NP, <<>>),
-    EncCreds = maps:get(encrypted_credentials, NP, <<>>),
-    case byte_size(EncCreds) of
-        0 -> logger:warning("[inherit_realm] inherited creds: no encrypted_credentials");
-        _ ->
-            spawn(fun() ->
-                catch hecate_realm_session:provision_from_inherited_creds(MembershipId, EncCreds)
-            end)
-    end,
-    ok;
+%% realm_credentials_secured_v1 is handled directly in handle_info/2
+%% (it touches gen_server state for once-per-session dedup).
 
 dispatch_inherited(Other, _) ->
-    logger:debug("[inherit_realm] ignoring unknown event type: ~s", [Other]),
+    logger:debug("[inherit_realm] ignoring inherited event type: ~s", [Other]),
     ok.
 
 %% @private evoq events arrive with atom OR binary keys depending on

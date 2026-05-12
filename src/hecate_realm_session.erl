@@ -419,21 +419,19 @@ provision_from_inherited_creds(MembershipId, EncryptedCreds) ->
             do_provision_from_inherited(MembershipId, EncryptedCreds)
     end.
 
-%% Heuristic: a node that has joined a realm has a non-anonymous MRI
-%% owner. Cheap, and idempotent enough — re-receiving the inherited
-%% event after we've provisioned is a no-op.
+%% Skip provisioning if this node already has a live realm membership
+%% in its own store (initiated/confirmed/credentials_secured, not
+%% ended/resigned/revoked). NOT keyed on the identity owner — that
+%% can be non-anonymous (set by a prior partial run) without there
+%% being a membership record. `not_ready' (store still spawning) ->
+%% skip too; we can't dispatch against it yet, a relay re-broadcast
+%% (or the next boot) retries.
 already_provisioned() ->
-    case hecate_identity:get_mri() of
-        {ok, MRI} -> not is_anonymous_mri(MRI);
-        _         -> false
+    case probe_live_membership() of
+        {hydrated, _, _} -> true;
+        empty            -> false;
+        not_ready        -> true
     end.
-
-is_anonymous_mri(MRI) when is_binary(MRI) ->
-    case binary:split(MRI, <<"/">>, [global]) of
-        [_, <<"anonymous">> | _] -> true;
-        _                        -> false
-    end;
-is_anonymous_mri(_) -> false.
 
 do_provision_from_inherited(_InheritedMembershipId, EncryptedCreds) ->
     case hecate_crypto:decrypt(EncryptedCreds) of
