@@ -26,12 +26,16 @@ init(Req0, State) ->
     end.
 
 discover() ->
+    %% The `mpong_lobby' pg group carries BOTH lobby servers and the
+    %% lobby seeker (the seeker joins it to receive lobby-open
+    %% broadcasts). The seeker answers `get_info' with `ok' from its
+    %% catch-all handle_call, so without a shape check the lobby list
+    %% came back as `["ok","ok",...]'. Keep only the map replies
+    %% (real lobby servers).
     Members = try pg:get_members(pg, mpong_lobby) catch _:_ -> [] end,
     lists:filtermap(fun(Pid) ->
-        try
-            Info = gen_server:call(Pid, get_info, 2000),
-            {true, Info}
-        catch _:_ ->
-            false
+        case (catch gen_server:call(Pid, get_info, 2000)) of
+            Info when is_map(Info) -> {true, Info};
+            _                      -> false
         end
     end, Members).

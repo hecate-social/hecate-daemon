@@ -9,39 +9,46 @@
 
 -export([start/2, stop/1]).
 
+-define(ENSURE_CHAMPION_GAP_MS, 3000).
+-define(ENSURE_CHAMPION_MAX_TRIES, 40).   %% ~2 min — well past the slowest cold boot
+
 start(_StartType, _StartArgs) ->
     {ok, Pid} = guide_mpong_game_lifecycle_sup:start_link(),
     %% Auto-register champion (async, non-blocking)
-    spawn(fun() ->
-        %% Wait for mpong_store to be ready
-        timer:sleep(3000),
-        ensure_champion()
-    end),
+    spawn(fun() -> ensure_champion(?ENSURE_CHAMPION_MAX_TRIES) end),
     {ok, Pid}.
 
 stop(_State) ->
     ok.
 
-ensure_champion() ->
+%% Keep dispatching `register_champion' until the champion actually
+%% lands in the `mpong_champions' projection table — NOT just once
+%% after a fixed 3s sleep. mpong_store is store #12 of 15 and on a
+%% cold disk it isn't ready for ~6s; a dispatch to a not-yet-ready
+%% store returns {ok,_} but the event is never persisted (the
+%% catch-up then reads 0 events), so the old single-shot version left
+%% `mpong_champions' empty forever — and every /api/mpong/lobby/open
+%% then 400s `no_champion_registered', which is why the UI's host
+%% buttons (Mesh / LAN / Quick start) did nothing.
+ensure_champion(0) ->
+    logger:warning("[mpong] Gave up registering champion after ~b tries",
+                   [?ENSURE_CHAMPION_MAX_TRIES]);
+ensure_champion(Tries) ->
     NodeId = atom_to_binary(node()),
-    %% Check if champion already registered (via ETS projection)
-    case ets:info(mpong_champions) of
-        undefined ->
-            %% Projection table not yet created, retry later
-            timer:sleep(2000),
-            ensure_champion();
-        _ ->
-            case ets:lookup(mpong_champions, NodeId) of
-                [{_, _Champion}] ->
-                    logger:info("[mpong] Champion already registered for ~s", [NodeId]);
-                [] ->
-                    logger:info("[mpong] Registering champion for ~s", [NodeId]),
-                    case maybe_register_champion:dispatch() of
-                        {ok, _V, _Events} ->
-                            #{name := Name} = maybe_register_champion:generate_champion(),
-                            logger:info("[mpong] Champion registered: ~s", [Name]);
-                        {error, Reason} ->
-                            logger:warning("[mpong] Failed to register champion: ~p", [Reason])
-                    end
+    case champion_in_table(NodeId) of
+        true ->
+            logger:info("[mpong] Champion registered for ~s", [NodeId]);
+        false ->
+            _ = (catch maybe_register_champion:dispatch()),
+            timer:sleep(?ENSURE_CHAMPION_GAP_MS),
+            case champion_in_table(NodeId) of
+                true  -> logger:info("[mpong] Champion registered for ~s", [NodeId]);
+                false -> ensure_champion(Tries - 1)
             end
+    end.
+
+champion_in_table(NodeId) ->
+    case ets:info(mpong_champions) of
+        undefined -> false;
+        _         -> ets:lookup(mpong_champions, NodeId) =/= []
     end.
