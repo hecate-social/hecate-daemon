@@ -74,15 +74,21 @@ On init, `hecate_mesh_client` reads configuration from the `hecate` app (not `he
 
 ```erlang
 Realm     = application:get_env(hecate, realm, <<"io.macula">>),
-Identity  = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate-dev">>),
 Bootstrap = application:get_env(hecate, bootstrap, [<<"https://boot.macula.io:4433">>])
 ```
+
+The daemon's identity is **not** config — it's the keypair held by
+`hecate_identity`. `hecate_identity:agent_id/0` returns its current
+MRI (anonymous on first boot, then the realm-asserted owner after a
+realm join). `hecate_mesh_client` reads it lazily where needed
+(`get_status`, `do_join_with_token`), not at `init/1` — the `hecate`
+app, which owns `hecate_identity`, starts after `hecate_mesh`.
 
 It then self-sends a `connect` message, deferring the actual connection to `handle_info`. This makes startup **non-blocking** -- other apps continue starting while the mesh connects.
 
 **Connection attempt:**
 1. Try each bootstrap URL in order (e.g., `https://boot.macula.io:4433`)
-2. Call `macula:connect(Url, #{realm => Realm, identity => Identity})`
+2. Call `macula:connect(Url, #{realm => Realm})`
 3. On success: monitor client PID, store in state
 4. On failure: retry after 5 seconds
 
@@ -256,9 +262,10 @@ Sends response back via mesh
 | `data_dir` | hecate | `~/.hecate` | SQLite + data directory |
 | `bootstrap` | hecate | `["https://boot.macula.io:4433"]` | Mesh bootstrap servers |
 | `realm` | hecate | `<<"io.macula">>` | Realm identifier |
-| `gateway_identity` | hecate | `<<"mri:agent:io.macula/hecate-dev">>` | Gateway MRI |
-| `managed_identities` | hecate | `[gateway_identity]` | Identity filter list |
+| `managed_identities` | hecate | `[<<"mri:agent:io.macula/hecate-dev">>]` | Child-service MRIs (currently unused — see realm rethink) |
 | `hardware` | hecate | `#{...}` | Hardware capabilities |
+
+> The daemon's own identity is **not** config — it's the keypair held by `hecate_identity` (`agent_id/0`). The old `gateway_identity` config string was removed (realm-rethink step 1).
 | `ollama_url` | serve_llm | `"http://localhost:11434"` | Ollama API endpoint |
 | `poll_interval_ms` | serve_llm | 300000 | Model detection interval (5 min) |
 | `status_interval_ms` | serve_llm | 30000 | Status heartbeat interval (30s) |

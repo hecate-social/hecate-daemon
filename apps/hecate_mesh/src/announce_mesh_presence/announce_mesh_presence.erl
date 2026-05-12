@@ -11,7 +11,7 @@
 
 -spec announce(macula:pool(), map()) -> ok | {error, term()}.
 announce(Pool, ProbeResults) ->
-    Identity = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>),
+    Identity = hecate_identity:agent_id(),
     RealmId = macula_realm:id(application:get_env(hecate, realm, <<"io.macula">>)),
     Topic = hecate_topics:app_fact(<<"presence">>, <<"announced">>, 1),
     Version = app_version(),

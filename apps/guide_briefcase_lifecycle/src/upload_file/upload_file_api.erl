@@ -54,8 +54,7 @@ process_upload(Content, Path, MimeType, Req) ->
 
 dispatch_upload(FileId, Path, MimeType, Size, Req) ->
     Realm      = application:get_env(hecate, realm, <<"io.macula">>),
-    AuthorDid  = application:get_env(hecate, gateway_identity,
-                                     <<"mri:agent:io.macula/hecate">>),
+    AuthorDid  = hecate_identity:agent_id(),
     UploadedAt = erlang:system_time(millisecond),
     Cmd = upload_file_v1:new(FileId, Realm, to_bin(Path), to_bin(MimeType),
                              Size, FileId, AuthorDid, UploadedAt),

@@ -75,7 +75,7 @@ subscribe(Topic) ->
     end.
 
 get_agent_identity() ->
-    application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>).
+    hecate_identity:agent_id().
 
 format_error(Reason) when is_binary(Reason) -> Reason;
 format_error(Reason) when is_atom(Reason) -> atom_to_binary(Reason, utf8);

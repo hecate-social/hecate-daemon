@@ -34,7 +34,6 @@
     pool :: pid() | undefined,
     activated :: boolean(),
     realm :: binary(),
-    identity :: binary(),
     relays :: [binary()],
     connections :: pos_integer(),
     site :: map(),
@@ -190,7 +189,6 @@ init([]) ->
     %% not cascade and we can self-heal in `handle_info/2'.
     erlang:process_flag(trap_exit, true),
     Realm = application:get_env(hecate, realm, <<"io.macula">>),
-    Identity = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>),
     Bootstrap = case os:getenv("MACULA_RELAYS") of
         false -> application:get_env(hecate, bootstrap,
                      [<<"https://station-be-leuven-centrum.macula.io:4433">>]);
@@ -261,7 +259,6 @@ init([]) ->
         pool = undefined,
         activated = false,
         realm = Realm,
-        identity = Identity,
         relays = Relays,
         connections = Connections,
         site = Site,
@@ -327,8 +324,7 @@ handle_call(is_activated, _From, #state{activated = A} = State) ->
     {reply, A, State};
 
 handle_call(get_status, _From,
-            #state{pool = Pool, realm = Realm,
-                   identity = Identity, relays = Relays,
+            #state{pool = Pool, realm = Realm, relays = Relays,
                    station_clients = StationClients,
                    activated = Activated} = State) ->
     %% `macula:status/1' returns `self_node_id' as a raw 32-byte
@@ -341,7 +337,9 @@ handle_call(get_status, _From,
         connected => is_pid(Pool),
         activated => Activated,
         realm => Realm,
-        identity => Identity,
+        %% The daemon's real identity, not a config string — reflects
+        %% the current MRI (anonymous, or the realm-asserted owner).
+        identity => hecate_identity:agent_id(),
         node_id => maps:get(self_node_id, PoolStatus, undefined),
         relays => Relays,
         pool => PoolStatus,
@@ -580,7 +578,7 @@ handle_info(do_join_with_token,
 handle_info(do_join_with_token,
             #state{station_clients = Pool, realm = Realm} = State) ->
     Token = list_to_binary(os:getenv("HECATE_REALM_JOIN_TOKEN")),
-    NodeName = State#state.identity,
+    NodeName = hecate_identity:agent_id(),
     SiteId = case State#state.site of
         #{<<"site_id">> := Id} -> Id;
         _ -> undefined

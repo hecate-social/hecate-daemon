@@ -16,7 +16,6 @@
         %% Config is read from hecate app env (see sys.config):
         %% - hecate.bootstrap
         %% - hecate.realm
-        %% - hecate.gateway_identity
     ]},
     {modules, []},
     {licenses, ["Apache-2.0"]},
