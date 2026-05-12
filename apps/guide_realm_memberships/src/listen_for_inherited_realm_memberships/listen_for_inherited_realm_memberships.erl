@@ -5,21 +5,19 @@
 %%% node's local realm_memberships_store produces an
 %%% initiated/confirmed/credentials_secured event, the relay PM
 %%% broadcasts it via pg. This gen_server — running on every node —
-%%% receives those broadcasts and re-dispatches the matching command
-%%% against the local store so the beam's own aggregate ends up in
-%%% the same state.
-%%%
-%%% Loop prevention: aggregate commands are idempotent
-%%% ({error, already_initiated | already_confirmed |
-%%% credentials_already_secured}). When the receiver writes its own
-%%% event, the relay PM on that node sees it, tries to rebroadcast —
-%%% but every peer is already in state, so their dispatch returns
-%%% already_* without producing a new event. No recursive storm.
-%%%
-%%% For the confirmed event we also synthesise an initiate if the
-%%% local aggregate isn't yet initiated — otherwise `confirm` would
-%%% fail with not_initiated on a peer that hasn't yet received the
-%%% initiate broadcast.
+%%% receives those broadcasts:
+%%%   * initiated / confirmed → re-dispatch the matching command
+%%%     against the local store, so the membership record exists
+%%%     locally (idempotent: {error, already_*} on re-receipt — no
+%%%     recursive storm via the relay PM).
+%%%   * credentials_secured  → DO NOT store the attended node's creds
+%%%     blob (that would run this node with the attended node's
+%%%     identity). Instead hand the inherited (cookie-encrypted) blob
+%%%     to hecate_realm_session:provision_from_inherited_creds/2,
+%%%     which decrypts it, takes ONLY the refresh token, and calls the
+%%%     realm's /api/v1/cluster/provision endpoint with this node's
+%%%     own pubkey — minting this node's OWN per-node certificate
+%%%     (mri:app:io.macula/<org>/_hecate-<node>).
 %%% @end
 -module(listen_for_inherited_realm_memberships).
 -behaviour(gen_server).
@@ -94,8 +92,24 @@ dispatch_inherited(<<"realm_membership_confirmed_v1">>, Payload) ->
              confirm_realm_membership);
 
 dispatch_inherited(<<"realm_credentials_secured_v1">>, Payload) ->
-    dispatch(maybe_secure_realm_credentials, handle_from_map, [normalize(Payload)],
-             secure_realm_credentials);
+    %% We do NOT store the attended node's creds blob — that would run
+    %% this node with the attended node's identity. Instead, hand the
+    %% inherited (cookie-encrypted) blob to hecate_realm_session, which
+    %% decrypts it, takes ONLY the refresh token, and calls the realm's
+    %% /api/v1/cluster/provision endpoint with OUR own pubkey to mint
+    %% OUR own per-node certificate. HTTP — do it off this gen_server.
+    NP = normalize(Payload),
+    MembershipId = maps:get(membership_id, NP, <<>>),
+    EncCreds = maps:get(encrypted_credentials, NP, <<>>),
+    case {byte_size(MembershipId), byte_size(EncCreds)} of
+        {0, _} -> logger:warning("[inherit_realm] inherited creds: no membership_id");
+        {_, 0} -> logger:warning("[inherit_realm] inherited creds: no encrypted_credentials");
+        _ ->
+            spawn(fun() ->
+                catch hecate_realm_session:provision_from_inherited_creds(MembershipId, EncCreds)
+            end)
+    end,
+    ok;
 
 dispatch_inherited(Other, _) ->
     logger:debug("[inherit_realm] ignoring unknown event type: ~s", [Other]),

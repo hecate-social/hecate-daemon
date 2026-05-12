@@ -18,7 +18,8 @@
 -export([
     start_joining/1,
     get_status/0,
-    cancel/0
+    cancel/0,
+    provision_from_inherited_creds/2
 ]).
 
 %% gen_server callbacks
@@ -41,7 +42,9 @@
                              handle_join_confirmed/2, get_agent_info/0, state_to_map/1,
                              dispatch_initiate_membership/1, dispatch_confirm_membership/4,
                              resolve_oauth_account/1, extract_owner_from_mri/1,
-                             update_identity_owner/1]}).
+                             update_identity_owner/1,
+                             provision_from_inherited_creds/2,
+                             do_provision_from_inherited/2, cluster_provision/2]}).
 
 -record(state, {
     status :: idle | joining | joined | failed,
@@ -385,6 +388,132 @@ dispatch_secure_credentials(MembershipId, CredsMap) ->
             logger:error("Failed to encrypt credentials: ~p", [Reason])
     end,
     ok.
+
+%%%===================================================================
+%%% Cluster-inherited provisioning
+%%%===================================================================
+
+%% @doc Provision THIS node's own realm credentials from a cluster
+%% peer's inherited credentials event.
+%%
+%% A headless node can't OAuth. An attended cluster peer does, gets a
+%% refresh token, and `relay_realm_events_to_peers' broadcasts its
+%% `realm_credentials_secured_v1' event over the cookie-gated pg seam
+%% (the payload is encrypted with the shared Erlang cookie). Here we
+%% decrypt it, take ONLY the refresh token, and call the realm's
+%% `/api/v1/cluster/provision' endpoint with OUR OWN pubkey + node
+%% name — getting back our OWN per-node certificate
+%% (`mri:app:io.macula/<org>/_hecate-<node>'). We do NOT run with a
+%% copy of the attended node's creds.
+%%
+%% Called (async, from a spawned worker) by
+%% `listen_for_inherited_realm_memberships' on each inherited
+%% `realm_credentials_secured_v1'.
+-spec provision_from_inherited_creds(binary(), binary()) -> ok.
+provision_from_inherited_creds(MembershipId, EncryptedCreds) ->
+    case already_provisioned() of
+        true ->
+            logger:debug("[realm_session] already a realm member — ignoring inherited creds"),
+            ok;
+        false ->
+            do_provision_from_inherited(MembershipId, EncryptedCreds)
+    end.
+
+%% Heuristic: a node that has joined a realm has a non-anonymous MRI
+%% owner. Cheap, and idempotent enough — re-receiving the inherited
+%% event after we've provisioned is a no-op.
+already_provisioned() ->
+    case hecate_identity:get_mri() of
+        {ok, MRI} -> not is_anonymous_mri(MRI);
+        _         -> false
+    end.
+
+is_anonymous_mri(MRI) when is_binary(MRI) ->
+    case binary:split(MRI, <<"/">>, [global]) of
+        [_, <<"anonymous">> | _] -> true;
+        _                        -> false
+    end;
+is_anonymous_mri(_) -> false.
+
+do_provision_from_inherited(MembershipId, EncryptedCreds) ->
+    case hecate_crypto:decrypt(EncryptedCreds) of
+        {ok, Serialized} ->
+            provision_with_decrypted(MembershipId, safe_binary_to_term(Serialized));
+        {error, Reason} ->
+            logger:warning("[realm_session] cannot decrypt inherited creds: ~p", [Reason]),
+            ok
+    end.
+
+provision_with_decrypted(MembershipId, #{refresh_token := RT})
+  when is_binary(RT), byte_size(RT) > 0 ->
+    RealmUrl = default_realm_url(),
+    case cluster_provision(RealmUrl, RT) of
+        {ok, #{org_identity := OrgMri, cert_pem := CertPem} = Provisioned}
+          when is_binary(OrgMri), is_binary(CertPem) ->
+            NodeAppMri = maps:get(node_app_mri, Provisioned, undefined),
+            logger:info("[realm_session] cluster-provisioned own node cert (~s) under ~s",
+                        [default_if_undef(NodeAppMri, <<"?">>), OrgMri]),
+            update_identity_owner(extract_owner_from_mri(OrgMri)),
+            dispatch_secure_credentials(MembershipId, #{
+                refresh_token => RT,
+                org_identity  => OrgMri,
+                cert_pem      => CertPem,
+                node_app_mri  => NodeAppMri
+            }),
+            hecate_web_events:broadcast(realm_join_status, #{status => joined}),
+            ok;
+        {ok, Other} ->
+            logger:warning("[realm_session] cluster-provision returned incomplete: ~p", [Other]),
+            ok;
+        {error, Reason} ->
+            logger:warning("[realm_session] cluster-provision failed: ~p", [Reason]),
+            ok
+    end;
+provision_with_decrypted(_MembershipId, _Other) ->
+    logger:warning("[realm_session] inherited creds carry no usable refresh_token"),
+    ok.
+
+safe_binary_to_term(Bin) ->
+    try binary_to_term(Bin) catch _:_ -> undefined end.
+
+%% POST {RealmUrl}/api/v1/cluster/provision with our own pubkey, using
+%% the inherited refresh token for authz. Returns the realm's response:
+%% {ok, #{org_identity, cert_pem, node_app_mri}} | {error, term()}.
+cluster_provision(RealmUrl, RefreshToken) ->
+    case hecate_identity:get_public_key() of
+        {ok, PubKey} ->
+            Url = <<RealmUrl/binary, "/api/v1/cluster/provision">>,
+            Body = json:encode(#{
+                public_key => base64:encode(PubKey),
+                node_name  => node_short_name(),
+                node_info  => get_agent_info()
+            }),
+            Headers = [{<<"content-type">>, <<"application/json">>},
+                       {<<"authorization">>, <<"Bearer ", RefreshToken/binary>>}],
+            case hackney:request(post, Url, Headers, Body, [with_body]) of
+                {ok, 201, _H, RespBody} ->
+                    Data = json:decode(RespBody),
+                    {ok, #{
+                        org_identity => maps:get(<<"org_identity">>, Data, undefined),
+                        cert_pem     => maps:get(<<"cert_pem">>, Data, undefined),
+                        node_app_mri => maps:get(<<"node_app_mri">>, Data, undefined)
+                    }};
+                {ok, Status, _H, RespBody} ->
+                    {error, {http_error, Status, RespBody}};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        not_initialized ->
+            {error, identity_not_initialized}
+    end.
+
+%% hecate@beam00.lab -> "beam00"; hecate_prodlocal@host00.lab -> "host00"
+node_short_name() ->
+    Node = atom_to_binary(node()),
+    case binary:split(Node, <<"@">>) of
+        [_, Host | _] -> hd(binary:split(Host, <<".">>));
+        [Whole]       -> Whole
+    end.
 
 -spec generate_membership_id() -> binary().
 generate_membership_id() ->
