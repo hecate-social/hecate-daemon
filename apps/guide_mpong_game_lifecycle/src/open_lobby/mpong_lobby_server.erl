@@ -569,7 +569,8 @@ publish_reservation(RequestId, GameId, NodeId, Did, WallIndex) ->
     Topic = hecate_topics:app_fact(<<"mpong">>, <<"seat_reserved">>, 1),
     Event = seat_reserved_v1:new(RequestId, GameId, NodeId, Did, WallIndex,
                                   erlang:system_time(millisecond)),
-    Payload = json:encode(seat_reserved_v1:to_map(Event)),
+    %% Pass the map, not json:encode'd — macula's V2 wire is CBOR.
+    Payload = seat_reserved_v1:to_map(Event),
     hecate_mesh:publish(Topic, Payload),
     logger:info("[mpong_lobby] published seat_reserved request_id=~s wall=~b",
                 [RequestId, WallIndex]).
@@ -578,7 +579,8 @@ publish_denial(RequestId, GameId, Reason) ->
     Topic = hecate_topics:app_fact(<<"mpong">>, <<"seat_denied">>, 1),
     Event = seat_denied_v1:new(RequestId, GameId, Reason,
                                 erlang:system_time(millisecond)),
-    Payload = json:encode(seat_denied_v1:to_map(Event)),
+    %% Pass the map, not json:encode'd — macula's V2 wire is CBOR.
+    Payload = seat_denied_v1:to_map(Event),
     hecate_mesh:publish(Topic, Payload),
     logger:info("[mpong_lobby] published seat_denied request_id=~s reason=~s",
                 [RequestId, Reason]).

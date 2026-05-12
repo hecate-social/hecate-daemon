@@ -16,7 +16,8 @@ topic() ->
 
 -spec broadcast(binary(), map()) -> ok.
 broadcast(GameId, StateMsg) ->
-    Payload = json:encode(StateMsg#{<<"game_id">> => GameId}),
+    %% Pass the map, not json:encode'd — macula's V2 wire is CBOR.
+    Payload = StateMsg#{<<"game_id">> => GameId},
     case erlang:function_exported(hecate_mesh, publish, 2) of
         true ->
             hecate_mesh:publish(topic(), Payload);

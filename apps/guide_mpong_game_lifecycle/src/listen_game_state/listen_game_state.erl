@@ -73,7 +73,8 @@ terminate(_Reason, #listener{game_id = GameId}) ->
 send_paddle(GameId, Position) ->
     Topic = handle_paddle_input:topic(),
     NodeId = atom_to_binary(node()),
-    Payload = json:encode(#{game_id => GameId, node_id => NodeId, position => Position}),
+    %% Pass the map, not json:encode'd — macula's V2 wire is CBOR.
+    Payload = #{game_id => GameId, node_id => NodeId, position => Position},
     case erlang:function_exported(hecate_mesh, publish, 2) of
         true -> hecate_mesh:publish(Topic, Payload);
         false -> ok

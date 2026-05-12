@@ -320,7 +320,8 @@ try_request_seat(Champion, GameId, State) ->
     Event     = seat_requested_v1:new(RequestId, GameId, NodeId, Did,
                                       Champion,
                                       erlang:system_time(millisecond)),
-    Payload   = json:encode(seat_requested_v1:to_map(Event)),
+    %% Pass the map, not json:encode'd — macula's V2 wire is CBOR.
+    Payload   = seat_requested_v1:to_map(Event),
     case erlang:function_exported(hecate_mesh, publish, 2) of
         true  -> hecate_mesh:publish(Topic, Payload);
         false -> ok
