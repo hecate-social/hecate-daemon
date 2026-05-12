@@ -193,7 +193,7 @@ init([]) ->
     Identity = application:get_env(hecate, gateway_identity, <<"mri:agent:io.macula/hecate">>),
     Bootstrap = case os:getenv("MACULA_RELAYS") of
         false -> application:get_env(hecate, bootstrap,
-                     [<<"https://relay00.macula.io:4433">>]);
+                     [<<"https://station-be-leuven-centrum.macula.io:4433">>]);
         EnvStr -> [list_to_binary(string:trim(U))
                    || U <- string:split(EnvStr, ",", all),
                       string:trim(U) =/= ""]

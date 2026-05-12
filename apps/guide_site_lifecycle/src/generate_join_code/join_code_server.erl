@@ -137,7 +137,7 @@ build_token(DisplayCode, ExpiresAt) ->
     NodeName = atom_to_binary(node()),
     Realm = to_binary(application:get_env(hecate, realm, <<"io.macula">>)),
     Bootstrap = case os:getenv("MACULA_RELAYS") of
-        false -> to_binary(application:get_env(hecate, mesh_bootstrap, <<"https://relay00.macula.io:4433">>));
+        false -> to_binary(application:get_env(hecate, mesh_bootstrap, <<"https://station-be-leuven-centrum.macula.io:4433">>));
         EnvStr -> list_to_binary(hd(string:split(EnvStr, ",")))
     end,
 

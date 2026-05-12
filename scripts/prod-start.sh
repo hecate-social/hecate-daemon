@@ -49,16 +49,18 @@ export HECATE_SOCKET_PATH="$HOME/.hecate-prodlocal/hecate-daemon/sockets/api.soc
 # of prod-local vs dev.
 export MACULA_MODE=client
 
-# Station fleet for the io.macula realm. CANONICAL SOURCE:
-#   macula-demo/topologies/eu/be/leuven/generated/realm-relays.txt
-# (the Greater-Leuven topology — the active one; the beam-node stubs
-# in that topology dial the same `station-be-leuven-*' hostnames).
+# Station fleet for the realm. SINGLE SOURCE OF TRUTH:
+#   macula-demo/topologies/$MACULA_TOPOLOGY/generated/realm-relays.txt
+# If that file is present (macula-demo checked out alongside this
+# repo) we read it directly, so there is exactly one place to change
+# the fleet. Otherwise fall back to the current Greater-Leuven list.
 # The old `relay-be-{leuven,antwerp,ghent}' / `station-be-{brussels,
 # antwerp,hasselt}' names were renamed away and no longer resolve to
 # a station that completes the QUIC handshake — dialing them just
 # burns 30s connect-timeout cycles and the mesh never goes healthy.
-# Override via MACULA_RELAYS env to test an alt fleet.
-export MACULA_RELAYS="${MACULA_RELAYS:-https://station-be-leuven-centrum.macula.io:4433,https://station-be-leuven-gasthuisberg.macula.io:4433,https://station-be-leuven-haasrode.macula.io:4433,https://station-be-leuven-kessel-lo.macula.io:4433,https://station-be-leuven-vaartkom.macula.io:4433,https://station-be-leuven-wilsele.macula.io:4433,https://station-be-leuven-arenberg.macula.io:4433,https://station-be-leuven-wijgmaal.macula.io:4433,https://station-be-leuven-bertem.macula.io:4433,https://station-be-leuven-linden.macula.io:4433}"
+# Override entirely via MACULA_RELAYS env.
+. "$SCRIPT_DIR/_relays.sh"
+export MACULA_RELAYS="${MACULA_RELAYS:-$(resolve_relays "$PROJECT_DIR")}"
 
 # BEAM cluster cookie + peers (lab topology: laptop <-> beam00..03).
 # Settings live here (tracked, survives --clear) rather than in the

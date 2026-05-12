@@ -44,8 +44,11 @@ export HECATE_SOCKET_PATH="$HOME/.hecate-dev/hecate-daemon/sockets/api.sock"
 # Client mode: node connects to relay, no local gateway/discovery.
 export MACULA_MODE=client
 
-# Relay list (override via env file or MACULA_RELAYS env var)
-export MACULA_RELAYS="${MACULA_RELAYS:-https://relays-hetzner-nuremberg.macula.io:4433,https://relays-hetzner-helsinki.macula.io:4433,https://relays-linode-paris.macula.io:4433}"
+# Station fleet — single source of truth is the macula-demo topology
+# (macula-demo/topologies/$MACULA_TOPOLOGY/generated/realm-relays.txt).
+# Override via env file or the MACULA_RELAYS env var.
+. "$SCRIPT_DIR/_relays.sh"
+export MACULA_RELAYS="${MACULA_RELAYS:-$(resolve_relays "$PROJECT_DIR")}"
 
 # MaxMind GeoIP: extract license key from GeoIP.conf if not already set
 if [ -z "${MAXMIND_LICENSE_KEY:-}" ] && [ -f "$HOME/.config/maxmind/GeoIP.conf" ]; then
