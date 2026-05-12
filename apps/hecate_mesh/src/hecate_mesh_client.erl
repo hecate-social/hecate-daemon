@@ -353,12 +353,34 @@ handle_call({publish, _Topic, _Payload}, _From, #state{activated = false} = Stat
     {reply, {error, not_activated}, State};
 handle_call({publish, Topic, Payload}, _From,
             #state{pool = Pool, realm = Realm} = State) ->
-    %% V2 publish — `macula:publish/4' returns ok as soon as one
-    %% connected station accepts the PUBLISH frame. Wrap with
-    %% safe_mesh_call: the pool pid can be dead-but-still-referenced
-    %% in the brief window between an EXIT message arriving and the
-    %% EXIT handler running.
-    _ = safe_mesh_call(fun() -> macula:publish(Pool, macula_realm:id(Realm), Topic, Payload) end),
+    %% V2 publish. `macula:publish/4' defaults `replication_factor' to
+    %% 1 — the PUBLISH frame hits exactly ONE station link. Combined
+    %% with macula-station's cross-station EVENT relay being bounded to
+    %% 1 hop from the origin station (see macula-station's
+    %% docs/PUBSUB_RESIGN_LOOP_LESSON.md — the bound is an accidental
+    %% verify-fail loop-kill), a subscriber only receives the event if
+    %% it's connected to that one origin station or a direct peer of
+    %% it. In the partial Leuven station mesh that coverage is
+    %% non-deterministic, so e.g. mpong games never reliably pair.
+    %%
+    %% STOPGAP (until macula-station Phase 2 — publisher-end-to-end
+    %% signed EVENT envelopes + (publisher, seq) dedup, which lets a
+    %% publish propagate multi-hop): fan the PUBLISH to ALL connected
+    %% station links. Every daemon in the deployment connects to the
+    %% full station list, so every subscriber is then 0 hops from an
+    %% origin station. `lists:sublist/2' in the SDK clamps to the
+    %% links actually available, so 99 just means "all". Cost: a
+    %% subscriber sees each event once per shared station — handlers
+    %% must be idempotent.
+    %%
+    %% Wrap with safe_mesh_call: the pool pid can be dead-but-still-
+    %% referenced in the brief window between an EXIT message arriving
+    %% and the EXIT handler running.
+    PubOpts = #{replication_factor => 99},
+    _ = safe_mesh_call(
+          fun() ->
+              macula:publish(Pool, macula_realm:id(Realm), Topic, Payload, PubOpts)
+          end),
     {reply, ok, State};
 
 %% -- DHT record operations (PLAN_DHT_FIRST.md) -----------------------
