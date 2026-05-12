@@ -1,23 +1,30 @@
-%%% @doc Listen for realm-membership events relayed from cluster peers.
+%%% @doc Listen for realm-membership events relayed across the site.
 %%%
-%%% Headless beam nodes can't OAuth. They depend on an attended peer
-%%% (host00) to go through the realm join flow. When the attended
-%%% node's local realm_memberships_store produces an
-%%% initiated/confirmed/credentials_secured event, the relay PM
-%%% broadcasts it via pg. This gen_server — running on every node —
-%%% receives those broadcasts:
-%%%   * initiated / confirmed → re-dispatch the matching command
-%%%     against the local store, so the membership record exists
-%%%     locally (idempotent: {error, already_*} on re-receipt — no
-%%%     recursive storm via the relay PM).
-%%%   * credentials_secured  → DO NOT store the attended node's creds
-%%%     blob (that would run this node with the attended node's
-%%%     identity). Instead hand the inherited (cookie-encrypted) blob
-%%%     to hecate_realm_session:provision_from_inherited_creds/2,
-%%%     which decrypts it, takes ONLY the refresh token, and calls the
-%%%     realm's /api/v1/cluster/provision endpoint with this node's
-%%%     own pubkey — minting this node's OWN per-node certificate
-%%%     (mri:app:io.macula/<org>/_hecate-<node>).
+%%% A "site" is the cluster of co-located daemons. Headless daemons
+%%% can't OAuth; they depend on an attended daemon in the same site to
+%%% go through the realm join flow. When the attended daemon writes a
+%%% realm-membership event to its realm_memberships_store,
+%%% relay_realm_events_to_site re-publishes it over the
+%%% boot_daemon:site_daemons_group/0 pg seam. This gen_server — running
+%%% on every daemon — receives those {site_realm_event, ...} messages:
+%%%
+%%%   * initiated / confirmed → informational. We do NOT replicate the
+%%%     attended daemon's membership record.
+%%%   * credentials_secured  → hand the (cookie-encrypted) blob to
+%%%     hecate_realm_session:provision_from_inherited_creds/2, which
+%%%     decrypts it, takes ONLY the refresh token, and calls the
+%%%     realm's /api/v1/cluster/provision with this daemon's own pubkey
+%%%     to mint this daemon's OWN per-daemon cert
+%%%     (mri:app:io.macula/<org>/_hecate-<daemon>) and OWN local
+%%%     membership.
+%%%
+%%% Dedup: the relay re-delivers credentials_secured many times during
+%%% a catch-up replay, and the attended daemon may carry several
+%%% memberships (some with revoked tokens). We trigger at most one
+%%% provision worker per distinct membership_id this session; the
+%%% worker also bails if a membership already exists
+%%% (hecate_realm_session:already_provisioned/0, an ETS read-model
+%%% check) so a daemon restart doesn't re-mint.
 %%% @end
 -module(listen_for_inherited_realm_memberships).
 -behaviour(gen_server).
@@ -29,15 +36,16 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    Group = boot_daemon:inherited_pg_group(),
+    Group = boot_daemon:site_daemons_group(),
+    Base = #{group => Group, provisioned_for => #{}},
     case safe_join(Group) of
         ok ->
-            logger:info("[inherit_realm] joined pg group ~p", [Group]),
-            {ok, #{joined => true, group => Group}};
+            logger:info("[site_realm] joined site pg group ~p", [Group]),
+            {ok, Base#{joined => true}};
         {error, Reason} ->
-            logger:warning("[inherit_realm] pg join failed (~p); retrying in 2s", [Reason]),
+            logger:warning("[site_realm] pg join failed (~p); retrying in 2s", [Reason]),
             erlang:send_after(2000, self(), retry_join),
-            {ok, #{joined => false, group => Group}}
+            {ok, Base#{joined => false}}
     end.
 
 handle_call(_Request, _From, State) ->
@@ -49,41 +57,36 @@ handle_cast(_Msg, State) ->
 handle_info(retry_join, #{joined := false, group := Group} = State) ->
     case safe_join(Group) of
         ok ->
-            logger:info("[inherit_realm] joined pg group ~p (retry)", [Group]),
+            logger:info("[site_realm] joined site pg group ~p (retry)", [Group]),
             {noreply, State#{joined => true}};
         {error, _} ->
             erlang:send_after(2000, self(), retry_join),
             {noreply, State}
     end;
 
-handle_info({inherited_realm_event, <<"realm_credentials_secured_v1">>, Payload, FromNode}, State) ->
-    logger:info("[inherit_realm] received realm_credentials_secured_v1 from ~p", [FromNode]),
-    %% The relay re-delivers this many times during a catch-up replay;
-    %% only act on the first one this session (the spawned worker also
-    %% re-checks for an existing membership via probe_live_membership,
-    %% but the flag avoids a swarm of concurrent HTTP provisions).
-    case maps:get(provision_triggered, State, false) of
-        true ->
+handle_info({site_realm_event, <<"realm_credentials_secured_v1">>, Payload, FromDaemon}, State) ->
+    logger:info("[site_realm] received realm_credentials_secured_v1 from ~p", [FromDaemon]),
+    NP = normalize(Payload),
+    MembershipId = maps:get(membership_id, NP, <<>>),
+    EncCreds = maps:get(encrypted_credentials, NP, <<>>),
+    Done = maps:get(provisioned_for, State, #{}),
+    case {byte_size(EncCreds), maps:is_key(MembershipId, Done)} of
+        {0, _} ->
+            logger:warning("[site_realm] inherited creds: no encrypted_credentials"),
             {noreply, State};
-        false ->
-            NP = normalize(Payload),
-            MembershipId = maps:get(membership_id, NP, <<>>),
-            EncCreds = maps:get(encrypted_credentials, NP, <<>>),
-            case byte_size(EncCreds) of
-                0 ->
-                    logger:warning("[inherit_realm] inherited creds: no encrypted_credentials"),
-                    {noreply, State};
-                _ ->
-                    spawn(fun() ->
-                        catch hecate_realm_session:provision_from_inherited_creds(MembershipId, EncCreds)
-                    end),
-                    {noreply, State#{provision_triggered => true}}
-            end
+        {_, true} ->
+            %% Already spawned a provision attempt for this membership this session.
+            {noreply, State};
+        {_, false} ->
+            spawn(fun() ->
+                catch hecate_realm_session:provision_from_inherited_creds(MembershipId, EncCreds)
+            end),
+            {noreply, State#{provisioned_for => Done#{MembershipId => true}}}
     end;
 
-handle_info({inherited_realm_event, EventType, Payload, FromNode}, State) ->
-    logger:info("[inherit_realm] received ~s from ~p", [EventType, FromNode]),
-    dispatch_inherited(EventType, Payload),
+handle_info({site_realm_event, EventType, Payload, FromDaemon}, State) ->
+    logger:info("[site_realm] received ~s from ~p", [EventType, FromDaemon]),
+    note_inherited(EventType, Payload),
     {noreply, State};
 
 handle_info(_Info, State) ->
@@ -95,26 +98,19 @@ terminate(_Reason, #{group := Group}) ->
 terminate(_Reason, _) -> ok.
 
 %%====================================================================
-%% Dispatch
+%% Internal
 %%====================================================================
 
-dispatch_inherited(<<"realm_membership_initiated_v1">>, _Payload) ->
-    %% Informational only. We do NOT replicate the attended node's
-    %% membership record — when its `realm_credentials_secured_v1'
-    %% arrives we mint our OWN membership locally (with our own cert
-    %% from /api/v1/cluster/provision). So nothing to do here.
-    logger:debug("[inherit_realm] noted peer realm_membership_initiated_v1"),
+%% initiated/confirmed are informational — we mint our own membership
+%% when credentials_secured arrives, not a copy of the attended one's.
+note_inherited(<<"realm_membership_initiated_v1">>, _Payload) ->
+    logger:debug("[site_realm] noted realm_membership_initiated_v1"),
     ok;
-
-dispatch_inherited(<<"realm_membership_confirmed_v1">>, _Payload) ->
-    logger:debug("[inherit_realm] noted peer realm_membership_confirmed_v1"),
+note_inherited(<<"realm_membership_confirmed_v1">>, _Payload) ->
+    logger:debug("[site_realm] noted realm_membership_confirmed_v1"),
     ok;
-
-%% realm_credentials_secured_v1 is handled directly in handle_info/2
-%% (it touches gen_server state for once-per-session dedup).
-
-dispatch_inherited(Other, _) ->
-    logger:debug("[inherit_realm] ignoring inherited event type: ~s", [Other]),
+note_inherited(Other, _) ->
+    logger:debug("[site_realm] ignoring inherited event type: ~s", [Other]),
     ok.
 
 %% @private evoq events arrive with atom OR binary keys depending on
@@ -128,10 +124,6 @@ normalize(Payload) when is_map(Payload) ->
         (K, V, Acc) ->
             Acc#{K => V}
     end, #{}, Payload).
-
-%%====================================================================
-%% pg helpers
-%%====================================================================
 
 safe_join(Group) ->
     try pg:join(Group, self())

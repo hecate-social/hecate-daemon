@@ -1,8 +1,8 @@
-%%% @doc CT suite for the boot_daemon pg relay seam.
+%%% @doc CT suite for the boot_daemon site pg relay seam.
 %%%
-%%% Validates that a message published via `boot_daemon:broadcast_inherited/2`
-%%% on one node reaches a peer node that has joined the
-%%% `{boot_daemon, inherited_realm_memberships}` pg group.
+%%% Validates that a message published via `boot_daemon:broadcast_to_site/2`
+%%% on one daemon reaches another daemon in the site that has joined
+%%% the `{boot_daemon, site_realm_memberships}` pg group.
 %%%
 %%% Intentionally narrower than the full realm-join flow — testing the
 %%% actual `initiate_realm_membership` / `confirm_realm_membership`
@@ -21,22 +21,22 @@
 
 -export([all/0, init_per_suite/1, end_per_suite/1,
          init_per_testcase/2, end_per_testcase/2]).
--export([broadcast_reaches_peer/1,
+-export([broadcast_reaches_site_daemon/1,
          broadcast_skips_self/1,
-         peer_without_group_is_ignored/1]).
+         site_daemon_without_group_is_ignored/1]).
 -export([collector_loop/1, pg_keepalive/0]).
 
--define(GROUP, {boot_daemon, inherited_realm_memberships}).
+-define(GROUP, {boot_daemon, site_realm_memberships}).
 -define(COOKIE, inherit_join_test_cookie).
 
 all() ->
-    [broadcast_reaches_peer,
+    [broadcast_reaches_site_daemon,
      broadcast_skips_self,
-     peer_without_group_is_ignored].
+     site_daemon_without_group_is_ignored].
 
 init_per_suite(Config) ->
     %% Make sure this runner node has a long name and a known cookie so
-    %% spawned peers can connect back.
+    %% spawned daemons can connect back.
     case net_kernel:get_state() of
         #{started := no} ->
             {ok, _} = net_kernel:start(ct_main, #{name_domain => shortnames});
@@ -50,16 +50,16 @@ end_per_suite(_Config) ->
     ok.
 
 init_per_testcase(_TC, Config) ->
-    {ok, PidA, NodeA} = start_peer(a),
-    {ok, PidB, NodeB} = start_peer(b),
+    {ok, PidA, NodeA} = start_daemon(a),
+    {ok, PidB, NodeB} = start_daemon(b),
     load_test_code([NodeA, NodeB]),
     start_pg([NodeA, NodeB]),
-    [{peer_a, {PidA, NodeA}},
-     {peer_b, {PidB, NodeB}} | Config].
+    [{daemon_a, {PidA, NodeA}},
+     {daemon_b, {PidB, NodeB}} | Config].
 
 end_per_testcase(_TC, Config) ->
-    {PidA, _} = ?config(peer_a, Config),
-    {PidB, _} = ?config(peer_b, Config),
+    {PidA, _} = ?config(daemon_a, Config),
+    {PidB, _} = ?config(daemon_b, Config),
     catch peer:stop(PidA),
     catch peer:stop(PidB),
     ok.
@@ -68,12 +68,12 @@ end_per_testcase(_TC, Config) ->
 %% Cases
 %%====================================================================
 
-%% Peer B joins the pg group via a collector process; peer A publishes
-%% via boot_daemon:broadcast_inherited; B's collector receives the
-%% {inherited_realm_event, ...} message.
-broadcast_reaches_peer(Config) ->
-    {_, NodeA} = ?config(peer_a, Config),
-    {_, NodeB} = ?config(peer_b, Config),
+%% Daemon B joins the pg group via a collector process; daemon A
+%% publishes via boot_daemon:broadcast_to_site; B's collector receives
+%% the {site_realm_event, ...} message.
+broadcast_reaches_site_daemon(Config) ->
+    {_, NodeA} = ?config(daemon_a, Config),
+    {_, NodeB} = ?config(daemon_b, Config),
 
     Self = self(),
     CollectorB = erpc:call(NodeB, erlang, spawn,
@@ -85,16 +85,16 @@ broadcast_reaches_peer(Config) ->
     Payload = #{membership_id => <<"test-mid">>,
                 realm_url => <<"https://io.macula:4433">>,
                 initiated_at => 1700000000000},
-    ok = erpc:call(NodeA, boot_daemon, broadcast_inherited, [EventType, Payload]),
+    ok = erpc:call(NodeA, boot_daemon, broadcast_to_site, [EventType, Payload]),
 
-    Received = recv_inherited(1000),
-    ?assertMatch({inherited_realm_event, EventType, Payload, NodeA}, Received).
+    Received = recv_site_event(1000),
+    ?assertMatch({site_realm_event, EventType, Payload, NodeA}, Received).
 
-%% Broadcast MUST skip the publishing node itself — the local event
+%% Broadcast MUST skip the publishing daemon itself — the local event
 %% store already produced this event; re-dispatching it would create a
 %% subscription loop (relay PM -> self listener -> relay PM ...).
 broadcast_skips_self(Config) ->
-    {_, NodeA} = ?config(peer_a, Config),
+    {_, NodeA} = ?config(daemon_a, Config),
 
     Self = self(),
     CollectorA = erpc:call(NodeA, erlang, spawn,
@@ -103,15 +103,15 @@ broadcast_skips_self(Config) ->
 
     EventType = <<"realm_membership_confirmed_v1">>,
     Payload = #{membership_id => <<"mid-2">>, realm_id => <<"io.macula">>},
-    ok = erpc:call(NodeA, boot_daemon, broadcast_inherited, [EventType, Payload]),
+    ok = erpc:call(NodeA, boot_daemon, broadcast_to_site, [EventType, Payload]),
 
-    ?assertEqual(timeout, recv_inherited(300)).
+    ?assertEqual(timeout, recv_site_event(300)).
 
-%% A peer that hasn't joined the pg group does not receive anything —
-%% broadcast fans out to pg members only.
-peer_without_group_is_ignored(Config) ->
-    {_, NodeA} = ?config(peer_a, Config),
-    {_, NodeB} = ?config(peer_b, Config),
+%% A site daemon that hasn't joined the pg group does not receive
+%% anything — broadcast fans out to pg members only.
+site_daemon_without_group_is_ignored(Config) ->
+    {_, NodeA} = ?config(daemon_a, Config),
+    {_, NodeB} = ?config(daemon_b, Config),
 
     Self = self(),
     CollectorB = erpc:call(NodeB, erlang, spawn,
@@ -120,15 +120,15 @@ peer_without_group_is_ignored(Config) ->
     _ = CollectorB,
 
     EventType = <<"realm_membership_initiated_v1">>,
-    ok = erpc:call(NodeA, boot_daemon, broadcast_inherited, [EventType, #{}]),
+    ok = erpc:call(NodeA, boot_daemon, broadcast_to_site, [EventType, #{}]),
 
-    ?assertEqual(timeout, recv_inherited(300)).
+    ?assertEqual(timeout, recv_site_event(300)).
 
 %%====================================================================
 %% Helpers
 %%====================================================================
 
-start_peer(Tag) ->
+start_daemon(Tag) ->
     Name = list_to_atom("inherit_join_" ++ atom_to_list(Tag)),
     {ok, Pid, NodeName} = peer:start_link(#{name => Name,
                                             host => "127.0.0.1",
@@ -139,7 +139,7 @@ start_peer(Tag) ->
     {ok, Pid, NodeName}.
 
 %% Add the compiled boot_daemon ebin AND this test suite's ebin to
-%% each peer's code path so `boot_daemon:broadcast_inherited/2` and
+%% each daemon's code path so `boot_daemon:broadcast_to_site/2` and
 %% `?MODULE:collector_loop/1` resolve remotely.
 load_test_code(Nodes) ->
     %% This module's beam file directory — test suites are compiled
@@ -155,7 +155,7 @@ load_test_code(Nodes) ->
         {module, ?MODULE}     = erpc:call(N, code, load_file, [?MODULE])
     end, Nodes).
 
-%% Start `pg` inside a long-lived keepalive process on each peer — the
+%% Start `pg` inside a long-lived keepalive process on each daemon — the
 %% pg scope is linked to its starter, so running it inside an ephemeral
 %% erpc worker would let it die as soon as the RPC reply returns.
 start_pg(Nodes) ->
@@ -190,7 +190,7 @@ pg_keepalive() ->
 
 collector_loop(Parent) ->
     receive
-        {inherited_realm_event, _, _, _} = Msg ->
+        {site_realm_event, _, _, _} = Msg ->
             Parent ! Msg,
             collector_loop(Parent);
         stop ->
@@ -200,14 +200,14 @@ collector_loop(Parent) ->
             collector_loop(Parent)
     end.
 
-recv_inherited(Timeout) ->
+recv_site_event(Timeout) ->
     receive
-        {inherited_realm_event, _, _, _} = Msg -> Msg
+        {site_realm_event, _, _, _} = Msg -> Msg
     after Timeout -> timeout
     end.
 
 %% pg membership is eventually consistent across nodes — poll until the
-%% publishing node sees the expected member count or the deadline fires.
+%% publishing daemon sees the expected member count or the deadline fires.
 wait_until_members_visible(Node, Expected, TimeoutMs) ->
     Deadline = erlang:monotonic_time(millisecond) + TimeoutMs,
     wait_members_loop(Node, Expected, Deadline).

@@ -4,15 +4,16 @@
 %%% register_stores/1 once reckon_db + evoq are up. boot_daemon does
 %%% not own the store catalog — that's domain knowledge belonging to
 %%% the hecate root app. boot_daemon owns the mechanics of spawning,
-%%% tracking, sequencing post-boot, and pg relay.
+%%% tracking, sequencing post-boot, and the site-relay pg seam.
 %%%
 %%% The facade exposes:
-%%%   register_stores/1 — hand a store list to boot_tracker + spawner.
-%%%   get_status/0      — current boot phase + store readiness map.
-%%%   set_phase/1       — hecate_boot_tracker used to own this; now
-%%%                       forwarded to boot_tracker.
-%%%   broadcast_inherited/2 — publish an inherited-event message to
-%%%                       peers in the pg group.
+%%%   register_stores/1   — hand a store list to boot_tracker + spawner.
+%%%   get_status/0        — current boot phase + store readiness map.
+%%%   set_phase/1         — forwarded to boot_tracker.
+%%%   broadcast_to_site/2 — publish a realm-membership event to the
+%%%                         other daemons in this site (pg group).
+%%%   site_daemons_group/0 — the pg group name every daemon's
+%%%                         listen_for_inherited_realm_memberships joins.
 %%% @end
 -module(boot_daemon).
 
@@ -21,11 +22,12 @@
     get_status/0,
     set_phase/1,
     set_running/0,
-    broadcast_inherited/2,
-    inherited_pg_group/0
+    broadcast_to_site/2,
+    site_daemons_group/0
 ]).
 
--define(INHERITED_PG_GROUP, {boot_daemon, inherited_realm_memberships}).
+%% pg group spanning the site (the co-located daemon cluster).
+-define(SITE_DAEMONS_GROUP, {boot_daemon, site_realm_memberships}).
 
 %% @doc Hand the full store catalog to boot_tracker so it can spawn
 %% stores sequentially and track readiness. Called by hecate_app.
@@ -45,19 +47,20 @@ set_phase(Phase) ->
 set_running() ->
     boot_tracker:set_running().
 
-%% @doc Publish an inherited-realm-memberships message to every peer
-%% subscribed to the pg group. The local relay PM calls this; the
-%% remote listener (listen_for_inherited_realm_memberships) receives.
+%% @doc Publish a realm-membership event to the other daemons in this
+%% site (everyone in the pg group except self). The local
+%% relay_realm_events_to_site PM calls this; each remote
+%% listen_for_inherited_realm_memberships receives a
+%% {site_realm_event, EventType, Payload, FromDaemon} message.
 %%
-%% EventType is the binary event_type (e.g. <<"realm_membership_confirmed_v1">>).
-%% Payload is the event map — re-dispatched as a command on the receiver.
--spec broadcast_inherited(binary(), map()) -> ok.
-broadcast_inherited(EventType, Payload) ->
-    Msg = {inherited_realm_event, EventType, Payload, node()},
-    Members = try pg:get_members(?INHERITED_PG_GROUP) catch _:_ -> [] end,
-    Peers = [P || P <- Members, node(P) =/= node()],
-    [P ! Msg || P <- Peers],
+%% EventType is the binary event_type (e.g. <<"realm_credentials_secured_v1">>).
+-spec broadcast_to_site(binary(), map()) -> ok.
+broadcast_to_site(EventType, Payload) ->
+    Msg = {site_realm_event, EventType, Payload, node()},
+    Members = try pg:get_members(?SITE_DAEMONS_GROUP) catch _:_ -> [] end,
+    Others = [P || P <- Members, node(P) =/= node()],
+    [P ! Msg || P <- Others],
     ok.
 
--spec inherited_pg_group() -> term().
-inherited_pg_group() -> ?INHERITED_PG_GROUP.
+-spec site_daemons_group() -> term().
+site_daemons_group() -> ?SITE_DAEMONS_GROUP.

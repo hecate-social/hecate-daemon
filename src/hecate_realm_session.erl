@@ -393,18 +393,18 @@ dispatch_secure_credentials(MembershipId, CredsMap) ->
 %%% Cluster-inherited provisioning
 %%%===================================================================
 
-%% @doc Provision THIS node's own realm credentials from a cluster
-%% peer's inherited credentials event.
+%% @doc Provision THIS daemon's own realm credentials from a site
+%% daemon's relayed credentials event.
 %%
-%% A headless node can't OAuth. An attended cluster peer does, gets a
-%% refresh token, and `relay_realm_events_to_peers' broadcasts its
-%% `realm_credentials_secured_v1' event over the cookie-gated pg seam
-%% (the payload is encrypted with the shared Erlang cookie). Here we
-%% decrypt it, take ONLY the refresh token, and call the realm's
-%% `/api/v1/cluster/provision' endpoint with OUR OWN pubkey + node
-%% name — getting back our OWN per-node certificate
-%% (`mri:app:io.macula/<org>/_hecate-<node>'). We do NOT run with a
-%% copy of the attended node's creds.
+%% A headless daemon can't OAuth. An attended daemon in the same site
+%% does, gets a refresh token, and `relay_realm_events_to_site'
+%% broadcasts its `realm_credentials_secured_v1' event over the
+%% cookie-gated pg seam (the payload is encrypted with the shared
+%% Erlang cookie). Here we decrypt it, take ONLY the refresh token,
+%% and call the realm's `/api/v1/cluster/provision' endpoint with OUR
+%% OWN pubkey + node name — getting back our OWN per-daemon
+%% certificate (`mri:app:io.macula/<org>/_hecate-<node>'). We do NOT
+%% run with a copy of the attended daemon's creds.
 %%
 %% Called (async, from a spawned worker) by
 %% `listen_for_inherited_realm_memberships' on each inherited

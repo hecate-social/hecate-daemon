@@ -96,24 +96,24 @@ init([]) ->
             modules => [evoq_event_handler,
                         on_realm_membership_ended_unsubscribe_from_revoked]
         },
-        %% Relay local realm events to cluster peers via pg (outbound).
-        %% Lets an attended node's OAuth flow propagate to headless
-        %% beams clustered to the same node. Idempotent — receivers
-        %% that are already in state no-op.
+        %% Relay local realm events to the site (the co-located daemon
+        %% cluster) via pg (outbound). Lets an attended daemon's OAuth
+        %% flow propagate to headless daemons in the same site, which
+        %% then mint their own per-daemon cert via cluster-provision.
         #{
-            id => relay_realm_events_to_peers,
+            id => relay_realm_events_to_site,
             start => {evoq_event_handler, start_link,
-                      [relay_realm_events_to_peers, #{}, #{}]},
+                      [relay_realm_events_to_site, #{}, #{}]},
             restart => permanent,
             shutdown => 5000,
             type => worker,
             modules => [evoq_event_handler,
-                        relay_realm_events_to_peers]
+                        relay_realm_events_to_site]
         },
         %% Inbound listener for relayed realm events (the cluster-
-        %% inherited-join seam). Joins the boot_daemon pg group and
-        %% re-dispatches initiated/confirmed/credentials-secured
-        %% commands against the local store.
+        %% inherited-join seam). Joins the boot_daemon site pg group
+        %% and, on relayed credentials, provisions this daemon's own
+        %% per-daemon cert via the realm's /api/v1/cluster/provision.
         #{
             id => listen_for_inherited_realm_memberships,
             start => {listen_for_inherited_realm_memberships, start_link, []},
