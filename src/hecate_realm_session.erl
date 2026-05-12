@@ -426,11 +426,17 @@ provision_from_inherited_creds(MembershipId, EncryptedCreds) ->
 %% being a membership record. `not_ready' (store still spawning) ->
 %% skip too; we can't dispatch against it yet, a relay re-broadcast
 %% (or the next boot) retries.
+%% True iff we've already credentials-secured a membership — i.e. the
+%% `credentials_secured_v1 -> realm_credentials' projection has at
+%% least one entry. A plain ETS read of the read model (reliable;
+%% unlike read_all_global against the event store, which can return
+%% `no_workers' on a freshly-up node). Within-session re-deliveries
+%% are deduped by listen_for_inherited_realm_memberships' flag; this
+%% covers the cross-restart case.
 already_provisioned() ->
-    case probe_live_membership() of
-        {hydrated, _, _} -> true;
-        empty            -> false;
-        not_ready        -> true
+    case (catch ets:info(realm_credentials, size)) of
+        N when is_integer(N), N > 0 -> true;
+        _                           -> false
     end.
 
 do_provision_from_inherited(_InheritedMembershipId, EncryptedCreds) ->
