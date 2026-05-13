@@ -56,6 +56,20 @@ start(_StartType, _StartArgs) ->
     application:set_env(macula, quic_max_conn_per_ip, 50),
     application:set_env(macula, quic_max_conn_global_per_sec, 200),
 
+    %% Pubsub Phase 2 — opt in to publisher-end-to-end signed events.
+    %% HECATE_PUBSUB_PUBLISHER_SIG=true → the daemon attaches a
+    %% `publisher_sig' to every PUBLISH frame (macula >= 4.4.1), which
+    %% relay stations carry onto the EVENT so it verifies end-to-end
+    %% at every hop and the (publisher,seq) dedup becomes the cross-
+    %% station loop kill. DO NOT enable until every relay is on macula
+    %% >= 4.4.0 (a pre-4.4.0 relay would reject a PUBLISH carrying
+    %% publisher_sig). Default off. HECATE_PUBSUB_STRICT_PUBLISHER_SIG=true
+    %% additionally drops (rather than log+deliver) an inbound EVENT
+    %% whose publisher_sig is present but invalid. See macula CHANGELOG
+    %% 4.4.0-4.4.2 + macula-station/plans/PLAN_PUBSUB_E2E_SIGNED_EVENTS.md.
+    set_macula_flag(pubsub_emit_publisher_sig, "HECATE_PUBSUB_PUBLISHER_SIG"),
+    set_macula_flag(pubsub_strict_publisher_sig, "HECATE_PUBSUB_STRICT_PUBLISHER_SIG"),
+
     %% 1. Create namespaced directory layout
     shared_paths:ensure_layout(),
 
@@ -130,3 +144,22 @@ stop(_State) ->
     end,
     hecate_lifecycle:cleanup(),
     ok.
+
+%% Mirror a boolean `HECATE_*' env var into a `macula' application
+%% env key. Recognised true values: "true" / "1" (case-insensitive).
+%% Anything else (incl. unset) leaves the macula default in place —
+%% we only ever set it to `true', never explicitly to `false', so a
+%% sys.config override still wins for the off state.
+-spec set_macula_flag(atom(), string()) -> ok.
+set_macula_flag(Key, EnvVar) ->
+    case env_truthy(os:getenv(EnvVar)) of
+        true ->
+            application:set_env(macula, Key, true),
+            logger:notice("[hecate] macula ~p enabled via ~s", [Key, EnvVar]);
+        false ->
+            ok
+    end.
+
+env_truthy(false)   -> false;
+env_truthy(V)       ->
+    lists:member(string:lowercase(V), ["true", "1", "yes", "on"]).
