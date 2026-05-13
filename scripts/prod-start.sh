@@ -75,6 +75,18 @@ export HECATE_CLUSTER_PEERS="${HECATE_CLUSTER_PEERS:-hecate@beam00.lab,hecate@be
 # The inproc backend is strictly dev/test territory.
 export HECATE_MESH_BACKEND=client
 
+# Emit `publisher_sig' on outbound PUBLISH frames (macula 4.4.1+).
+# Without this, cross-station EVENT relay falls back to per-hop signature
+# verify, which is bounded to one hop by the verify-fail-loop-kill
+# accident. Any subscriber more than one station-hop away never receives
+# our publishes — e.g. mpong's `game_advertised_v1' from this laptop
+# never reaches beam daemons connected to a different relay than ours.
+# The deployed beam fleet already has this flag on; the laptop has been
+# the lone holdout (deployed env files set it via
+# macula-demo/infrastructure/*/hecate-daemon.env.example, but
+# prod-start.sh did not).
+export HECATE_PUBSUB_PUBLISHER_SIG=true
+
 # MaxMind GeoIP: extract license key from GeoIP.conf if not already set
 if [ -z "${MAXMIND_LICENSE_KEY:-}" ] && [ -f "$HOME/.config/maxmind/GeoIP.conf" ]; then
     MAXMIND_LICENSE_KEY="$(grep '^LicenseKey' "$HOME/.config/maxmind/GeoIP.conf" | awk '{print $2}')"
