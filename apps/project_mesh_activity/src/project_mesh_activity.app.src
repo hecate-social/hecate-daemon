@@ -1,0 +1,18 @@
+{application, project_mesh_activity, [
+    {description, "PRJ service: agent activity ETS read model (publications + artifacts)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {project_mesh_activity_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        evoq,
+        reckon_evoq,
+        guide_mesh_publications,
+        guide_mesh_artifacts
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

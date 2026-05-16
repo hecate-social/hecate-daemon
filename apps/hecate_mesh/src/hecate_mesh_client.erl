@@ -21,7 +21,8 @@
 -export([connected_peer_pubkeys/0]).
 -export([get_status/0, publish/2, subscribe/2,
          unsubscribe/1, discover_subscribers/1, advertise/2, call/3, call/4,
-         put_record/1, find_record/1, find_records_by_type/1]).
+         put_record/1, find_record/1, find_records_by_type/1,
+         put_content/1, get_content/1]).
 -export([register_subscription/2, register_advertisement/2,
          unregister_advertisement/1,
          register_stream_advertisement/3, call_stream/4]).
@@ -156,6 +157,28 @@ find_record(Key) when is_binary(Key), byte_size(Key) =:= 32 ->
         {ok, [macula_record:record()]} | {error, term()}.
 find_records_by_type(Type) when is_integer(Type), Type >= 1, Type =< 16#FF ->
     safe_call({find_records_by_type, Type}, ?STATION_DHT_TIMEOUT_MS + 5_000).
+
+%% @doc Store bytes via the SDK pool's content-sharing primitive.
+%%
+%% Routes through `macula:put_content/2' on the V2 pool — same pool used
+%% for pubsub/RPC. Surfaces `{error, not_activated}' until the pool is
+%% built (post-activation). The MCID is BLAKE3-derived from the bytes.
+-spec put_content(binary()) -> {ok, binary()} | {error, term()}.
+put_content(Bytes) when is_binary(Bytes) ->
+    case get_client() of
+        {ok, Pool} -> macula:put_content(Pool, Bytes);
+        Error      -> Error
+    end.
+
+%% @doc Fetch bytes by MCID via the SDK pool.
+-spec get_content(binary()) -> {ok, binary()} | {error, term()}.
+get_content(<<1, 16#55, _:32/binary>> = MCID) ->
+    case get_client() of
+        {ok, Pool} -> macula:get_content(Pool, MCID);
+        Error      -> Error
+    end;
+get_content(_) ->
+    {error, invalid_mcid}.
 
 subscribe(Topic, Callback) ->
     gen_server:call(?MODULE, {subscribe, Topic, Callback}).

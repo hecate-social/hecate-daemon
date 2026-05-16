@@ -1,0 +1,18 @@
+{application, guide_mesh_publications, [
+    {description, "CMD service: agent-initiated mesh fact publication (publish_mesh_fact desk + emitter)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_mesh_publications_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        reckon_db,
+        evoq,
+        reckon_evoq,
+        hecate_mesh
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

@@ -1,0 +1,15 @@
+{application, query_mesh_activity, [
+    {description, "QRY service: GET /api/mesh/activity from mesh_activity ETS read model"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {query_mesh_activity_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        project_mesh_activity
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

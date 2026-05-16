@@ -11,6 +11,9 @@
     put_record/1,
     find_record/1,
     find_records_by_type/1,
+    %% Content sharing (raw bytes <-> MCID)
+    put_content/1,
+    get_content/1,
     get_client/0,
     get_status/0,
     is_connected/0,
@@ -65,6 +68,21 @@ find_record(Key) ->
         {ok, [macula_record:record()]} | {error, term()}.
 find_records_by_type(Type) ->
     hecate_mesh_client:find_records_by_type(Type).
+
+%% @doc Store raw bytes in the content-sharing fabric.
+%%
+%% Returns the 34-byte MCID (Macula Content ID, `<<1, 16#55, Hash:32/binary>>')
+%% which any other reachable peer can use with `get_content/1' to pull the
+%% same bytes. Only supported when the real mesh backend is active —
+%% the inproc backend returns `{error, not_supported_on_inproc}'.
+-spec put_content(binary()) -> {ok, binary()} | {error, term()}.
+put_content(Bytes) when is_binary(Bytes) ->
+    hecate_mesh_client:put_content(Bytes).
+
+%% @doc Fetch raw bytes previously stored with `put_content/1' by their MCID.
+-spec get_content(binary()) -> {ok, binary()} | {error, term()}.
+get_content(MCID) when is_binary(MCID) ->
+    hecate_mesh_client:get_content(MCID).
 
 -spec get_client() -> {ok, pid()} | {error, term()}.
 get_client() ->

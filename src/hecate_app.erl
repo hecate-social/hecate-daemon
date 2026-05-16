@@ -37,7 +37,9 @@
     {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"},
     {mpong_store,               "mpong",               "MPong (mesh pong game lifecycle)"},
     {briefcase_store,           "briefcase",           "Briefcase (file upload, revise, move, archive, grant)"},
-    {repo_store,                "repos",               "Repos (git-over-mesh lifecycle: initiate, rename, describe, archive)"}
+    {repo_store,                "repos",               "Repos (git-over-mesh lifecycle: initiate, rename, describe, archive)"},
+    {mesh_publications_store,   "mesh_publications",   "Mesh publications (agent FACT publishes via /api/mesh/publish)"},
+    {mesh_artifacts_store,      "mesh_artifacts",      "Mesh artifacts (agent content-sharing via /api/mesh/artifact/put)"}
 ]).
 
 -define(SITE_STORES, [
