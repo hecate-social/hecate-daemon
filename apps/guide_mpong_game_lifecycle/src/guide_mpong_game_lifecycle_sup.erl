@@ -12,7 +12,7 @@ start_link() ->
 
 init([]) ->
     SupFlags = #{strategy => one_for_one, intensity => 10, period => 10},
-    Children = [
+    Base = [
         #{id => run_game_engine_sup,
           start => {run_game_engine_sup, start_link, []},
           restart => permanent,
@@ -26,4 +26,19 @@ init([]) ->
           restart => permanent,
           type => worker}
     ],
+    Children = Base ++ auto_host_demo_loop_children(),
     {ok, {SupFlags, Children}}.
+
+%% Only run the public-demo auto-host loop when explicitly enabled via
+%% application env. Default off — user-installed daemons must never
+%% spam mpong matches.
+auto_host_demo_loop_children() ->
+    case application:get_env(hecate, mpong_auto_host, false) of
+        true ->
+            [#{id => auto_host_demo_loop_sup,
+               start => {auto_host_demo_loop_sup, start_link, []},
+               restart => permanent,
+               type => supervisor}];
+        _ ->
+            []
+    end.
