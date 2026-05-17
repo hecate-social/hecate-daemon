@@ -396,10 +396,25 @@ handle_call({publish, Topic, Payload}, _From,
     %% Wrap with safe_mesh_call: the pool pid can be dead-but-still-
     %% referenced in the brief window between an EXIT message arriving
     %% and the EXIT handler running.
-    _ = safe_mesh_call(
+    PublishResult = safe_mesh_call(
           fun() ->
               macula:publish(Pool, macula_realm:id(Realm), Topic, Payload)
           end),
+    %% [mpong-trace] temporary — diagnose the silent-drop where
+    %% hecate_mesh:publish/2 returns ok but no station's dispatcher
+    %% ever sees the PUBLISH frame. The handle_call below currently
+    %% returns ok unconditionally; capture the real result and log
+    %% it for mpong topics (and any non-ok result for any topic).
+    case {Topic, PublishResult} of
+        {<<"io.macula/beam-campus/hecate/mpong/", _/binary>>, _} ->
+            logger:info("[mpong-trace] macula:publish topic=~s result=~p",
+                        [Topic, PublishResult]);
+        {_, ok} ->
+            ok;
+        {_, _NotOk} ->
+            logger:warning("[hecate_mesh] macula:publish topic=~s result=~p",
+                           [Topic, PublishResult])
+    end,
     {reply, ok, State};
 
 %% -- DHT record operations (PLAN_DHT_FIRST.md) -----------------------
