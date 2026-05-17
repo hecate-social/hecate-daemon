@@ -82,6 +82,18 @@ host_one_match() ->
     Cmd = host_game_v1:new(GameId, HostNodeId, BotCount),
     case maybe_host_game:dispatch(Cmd) of
         {ok, _V, _Events} ->
+            %% Announce the game to the mesh — host_game's event store
+            %% emits `game_hosted_v1' locally but there is no emitter
+            %% subscribing to it, so without this explicit call no
+            %% remote spectator (e.g. macula.io/demo/mpong) ever sees
+            %% a lobby tile. `mpong_lobby_server' makes the same call
+            %% on its happy path; the auto-host loop bypasses that
+            %% server because it's a direct headless host.
+            advertise_game:announce(#{
+                game_id      => GameId,
+                host_node_id => HostNodeId,
+                max_players  => BotCount
+            }),
             quick_start(GameId, HostNodeId, BotCount),
             logger:info("[auto_host_demo_loop] hosted ~s (~p bots)",
                         [GameId, BotCount]),
