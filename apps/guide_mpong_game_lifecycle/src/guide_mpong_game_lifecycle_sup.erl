@@ -30,10 +30,12 @@ init([]) ->
     {ok, {SupFlags, Children}}.
 
 %% Only run the public-demo auto-host loop when explicitly enabled via
-%% application env. Default off — user-installed daemons must never
-%% spam mpong matches.
+%% application env (`{hecate, mpong_auto_host}') OR the OS env
+%% `HECATE_MPONG_AUTO_HOST=true' (set in `~/.hecate/gitops/system/
+%% hecate-daemon.env' on beam-cluster boxes designated for the demo).
+%% Default off — user-installed daemons must never spam mpong matches.
 auto_host_demo_loop_children() ->
-    case application:get_env(hecate, mpong_auto_host, false) of
+    case auto_host_enabled() of
         true ->
             [#{id => auto_host_demo_loop_sup,
                start => {auto_host_demo_loop_sup, start_link, []},
@@ -41,4 +43,20 @@ auto_host_demo_loop_children() ->
                type => supervisor}];
         _ ->
             []
+    end.
+
+auto_host_enabled() ->
+    case application:get_env(hecate, mpong_auto_host, undefined) of
+        true -> true;
+        false -> false;
+        _ -> os_env_true("HECATE_MPONG_AUTO_HOST")
+    end.
+
+os_env_true(Var) ->
+    case os:getenv(Var) of
+        "true"  -> true;
+        "1"     -> true;
+        "yes"   -> true;
+        "TRUE"  -> true;
+        _       -> false
     end.
