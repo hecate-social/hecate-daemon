@@ -22,7 +22,18 @@ broadcast(GameId, StateMsg) ->
     Payload = StateMsg#{<<"game_id">> => GameId},
     case erlang:function_exported(hecate_mesh, publish, 2) of
         true ->
-            hecate_mesh:publish(topic(), Payload);
+            Result = hecate_mesh:publish(topic(), Payload),
+            %% Diagnostic: log every 25th broadcast (~1Hz at 25Hz tick
+            %% rate) so we can see whether publishes are reaching the
+            %% wire and what the return looks like. Remove once the
+            %% realm-side state cache is reliably populated.
+            Tick = maps:get(tick, StateMsg, 0),
+            case Tick rem 25 of
+                0 -> logger:info("[broadcast_game_state] tick=~p result=~p",
+                                  [Tick, Result]);
+                _ -> ok
+            end,
+            Result;
         false ->
             ok
     end.
