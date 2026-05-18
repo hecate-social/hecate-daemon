@@ -26,7 +26,7 @@
 -define(STORES, [
     {settings_store,            "settings",            "Settings (identity, preferences)"},
     {realm_memberships_store,   "realm_memberships",   "Realm Memberships (join, confirm, revoke)"},
-    {llm_store,                 "llm",                 "LLM (detection, status reporting)"},
+    %% llm_store moved to hecate-services/hecate-llm (2026-05-18)
     {licenses_store,            "licenses",            "Licenses (consumer lifecycle)"},
     {share_licenses_store,      "share_licenses",      "Share-Licenses (Phase D crypto grants)"},
     {license_offerings_store,   "license_offerings",   "License Offerings (author catalog)"},
@@ -39,7 +39,10 @@
     {briefcase_store,           "briefcase",           "Briefcase (file upload, revise, move, archive, grant)"},
     {repo_store,                "repos",               "Repos (git-over-mesh lifecycle: initiate, rename, describe, archive)"},
     {mesh_publications_store,   "mesh_publications",   "Mesh publications (agent FACT publishes via /api/mesh/publish)"},
-    {mesh_artifacts_store,      "mesh_artifacts",      "Mesh artifacts (agent content-sharing via /api/mesh/artifact/put)"}
+    {mesh_artifacts_store,      "mesh_artifacts",      "Mesh artifacts (agent content-sharing via /api/mesh/artifact/put)"},
+    {mesh_subscriptions_store,  "mesh_subscriptions",  "Mesh subscriptions (agent topic subscribe / unsubscribe via /api/mesh/subscriptions)"},
+    {mesh_inbox_store,          "mesh_inbox",          "Mesh inbox (inbound FACTs on subscribed topics, projected into mesh_activity with direction=in)"},
+    {realm_cert_store,          "realm_cert",          "Realm cert lifecycle (provisional cert acquisition + renewal audit trail)"}
 ]).
 
 -define(SITE_STORES, [

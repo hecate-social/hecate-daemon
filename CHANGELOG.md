@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed (breaking)
+- **`serve_llm` extracted to its own service.** The in-VM LLM gateway
+  moved to [`hecate-services/hecate-llm`](https://codeberg.org/hecate-services/hecate-llm)
+  on 2026-05-18 as part of the four-tier reshape. Layer-3 (this
+  daemon) no longer hosts the gateway; callers reach it via
+  `macula:call(LocalPool, Realm, <<"hecate-llm.chat">>, Params, T)`
+  and friends. Removed from this repo:
+  - `apps/serve_llm/` (whole umbrella, 36 modules)
+  - `apps/project_llm_usage/` (usage projections)
+  - `llm_store` from the `?STORES` macro in `src/hecate_app.erl`
+    (the new store lives on the infra node running hecate-llm)
+  - `serve_llm` from `rebar.config` release tarball + every
+    `config/*.sys.config` + `apps/hecate_api/src/hecate_api_routes.erl`
+  Plugins / agents that previously called into `serve_llm` directly
+  must now go through the mesh. Capabilities advertised by hecate-llm:
+  `hecate-llm.{chat, stream_chat, list_available, check_health,
+  report_status, track_usage}`.
+
 ### Ideas
 - **Settings history widget** — expose the settings event stream as a timeline
   on the settings page. A way to visualize our event-sourced nature: every

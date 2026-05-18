@@ -18,7 +18,7 @@
     guide_realm_memberships, query_realm_memberships,
     guide_site_lifecycle, query_site,
     discover_lan,
-    serve_llm,
+    %% serve_llm moved to hecate-services/hecate-llm (2026-05-18)
     guide_license_offering_lifecycle, project_license_offerings, query_license_offerings,
     guide_license_lifecycle, project_licenses, query_licenses,
     guide_procurement_lifecycle, project_procurements, query_procurements,
@@ -31,6 +31,7 @@
     guide_repo_lifecycle, project_repos, query_repos,
     guide_mesh_publications,
     guide_mesh_artifacts,
+    guide_mesh_subscriptions,
     project_mesh_activity, query_mesh_activity,
     announce_ref_updates, serve_git_over_mesh,
     serve_dns_over_mesh,   %% DoH endpoint (/dns-query) via listen_doh:routes/0
