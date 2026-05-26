@@ -566,9 +566,9 @@ Add `alc_routes/0` function returning all 34 routes.
 
 ---
 
-## hecate-agents Updates Required
+## hecate-corpus Updates Required
 
-The phase rename from `AnD/AnP/InT/DoO` to `discovery_n_analysis/architecture_n_planning/testing_n_implementation/deployment_n_operations` requires updating the following files in `hecate-social/hecate-agents/`:
+The phase rename from `AnD/AnP/InT/DoO` to `discovery_n_analysis/architecture_n_planning/testing_n_implementation/deployment_n_operations` requires updating the following files in `hecate-social/hecate-corpus/`:
 
 | File | Changes |
 |------|---------|

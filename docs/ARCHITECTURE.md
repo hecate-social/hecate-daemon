@@ -215,7 +215,7 @@ The AI-guided venture lifecycle system. This is the product — it helps develop
 
 **10 processes:** Managed by 4 consolidated apps — `guide_venture_lifecycle` (inception + discovery), `guide_division_alc` (design → plan → generate → test → deploy → monitor → rescue), `query_venture_lifecycle`, and `query_division_alc`.
 
-Each process follows the venture lifecycle protocol (pending → active → paused → completed). See `hecate-agents/philosophy/HECATE_VENTURE_LIFECYCLE.md` for full details.
+Each process follows the venture lifecycle protocol (pending → active → paused → completed). See `hecate-corpus/philosophy/HECATE_DOMAIN_LIFECYCLE.md` for full details.
 
 ### 2. `operate_hecate_node` (Infrastructure)
 

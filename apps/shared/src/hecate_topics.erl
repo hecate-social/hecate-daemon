@@ -23,7 +23,7 @@
 %%%   macula-io/macula/docs/guides/TOPIC_NAMING_GUIDE.md
 %%%
 %%% Hecate-flavored guide:
-%%%   hecate-social/hecate-agents/skills/MESH_TOPIC_TIERING.md
+%%%   hecate-social/hecate-corpus/skills/MESH_TOPIC_TIERING.md
 %%% @end
 %%%-------------------------------------------------------------------
 -module(hecate_topics).

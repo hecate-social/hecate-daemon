@@ -525,4 +525,4 @@ The skeleton is complete when:
 
 - `plans/VISION_HECATE_ECOSYSTEM.md` — Full ecosystem vision
 - `plans/METHODOLOGY_CARTWHEEL_SKELETON.md` — Division pattern
-- `hecate-agents/skills/ANTIPATTERNS.md` — Rules to follow
+- `hecate-corpus/skills/ANTIPATTERNS.md` — Rules to follow

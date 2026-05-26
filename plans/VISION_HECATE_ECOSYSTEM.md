@@ -332,7 +332,7 @@ Configurable strictness per venture:
 |-----------|----------|---------|
 | hecate-daemon | Erlang | Agent runtime, mesh connection, LLM routing |
 | hecate-tui | Go | Human command center |
-| hecate-agents | Markdown | Personality, skills, philosophy |
+| hecate-corpus | Markdown | Personality, skills, philosophy |
 | macula-boot | Elixir | Mesh bootstrap node |
 | macula-realm | Elixir | Identity, authentication |
 
@@ -826,10 +826,10 @@ Skills are knowledge packages that agents load to work effectively in specific c
 
 ### Profile Definition
 
-Profiles live in `hecate-agents/profiles/`:
+Profiles live in `hecate-corpus/profiles/`:
 
 ```toml
-# hecate-agents/profiles/erlang-cqrs.toml
+# hecate-corpus/profiles/erlang-cqrs.toml
 [profile]
 name = "erlang-cqrs"
 description = "Erlang event-sourced CQRS with ReckonDB/Evoq"
@@ -1377,4 +1377,4 @@ Pricing stored in config, updated as providers change:
 2. Prototype agent spawning in hecate-daemon
 3. Design TUI command center view
 4. Implement Venture repo structure
-5. Create skill profiles in hecate-agents
+5. Create skill profiles in hecate-corpus

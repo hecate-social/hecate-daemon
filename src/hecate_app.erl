@@ -6,7 +6,7 @@
 %%% tracking, and post-boot sequencing. This module only:
 %%%
 %%%   1. Creates the namespaced directory layout
-%%%   2. Clones the hecate-agents repo if needed
+%%%   2. Clones the hecate-corpus repo if needed
 %%%   3. Writes lifecycle files + opens an early health-only socket
 %%%   4. Hands the store catalog to boot_daemon
 %%%   5. Starts the business supervisor (identity, realm_session,
@@ -78,12 +78,12 @@ start(_StartType, _StartArgs) ->
     %% 1. Create namespaced directory layout
     shared_paths:ensure_layout(),
 
-    %% 2. Ensure hecate-agents repo is cloned (non-blocking on failure)
+    %% 2. Ensure hecate-corpus repo is cloned (non-blocking on failure)
     case hecate_agents_repo:ensure() of
         {ok, AgentsPath} ->
-            logger:info("hecate-agents available at ~s", [AgentsPath]);
+            logger:info("hecate-corpus available at ~s", [AgentsPath]);
         {error, _} ->
-            logger:warning("hecate-agents not available — some features may be limited")
+            logger:warning("hecate-corpus not available — some features may be limited")
     end,
 
     %% 3. Write lifecycle files (daemon.pid + state = starting)

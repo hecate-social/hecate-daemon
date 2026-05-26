@@ -1,8 +1,8 @@
-%%% @doc Manages the local clone of the hecate-agents repository.
+%%% @doc Manages the local clone of the hecate-corpus repository.
 %%%
-%%% hecate-agents contains philosophy, skills, templates, and roles
+%%% hecate-corpus contains philosophy, skills, templates, and roles
 %%% used by the daemon and its orchestration layer. This module ensures
-%%% the repo is cloned into HECATE_HOME/hecate-agents/ and provides
+%%% the repo is cloned into HECATE_HOME/hecate-corpus/ and provides
 %%% convenience paths for consumers.
 %%%
 %%% ensure/0 is called during daemon startup (non-blocking on failure).
@@ -17,20 +17,20 @@
 ]).
 
 %% Codeberg is canonical post-migration; GitHub is a read-only mirror.
--define(REPO_URL, "https://codeberg.org/hecate-social/hecate-agents.git").
--define(DIR_NAME, "hecate-agents").
+-define(REPO_URL, "https://codeberg.org/hecate-social/hecate-corpus.git").
+-define(DIR_NAME, "hecate-corpus").
 
-%% @doc Return the local path to the hecate-agents repo.
+%% @doc Return the local path to the hecate-corpus repo.
 -spec path() -> file:filename().
 path() ->
     filename:join(shared_paths:hecate_home(), ?DIR_NAME).
 
-%% @doc Return the path to the roles directory inside hecate-agents.
+%% @doc Return the path to the roles directory inside hecate-corpus.
 -spec roles_path() -> file:filename().
 roles_path() ->
     filename:join(path(), "roles").
 
-%% @doc Clone hecate-agents if it does not exist locally.
+%% @doc Clone hecate-corpus if it does not exist locally.
 %% Returns {ok, Path} on success or if already present.
 %% Returns {error, Reason} if the clone fails.
 -spec ensure() -> {ok, file:filename()} | {error, term()}.
@@ -38,7 +38,7 @@ ensure() ->
     RepoPath = path(),
     case filelib:is_dir(filename:join(RepoPath, ".git")) of
         true ->
-            logger:info("[hecate-agents] Repository already present at ~s", [RepoPath]),
+            logger:info("[hecate-corpus] Repository already present at ~s", [RepoPath]),
             {ok, RepoPath};
         false ->
             clone(RepoPath)
@@ -53,7 +53,7 @@ update() ->
         true ->
             pull(RepoPath);
         false ->
-            logger:warning("[hecate-agents] Cannot update — repo not cloned at ~s", [RepoPath]),
+            logger:warning("[hecate-corpus] Cannot update — repo not cloned at ~s", [RepoPath]),
             {error, not_cloned}
     end.
 
@@ -61,7 +61,7 @@ update() ->
 %%% ========
 
 clone(RepoPath) ->
-    logger:info("[hecate-agents] Cloning ~s into ~s", [?REPO_URL, RepoPath]),
+    logger:info("[hecate-corpus] Cloning ~s into ~s", [?REPO_URL, RepoPath]),
     Cmd = lists:flatten(io_lib:format(
         "git clone ~s ~s 2>&1 && echo __OK__ || echo __FAIL__",
         [?REPO_URL, RepoPath]
@@ -70,7 +70,7 @@ clone(RepoPath) ->
     case string:find(Output, "__OK__") of
         nomatch ->
             logger:error(
-                "[hecate-agents] Failed to clone hecate-agents repository.~n"
+                "[hecate-corpus] Failed to clone hecate-corpus repository.~n"
                 "  Ensure git is installed and network is available.~n"
                 "  URL: ~s~n"
                 "  Target: ~s~n"
@@ -79,12 +79,12 @@ clone(RepoPath) ->
             ),
             {error, {clone_failed, Output}};
         _ ->
-            logger:info("[hecate-agents] Clone complete at ~s", [RepoPath]),
+            logger:info("[hecate-corpus] Clone complete at ~s", [RepoPath]),
             {ok, RepoPath}
     end.
 
 pull(RepoPath) ->
-    logger:info("[hecate-agents] Pulling latest changes in ~s", [RepoPath]),
+    logger:info("[hecate-corpus] Pulling latest changes in ~s", [RepoPath]),
     Cmd = lists:flatten(io_lib:format(
         "git -C ~s pull --ff-only 2>&1 && echo __OK__ || echo __FAIL__",
         [RepoPath]
@@ -93,13 +93,13 @@ pull(RepoPath) ->
     case string:find(Output, "__OK__") of
         nomatch ->
             logger:error(
-                "[hecate-agents] Failed to pull updates.~n"
+                "[hecate-corpus] Failed to pull updates.~n"
                 "  Path: ~s~n"
                 "  Output: ~s",
                 [RepoPath, Output]
             ),
             {error, {pull_failed, Output}};
         _ ->
-            logger:info("[hecate-agents] Updated successfully"),
+            logger:info("[hecate-corpus] Updated successfully"),
             ok
     end.
