@@ -26,7 +26,7 @@
     guide_payment_lifecycle, project_payments, query_payments,
     guide_plugin_lifecycle, project_plugins, query_plugins,
     guide_launcher_lifecycle, project_launcher, query_launcher,
-    guide_mpong_game_lifecycle, project_mpong_games, query_mpong_games,
+    %% mpong apps moved to hecate-services/hecate-mpong-bot (2026-06-01)
     guide_briefcase_lifecycle, project_briefcase_files, query_briefcase_files,
     guide_repo_lifecycle, project_repos, query_repos,
     guide_mesh_publications,

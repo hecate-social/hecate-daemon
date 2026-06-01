@@ -35,7 +35,7 @@
     {payments_store,            "payments",            "Payments (payment process)"},
     {plugins_store,             "plugins",             "Plugins (install/upgrade/remove)"},
     {launcher_store,            "launcher",            "Launcher (sidebar layout lifecycle)"},
-    {mpong_store,               "mpong",               "MPong (mesh pong game lifecycle)"},
+    %% mpong_store moved to hecate-services/hecate-mpong-bot (2026-06-01)
     {briefcase_store,           "briefcase",           "Briefcase (file upload, revise, move, archive, grant)"},
     {repo_store,                "repos",               "Repos (git-over-mesh lifecycle: initiate, rename, describe, archive)"},
     {mesh_publications_store,   "mesh_publications",   "Mesh publications (agent FACT publishes via /api/mesh/publish)"},
