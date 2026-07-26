@@ -31,6 +31,20 @@ init([]) ->
           start => {evoq_projection, start_link,
                     [mesh_artifact_shared_v1_to_mesh_activity, #{},
                      #{store_id => mesh_artifacts_store}]},
+          restart => permanent, type => worker},
+
+        %% Projection: domain events from mesh_inbox_store (inbound).
+        #{id => mesh_fact_received_v1_to_mesh_activity,
+          start => {evoq_projection, start_link,
+                    [mesh_fact_received_v1_to_mesh_activity, #{},
+                     #{store_id => mesh_inbox_store}]},
+          restart => permanent, type => worker},
+
+        %% Projection: subscription roster (mesh_subscriptions ETS).
+        #{id => mesh_subscriptions_lifecycle_to_subscription_list,
+          start => {evoq_projection, start_link,
+                    [mesh_subscriptions_lifecycle_to_subscription_list, #{},
+                     #{store_id => mesh_subscriptions_store}]},
           restart => permanent, type => worker}
     ],
     {ok, {SupFlags, Children}}.

@@ -1,26 +1,32 @@
-%%% @doc ETS-backed read model for unified mesh activity.
+%%% @doc ETS-backed read model for unified mesh activity + subscriptions.
 %%%
-%%% Single named table `mesh_activity', ordered_set keyed by `{TsMs, Seq}'
-%%% so reads can return everything since a given timestamp in chronological
-%%% order. `Seq' (a monotonic positive integer) tie-breaks within the same
-%%% millisecond. Each row holds an activity map:
+%%% Two named tables owned by this gen_server:
 %%%
-%%%   #{fact_id   => binary(),
-%%%     kind      => <<"mesh_fact_published">> | <<"mesh_artifact_shared">>,
-%%%     ts_ms     => integer(),
-%%%     payload   => map()}
+%%%  * `mesh_activity', ordered_set keyed by `{TsMs, Seq}' — every
+%%%    outgoing publish / share / inbound receive, in chronological
+%%%    order. Each row:
+%%%      #{fact_id => binary(), kind => <<"mesh_fact_published">> |
+%%%        <<"mesh_artifact_shared">> | <<"mesh_fact_received">>,
+%%%        ts_ms => integer(), payload => map()}
+%%%    The three projections write here via `record/1'.
 %%%
-%%% The two projections (`mesh_fact_published_v1_to_mesh_activity' and
-%%% `mesh_artifact_shared_v1_to_mesh_activity') call `record/1' to insert.
+%%%  * `mesh_subscriptions', set keyed by `Topic' — current
+%%%    subscription roster, populated by
+%%%    `mesh_subscriptions_lifecycle_to_subscription_list'. Each row:
+%%%      #{topic => binary(), subscribed_at => integer(),
+%%%        fact_id => binary()}
+%%%    Removed entries are deleted (not tombstoned).
 %%% @end
 -module(project_mesh_activity_store).
 -behaviour(gen_server).
 
 -export([start_link/0]).
 -export([record/1, since/1, since/2, all/0]).
+-export([record_subscription/1, drop_subscription/1, list_subscriptions/0]).
 -export([init/1, handle_call/3, handle_cast/2]).
 
 -define(TABLE, mesh_activity).
+-define(SUBS_TABLE, mesh_subscriptions).
 -define(DEFAULT_LIMIT, 200).
 -define(MAX_LIMIT, 2000).
 
@@ -30,6 +36,8 @@ start_link() ->
 init([]) ->
     ets:new(?TABLE, [public, named_table, ordered_set, {read_concurrency, true},
                      {write_concurrency, true}]),
+    ets:new(?SUBS_TABLE, [public, named_table, set, {read_concurrency, true},
+                          {write_concurrency, true}]),
     {ok, #{}}.
 
 handle_call(_Req, _From, State) -> {reply, ok, State}.
@@ -65,6 +73,29 @@ all() ->
     Rows = ets:tab2list(?TABLE),
     Sorted = lists:keysort(1, Rows),
     {ok, [V || {_K, V} <- Sorted]}.
+
+%%====================================================================
+%% Subscription roster (mesh_subscriptions table)
+%%====================================================================
+
+-spec record_subscription(map()) -> ok.
+record_subscription(#{topic := Topic} = Entry) when is_binary(Topic) ->
+    ets:insert(?SUBS_TABLE, {Topic, Entry}),
+    ok.
+
+-spec drop_subscription(binary()) -> ok.
+drop_subscription(Topic) when is_binary(Topic) ->
+    ets:delete(?SUBS_TABLE, Topic),
+    ok.
+
+-spec list_subscriptions() -> {ok, [map()]}.
+list_subscriptions() ->
+    Rows = ets:tab2list(?SUBS_TABLE),
+    Entries = [V || {_K, V} <- Rows],
+    Sorted = lists:sort(fun(#{subscribed_at := A}, #{subscribed_at := B}) ->
+                            A =< B
+                        end, Entries),
+    {ok, Sorted}.
 
 %%====================================================================
 %% Internal

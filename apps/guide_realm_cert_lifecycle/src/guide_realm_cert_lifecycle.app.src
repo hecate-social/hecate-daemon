@@ -1,0 +1,21 @@
+{application, guide_realm_cert_lifecycle, [
+    {description, "CMD service: first-boot provisional realm cert acquisition. Calls POST /api/v1/provisional/issue on macula-realm, writes cert+key+chain to disk, records the event so the audit trail (and the next boot's idempotency check) is intact."},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_realm_cert_lifecycle_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        ssl,
+        public_key,
+        hackney,
+        reckon_db,
+        evoq,
+        reckon_evoq
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

@@ -55,7 +55,7 @@ Already partially migrated:
 
 ### 1.3 V2 SDK surface available today (macula 3.15.x)
 
-From `~/work/codeberg.org/macula-io/macula/src/macula.erl`:
+From `~/work/github.com/macula-io/macula/src/macula.erl`:
 
 | Op | V2 facade |
 |---|---|

@@ -1,0 +1,18 @@
+{application, guide_mesh_subscriptions, [
+    {description, "CMD service: agent-initiated mesh topic subscription lifecycle (add_mesh_subscription + remove_mesh_subscription desks)"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_mesh_subscriptions_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        reckon_db,
+        evoq,
+        reckon_evoq,
+        hecate_mesh
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

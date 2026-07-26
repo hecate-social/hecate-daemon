@@ -1,0 +1,18 @@
+{application, guide_mesh_inbox, [
+    {description, "CMD service: inbound FACTs from the mesh -> receive_mesh_fact_v1 -> mesh_fact_received_v1 (joins the unified mesh_activity read model with direction=in). Also wires the topic-to-handler mesh subscriptions in reaction to events from mesh_subscriptions_store."},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {mod, {guide_mesh_inbox_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        reckon_db,
+        evoq,
+        reckon_evoq,
+        hecate_mesh
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, []}
+]}.

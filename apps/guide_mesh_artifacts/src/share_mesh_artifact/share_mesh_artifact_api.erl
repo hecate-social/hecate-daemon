@@ -1,4 +1,4 @@
-%%% @doc POST /api/mesh/artifact/put — Agent-facing artifact share.
+%%% @doc POST /api/mesh/artifact — Agent-facing artifact share.
 %%%
 %%% Request body:
 %%%   #{<<"content">>      => <<"base64-encoded bytes">>,
@@ -14,7 +14,10 @@
 
 -export([init/2, routes/0]).
 
-routes() -> [{"/api/mesh/artifact/put", ?MODULE, []}].
+%% RESTful pair: POST .../artifact creates, GET .../artifact/:hash retrieves.
+%% Keeping these on distinct path shapes prevents the discover-routes auto-
+%% wiring (order-undefined) from letting the `:hash' pattern shadow the put.
+routes() -> [{"/api/mesh/artifact", ?MODULE, []}].
 
 init(Req0, State) ->
     case cowboy_req:method(Req0) of
