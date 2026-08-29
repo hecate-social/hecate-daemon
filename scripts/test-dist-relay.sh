@@ -15,15 +15,16 @@ echo "=== Testing Erlang Distribution over Relay Mesh ==="
 docker exec hecate-daemon sh -c '
     echo "Starting test node with -proto_dist macula..."
 
-    # Check if macula_dist_relay module exists
+    # Check if macula_dist_pool module exists (renamed from
+    # macula_dist_relay in macula 9.0.0)
     ./bin/hecate eval "
-        case code:ensure_loaded(macula_dist_relay) of
+        case code:ensure_loaded(macula_dist_pool) of
             {module, _} ->
-                io:format(\"macula_dist_relay: loaded~n\"),
-                io:format(\"relay_mode: ~p~n\", [macula_dist_relay:is_relay_mode()]),
-                io:format(\"mesh_client: ~p~n\", [macula_dist_relay:get_mesh_client()]);
+                io:format(\"macula_dist_pool: loaded~n\"),
+                io:format(\"relay_mode: ~p~n\", [macula_dist_pool:is_relay_mode()]),
+                io:format(\"mesh_pool: ~p~n\", [macula_dist_pool:get_mesh_pool()]);
             {error, Reason} ->
-                io:format(\"macula_dist_relay: ~p~n\", [Reason])
+                io:format(\"macula_dist_pool: ~p~n\", [Reason])
         end,
         halt(0).
     "
