@@ -26,7 +26,7 @@
 set -eu
 
 DEFAULT_NODES=(beam00 beam01 beam02 beam03)
-IMAGE='codeberg.org/hecate-social/hecate-daemon:main'
+IMAGE='ghcr.io/hecate-social/hecate-daemon:main'
 
 if [ "$#" -gt 0 ]; then
     NODES=("$@")

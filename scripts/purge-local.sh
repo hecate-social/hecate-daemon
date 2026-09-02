@@ -63,7 +63,7 @@ pkill -f 'epmd' 2>/dev/null && info "  killed epmd" || true
 info "Removing podman container and image..."
 podman stop hecate-daemon 2>/dev/null && info "  stopped container" || true
 podman rm hecate-daemon 2>/dev/null && info "  removed container" || true
-podman rmi codeberg.org/hecate-social/hecate-daemon:latest 2>/dev/null && info "  removed image" || true
+podman rmi ghcr.io/hecate-social/hecate-daemon:latest 2>/dev/null && info "  removed image" || true
 # Also try with systemd-generated name
 podman rm systemd-hecate-daemon 2>/dev/null || true
 

@@ -1,13 +1,9 @@
-name: Release (Codeberg)
+name: Release (GitHub)
 
 # Tag-only. Per-arch matrix builds the Erlang release tarball and a
-# self-extracting executable on GitHub-hosted runners (Codeberg has no
-# hosted runners; per workspace policy GitHub stays for build only).
-# Final job creates a Codeberg Release and uploads all assets.
-#
-# Replaces the previous softprops/action-gh-release flow that targeted
-# GitHub Releases. macOS targets stay disabled (macula_nifs Rust NIFs
-# fail to link on macOS CI).
+# self-extracting executable on GitHub-hosted runners; the final job
+# creates the GitHub Release and uploads every asset. macOS targets stay
+# disabled (macula_nifs Rust NIFs fail to link on macOS CI).
 
 on:
   push:
@@ -22,14 +18,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Ubuntu 20.04 for Linux amd64 — wider glibc compatibility
-          # (GLIBC 2.31, runs on most distros).
+          # Ubuntu 22.04 is the oldest runner GitHub still hosts (20.04 was
+          # retired in 2025): GLIBC 2.35 is the floor for these binaries.
           - os: linux
             arch: amd64
-            runner: ubuntu-20.04
+            runner: ubuntu-22.04
           - os: linux
             arch: arm64
-            runner: ubuntu-22.04-arm   # 20.04-arm not available; 22.04 is oldest arm64
+            runner: ubuntu-22.04-arm
 
     steps:
       - name: Checkout code
@@ -77,10 +73,12 @@ jobs:
           path: /tmp/release-assets/
           if-no-files-found: error
 
-  publish-codeberg-release:
-    name: Publish to Codeberg Releases
+  publish-github-release:
+    name: Publish to GitHub Releases
     runs-on: ubuntu-latest
     needs: build-release
+    permissions:
+      contents: write
 
     steps:
       - name: Download all build artifacts
@@ -93,77 +91,42 @@ jobs:
       - name: List collected assets
         run: ls -la /tmp/release-assets-merged/
 
-      - name: Create Codeberg Release + upload assets
-        env:
-          CB_TOKEN: ${{ secrets.CODEBERG_RELEASE_TOKEN }}
-          TAG: ${{ github.ref_name }}
-          REPO: hecate-social/hecate-daemon
-        run: |
-          set -euo pipefail
-          BODY=$(cat <<EOF
-          ## Installation
+      - name: Create GitHub Release + upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          files: /tmp/release-assets-merged/*
+          body: |
+            ## Installation
 
-          **Recommended: Use the installer**
-          \`\`\`bash
-          curl -fsSL https://codeberg.org/hecate-social/hecate-install/raw/branch/main/install.sh | bash
-          \`\`\`
+            **Recommended: Use the installer**
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/hecate-social/hecate-install/main/install.sh | bash
+            ```
 
-          **Single executable (includes bundled Erlang runtime):**
-          \`\`\`bash
-          # Linux (amd64)
-          curl -fsSL https://codeberg.org/hecate-social/hecate-daemon/releases/download/${TAG}/hecate-daemon-linux-amd64 -o hecate
-          chmod +x hecate
-          ./hecate start
+            **Single executable (includes bundled Erlang runtime):**
+            ```bash
+            # Linux (amd64)
+            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-linux-amd64 -o hecate
+            chmod +x hecate
+            ./hecate start
 
-          # Linux (arm64)
-          curl -fsSL https://codeberg.org/hecate-social/hecate-daemon/releases/download/${TAG}/hecate-daemon-linux-arm64 -o hecate
-          chmod +x hecate
-          ./hecate start
-          \`\`\`
+            # Linux (arm64)
+            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-linux-arm64 -o hecate
+            chmod +x hecate
+            ./hecate start
+            ```
 
-          **Tarball (advanced):**
-          \`\`\`bash
-          curl -fsSL https://codeberg.org/hecate-social/hecate-daemon/releases/download/${TAG}/hecate-daemon-linux-amd64.tar.gz | tar xz
-          \`\`\`
+            **Tarball (advanced):**
+            ```bash
+            curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/download/${{ github.ref_name }}/hecate-daemon-linux-amd64.tar.gz | tar xz
+            ```
 
-          ## Documentation
+            ## Documentation
 
-          - [README](https://codeberg.org/hecate-social/hecate-daemon/src/branch/main/README.md)
-          - [API](https://codeberg.org/hecate-social/hecate-daemon/src/branch/main/docs/API.md)
-          - [Architecture](https://codeberg.org/hecate-social/hecate-daemon/src/branch/main/docs/ARCHITECTURE.md)
+            - [README](https://github.com/hecate-social/hecate-daemon/blob/main/README.md)
+            - [API](https://github.com/hecate-social/hecate-daemon/blob/main/docs/API.md)
+            - [Architecture](https://github.com/hecate-social/hecate-daemon/blob/main/docs/ARCHITECTURE.md)
 
-          See [CHANGELOG.md](https://codeberg.org/hecate-social/hecate-daemon/src/branch/main/CHANGELOG.md) for changes.
-          EOF
-          )
-
-          # Create the release. If it already exists (re-tag scenario),
-          # look up the existing release id by tag and reuse it.
-          CREATE=$(curl -sS -o /tmp/release.json -w "%{http_code}" \
-              -H "Authorization: token ${CB_TOKEN}" \
-              -H "Content-Type: application/json" \
-              -X POST "https://codeberg.org/api/v1/repos/${REPO}/releases" \
-              -d "$(jq -n --arg tag "$TAG" --arg name "Release $TAG" --arg body "$BODY" \
-                  '{tag_name:$tag, name:$name, body:$body, draft:false, prerelease:false}')")
-          if [ "$CREATE" = "201" ]; then
-              REL_ID=$(jq -r .id < /tmp/release.json)
-              echo "Created Codeberg release id=$REL_ID"
-          else
-              echo "Create returned $CREATE; looking up existing release by tag..."
-              curl -sS -H "Authorization: token ${CB_TOKEN}" \
-                  "https://codeberg.org/api/v1/repos/${REPO}/releases/tags/${TAG}" \
-                  > /tmp/release.json
-              REL_ID=$(jq -r .id < /tmp/release.json)
-              echo "Existing release id=$REL_ID"
-          fi
-
-          # Upload each asset.
-          for f in /tmp/release-assets-merged/*; do
-              name=$(basename "$f")
-              echo "Uploading $name..."
-              curl -sS -o /dev/null -w "  %{http_code}\n" \
-                  -H "Authorization: token ${CB_TOKEN}" \
-                  -X POST "https://codeberg.org/api/v1/repos/${REPO}/releases/${REL_ID}/assets?name=${name}" \
-                  -F "attachment=@${f}"
-          done
-
-          echo "Codeberg release: https://codeberg.org/${REPO}/releases/tag/${TAG}"
+            See [CHANGELOG.md](https://github.com/hecate-social/hecate-daemon/blob/main/CHANGELOG.md) for changes.

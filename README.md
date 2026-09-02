@@ -34,14 +34,14 @@ This installs the daemon, TUI, and Hecate Skills.
 
 ### Manual Install
 
-Download from [Releases](https://codeberg.org/hecate-social/hecate-daemon/releases):
+Download from [Releases](https://github.com/hecate-social/hecate-daemon/releases):
 
 ```bash
 # Linux (amd64)
-curl -fsSL https://codeberg.org/hecate-social/hecate-daemon/releases/latest/download/hecate-linux-amd64.tar.gz | tar xz -C ~/.local/bin
+curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/latest/download/hecate-linux-amd64.tar.gz | tar xz -C ~/.local/bin
 
 # macOS (arm64)
-curl -fsSL https://codeberg.org/hecate-social/hecate-daemon/releases/latest/download/hecate-darwin-arm64.tar.gz | tar xz -C ~/.local/bin
+curl -fsSL https://github.com/hecate-social/hecate-daemon/releases/latest/download/hecate-darwin-arm64.tar.gz | tar xz -C ~/.local/bin
 ```
 
 ### Build from Source
@@ -49,7 +49,7 @@ curl -fsSL https://codeberg.org/hecate-social/hecate-daemon/releases/latest/down
 Requires Erlang/OTP 27+ and rebar3:
 
 ```bash
-git clone https://codeberg.org/hecate-social/hecate-daemon
+git clone https://github.com/hecate-social/hecate-daemon
 cd hecate-daemon
 rebar3 release
 _build/default/rel/hecate/bin/hecate foreground
@@ -170,7 +170,7 @@ level = info
 ## Related Projects
 
 - [hecate-tui](https://github.com/hecate-social/hecate-tui) - Terminal UI
-- [hecate-install](https://codeberg.org/hecate-social/hecate-install) - Installer and Claude skills
+- [hecate-install](https://github.com/hecate-social/hecate-install) - Installer and Claude skills
 
 ## License
 
@@ -178,5 +178,5 @@ Apache 2.0 - See [LICENSE](LICENSE)
 
 ## Support
 
-- [Issues](https://codeberg.org/hecate-social/hecate-daemon/issues)
+- [Issues](https://github.com/hecate-social/hecate-daemon/issues)
 - [Buy Me a Coffee](https://buymeacoffee.com/rgfaber)

@@ -1,14 +1,14 @@
 name: Renovate
 
-# Self-hosted Renovate: runs on GitHub Actions (where CI already lives)
-# but operates against the canonical Codeberg repo. Keeps the `macula`
-# SDK family in lock-step with hex.pm and auto-merges the bump on green
-# (config lives in-repo: renovate.json5).
+# Self-hosted Renovate on GitHub Actions, against this repo. Keeps the
+# `macula` SDK family in lock-step with hex.pm and auto-merges the bump
+# on green (config lives in-repo: renovate.json5).
 #
-# Requires a repo Actions secret RENOVATE_TOKEN — a Codeberg personal
-# access token with read+write `repository`, `issue` and `pull request`
-# scopes for this repo, so Renovate can push the branch, open the PR,
-# and enable auto-merge.
+# Requires a repo Actions secret RENOVATE_TOKEN — a GitHub personal
+# access token with `repo` (contents, pull requests, workflows) scope
+# for this repo, so Renovate can push the branch, open the PR, and
+# enable auto-merge. The default GITHUB_TOKEN cannot be used: PRs it
+# opens never trigger the CI that auto-merge waits for.
 
 on:
   schedule:
@@ -35,11 +35,10 @@ jobs:
         with:
           token: ${{ secrets.RENOVATE_TOKEN }}
         env:
-          RENOVATE_PLATFORM: gitea
-          RENOVATE_ENDPOINT: https://codeberg.org
+          RENOVATE_PLATFORM: github
           RENOVATE_REPOSITORIES: hecate-social/hecate-daemon
           RENOVATE_AUTODISCOVER: "false"
           RENOVATE_ONBOARDING: "false"
           RENOVATE_REQUIRE_CONFIG: "required"
-          RENOVATE_GIT_AUTHOR: "Renovate Bot <renovate-bot@users.noreply.codeberg.org>"
+          RENOVATE_GIT_AUTHOR: "Renovate Bot <renovate-bot@users.noreply.github.com>"
           LOG_LEVEL: ${{ github.event.inputs.logLevel || 'info' }}

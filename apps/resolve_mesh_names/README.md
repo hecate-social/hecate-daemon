@@ -2,7 +2,7 @@
 
 Tier-1 mesh-native naming service. Exposes resolve / watch / describe / verify_trust_chain / backlinks over MRIs and signed records. Push-invalidated cache. Consumed by every Tier-2 wire bridge (`serve_dns_over_mesh`, future `serve_https_over_mesh` / `serve_mdns_over_mesh`, the daemon REST API, the TUI naming browser).
 
-**Status:** Phase 1 complete — the lookup pipeline, the 5-link trust chain, the 5-layer push-invalidated cache, the two cache-invalidation PMs, and watch subscriptions are all implemented; 83/83 CT green; and the whole path is verified live against the Macula mesh by `hecate-daemon/harness/run-live-dns-harness.sh` (`macula:put_record` → `find_record` round-trip → `resolve_mesh_names_api:resolve` with self-rooted station trust verification → L4/L5 cache → the two PMs subscribed to the live pool: all PASS). Plan: [PLAN_RESOLVE_MESH_NAMES_PART1](https://codeberg.org/macula-internal/macula-architecture/src/branch/main/plans/PLAN_RESOLVE_MESH_NAMES_PART1.md).
+**Status:** Phase 1 complete — the lookup pipeline, the 5-link trust chain, the 5-layer push-invalidated cache, the two cache-invalidation PMs, and watch subscriptions are all implemented; 83/83 CT green; and the whole path is verified live against the Macula mesh by `hecate-daemon/harness/run-live-dns-harness.sh` (`macula:put_record` → `find_record` round-trip → `resolve_mesh_names_api:resolve` with self-rooted station trust verification → L4/L5 cache → the two PMs subscribed to the live pool: all PASS). Plan: [PLAN_RESOLVE_MESH_NAMES_PART1](https://github.com/macula-io/macula-architecture/blob/main/plans/PLAN_RESOLVE_MESH_NAMES_PART1.md).
 
 What works today:
 

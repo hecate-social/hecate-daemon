@@ -74,7 +74,7 @@ Opinionated directory layout:
 │   │   └── hecate-tui/          # Code repo
 │   └── macula-io/
 │       └── macula/              # Code repo
-└── codeberg.org/
+└── github.com/
     └── ...
 ```
 

@@ -11,7 +11,7 @@
 #
 # Looks for macula-demo as a sibling checkout:
 #   <project-dir>/../../macula-internal/macula-demo
-# (the codeberg.org workspace layout). Override with MACULA_DEMO_DIR.
+# (the work/github.com workspace layout). Override with MACULA_DEMO_DIR.
 # Falls back to the current Greater-Leuven list if the topology file
 # isn't reachable (e.g. on a box where macula-demo isn't checked out).
 
